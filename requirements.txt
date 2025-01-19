@@ -8,7 +8,7 @@ networkx==3.3
 nltk==3.9.1
 numpy==1.26.4
 openai==1.55.3
-litellm==1.55.6
+litellm==1.40.1
 pydantic==2.9.0
 pydantic_core==2.23.2
 loguru==0.7.2 
