@@ -26,7 +26,7 @@ class LiteLLM(BaseLLM):
         
         # Set model and extract the company name
         self.model = self.config.model
-        company = self.model.split("/")[0]
+        company = self.model.split("/")[0] if "/" in self.model else "openai"
 
         # Set environment variables based on the company
         if company == "openai":
