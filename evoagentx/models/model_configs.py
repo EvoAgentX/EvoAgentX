@@ -10,7 +10,7 @@ from ..core.base_config import BaseConfig
 class LLMConfig(BaseConfig):
 
     llm_type: str
-    model: str 
+    model: str
 
 
 class OpenAILLMConfig(LLMConfig):
@@ -30,7 +30,7 @@ class OpenAILLMConfig(LLMConfig):
     # tools 
     tools: Optional[List] = Field(default=None, description="A list of tools the model may call. Currently, only functions are supported as a tool. Use this to provide a list of functions the model may generate JSON inputs for.")
     tool_choice: Optional[str] = Field(default=None, description="Controls which (if any) function is called by the model. none means the model will not call a function and instead generates a message. auto means the model can pick between generating a message or calling a function. Specifying a particular function via {\"type\": \"function\", \"function\": {\"name\": \"my_function\"}} forces the model to call that function.")
-    parallel_tool_calls: Optional[bool] = Field(default=None, description="Whether to enable parallel function calling during tool use. OpenAI default is true.")
+    parallel_tool_calls: Optional[bool] = Field(default=None, description="Whether to enable parallel function calling")
     
     # reasoning parameters 
     reasoning_effort: Optional[str] = Field(default=None, description="Constrains effort on reasoning for reasoning models. Currently supported values are low, medium, and high. Reducing reasoning effort can result in faster responses and fewer tokens used on reasoning in a response.")
@@ -50,6 +50,9 @@ class OpenAILLMConfig(LLMConfig):
 class LiteLLMConfig(LLMConfig):
 
     llm_type: str = "LiteLLM"
+    # LLM keys
+    openai_key: Optional[str] = Field(default=None, description="the API key used to authenticate OpenAI requests")
+    deepseek_key: Optional[str] = Field(default=None, description="the API key used to authenticate Deepseek requests")
 
     # generation parameters 
     temperature: Optional[float] = Field(default=None, description="the temperature used to scaling logits")
@@ -73,7 +76,9 @@ class LiteLLMConfig(LLMConfig):
     # output format
     response_format: Optional[Union[BaseModel, dict]] = Field(default=None, description=" An object specifying the format that the model must output.")
 
+    def __str__(self):
+        return self.model
+
 
 def get_default_device():
     return "cuda" if torch.cuda.is_available() else "cpu"
-
