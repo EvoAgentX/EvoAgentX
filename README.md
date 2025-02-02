@@ -1,5 +1,5 @@
 
-# EvoAgentX 
+# EvoAgentX [Dev]
 an automatic agentic workflow generation and evolving framework. 
 
 
