@@ -70,7 +70,8 @@ class OpenAILLM(BaseLLM):
 
         try:
             completion_params = self.get_completion_params(**kwargs)
-            response = self._client.chat.completions.create(messages=messages, **completion_params)
+            response = self._client.chat.completions.create(messages=messages, 
+                                                            **completion_params)
             if stream:
                 output = self.get_stream_output(response, output_response=output_response)
             else:
@@ -78,6 +79,9 @@ class OpenAILLM(BaseLLM):
                 if output_response:
                     print(output)
         except Exception as e:
+            if "account balance is insufficient" in str(e):
+                print("Warning: Account balance insufficient. Please recharge your account.")
+                return ""
             raise RuntimeError(f"Error during single_generate of OpenAILLM: {str(e)}")
         
         return output
