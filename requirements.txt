@@ -14,8 +14,8 @@ pydantic==2.9.0
 pydantic_core==2.23.2
 loguru==0.7.2 
 --extra-index-url https://download.pytorch.org/whl/cu118
-torch==2.2.1 
-torchvision==0.17.1 
-torchaudio==2.2.1
+# torch==2.2.1 
+# torchvision==0.17.1 
+# torchaudio==2.2.1
 transformers==4.44.2
 faiss-cpu==1.8.0.post1
