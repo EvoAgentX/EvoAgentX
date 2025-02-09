@@ -18,8 +18,8 @@ class BaseConfig(BaseModule):
         config_params.remove("class_name")
         return config_params
 
-    def get_set_params(self, ignore: List[str] = []):
-        explicitly_set_fields = {field: getattr(self, field) for field in self.__fields_set__}
+    def get_set_params(self, ignore: List[str] = []) -> dict:
+        explicitly_set_fields = {field: getattr(self, field) for field in self.model_fields_set}
         if self.kwargs:
             explicitly_set_fields.update(self.kwargs)
         for field in ignore:

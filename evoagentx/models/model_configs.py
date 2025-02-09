@@ -55,6 +55,7 @@ class LiteLLMConfig(LLMConfig):
 
     # LLM keys
     openai_key: Optional[str] = Field(default=None, description="the API key used to authenticate OpenAI requests")
+    anthropic_key: Optional[str] = Field(default=None, description="the API key used to authenticate Anthropic requests")
     deepseek_key: Optional[str] = Field(default=None, description="the API key used to authenticate Deepseek requests")
 
     # generation parameters 

@@ -86,7 +86,8 @@ class Message(BaseModule):
             messages (List[Message]): the messages to be sorted. 
             reverse (bool): If True, sort the messages in descending order. Otherwise, sort the messages in ascending order.
         """
-        return sorted(messages, key=lambda msg: datetime.strptime(msg.timestamp, "%Y-%m-%d %H:%M:%S"), reverse=reverse)
+        messages.sort(key=lambda msg: datetime.strptime(msg.timestamp, "%Y-%m-%d %H:%M:%S"), reverse=reverse)
+        return messages
 
     @classmethod
     def sort(cls, messages: List['Message'], key: Optional[Callable[['Message'], Any]] = None, reverse: bool = False) -> List['Message']:
@@ -100,7 +101,8 @@ class Message(BaseModule):
         """
         if key is None:
             return cls.sort_by_timestamp(messages, reverse=reverse)
-        return sorted(messages, key=key, reverse=reverse)
+        messages.sort(key=key, reverse=reverse)
+        return messages
 
     @classmethod
     def merge(cls, messages: List[List['Message']], sort: bool=False, key: Optional[Callable[['Message'], Any]] = None, reverse: bool=False) -> List['Message']:

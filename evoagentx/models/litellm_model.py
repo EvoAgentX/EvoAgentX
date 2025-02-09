@@ -31,16 +31,20 @@ class LiteLLM(OpenAILLM):
         # Set environment variables based on the company
         if company == "openai":
             if not self.config.openai_key:
-                raise ValueError("OpenAI API key is required for OpenAI models")
+                raise ValueError("OpenAI API key is required for OpenAI models. You should set `openai_key` in LiteLLMConfig")
             os.environ["OPENAI_API_KEY"] = self.config.openai_key
         elif company == "deepseek":
             if not self.config.deepseek_key:
-                raise ValueError("DeepSeek API key is required for DeepSeek models")
+                raise ValueError("DeepSeek API key is required for DeepSeek models. You should set `deepseek_key` in LiteLLMConfig")
             os.environ["DEEPSEEK_API_KEY"] = self.config.deepseek_key
+        elif company == "anthropic":
+            if not self.config.anthropic_key:
+                raise ValueError("Anthropic API key is required for Anthropic models. You should set `anthropic_key` in LiteLLMConfig")
+            os.environ["ANTHROPIC_API_KEY"] = self.config.anthropic_key
         else:
             raise ValueError(f"Unsupported company: {company}")
 
-        self._default_ignore_fields = ["llm_type", "output_response", "openai_key", "deepseek_key"] # parameters in LiteLLMConfig that are not LiteLLM models' input parameters
+        self._default_ignore_fields = ["llm_type", "output_response", "openai_key", "deepseek_key", "anthropic_key"] # parameters in LiteLLMConfig that are not LiteLLM models' input parameters
 
     @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(5))
     def single_generate(self, messages: List[dict], **kwargs) -> str:
@@ -59,10 +63,11 @@ class LiteLLM(OpenAILLM):
             response = completion(messages=messages, **completion_params)
             if stream:
                 output = self.get_stream_output(response, output_response=output_response)
+                cost = self._stream_cost(messages=messages, output=output)
             else:
-                output: str = response.choices[0].message.content
-                if output_response:
-                    print(output)
+                output: str = self.get_completion_output(response=response, output_response=output_response)
+                cost = self._completion_cost(response=response)
+            self._update_cost(cost=cost)
         except Exception as e:
             raise RuntimeError(f"Error during single_generate: {str(e)}")
         

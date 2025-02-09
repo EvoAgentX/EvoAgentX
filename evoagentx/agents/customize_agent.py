@@ -65,7 +65,8 @@ class CustomizeAgent(Agent):
     
     def create_customize_action(self, name: str, desc: str, prompt: str, inputs: List[dict], outputs: List[dict]) -> Action:
 
-        assert prompt is None, "must provide `prompt` when creating CustomizeAgent"
+        assert prompt is not None, "must provide `prompt` when creating CustomizeAgent"
+
         action_input_fields = {}
         for field in inputs:
             action_input_fields[field["name"]] = (str, Field(description=field["description"]))

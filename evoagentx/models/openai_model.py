@@ -4,10 +4,13 @@ from tenacity import (
     wait_random_exponential,
 )
 from openai import OpenAI, Stream 
+from openai.types.chat import ChatCompletion
 from typing import Optional, List
+from litellm import token_counter, cost_per_token
 from ..core.registry import register_model
 from .model_configs import OpenAILLMConfig
 from .base_model import BaseLLM
+from .model_utils import Cost, cost_manager, get_openai_model_cost 
 
 
 @register_model(config_cls=OpenAILLMConfig, alias=["openai_llm"])
@@ -16,7 +19,9 @@ class OpenAILLM(BaseLLM):
     def init_model(self):
         config: OpenAILLMConfig = self.config
         self._client = OpenAI(api_key=config.openai_key)
-        self._default_ignore_fields = ["llm_type", "openai_key", "output_response"] # parameters in OpenAILLMConfig that are not OpenAI models' input parameters 
+        self._default_ignore_fields = ["llm_type", "output_response", "openai_key", "deepseek_key", "anthropic_key"] # parameters in OpenAILLMConfig that are not OpenAI models' input parameters 
+        if self.config.model not in get_openai_model_cost():
+            raise KeyError(f"'{self.config.model}' is not a valid OpenAI model name!")
 
     def formulate_messages(self, prompts: List[str], system_messages: Optional[List[str]] = None) -> List[List[dict]]:
         
@@ -62,6 +67,12 @@ class OpenAILLM(BaseLLM):
             print("")
         return output
 
+    def get_completion_output(self, response: ChatCompletion, output_response: bool=True) -> str:
+        output = response.choices[0].message.content
+        if output_response:
+            print(output)
+        return output
+
     @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(5))
     def single_generate(self, messages: List[dict], **kwargs) -> str:
 
@@ -74,10 +85,11 @@ class OpenAILLM(BaseLLM):
                                                             **completion_params)
             if stream:
                 output = self.get_stream_output(response, output_response=output_response)
+                cost = self._stream_cost(messages=messages, output=output)
             else:
-                output: str = response.choices[0].message.content
-                if output_response:
-                    print(output)
+                output: str = self.get_completion_output(response=response, output_response=output_response)
+                cost = self._completion_cost(response) # calculate completion cost
+            self._update_cost(cost=cost)
         except Exception as e:
             if "account balance is insufficient" in str(e):
                 print("Warning: Account balance insufficient. Please recharge your account.")
@@ -88,4 +100,28 @@ class OpenAILLM(BaseLLM):
         
     def batch_generate(self, batch_messages: List[List[dict]], **kwargs) -> List[str]:
         return [self.single_generate(messages=one_messages, **kwargs) for one_messages in batch_messages]
+    
+    def _completion_cost(self, response: ChatCompletion) -> Cost:
+        input_tokens = response.usage.prompt_tokens
+        output_tokens = response.usage.completion_tokens
+        return self._compute_cost(input_tokens=input_tokens, output_tokens=output_tokens)
+
+    def _stream_cost(self, messages: List[dict], output: str) -> Cost:
+        model: str = self.config.model
+        input_tokens = token_counter(model=model, messages=messages)
+        output_tokens = token_counter(model=model, text=output)
+        return self._compute_cost(input_tokens=input_tokens, output_tokens=output_tokens)
+    
+    def _compute_cost(self, input_tokens: int, output_tokens: int) -> Cost:
+        # use LiteLLM to compute cost, require the model name to be a valid model name in LiteLLM.
+        input_cost, output_cost = cost_per_token(
+            model=self.config.model, 
+            prompt_tokens=input_tokens, 
+            completion_tokens=output_tokens, 
+        )
+        cost = Cost(input_tokens=input_tokens, output_tokens=output_tokens, input_cost=input_cost, output_cost=output_cost)
+        return cost
+    
+    def _update_cost(self, cost: Cost):
+        cost_manager.update_cost(cost=cost, model=self.config.model)
     

@@ -101,14 +101,14 @@ Define the agent's output explicitly in JSON format. The output variables should
 5.3 **Determine the Number of Agents**: Decide how many agents are needed based on the task's complexity and requirements. 
 - **Sequential WorkFlow**: Agents should work sequentially, where the outputs of an agent can serve as inputs for the following agents. 
 - **Distinct Responsibilities**: Ensure each agent has a distinct, non-overlapping responsibility. 
-- **Input and Output Coverage**:
-    - Ensure that **all inputs** defined in the task are used by at least on created agent. 
-    - Ensure that **all outputs** defined in the task can be derived from the outputs of the created agents.
 5.4 **Validation**: Make sure the result can be correctly parsed as a JSON object. Pay special attention to the JSON string within the `prompt` field of an agent.
 
 
 ### Notes:
 - Use concise, meaningful names for agents, inputs, and outputs. 
+- Ensure that ALL `inputs` defined in the sub-task are used by at least on created agent. 
+- Ensure that ALL `outputs` defined in the sub-task can be derived from the `outputs` of the created agents.
+- Ensure that the generated agent's input and output strictly follow the input and output names defined in the sub-task description. Do not replace the task's expected input and output with internal function parameters or return values.  
 - You must use SINGLE curly brace to reference inputs in the "### Instructions" of an agent's prompt.
 - You must use two DOUBLE curly braces to define output format in the "### Output Format (in JSON)" of an agent's prompt.
 

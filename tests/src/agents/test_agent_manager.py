@@ -53,6 +53,7 @@ class TestModule(unittest.TestCase):
             {
                 "name": "custom_agent", 
                 "description": "custom_agent_desc", 
+                "prompt": "customize prompt", 
                 "is_human": True
             }
         )

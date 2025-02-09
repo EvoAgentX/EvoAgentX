@@ -220,5 +220,5 @@ class BaseLLM(ABC):
         return output
 
 
-__all__ = ["LLMConfig", "BaseLLM"]
+__all__ = ["LLMConfig", "BaseLLM", "LLMOutputParser"]
 
