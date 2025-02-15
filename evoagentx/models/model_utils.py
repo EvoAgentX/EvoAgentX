@@ -16,11 +16,12 @@ def get_openai_model_cost() -> dict:
 
 @dataclass
 class Cost:
-    input_tokens: int 
-    output_tokens: int
-    input_cost: float 
-    output_cost: float
-
+    input_tokens: int = 0
+    output_tokens: int = 0
+    input_cost: float = 0.0
+    output_cost: float = 0.0
+    total_cost: float = 0.0
+    total_tokens: int = 0
 
 class CostManager:
 
@@ -59,6 +60,19 @@ class CostManager:
         
         total_tokens, total_cost = self.compute_total_cost()
         logger.info(f"Total cost: ${total_cost:.3f} | Total tokens: {total_tokens} | Current cost: ${current_total_cost:.3f} | Current tokens: {current_total_tokens}")
+
+
+    @atomic_method
+    def update_siliconflow_cost(self, cost: Cost, model: str):
+        # logger.info(f"cost: {cost}")
+        self.total_tokens[model] = self.total_tokens.get(model, 0) + cost.total_tokens
+        self.total_cost[model] = self.total_cost.get(model, 0.0) + cost.total_cost
+        
+        current_total_cost = cost.total_cost
+        current_total_tokens = cost.total_tokens
+        
+        logger.info(f"Total cost: ${self.total_cost[model]:.8f} | Total tokens: {self.total_tokens[model]} | Current cost: ${current_total_cost:.8f} | Current tokens: {current_total_tokens}")
+
 
     def display_cost(self):
 

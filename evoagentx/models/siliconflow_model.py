@@ -9,6 +9,10 @@ from .openai_model import OpenAILLM
 from .model_configs import SiliconFlowConfig
 from ..core.registry import register_model
 from openai import OpenAI, Stream
+from loguru import logger
+from .model_utils import Cost, cost_manager
+from openai.types.chat import ChatCompletion
+from .siliconflow_model_cost import model_cost
 
 @register_model(config_cls=SiliconFlowConfig, alias=["siliconflow"])
 class SiliconFlow(OpenAILLM):
@@ -31,14 +35,19 @@ class SiliconFlow(OpenAILLM):
                 messages=messages, 
                 **completion_params
             )
+            # logger.info(f"response: {response}")
             
             if stream:
                 output = self.get_stream_output(response, output_response=output_response)
+                cost = self._completion_cost(self.response)      
             else:
                 output: str = response.choices[0].message.content
-                self.response = response
+                cost = self._completion_cost(response)
+
+                # self.response = response
                 if output_response:
                     print(output)
+            self._update_cost(cost=cost)
         except Exception as e:
             if "account balance is insufficient" in str(e):
                 print("Warning: Account balance insufficient. Please recharge your account.")
@@ -47,15 +56,35 @@ class SiliconFlow(OpenAILLM):
         
         return output
     
+    
+    def _completion_cost(self, response: ChatCompletion) -> Cost:
+        input_tokens = response.usage.prompt_tokens
+        output_tokens = response.usage.completion_tokens
+        return self._compute_cost(input_tokens=input_tokens, output_tokens=output_tokens)
+    
+    
+    def _compute_cost(self, input_tokens: int, output_tokens: int) -> Cost:
+        model: str = self.config.model
+        total_tokens = input_tokens + output_tokens
+        if model not in model_cost:
+            return Cost(input_tokens=input_tokens, output_tokens=output_tokens, total_cost=0.0)
+        
+        if "token_cost" in model_cost[model]:
+            total_cost = total_tokens * model_cost[model]["token_cost"] / 1e6
+        else:
+            total_cost = input_tokens * model_cost[model]["input_token_cost"] / 1e6 + output_tokens * model_cost[model]["output_token_cost"] / 1e6
+        return Cost(input_tokens=input_tokens, output_tokens=output_tokens, total_cost=total_cost, total_tokens=total_tokens)
+    
+    
     def get_cost(self) -> dict:
         cost_info = {}
         try:
             tokens = self.response.usage
             if tokens.prompt_tokens == -1:
                 cost_info["note"] = "Token counts not available in stream mode"
-                cost_info["prompt_tokens"] = "N/A"
-                cost_info["completion_tokens"] = "N/A" 
-                cost_info["total_tokens"] = "N/A"
+                cost_info["prompt_tokens"] = 0
+                cost_info["completion_tokens"] = 0
+                cost_info["total_tokens"] = 0
             else:
                 cost_info["prompt_tokens"] = tokens.prompt_tokens
                 cost_info["completion_tokens"] = tokens.completion_tokens
@@ -94,3 +123,6 @@ class SiliconFlow(OpenAILLM):
             })
         
         return output
+    
+    def _update_cost(self, cost: Cost):
+        cost_manager.update_siliconflow_cost(cost=cost, model=self.config.model)
