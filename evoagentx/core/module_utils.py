@@ -130,6 +130,21 @@ def parse_json_from_text(text: str) -> List[str]:
     matches = [escape_json_values(match) for match in matches]
     return matches
 
+def parse_json_from_llm_output(text: str) -> dict:
+    """
+    Extract JSON str from LLM outputs and convert it to dict. 
+    """
+    json_list = parse_json_from_text(text=text)
+    if json_list:
+        json_text = json_list[0]
+        try:
+            data = yaml.safe_load(json_text)
+        except Exception:
+            raise ValueError(f"The following generated text is not a valid JSON string!\n{json_text}")
+    else:
+        raise ValueError(f"The follwoing generated text does not contain JSON string!\n{text}")
+    return data
+
 def extract_code_blocks(text):
 
     # Regular expression to match code blocks enclosed in triple backticks

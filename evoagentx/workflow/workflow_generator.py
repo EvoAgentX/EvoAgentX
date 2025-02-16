@@ -2,8 +2,9 @@ import json
 from typing import Optional, List
 from pydantic import Field, PositiveInt 
 
+from ..core.logging import logger
 from ..core.module import BaseModule
-from ..core.base_config import Parameter
+# from ..core.base_config import Parameter
 from ..core.message import Message, MessageType
 from ..models.base_model import BaseLLM
 from ..agents.agent import Agent
@@ -45,9 +46,12 @@ class WorkFlowGenerator(BaseModule):
 
         plan_history, plan_suggestion = "", ""
         # generate the initial workflow
+        logger.info(f"Generating a workflow for: {goal} ...")
         plan = self.generate_plan(goal=goal, history=plan_history, suggestion=plan_suggestion)
         workflow = self.build_workflow_from_plan(goal=goal, plan=plan)
+        logger.info(f"Successfully generate the following workflow:\n{workflow.get_workflow_description()}")
         # generate / assigns the initial agents
+        logger.info("Generating agents for the workflow ...")
         workflow = self.generate_agents(goal=goal, workflow=workflow, existing_agents=existing_agents)
         return workflow
     
@@ -75,13 +79,14 @@ class WorkFlowGenerator(BaseModule):
     ) -> WorkFlowGraph:
         
         agent_generator: AgentGenerator = self.agent_generator
-        workflow_desc = self.get_workflow_description(workflow=workflow)
+        workflow_desc = workflow.get_workflow_description()
         agent_generation_action_name = agent_generator.agent_generation_action_name
         for subtask in workflow.nodes:
             subtask_fields = ["name", "description", "reason", "inputs", "outputs"]
             subtask_data = {key: value for key, value in subtask.to_dict(ignore=["class_name"]).items() if key in subtask_fields}
             subtask_desc = json.dumps(subtask_data, indent=4)
             agent_generation_action_data = {"goal": goal, "workflow": workflow_desc, "task": subtask_desc}
+            logger.info(f"Generating agents for subtask: {subtask_data['name']}")
             agents: AgentGenerationOutput = agent_generator.execute(
                 action_name=agent_generation_action_name, 
                 action_input_data=agent_generation_action_data,
@@ -114,21 +119,3 @@ class WorkFlowGenerator(BaseModule):
         workflow = WorkFlowGraph(goal=goal, nodes=nodes, edges=edges)
         return workflow
     
-    def get_workflow_description(self, workflow: WorkFlowGraph) -> str:
-
-        def format_parameters(params: List[Parameter]) -> str:
-            if not params:
-                return "None"
-            return "\n".join(f"  - {param.name} ({param.type}): {param.description}" for param in params)
-        
-        subtask_texts = [] 
-        for node in workflow.nodes:
-            text = (
-                f"Task Name: {node.name}\n"
-                f"Description: {node.description}\n"
-                f"Inputs:\n{format_parameters(node.inputs)}\n"
-                f"Outputs:\n{format_parameters(node.outputs)}"
-            )
-            subtask_texts.append(text)
-        workflow_desc = "\n\n".join(subtask_texts)
-        return workflow_desc

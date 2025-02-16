@@ -13,6 +13,7 @@ class MessageType(Enum):
     COMMAND = "command"
     ERROR = "error"
     UNKNOWN = "unknown"
+    INPUT = "input"
 
 
 class Message(BaseModule):

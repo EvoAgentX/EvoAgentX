@@ -150,6 +150,21 @@ class Agent(BaseModule):
         cext_action = self.get_action(self.cext_action_name)
         action_inputs = cext_action.execute(llm=self.llm, action=action, context=context)
         return action_inputs
+    
+    def get_all_actions(self) -> List[Action]:
+        actions = [action for action in self.actions if action.name != self.cext_action_name]
+        return actions
+    
+    def get_agent_profile(self, action_names: List[str] = None) -> str:
+        all_actions = self.get_all_actions()
+        if action_names is None:
+            # if `action_names` is None, return description of all actions 
+            action_descriptions = "\n".join([f"  - {action.name}: {action.description}" for action in all_actions])
+        else: 
+            # otherwise, only return description of actions that matches `action_names`
+            action_descriptions = "\n".join([f"  - {action.name}: {action.description}" for action in all_actions if action.name in action_names])
+        profile = f"Agent Name: {self.name}\nDescription: {self.description}\nAvailable Actions:\n{action_descriptions}"
+        return profile
 
     def clear_short_term_memory(self):
         """

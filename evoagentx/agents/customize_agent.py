@@ -3,10 +3,76 @@ from pydantic import create_model, Field
 from typing import Union, Optional, List
 
 from .agent import Agent
-from ..models.base_model import BaseLLM
+from ..core.logging import logger
+from ..core.module_utils import parse_json_from_llm_output
+from ..models.base_model import BaseLLM, LLMOutputParser
 from ..prompts.utils import DEFAULT_SYSTEM_PROMPT
 from ..actions.action import Action, ActionInput, ActionOutput
 from ..utils.utils import generate_dynamic_class_name
+
+OUTPUT_EXTRACTION_PROMPT = """
+You are given the following text:
+{text}
+
+Within this text, there are specific outputs we want to extract. Please locate and extract the content for each of the following outputs:
+{output_description}
+
+**Instructions:**
+1. Read through the provided text carefully.
+2. For each of the listed output names, extract the corresponding content from the text. 
+3. Return your findings in a single JSON object, where the JSON keys **exactly match** the output names given above.
+4. If you cannot find content for an output, set its value to an empty string ("") or `null`.
+5. Do not include any additional keys in the JSON. 
+6. Your final output should be valid JSON and should not include any explanatory text.
+
+**Example JSON format:**
+{{
+  "<OUTPUT_NAME_1>": "Extracted content here",
+  "<OUTPUT_NAME_2>": "Extracted content here",
+  "<OUTPUT_NAME_3>": "Extracted content here"
+}}
+
+Now, based on the text and the instructions above, provide your final JSON output.
+"""
+
+@classmethod
+def customize_get_content_data(cls, content: str, **kwargs) -> dict:
+    """
+    parse the LLM generated data to a dict, only valid when the data of all attrs is continuous in the `content`.
+    """
+    attrs: List[str] = cls.get_attrs()
+    if not attrs:
+        return {}
+    output_titles = [f"## {attr}" for attr in attrs]
+
+    def is_output_title(text: str):
+        return any(text.strip().startswith(title) for title in output_titles)
+
+    data = {}
+    current_output_name: str = None
+    current_output_content: list = None
+    for line in content.split("\n"):
+        if is_output_title(line):
+            if current_output_name is not None and current_output_content is not None:
+                data[current_output_name] = "\n".join(current_output_content)
+            current_output_content = []
+            current_output_name = line.replace("#", "").strip()
+        else: 
+            if current_output_content is not None:
+                current_output_content.append(line)
+    if current_output_name is not None and current_output_content is not None:
+        data[current_output_name] = "\n".join(current_output_content)
+    return data
+
+
+def customize_to_str(self) -> str:
+    
+    data: dict = self.get_structured_data()
+    outputs = [] 
+    for key, value in data.items():
+        outputs.append("### {}\n{}".format(key, value))
+    return "\n\n".join(outputs)
+
 
 def customize_action_execute(self, llm: Optional[BaseLLM] = None, inputs: Optional[dict] = None, sys_msg: Optional[str]=None, return_prompt: bool = False, **kwargs) -> ActionOutput:
 
@@ -22,7 +88,21 @@ def customize_action_execute(self, llm: Optional[BaseLLM] = None, inputs: Option
         else:
             raise TypeError(f"The input type {type(value)} to `customize_action_execute` is invalid!")
     prompt = self.prompt.format(**prompt_params_values)
-    output = llm.generate(prompt=prompt, system_message=sys_msg, parser=self.outputs_format)
+    # output = llm.generate(prompt=prompt, system_message=sys_msg, parser=self.outputs_format)
+    llm_output: LLMOutputParser = llm.generate(prompt=prompt, system_message=sys_msg)
+    try:
+        output = self.outputs_format.parse(llm_output.content)
+    except Exception:
+        logger.warning(f"Couldn't automatically extract output data for '{self.name}'. Use LLM to extract output data ...")
+        attr_descriptions: dict = self.outputs_format.get_attr_descriptions()
+        output_description_list = [] 
+        for i, (name, desc) in enumerate(attr_descriptions.items()):
+            output_description_list.append(f"{i+1}. {name}\nDescription: {desc}")
+        output_description = "\n\n".join(output_description_list)
+        extraction_prompt = OUTPUT_EXTRACTION_PROMPT.format(text=llm_output.content, output_description=output_description)
+        llm_extracted_output: LLMOutputParser = llm.generate(prompt=extraction_prompt)
+        llm_extracted_data: dict = parse_json_from_llm_output(llm_extracted_output.content)
+        output = self.outputs_format.from_dict(llm_extracted_data)
 
     if return_prompt:
         return output, prompt
@@ -81,7 +161,9 @@ class CustomizeAgent(Agent):
         action_output_type = create_model(
             generate_dynamic_class_name(name+" ActionOutput"),
             **action_output_fields, 
-            __base__=ActionOutput
+            __base__=ActionOutput,
+            get_content_data=customize_get_content_data,
+            to_str=customize_to_str
         )
 
         customize_action_cls = create_model(
@@ -90,7 +172,7 @@ class CustomizeAgent(Agent):
             execute=customize_action_execute
         )
         customize_action = customize_action_cls(
-            name = name,
+            name = generate_dynamic_class_name(name+" Action"),
             description=desc, 
             prompt=prompt, 
             inputs_format=action_input_type, 

@@ -1,5 +1,7 @@
 import os 
 import re 
+import regex
+# import string
 from typing import Union, Any, List, Set
 
 from ..core.logging import logger
@@ -26,3 +28,21 @@ def generate_dynamic_class_name(base_name: str) -> str:
     class_name = ''.join(x.capitalize() for x in components)
 
     return class_name if class_name else 'DefaultClassName'
+
+def normalize_text(s: str) -> str:
+
+    def remove_articles(text):
+        return regex.sub(r'\b(a|an|the)\b', ' ', text)
+
+    def white_space_fix(text):
+        return ' '.join(text.split())
+
+    def remove_punc(text):
+        return text.replace("_", " ")
+        # exclude = set(string.punctuation)
+        # return ''.join(ch for ch in text if ch not in exclude)
+
+    def lower(text):
+        return text.lower()
+
+    return white_space_fix(remove_articles(remove_punc(lower(s))))

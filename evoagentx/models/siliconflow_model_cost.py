@@ -36,9 +36,12 @@ model_cost = {
     "Qwen/Qwen2.5-Coder-32B-Instruct": {
         "token_cost": 1.26
     },
+<<<<<<< HEAD
     "Qwen/Qwen2.5-Coder-32B-Instruct": {
         "token_cost": 1.26
     },
+=======
+>>>>>>> origin/main
     "Qwen/Qwen2-VL-72B-Instruct": {
         "token_cost": 4.13
     },
