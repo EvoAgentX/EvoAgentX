@@ -1,3 +1,4 @@
+from time import sleep
 from pydantic import Field
 from typing import Optional
 from ..core.logging import logger
@@ -5,6 +6,7 @@ from ..core.module import BaseModule
 from ..core.message import Message, MessageType
 from ..core.module_utils import generate_id
 from ..models.base_model import BaseLLM, LLMOutputParser
+from ..agents.agent import Agent
 from ..agents.agent_manager import AgentManager, AgentState
 from ..storages.base import StorageHandler
 from .environment import Environment, TrajectoryState
@@ -33,7 +35,7 @@ class WorkFlow(BaseModule):
                 raise ValueError("Must provide `llm` when `workflow_manager` is None")
             self.workflow_manager = WorkFlowManager(llm=self.llm)
 
-    def execute(self, **kwargs):
+    def execute(self, **kwargs) -> str:
         """
         Execute the workflow in a loop:
             - Check whether the workflow is completed. If the workflow is completed or there is failed task, stop execution.
@@ -75,6 +77,11 @@ class WorkFlow(BaseModule):
         
         if failed:
             logger.error(error_message.content)
+            return "Workflow Execution Failed"
+        
+        logger.info("Extracting WorkFlow Output ...")
+        output: str = self.workflow_manager.extract_output(graph=self.graph, env=self.environment)
+        return output
     
     def get_next_task(self) -> WorkFlowNode:
         task_execution_history = " -> ".join(self.environment.task_execution_history)
@@ -94,7 +101,9 @@ class WorkFlow(BaseModule):
             env=self.environment
         )
         while next_action:
-            agent = self.agent_manager.get_agent(agent_name=next_action.agent)
+            agent: Agent = self.agent_manager.get_agent(agent_name=next_action.agent)
+            while self.agent_manager.get_agent_state(agent_name=agent.name) != AgentState.AVAILABLE:
+                sleep(5)
             self.agent_manager.set_agent_state(agent_name=next_action.agent, new_state=AgentState.RUNNING)
             message = agent.execute(
                 action_name=next_action.action,

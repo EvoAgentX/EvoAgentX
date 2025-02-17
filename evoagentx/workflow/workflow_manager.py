@@ -7,12 +7,16 @@ from ..core.module import BaseModule
 # from ..core.base_config import Parameter
 from ..core.message import Message, MessageType
 from ..models.base_model import BaseLLM, LLMOutputParser
-from ..prompts.workflow_manager import DEFAULT_TASK_SCHEDULER, DEFAULT_ACTION_SCHEDULER
 # from ..agents.agent import Agent
 from ..actions.action import Action
 from ..agents.agent_manager import AgentManager
 from .environment import Environment, TrajectoryState
 from .workflow_graph import WorkFlowNode, WorkFlowGraph
+from ..prompts.workflow_manager import (
+    DEFAULT_TASK_SCHEDULER, 
+    DEFAULT_ACTION_SCHEDULER, 
+    OUTPUT_EXTRACTION_PROMPT
+)
 
 
 class Scheduler(Action):
@@ -271,6 +275,26 @@ class WorkFlowManager(BaseModule):
         )
         env.update(message=message, state=TrajectoryState.COMPLETED)
         return next_action
+    
+    def extract_output(self, graph: WorkFlowGraph, env: Environment, **kwargs) -> str:
+
+        # obtain the output for end tasks
+        end_tasks = graph.find_end_nodes()
+        end_task_predecesssors = sum([graph.get_node_predecessors(node=end_task) for end_task in end_tasks], [])
+        candidate_taks_with_output = list(set(end_tasks)|set(end_task_predecesssors))
+        candidate_msgs_with_output = [] 
+        for task in candidate_taks_with_output:
+            # only task the final output of the task
+            candidate_msgs_with_output.extend(env.get_task_messages(tasks=task, n=1))
+        candidate_msgs_with_output = Message.sort_by_timestamp(messages=candidate_msgs_with_output)
+
+        prompt = OUTPUT_EXTRACTION_PROMPT.format(
+            goal=graph.goal, 
+            workflow_graph_representation=graph.get_workflow_description(), 
+            workflow_execution_results="\n\n".join([str(msg) for msg in candidate_msgs_with_output]), 
+        )
+        llm_output: LLMOutputParser = self.llm.generate(prompt=prompt)
+        return llm_output.content
 
     def save_module(self, path: str, ignore: List[str] = [], **kwargs)-> str:
         ignore_fields = self._save_ignore_fields + ignore

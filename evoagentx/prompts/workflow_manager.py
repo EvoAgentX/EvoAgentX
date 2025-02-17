@@ -120,3 +120,35 @@ DEFAULT_ACTION_SCHEDULER = {
     "description": DEFAULT_ACTION_SCHEDULER_DESC, 
     "prompt": DEFAULT_ACTION_SCHEDULER_PROMPT
 }
+
+
+OUTPUT_EXTRACTION_PROMPT = """
+### Objective 
+Your goal is to read the Workflow Goal, the WorkFlow Information, and the WorkFlow Execution Results from the provided input. Then, based on those details, extract and present ONLY the FINAL output data that meets the Workflow Goal.
+
+### Instructions 
+1. Carefully analyze the Workflow Goal to understand the specific objective.
+2. Review the WorkFlow Information (including the workflow graph and any steps or dependencies) to see how tasks are organized or connected.
+3. Inspect the WorkFlow Execution Results to determine which parts directly contribute to the final required output.
+4. Ignore any information that does not help fulfill the stated Workflow Goal (such as intermediate debug logs, partial results not relevant to the final outcome, or any extraneous details).
+5. Provide your extracted final output in a concise and clear form that directly meets the Workflow Goal.
+
+### Note
+1. If you need to extract generated code, DO NOT change the provided code. 
+
+--- 
+lets' begin 
+
+Here is your information for extracting the workflow output: 
+
+### Workflow Goal:
+{goal}
+
+### WorkFlow Information:
+{workflow_graph_representation}
+
+### WorkFlow Execution Results:
+{workflow_execution_results}
+
+Now, based on the workflow information and execution results, provide your extracted output.
+"""
