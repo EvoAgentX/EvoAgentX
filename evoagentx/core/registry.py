@@ -5,11 +5,11 @@ class ModuleRegistry:
     def __init__(self):
         self.module_dict = {}
     
-    def register_module(self, cls_name: str, cls):
-        if cls_name in self.module_dict:
-            raise ValueError(f"Found duplicate module: `{cls_name}`!")
+    def register_module(self, cls_name: str, cls, force: bool=False):
+        if cls_name in self.module_dict and not force:
+            return self.module_dict[cls_name]
         self.module_dict[cls_name] = cls 
-    
+        return cls 
     def get_module(self, cls_name: str):
         if cls_name not in self.module_dict:
             raise ValueError(f"module `{cls_name}` not Found!")
