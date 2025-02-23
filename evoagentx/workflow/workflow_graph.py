@@ -11,6 +11,7 @@ from ..core.logging import logger
 from ..core.module import BaseModule
 from ..core.base_config import Parameter
 from ..core.decorators import atomic_method
+from .action_graph import ActionGraph
 
 
 class WorkFlowNodeState(str, Enum):
@@ -28,6 +29,7 @@ class WorkFlowNode(BaseModule):
     outputs: List[Parameter] # outputs of the task
     reason: Optional[str] = None
     agents: Optional[List[Union[str, dict]]] = None
+    action_graph: Optional[ActionGraph] = None
     status: Optional[WorkFlowNodeState] = WorkFlowNodeState.PENDING
 
     @field_validator('agents')
@@ -744,7 +746,7 @@ class WorkFlowGraph(BaseModule):
         
         def format_parameters(params: List[Parameter]) -> str:
             if not params:
-                return "None"
+                return "  - None"
             # return "\n".join(f"  - {param.name} ({param.type}): {param.description}" for param in params)
             return "\n".join(f"  - {param.name} ({param.type})" for param in params)
         
@@ -753,12 +755,18 @@ class WorkFlowGraph(BaseModule):
                 return "None"
             return "\n".join(f"  - {name}" for name in agent_names)
         
+        def format_action_graph(action_graph: ActionGraph) -> str:
+            if action_graph is None:
+                return "  - None"
+            return type(action_graph).__name__
+        
         desc = (
             f"Name: {node.name}\n"
             # f"Description: {node.description}\n"
             f"Inputs:\n{format_parameters(node.inputs)}\n"
             f"Outputs:\n{format_parameters(node.outputs)}\n"
-            f"Agents:\n{format_agents(node.get_agents())}"
+            f"Agents:\n{format_agents(node.get_agents())}\n"
+            f"Action Graph:\n{format_action_graph(node.action_graph)}"
         )
         return desc
 

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from ..core.logging import logger
 from ..core.decorators import atomic_method
-
+from ..core.callbacks import suppress_cost_logs
 
 def get_openai_model_cost() -> dict:
     import json 
@@ -59,7 +59,8 @@ class CostManager:
         self.total_cost[model] = self.total_cost.get(model, 0.0) + current_total_cost
         
         total_tokens, total_cost = self.compute_total_cost()
-        logger.info(f"Total cost: ${total_cost:.3f} | Total tokens: {total_tokens} | Current cost: ${current_total_cost:.3f} | Current tokens: {current_total_tokens}")
+        if not suppress_cost_logs.get():
+            logger.info(f"Total cost: ${total_cost:.3f} | Total tokens: {total_tokens} | Current cost: ${current_total_cost:.3f} | Current tokens: {current_total_tokens}")
 
 
     @atomic_method

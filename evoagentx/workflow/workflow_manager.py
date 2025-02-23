@@ -10,6 +10,7 @@ from ..models.base_model import BaseLLM, LLMOutputParser
 # from ..agents.agent import Agent
 from ..actions.action import Action
 from ..agents.agent_manager import AgentManager
+from .action_graph import ActionGraph
 from .environment import Environment, TrajectoryState
 from .workflow_graph import WorkFlowNode, WorkFlowGraph
 from ..prompts.workflow_manager import (
@@ -73,6 +74,17 @@ class TaskScheduler(Action):
         candidate_tasks: List[WorkFlowNode] = graph.next()
         if not candidate_tasks:
             return None
+        
+        # directly return the task if there is only one single candidate task
+        if len(candidate_tasks) == 1:
+            task_name = candidate_tasks[0].name
+            scheduled_task = TaskSchedulerOutput(
+                decision="forward", 
+                task_name=task_name,
+                reason = f"Only one candidate task '{task_name}' is available."
+            )
+            return (scheduled_task, None) if return_prompt else scheduled_task
+        
         workflow_graph_representation = graph.get_workflow_description()
         execution_history = " -> ".join(env.task_execution_history)
         # in execution_ouputs only consider the predecessors of candidate tasks
@@ -95,12 +107,18 @@ class TaskScheduler(Action):
 
 class NextAction(LLMOutputParser):
 
-    agent: str = Field(description="The name of the selected agent responsible for executing the next action in the workflow.")
-    action: str = Field(description="The name of the action that the selected agent will execute to continue progressing the subtask.")
-    reason: str = Field(description= "The justification for selecting this agent and action, explaining how it contributes to subtask execution based on workflow requirements and execution history.")
+    agent: Optional[str] = Field(default=None, description="The name of the selected agent responsible for executing the next action in the workflow.")
+    action: Optional[str] = Field(default=None, description="The name of the action that the selected agent will execute to continue progressing the subtask.")
+    reason: Optional[str] = Field(default=None, description= "The justification for selecting this agent and action, explaining how it contributes to subtask execution based on workflow requirements and execution history.")
+    action_graph: Optional[ActionGraph] = Field(default=None, description="The predefined action graph to be executed.")
 
     def to_str(self, **kwargs) -> str:
-        return f"Based on the tasks' execution results, the next action to be executed is the '{self.action}' action of '{self.agent}' agent."
+        if self.agent is not None and self.action is not None:
+            return f"Based on the tasks' execution results, the next action to be executed is the '{self.action}' action of '{self.agent}' agent."
+        elif self.action_graph is not None:
+            return f"The predefined action graph '{type(self.action_graph).__name__}' will be executed."
+        else:
+            raise ValueError("must provide either both agent (str) and action (str), or action_graph (ActionGraph).")
 
 
 class ActionScheduler(Action):
@@ -153,6 +171,12 @@ class ActionScheduler(Action):
         Returns:
             NextAction: The next action to execute for the task.
         """
+        # the task has a action_graph, directly return the action_graph for execution 
+        if task.action_graph is not None:
+            next_action = NextAction(action_graph=task.action_graph)
+            return (next_action, None) if return_prompt else next_action
+        
+        # Otherwise, schedule an agent to execute the task.
         task_agent_names = task.get_agents()
         if not task_agent_names:
             raise ValueError(f"The task '{task.name}' does not provide any agents for execution!")

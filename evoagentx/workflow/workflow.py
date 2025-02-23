@@ -100,6 +100,18 @@ class WorkFlow(BaseModule):
             agent_manager=self.agent_manager, 
             env=self.environment
         )
+        if next_action.action_graph is not None:
+            self._execute_task_by_action_graph(task=task, next_action=next_action)
+        else:
+            self._execute_task_by_agents(task=task, next_action=next_action)
+        self.graph.completed(node=task)
+
+    def _execute_task_by_action_graph(self, task: WorkFlowNode, next_action: NextAction):
+        # TODO
+        pass 
+    
+    def _execute_task_by_agents(self, task: WorkFlowNode, next_action: NextAction):
+        
         while next_action:
             agent: Agent = self.agent_manager.get_agent(agent_name=next_action.agent)
             while self.agent_manager.get_agent_state(agent_name=agent.name) != AgentState.AVAILABLE:
@@ -123,7 +135,6 @@ class WorkFlow(BaseModule):
                 agent_manager=self.agent_manager, 
                 env=self.environment
             )
-        self.graph.completed(node=task)
 
     def is_task_completed(self, task: WorkFlowNode) -> bool:
         task_outputs = [output.name for output in task.outputs]

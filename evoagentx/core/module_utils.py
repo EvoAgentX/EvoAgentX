@@ -33,7 +33,8 @@ def load_json(path: str, type: str="json"):
     if type == "json":
         try:
             with open(path, "r", encoding="utf-8") as file:
-                outputs = yaml.safe_load(file.read())
+                # outputs = yaml.safe_load(file.read()) # 用yaml.safe_load加载大文件的时候会非常慢
+                outputs = json.loads(file.read())
         except Exception:
             logger.error(f"File \"{path}\" is not a valid json file!")
     
@@ -41,7 +42,8 @@ def load_json(path: str, type: str="json"):
         outputs = []
         with open(path, "r", encoding="utf-8") as fin:
             for line in fin:
-                outputs.append(yaml.safe_load(line))
+                # outputs.append(yaml.safe_load(line))
+                outputs.append(json.loads(line))
     else:
         outputs = []
         
@@ -129,6 +131,35 @@ def parse_json_from_text(text: str) -> List[str]:
     matches = pattern.findall(text)
     matches = [escape_json_values(match) for match in matches]
     return matches
+
+def parse_xml_from_text(text: str, label: str) -> List[str]:
+    pattern = rf"<{label}>(.*?)</{label}>"
+    matches: List[str] = regex.findall(pattern, text, regex.DOTALL)
+    values = [] 
+    if matches:
+        values = [match.strip() for match in matches]
+    return values
+
+def parse_data_from_text(text: str, datatype: str):
+
+    if datatype == "str":
+        data = text
+    elif datatype == "int":
+        data = int(text)
+    elif datatype == "float":
+        data = float(text)
+    elif datatype == "bool":
+        data = text.lower() in ("true", "yes", "1", "on", "True")
+    elif datatype == "list":
+        data = eval(text)
+    elif datatype == "dict":
+        data = eval(text)
+    else:
+        raise ValueError(
+            f"Invalid value '{datatype}' is detected for `datatype`. "
+            "Available choices: ['str', 'int', 'float', 'bool', 'list', 'dict']"
+        )
+    return data
 
 def parse_json_from_llm_output(text: str) -> dict:
     """

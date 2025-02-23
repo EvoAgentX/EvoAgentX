@@ -1,4 +1,5 @@
 import threading
+import contextvars
 from contextlib import contextmanager
 
 class Callback:
@@ -69,3 +70,13 @@ def exception_buffer():
         callback_manager.clear_callback("exception_buffer")
     
 
+suppress_cost_logs = contextvars.ContextVar("suppress_cost_logs", default=False)
+
+@contextmanager
+def suppress_cost_logging():
+    """Thread-safe context manager: only suppresses cost-related logs without affecting other info-level logs"""
+    token = suppress_cost_logs.set(True)  # Set the value in the current thread/task
+    try:
+        yield
+    finally:
+        suppress_cost_logs.reset(token)  # Restore the previous value
