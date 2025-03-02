@@ -8,7 +8,6 @@ from .customize_agent import CustomizeAgent
 from ..core.module import BaseModule
 from ..core.decorators import atomic_method
 from ..storages.base import StorageHandler
-from ..workflow.workflow_graph import WorkFlowGraph
 
 
 class AgentState(str, Enum):
@@ -170,7 +169,7 @@ class AgentManager(BaseModule):
         for agent in agents:
             self.add_agent(agent=agent, **kwargs)
     
-    def add_agents_from_workflow(self, workflow_graph: WorkFlowGraph, **kwargs):
+    def add_agents_from_workflow(self, workflow_graph, **kwargs):
         """
         Initialize agents from the nodes of a given WorkFlowGraph and add these agents to self.agents. 
 
@@ -180,6 +179,9 @@ class AgentManager(BaseModule):
         Notes:
             - The agent information is in workflow_graph.nodes: List[WorkFlowNode].
         """
+        from ..workflow.workflow_graph import WorkFlowGraph
+        if not isinstance(workflow_graph, WorkFlowGraph):
+            raise TypeError("workflow_graph must be an instance of WorkFlowGraph")
         for node in workflow_graph.nodes:
             if node.agents:
                 for agent in node.agents:

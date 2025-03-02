@@ -61,7 +61,7 @@ class GeneratedAgent(BaseModule):
         def replace_with_braces(match):
             instructions = match.group(1)
             for name in input_names:
-                instructions = re.sub(fr'</input>{{*\b{re.escape(name)}\b}}*</input>', fr'</input>{{{name}}}</input>', instructions)
+                instructions = re.sub(fr'<input>{{*\b{re.escape(name)}\b}}*</input>', fr'<input>{{{name}}}</input>', instructions)
             return "### Instructions" + instructions + "### Output Format"
         
         modified_prompt = re.sub(pattern, replace_with_braces, prompt, flags=re.DOTALL)
@@ -125,7 +125,8 @@ class AgentGeneration(Action):
         agents = llm.generate(
             prompt = prompt, 
             system_message = sys_msg, 
-            parser=outputs_format
+            parser=outputs_format,
+            parse_mode="json"
         )
         
         if return_prompt:

@@ -43,7 +43,8 @@ class TaskPlanning(Action):
         task_plan = llm.generate(
             prompt = prompt, 
             system_message = sys_msg, 
-            parser=self.outputs_format
+            parser=self.outputs_format,
+            parse_mode="json"
         )
         
         if return_prompt:

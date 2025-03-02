@@ -1,3 +1,4 @@
+import inspect
 from time import sleep
 from pydantic import Field
 from typing import Optional
@@ -5,24 +6,21 @@ from ..core.logging import logger
 from ..core.module import BaseModule
 from ..core.message import Message, MessageType
 from ..core.module_utils import generate_id
-from ..models.base_model import BaseLLM, LLMOutputParser
+from ..models.base_model import BaseLLM
 from ..agents.agent import Agent
 from ..agents.agent_manager import AgentManager, AgentState
 from ..storages.base import StorageHandler
 from .environment import Environment, TrajectoryState
 from .workflow_manager import WorkFlowManager, NextAction
 from .workflow_graph import WorkFlowNode, WorkFlowGraph
-
-
-class WorkFlowInput(LLMOutputParser):
-    goal: str 
+from .action_graph import ActionGraph
 
 
 class WorkFlow(BaseModule):
 
     graph: WorkFlowGraph
-    agent_manager: AgentManager
     llm: Optional[BaseLLM] = None
+    agent_manager: AgentManager = Field(default=None, description="Responsible for managing agents")
     workflow_manager: WorkFlowManager = Field(default=None, description="Responsible for task and action scheduling for workflow execution")
     environment: Environment = Field(default_factory=Environment)
     storage_handler: StorageHandler = None
@@ -35,7 +33,7 @@ class WorkFlow(BaseModule):
                 raise ValueError("Must provide `llm` when `workflow_manager` is None")
             self.workflow_manager = WorkFlowManager(llm=self.llm)
 
-    def execute(self, **kwargs) -> str:
+    def execute(self, inputs: dict = {}, **kwargs) -> str:
         """
         Execute the workflow in a loop:
             - Check whether the workflow is completed. If the workflow is completed or there is failed task, stop execution.
@@ -54,8 +52,8 @@ class WorkFlow(BaseModule):
         """
 
         goal = self.graph.goal
-        inp = WorkFlowInput(goal=goal)
-        inp_message = Message(content=inp, msg_type=MessageType.INPUT, wf_goal=goal)
+        inputs.update({"goal": goal})
+        inp_message = Message(content=inputs, msg_type=MessageType.INPUT, wf_goal=goal)
         self.environment.update(message=inp_message, state=TrajectoryState.COMPLETED)
 
         failed = False
@@ -85,6 +83,8 @@ class WorkFlow(BaseModule):
     
     def get_next_task(self) -> WorkFlowNode:
         task_execution_history = " -> ".join(self.environment.task_execution_history)
+        if not task_execution_history:
+            task_execution_history = "None"
         logger.info(f"Task Execution Trajectory: {task_execution_history}. Scheduling next subtask ...")
         task: WorkFlowNode = self.workflow_manager.schedule_next_task(graph=self.graph, env=self.environment)
         logger.info(f"The next subtask to be executed is: {task.name}")
@@ -107,8 +107,22 @@ class WorkFlow(BaseModule):
         self.graph.completed(node=task)
 
     def _execute_task_by_action_graph(self, task: WorkFlowNode, next_action: NextAction):
-        # TODO
-        pass 
+
+        action_graph: ActionGraph = next_action.action_graph
+        execute_signature = inspect.signature(type(action_graph).execute)
+        execute_params = []
+        for param, _ in execute_signature.parameters.items():
+            if param in ["self", "args", "kwargs"]:
+                continue
+            execute_params.append(param)
+        action_input_data = self.environment.get_all_execution_data()
+        execute_inputs = {param: action_input_data.get(param, "") for param in execute_params}
+        action_graph_output: dict = action_graph.execute(**execute_inputs)
+        message = Message(
+            content=action_graph_output, action=action_graph.name, msg_type=MessageType.RESPONSE, \
+                wf_goal=self.graph.goal, wf_task=task.name, wf_task_desc=task.description
+        )
+        self.environment.update(message=message, state=TrajectoryState.COMPLETED)
     
     def _execute_task_by_agents(self, task: WorkFlowNode, next_action: NextAction):
         

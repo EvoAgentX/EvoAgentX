@@ -1,5 +1,5 @@
 # from pydantic import BaseModel
-from typing import List
+from typing import Optional, List
 from .module import BaseModule
 
 class BaseConfig(BaseModule):
@@ -32,3 +32,5 @@ class Parameter(BaseModule):
     name: str
     type: str 
     description: str 
+    required: Optional[bool] = True 
+

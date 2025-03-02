@@ -53,6 +53,9 @@ class Environment(BaseModule):
         if isinstance(message.content, LLMOutputParser):
             data = message.content.get_structured_data()
             self.execution_data.update(data)
+        if isinstance(message.content, dict):
+            data = message.content
+            self.execution_data.update(data)
 
     def get_task_messages(self, tasks: Union[str, List[str]], n: int = None, **kwargs) -> List[Message]:
         """

@@ -46,6 +46,13 @@ class Benchmark(ABC):
         pass
 
     @abstractmethod
+    def _get_id(self, example: Any) -> Any:
+        """
+        Abstract method to return the id for a given example.
+        """
+        pass
+
+    @abstractmethod
     def _get_label(self, example: Any) -> Any:
         """
         Abstract method to return the ground-truth label for a given example.
@@ -59,7 +66,7 @@ class Benchmark(ABC):
         pass
 
     @abstractmethod
-    def evaluate(prediction: Any, label: Any) -> dict:
+    def evaluate(self, prediction: Any, label: Any) -> dict:
         """
         Abstract method to evaluate a single prediction against the ground-truth label.
         
@@ -71,11 +78,73 @@ class Benchmark(ABC):
             dict: A dictionary containing evaluation metrics.
         """
         pass 
-
+    
+    def get_label(self, example: List[Any]) -> Any:
+        return self._get_label(example=example)
+    
     def get_labels(self, examples: List[Any]) -> List[Any]:
         return [self._get_label(example=example) for example in examples]
     
-    def _get_data(self, data: List[dict], indices: List[int]=None, sample_k: int=None) -> List[dict]:
+    def get_id(self, example: List[Any]) -> Any:
+        return self._get_id(example=example)
+    
+    def get_ids(self, examples: List[Any]) -> List[Any]:
+        return [self._get_id(example=example) for example in examples]
+    
+    def get_data_by_mode(self, mode: str = "test") -> List[Any]:
+        """
+        Get the data from the benchmark by mode.
+        """
+        assert mode in ["train", "dev", "test"], f"Invalid value for mode: {mode}. Available choices: ['train', 'dev', 'test']"
+        if mode == "train":
+            if self._train_data is None:
+                logger.warning(f"Train data for benchmark {type(self).__name__} is not loaded or None. Return an empty list.")
+                return []
+            data = self._train_data
+        elif mode == "dev":
+            if self._dev_data is None:
+                logger.warning(f"Dev data for benchmark {type(self).__name__} is not loaded or None. Return an empty list.")
+                return []
+            data = self._dev_data 
+        else:
+            if self._test_data is None:
+                logger.warning(f"Test data for benchmark {type(self).__name__} is not loaded or None. Return an empty list.")
+                return []
+            data = self._test_data
+        return data
+    
+    def get_example_by_id(self, example_id: Any, mode: str = "test") -> Optional[Any]:
+        """
+        Get an example from the benchmark by its id.
+
+        Args:
+            example_id (Any): The id of the example to retrieve.
+            mode (str): The mode to retrieve the example from, choices: ["train", "dev", "test"]
+        
+        Returns:
+            Optional[Any]: The example if found, otherwise None.
+        """
+        data = self.get_data_by_mode(mode=mode)
+        for example in data:
+            if self._get_id(example=example) == example_id:
+                return example
+        return None
+    
+    def get_example_by_index(self, index: int, mode: str = "test") -> Optional[Any]:
+        """
+        Get an example from the benchmark by its index.
+
+        Args:
+            index (int): The index of the example to retrieve.
+            mode (str): The mode to retrieve the example from, choices: ["train", "dev", "test"]
+        
+        Returns:
+            Optional[Any]: The example if found, otherwise None.
+        """
+        data = self.get_data_by_mode(mode=mode)
+        return data[index] if index < len(data) else None
+        
+    def _get_data(self, data: List[dict], indices: Optional[List[int]]=None, sample_k: Optional[int]=None) -> List[dict]:
         """
         Retrieves a subset of data based on provided indices or a random sample.
         
@@ -94,7 +163,7 @@ class Benchmark(ABC):
         return_data = [data[idx] for idx in indices]
         return return_data
 
-    def get_train_data(self, indices: List[int] = None, sample_k: int = None) -> List[dict]:
+    def get_train_data(self, indices: Optional[List[int]] = None, sample_k: Optional[int] = None) -> List[dict]:
         # Retrieves training data based on specified indices or random sampling.
         if self._train_data is None:
             logger.warning(f"Train data for benchmark {type(self).__name__} is not loaded or None. Return an empty list.")
@@ -103,7 +172,7 @@ class Benchmark(ABC):
         train_data = self._get_data(self._train_data, indices=indices, sample_k=sample_k)
         return train_data 
     
-    def get_dev_data(self, indices: List[int] = None, sample_k: int = None) -> List[dict]:
+    def get_dev_data(self, indices: Optional[List[int]] = None, sample_k: Optional[int] = None) -> List[dict]:
         # Retrieves development data based on specified indices or random sampling.
         if self._dev_data is None:
             logger.warning(f"Dev data for benchmark {type(self).__name__} is not loaded or None. Return an empty list.")
@@ -112,7 +181,7 @@ class Benchmark(ABC):
         dev_data = self._get_data(self._dev_data, indices=indices, sample_k=sample_k)
         return dev_data  
 
-    def get_test_data(self, indices: List[int] = None, sample_k: int = None) -> List[dict]:
+    def get_test_data(self, indices: Optional[List[int]] = None, sample_k: Optional[int] = None) -> List[dict]:
         # Retrieves test data based on specified indices or random sampling.
         if self._test_data is None:
             logger.warning(f"Test data for benchmark {type(self).__name__} is not loaded or None. Return an empty list.")

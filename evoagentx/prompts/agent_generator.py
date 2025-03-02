@@ -182,6 +182,7 @@ You are tasked with generating agents to complete a sub-task within a workflow. 
         {{
             "name": "the input's name", 
             "type": "string/int/float/other_type",
+            "required": true/false (`false` means the input is the feedback from later sub-task, or the previous output for the current sub-task), 
             "description": "Description of the input's purpose and usage."
         }},
         ...
@@ -190,6 +191,7 @@ You are tasked with generating agents to complete a sub-task within a workflow. 
         {{
             "name": "the output's name", 
             "type": "string/int/float/other_type",
+            "required": true (the `required` field of outputs are always true), 
             "description": "Description of the output produced by this sub-task."
         }},
         ...
@@ -213,6 +215,7 @@ You are tasked with generating agents to complete a sub-task within a workflow. 
         {{
             "name": "the input's name", 
             "type": "string/int/float/other_type",
+            "required": true/false (only set to `false` when this input is the feedback from later sub-task, or the previous generated output for the current sub-task), 
             "description": "Description of the input's purpose and usage."
         }},
         ...
@@ -221,12 +224,13 @@ You are tasked with generating agents to complete a sub-task within a workflow. 
         {{
             "name": "the output's name", 
             "type": "string/int/float/other_type",
+            "required": true (always set the `required` field of outputs as true), 
             "description": "Description of the output produced by this agent."
         }},
         ...
     ],
     "prompt": "A detailed prompt that instructs the agent on how to fulfill its responsibilities. Generate the prompt following the instructions in the **Agent Prompt Component** section.", 
-    "tool": ["optional, The tools the agent may use, selected from the tools listed in the '### Tools' section. If no tool is required, set this field to `null`, otherwise set as a list of str."]
+    "tool": ["optional, The tools the agent may use, selected from the tools listed in the '### Tools' section. If no tool is required or no tools are provided, set this field to `null`, otherwise set as a list of str."]
 }}
 ```
 5.2 **Agent Prompt Component**: The `prompt` field of the agent should be a string that uses the following template:
@@ -250,7 +254,7 @@ You should STRICTLY use the above template to generate the `prompt` field of the
 - In the '### Objective' section, you should provide a clear description of the agent's goal. 
 - In the '### Instructions' section, you should generate step-by-step instructions based on the following principles: 
     - Provide a clear and logical sequence of actions the agent should follow to complete its task. 
-    - Reference the input variables using placeholders (e.g., </input>{{input_name}}</input>) that match the agent's `inputs`. You MUST use a SINGLE pair of curly brace warpped by "</input>" to reference the inputs.
+    - Reference the input variables using placeholders (e.g., <input>{{input_name}}</input>) that match the agent's `inputs`. You MUST use a SINGLE pair of curly brace warpped by "<input>xxx</input>" to reference the inputs.
     - Include instructions on how the agent can use relevant tools from the "### Tools" section to assist with its task if applicable. 
 - In the '### Output Format' section, 
     - For the '## Thought' subsection, keep the text 'Briefly explain the reasoning process for achieving the objective'. 
@@ -267,7 +271,7 @@ You should STRICTLY use the above template to generate the `prompt` field of the
 - Ensure that ALL `inputs` defined in the sub-task are used by at least on created agent. 
 - Ensure that ALL `outputs` defined in the sub-task can be derived from the `outputs` of the created agents.
 - Ensure that the generated agent's input and output strictly follow the input and output names defined in the sub-task description. Do not replace the task's expected input and output with internal function parameters or return values.  
-- You must use a SINGLE pair of curly brace warpped by "</input>" to reference inputs in the "### Instructions" of an agent's prompt.
+- You must use a SINGLE pair of curly brace warpped by "<input>xxx</input>" to reference inputs in the "### Instructions" of an agent's prompt.
 - Below is **a generated agent** that follows the given instructions:
 ```json
 {{
@@ -277,16 +281,19 @@ You should STRICTLY use the above template to generate the `prompt` field of the
         {{
             "name": "parsed_requirements", 
             "type": "string",
+            "required": true, 
             "description": "The clarified requirements produced by the task_parsing subtask."
         }},
         {{
             "name": "initial_code", 
             "type": "string",
+            "required": true, 
             "description": "The initial Python code generated by the code_generation subtask."
         }},
         {{
             "name": "review_feedback", 
             "type": "string",
+            "required": true, 
             "description": "The feedback from the code reviewer, guiding improvements to the code."
         }}
     ],
@@ -294,10 +301,11 @@ You should STRICTLY use the above template to generate the `prompt` field of the
         {{
             "name": "final_code", 
             "type": "string",
+            "required": true, 
             "description": "The final, refined Python code for the factorial function."
         }}
     ], 
-    "prompt": "### Objective\\nRefine the given initial code by incorporating the parsed requirements and addressing the review feedback to produce a cleaner, more efficient, and maintainable final solution.\\n\\n### Instructions\\n1. Read and understand the clarified requirements: </input>{{parsed_requirements}}</input>\\n2. Review the initial code: </input>{{initial_code}}</input>\\n3. Analyze the review feedback: </input>{{review_feedback}}</input>\\n4. Identify the improvements required to meet the clarified requirements and address all the feedback.\\n5. Implement necessary modifications to the code. Optimize, clean up, ensure maintainability, and follow best practices.\\n6. Produce the final refined code as the output.\\n\\n### Output Format\\nYour final output should ALWAYS in the following format:\\n\\n## Thought\\nBriefly explain the reasoning process for refining the given initial code\\n\\n## final_code\\nThe final, refined Python code for the factorial function.",
+    "prompt": "### Objective\\nRefine the given initial code by incorporating the parsed requirements and addressing the review feedback to produce a cleaner, more efficient, and maintainable final solution.\\n\\n### Instructions\\n1. Read and understand the clarified requirements: <input>{{parsed_requirements}}</input>\\n2. Review the initial code: <input>{{initial_code}}</input>\\n3. Analyze the review feedback: <input>{{review_feedback}}</input>\\n4. Identify the improvements required to meet the clarified requirements and address all the feedback.\\n5. Implement necessary modifications to the code. Optimize, clean up, ensure maintainability, and follow best practices.\\n6. Produce the final refined code as the output.\\n\\n### Output Format\\nYour final output should ALWAYS in the following format:\\n\\n## Thought\\nBriefly explain the reasoning process for refining the given initial code\\n\\n## final_code\\nThe final, refined Python code for the factorial function.",
     "tools": null
 }}
 ```

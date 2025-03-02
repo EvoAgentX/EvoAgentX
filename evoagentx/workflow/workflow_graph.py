@@ -1,3 +1,4 @@
+import json
 import threading
 from enum import Enum
 import networkx as nx 
@@ -12,6 +13,10 @@ from ..core.module import BaseModule
 from ..core.base_config import Parameter
 from ..core.decorators import atomic_method
 from .action_graph import ActionGraph
+from ..models.base_model import BaseLLM
+from ..models.model_configs import LLMConfig
+from ..utils.utils import generate_dynamic_class_name
+from ..prompts.sem_workflow import SEM_WORKFLOW
 
 
 class WorkFlowNodeState(str, Enum):
@@ -468,7 +473,9 @@ class WorkFlowGraph(BaseModule):
     
     @property
     def is_complete(self):
-        node_complete_list = [node.is_complete for node in self.nodes]
+        # node_complete_list = [node.is_complete for node in self.nodes]
+        leaf_nodes = [self.get_node(name) for name in self.find_end_nodes()]
+        node_complete_list = [node.is_complete for node in leaf_nodes]
         if len(node_complete_list) == 0:
             return True
         if all(node_complete_list):
@@ -545,6 +552,9 @@ class WorkFlowGraph(BaseModule):
 
         def dfs(current_node_name: str, path: List[str]):
             if current_node_name in visited:
+                # 如果一个loop的end node只有指向loop的start node的边，那么添加这条路径
+                if path and len(self.get_node_children(path[-1])) == 1:
+                    all_paths.append(path.copy())
                 return
             path.append(current_node_name)
             visited.add(current_node_name)
@@ -785,6 +795,10 @@ class WorkFlowGraph(BaseModule):
             WorkFlowNodeState.FAILED: 'red'
         }
 
+        if not self.graph.nodes:
+            print("Graph is empty. No nodes to display.")
+            return
+
         # Get node colors based on their statuses
         node_colors = [status_colors.get(self.get_node_status(node), 'lightgray') for node in self.graph.nodes]
 
@@ -792,29 +806,39 @@ class WorkFlowGraph(BaseModule):
         node_labels = {node: self.get_node_description(data["ref"]) for node, data in self.graph.nodes(data=True)}
         
         # Draw the graph
-        pos = nx.shell_layout(self.graph)
+        # pos = nx.shell_layout(self.graph)
+        if len(self.graph.nodes) == 1:
+            single_node = list(self.graph.nodes)[0]
+            pos = {single_node: (0, 0)}  # Place the single node at the center
+        else:
+            pos = nx.shell_layout(self.graph)
+        
         plt.figure(figsize=(12, 8))
         nx.draw(
             self.graph, pos, with_labels=False, node_color=node_colors, edge_color='black',
             node_size=1500, font_size=8, font_color='black', font_weight='bold'
         )
 
-        # Draw node labels next to the nodes (left-aligned)
-        # text_offsets = {node: (pos[node][0]-0.2, pos[node][1]-0.22) for node in self.graph.nodes}
-        y_positions = [y for _, y in pos.values()]
-        y_min, y_max = min(y_positions), max(y_positions)
-        lower_third_boundary = y_min + (y_max - y_min) / 3
+        if len(self.graph.nodes) == 1:
+            for node, (x, y) in pos.items():
+                plt.text(x+0.005, y, node_labels[node], ha='left', va='center', fontsize=9, bbox=dict(facecolor='white', alpha=0.7))
+        else:
+            # Draw node labels next to the nodes (left-aligned)
+            # text_offsets = {node: (pos[node][0]-0.2, pos[node][1]-0.22) for node in self.graph.nodes}
+            y_positions = [y for _, y in pos.values()]
+            y_min, y_max = min(y_positions), max(y_positions)
+            lower_third_boundary = y_min + (y_max - y_min) / 3
 
-        # Adjust text offsets based on node position in the graph
-        text_offsets = {}
-        for node, (x, y) in pos.items():
-            if y < lower_third_boundary:  # If in the lower third, display label above the node
-                text_offsets[node] = (x-0.2, y + 0.23)
-            else:  # Otherwise, display label below the node
-                text_offsets[node] = (x-0.2, y - 0.23)
-        
-        for node, (x, y) in text_offsets.items():
-            plt.text(x, y, node_labels[node], ha='left', va='center', fontsize=9, bbox=dict(facecolor='white', alpha=0.7))
+            # Adjust text offsets based on node position in the graph
+            text_offsets = {}
+            for node, (x, y) in pos.items():
+                if y < lower_third_boundary:  # If in the lower third, display label above the node
+                    text_offsets[node] = (x-0.2, y + 0.23)
+                else:  # Otherwise, display label below the node
+                    text_offsets[node] = (x-0.2, y - 0.23)
+            
+            for node, (x, y) in text_offsets.items():
+                plt.text(x, y, node_labels[node], ha='left', va='center', fontsize=9, bbox=dict(facecolor='white', alpha=0.7))
 
         # Draw edge labels for priorities
         edge_labels = nx.get_edge_attributes(self.graph, 'priority')
@@ -832,10 +856,16 @@ class WorkFlowGraph(BaseModule):
 
     def get_workflow_description(self) -> str:
 
+        def format_param_requirement(required: bool):
+            return "required" if required else "optional"
+        
         def format_parameters(params: List[Parameter]) -> str:
             if not params:
                 return "None"
-            return "\n".join(f"  - {param.name} ({param.type}): {param.description}" for param in params)
+            return "\n".join(
+                f"  - {param.name} ({param.type}, {format_param_requirement(param.required)}): "
+                f"{param.description}" for param in params
+            )
         
         subtask_texts = [] 
         for node in self.nodes:
@@ -848,3 +878,129 @@ class WorkFlowGraph(BaseModule):
             subtask_texts.append(text)
         workflow_desc = "\n\n".join(subtask_texts)
         return workflow_desc
+    
+    def _infer_edges_from_nodes(self, nodes: List[WorkFlowNode]) -> List[WorkFlowEdge]:
+
+        if not nodes:
+            return []
+        edges: List[WorkFlowEdge] = []
+        for node in nodes:
+            for another_node in nodes:
+                if node.name == another_node.name:
+                    continue
+                node_output_params = [param.name for param in node.outputs]
+                another_node_input_params = [param.name for param in another_node.inputs]
+                if any([param in another_node_input_params for param in node_output_params]):
+                    edges.append(WorkFlowEdge(edge_tuple=(node.name, another_node.name)))
+        return edges
+
+
+class SequentialWorkFlowGraph(WorkFlowGraph):
+
+    """
+    A linear workflow graph with a single path from start to end.
+
+    Args:
+        goal (str): The goal of the workflow.
+        tasks (List[dict]): A list of tasks with their descriptions and inputs. Each task should have the following format:
+            {
+                "name": str,
+                "description": str,
+                "inputs": [{"name": str, "type": str, "required": bool, "description": str}, ...],
+                "outputs": [{"name": str, "type": str, "required": bool, "description": str}, ...],
+                "prompt": str, 
+                "llm_config" (optional): dict,
+                "llm" (optional): BaseLLM,
+                "output_parser" (optional): Type[ActionOutput],
+                "parse_mode" (optional): str,
+                "parse_func" (optional): Callable
+            }
+        llm_config (LLMConfig, optional): The default configuration for the LLM. If provided, it will be used as the default configuration for agents without `llm_config`.
+        llm (BaseLLM, optional): The default LLM. If provided, it will be used as the default LLM for agents without `llm`.
+    """
+
+    def __init__(self, goal: str, tasks: List[dict], llm_config: Optional[LLMConfig] = None, llm: Optional[BaseLLM] = None, **kwargs):
+        if llm_config is not None or llm is not None:
+            assert (llm_config is not None) != (llm is not None), "exactly one of `llm_config` or `llm` should be provided"
+        nodes = self._infer_nodes_from_tasks(tasks=tasks, llm_config=llm_config, llm=llm)
+        edges = self._infer_edges_from_nodes(nodes=nodes)
+        super().__init__(goal=goal, nodes=nodes, edges=edges, **kwargs)
+    
+    def _infer_nodes_from_tasks(self, tasks: List[dict], llm_config: Optional[LLMConfig] = None, llm: Optional[BaseLLM] = None) -> List[WorkFlowNode]:
+        nodes = [self._infer_node_from_task(task=task, llm_config=llm_config, llm=llm) for task in tasks]
+        return nodes
+    
+    def _infer_node_from_task(self, task: dict, llm_config: Optional[LLMConfig] = None, llm: Optional[BaseLLM] = None) -> WorkFlowNode:
+
+        node_name = task["name"] 
+        node_description = task["description"]
+        inputs = task["inputs"]
+        outputs = task["outputs"]
+        agent_name = generate_dynamic_class_name(node_name+" Agent")
+        agent_description = node_description.replace("task", "agent")
+        agent_prompt = task["prompt"]
+        agent_llm_config = task.get("llm_config", llm_config)
+        agent_llm = task.get("llm", llm)
+        agent_output_parser = task.get("output_parser", None)
+        agent_parse_mode = task.get("parse_mode", "str")
+        agent_parse_func = task.get("parse_func", None)
+
+        node = WorkFlowNode.from_dict(
+            {
+                "name": node_name,
+                "description": node_description,
+                "inputs": inputs,
+                "outputs": outputs,
+                "agents": [
+                    {
+                        "name": agent_name,
+                        "description": agent_description,
+                        "prompt": agent_prompt,
+                        "llm_config": agent_llm_config,
+                        "llm": agent_llm,
+                        "inputs": inputs,
+                        "outputs": outputs,
+                        "output_parser": agent_output_parser,
+                        "parse_mode": agent_parse_mode,
+                        "parse_func": agent_parse_func
+                    }
+                ],
+            }
+        )
+        return node
+    
+    def save_module(self, path: str, ignore: List[str] = [], **kwargs):
+        """
+        Save the workflow graph to a module file.
+        """
+        config = {
+            "goal": self.goal, 
+            "tasks": [
+                {
+                    "name": node.name,
+                    "description": node.description,
+                    "inputs": [param.to_dict(ignore=["class_name"]) for param in node.inputs],
+                    "outputs": [param.to_dict(ignore=["class_name"]) for param in node.outputs],
+                    "prompt": node.agents[0].get("prompt", None),
+                    "llm_config": node.agents[0].get("llm_config", None).to_dict(exclude_none=True) \
+                        if node.agents[0].get("llm_config", None) is not None else \
+                            node.agents[0]["llm"].config.to_dict(exclude_none=True),
+                    "parse_mode": node.agents[0].get("parse_mode", "str")
+                }
+                for node in self.nodes
+            ]
+        }
+
+        for ignore_key in ignore:
+            config.pop(ignore_key, None)
+
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(config, f, indent=4)
+
+        return path
+    
+
+class SEMWorkFlowGraph(SequentialWorkFlowGraph):
+
+    def __init__(self, llm_config: Optional[LLMConfig] = None, llm: Optional[BaseLLM] = None, **kwargs):
+        super().__init__(goal=SEM_WORKFLOW["goal"], tasks=SEM_WORKFLOW["tasks"], llm_config=llm_config, llm=llm, **kwargs)
