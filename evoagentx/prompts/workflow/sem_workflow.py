@@ -1,6 +1,6 @@
 
 SEM_WORKFLOW = {
-    "class_name": "LinearWorkflow",
+    "class_name": "SEMWorkFlowGraph",
     "goal": "A general workflow for coding tasks.",
     "tasks": [
         {

@@ -25,6 +25,7 @@ class Operator(BaseModule):
     outputs_format: Type[OperatorOutput] = Field(description="The structured content of the operator's output.")
 
     interface: Optional[str] = Field(description="The interface for calling the operator.")
+    prompt: Optional[str] = Field(default="", description="The prompt for calling the operator.")
 
     def init_module(self):
         self._save_ignore_fields = ["llm"]
@@ -39,6 +40,18 @@ class Operator(BaseModule):
         ignore_fields = self._save_ignore_fields + ignore
         super().save_module(path=path, ignore=ignore_fields, **kwargs)
 
+    def get_prompt(self, **kwargs) -> str:
+        return self.prompt 
+    
+    def set_prompt(self, prompt: str):
+        self.prompt = prompt
+
+    def set_operator(self, data: dict):
+        self.name = data.get("name", self.name)
+        self.description = data.get("description", self.description)
+        self.interface = data.get("interface", self.interface)      
+        self.prompt = data.get("prompt", self.prompt)
+    
 
 ## The following operators are inspired by AFlow's predefined operators: https://github.com/geekan/MetaGPT/blob/main/metagpt/ext/aflow/scripts/operator.py 
 
@@ -72,10 +85,12 @@ class AnswerGenerate(Operator):
         name = "AnswerGenerate"
         description = "Generate step by step based on the input. The step by step thought process is in the field of 'thought', and the final answer is in the field of 'answer'."
         interface = "answer_generate(input: str) -> dict with key 'thought' of type str, 'answer' of type str"
-        super().__init__(name=name, description=description, interface=interface, llm=llm, outputs_format=AnswerGenerateOutput, **kwargs)
+        prompt = kwargs.pop("prompt", ANSWER_GENERATION_PROMPT)
+        super().__init__(name=name, description=description, interface=interface, llm=llm, outputs_format=AnswerGenerateOutput, prompt=prompt, **kwargs)
     
     def execute(self, input: str) -> dict:
-        prompt = ANSWER_GENERATION_PROMPT.format(input=input)
+        # prompt = ANSWER_GENERATION_PROMPT.format(input=input)
+        prompt = self.prompt.format(input=input)
         response = self.llm.generate(prompt=prompt, parser=self.outputs_format, parse_mode="xml")
         return response.get_structured_data()
     
@@ -91,7 +106,8 @@ class ScEnsemble(Operator):
         name = "ScEnsemble"
         description = "Uses self-consistency to select the solution that appears most frequently in the solution list, improve the selection to enhance the choice of the best solution."
         interface = "sc_ensemble(solutions: List[str]) -> dict with key 'response' of type str"
-        super().__init__(name=name, description=description, interface=interface, llm=llm, outputs_format=ScEnsembleOutput, **kwargs)
+        prompt = kwargs.pop("prompt", SC_ENSEMBLE_PROMPT)
+        super().__init__(name=name, description=description, interface=interface, llm=llm, outputs_format=ScEnsembleOutput, prompt=prompt, **kwargs)
     
     def execute(self, solutions: List[str]) -> dict:
         answer_mapping = {} 
@@ -99,7 +115,8 @@ class ScEnsemble(Operator):
         for index, solution in enumerate(solutions):
             answer_mapping[chr(65+index)] = index
             solution_text += f"{chr(65 + index)}: \n{str(solution)}\n\n\n"
-        prompt = SC_ENSEMBLE_PROMPT.format(solutions=solution_text)
+        # prompt = SC_ENSEMBLE_PROMPT.format(solutions=solution_text)
+        prompt = self.prompt.format(solutions=solution_text)
         response = self.llm.generate(prompt=prompt, parser=self.outputs_format, parse_mode="xml")
         answer: str = response.get_structured_data().get("solution_letter", "")
         answer = answer.strip().upper()

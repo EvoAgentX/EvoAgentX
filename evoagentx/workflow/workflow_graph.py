@@ -16,7 +16,7 @@ from .action_graph import ActionGraph
 from ..models.base_model import BaseLLM
 from ..models.model_configs import LLMConfig
 from ..utils.utils import generate_dynamic_class_name
-from ..prompts.sem_workflow import SEM_WORKFLOW
+from ..prompts.workflow.sem_workflow import SEM_WORKFLOW
 
 
 class WorkFlowNodeState(str, Enum):
@@ -969,11 +969,12 @@ class SequentialWorkFlowGraph(WorkFlowGraph):
         )
         return node
     
-    def save_module(self, path: str, ignore: List[str] = [], **kwargs):
+    def get_graph_info(self, **kwargs) -> dict:
         """
-        Save the workflow graph to a module file.
+        Get the information of the workflow graph.
         """
         config = {
+            "class_name": self.__class__.__name__,
             "goal": self.goal, 
             "tasks": [
                 {
@@ -990,17 +991,24 @@ class SequentialWorkFlowGraph(WorkFlowGraph):
                 for node in self.nodes
             ]
         }
-
+        return config
+    
+    def save_module(self, path: str, ignore: List[str] = [], **kwargs):
+        """
+        Save the workflow graph to a module file.
+        """
+        logger.info("Saving {} to {}", self.__class__.__name__, path)
+        config = self.get_graph_info()
         for ignore_key in ignore:
             config.pop(ignore_key, None)
-
         with open(path, "w", encoding="utf-8") as f:
             json.dump(config, f, indent=4)
-
         return path
     
 
 class SEMWorkFlowGraph(SequentialWorkFlowGraph):
 
     def __init__(self, llm_config: Optional[LLMConfig] = None, llm: Optional[BaseLLM] = None, **kwargs):
-        super().__init__(goal=SEM_WORKFLOW["goal"], tasks=SEM_WORKFLOW["tasks"], llm_config=llm_config, llm=llm, **kwargs)
+        goal = kwargs.pop("goal", SEM_WORKFLOW["goal"])
+        tasks = kwargs.pop("tasks", SEM_WORKFLOW["tasks"])
+        super().__init__(goal=goal, tasks=tasks, llm_config=llm_config, llm=llm, **kwargs)

@@ -67,22 +67,22 @@ class TestEvaluator(unittest.TestCase):
         self.assertEqual(results, {"accuracy": 1.0})
         self.assertEqual(len(self.evaluator.get_all_evaluation_records()), 2)
 
-    def test_multi_thread_evaluation(self):
-        # Test evaluation with multiple threads
-        evaluator = Evaluator(
-            llm=self.llm,
-            num_workers=2,
-            verbose=True
-        )
-        results = evaluator.evaluate(
-            graph=self.action_graph,
-            benchmark=self.benchmark,
-            eval_mode="test"
-        )
+    # def test_multi_thread_evaluation(self):
+    #     # Test evaluation with multiple threads
+    #     evaluator = Evaluator(
+    #         llm=self.llm,
+    #         num_workers=2,
+    #         verbose=True
+    #     )
+    #     results = evaluator.evaluate(
+    #         graph=self.action_graph,
+    #         benchmark=self.benchmark,
+    #         eval_mode="test"
+    #     )
 
-        # Verify results
-        self.assertEqual(results, {"accuracy": 1.0})
-        self.assertEqual(len(evaluator.get_all_evaluation_records()), 2)
+    #     # Verify results
+    #     self.assertEqual(results, {"accuracy": 1.0})
+    #     self.assertEqual(len(evaluator.get_all_evaluation_records()), 2)
 
     def test_evaluation_with_custom_collate(self):
         # Test evaluation with custom collate function

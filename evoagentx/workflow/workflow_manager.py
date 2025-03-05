@@ -13,7 +13,7 @@ from ..agents.agent_manager import AgentManager
 from .action_graph import ActionGraph
 from .environment import Environment, TrajectoryState
 from .workflow_graph import WorkFlowNode, WorkFlowGraph
-from ..prompts.workflow_manager import (
+from ..prompts.workflow.workflow_manager import (
     DEFAULT_TASK_SCHEDULER, 
     DEFAULT_ACTION_SCHEDULER, 
     OUTPUT_EXTRACTION_PROMPT

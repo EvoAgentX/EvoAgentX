@@ -1,7 +1,7 @@
 from tqdm import tqdm
-from time import time
+# from time import time
 from typing import Callable, Optional, Any, List, Union, Tuple
-from concurrent.futures import ThreadPoolExecutor, as_completed
+# from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from ..core.logging import logger
 from ..core.message import Message
@@ -217,58 +217,7 @@ class Evaluator:
         return results
 
     def _parallel_evaluate(self, graph: Union[WorkFlowGraph, ActionGraph], data: List[dict], benchmark: Benchmark, verbose: Optional[bool] = None, **kwargs) -> List[dict]:
-        """
-        Evaluate workflow on data using parallel threads. Optimized for I/O bound operations with network requests.
-
-        Args:
-            graph (WorkFlowGraph or ActionGraph): The workflow to evaluate
-            data (List[dict]): List of input data
-            benchmark (Benchmark): The benchmark to evaluate the workflow on
-            verbose (bool): Whether to show progress bar
-            **kwargs: Additional arguments for workflow execution
-
-        Returns:
-            List[dict]: List of valid evaluation metrics
-        """
-        if not data:
-            logger.warning("No data to evaluate. Return an empty list.")
-            return []
-        
-        results = []
-        start_time = time()
-
-        if verbose:
-            progress_bar = tqdm(total=len(data), desc="Evaluating workflow (parallel)")
-        
-        with ThreadPoolExecutor(max_workers=self.num_workers) as executor:
-            # submit all tasks
-            future_to_example = {
-                executor.submit(self._evaluate_single_example, graph, example, benchmark, **kwargs): i 
-                for i, example in enumerate(data)
-            }
-
-            # process completed tasks
-            completed = 0
-            for future in as_completed(future_to_example):
-                example_idx = future_to_example[future]
-                try:
-                    result = future.result()
-                    if result is not None:
-                        results.append(result)
-                except Exception as e:
-                    logger.error(f"Example {example_idx} failed: {str(e)}")
-                
-                completed += 1
-                if verbose and 'progress_bar' in locals():  # make sure progress_bar exists
-                    progress_bar.update(1)
-                elif not verbose and completed % 100 == 0:  # output log periodically if not using progress bar
-                    elapsed = time() - start_time
-                    logger.info(f"Processed {completed}/{len(data)} examples. Time elapsed: {elapsed:.2f}s")
-
-        if verbose and 'progress_bar' in locals():  # make sure progress_bar exists
-            progress_bar.close()
-
-        return results
+        raise NotImplementedError("Parallel evaluation is not implemented yet.")
 
     def _calculate_average_score(self, scores: List[dict]) -> dict:
         """

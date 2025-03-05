@@ -205,6 +205,11 @@ class BaseLLM(ABC):
     def init_model(self):
         pass
 
+    def __deepcopy__(self, memo):
+        # return the same instance when deepcopy
+        memo[id(self)] = self
+        return self
+
     @abstractmethod
     def formulate_messages(self, prompts: List[str], system_messages: Optional[List[str]] = None) -> List[List[dict]]:
         """
