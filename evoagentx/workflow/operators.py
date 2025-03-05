@@ -57,7 +57,7 @@ class Custom(Operator):
     def execute(self, input: str, instruction: str) -> dict: 
         prompt = instruction + input
         response = self.llm.generate(prompt=prompt, parser=self.outputs_format, parse_mode="str")
-        output =response.get_structured_data()
+        output = response.get_structured_data()
         return output 
 
 

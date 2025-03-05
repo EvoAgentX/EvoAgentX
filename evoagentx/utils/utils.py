@@ -50,51 +50,67 @@ def normalize_text(s: str) -> str:
     return white_space_fix(remove_articles(remove_punc(lower(s))))
 
 
-def download_file(url: str, save_file: str, max_retries=3, timeout=10):
+def download_file(url: str, save_file: str) -> None:
+    """Download a file from the given URL and show progress."""
+    response = requests.get(url, stream=True)
+    total_size = int(response.headers.get("content-length", 0))
+    block_size = 1024
+    progress_bar = tqdm(total=total_size, unit="iB", unit_scale=True)
 
-    make_parent_folder(save_file)
-    for attempt in range(max_retries):
-        try:
-            resume_byte_pos = 0
-            if os.path.exists(save_file):
-                resume_byte_pos = os.path.getsize(save_file)
+    with open(save_file, "wb") as file:
+        for data in response.iter_content(block_size):
+            size = file.write(data)
+            progress_bar.update(size)
+    progress_bar.close()
+
+# def download_file(url: str, save_file: str, max_retries=3, timeout=10):
+
+#     make_parent_folder(save_file)
+#     for attempt in range(max_retries):
+#         try:
+#             resume_byte_pos = 0
+#             if os.path.exists(save_file):
+#                 resume_byte_pos = os.path.getsize(save_file)
             
-            response_head = requests.head(url=url)
-            total_size = int(response_head.headers.get("content-length", 0))
+#             response_head = requests.head(url=url)
+#             total_size = int(response_head.headers.get("content-length", 0))
 
-            if resume_byte_pos >= total_size:
-                logger.info("File already downloaded completely.")
-                return
+#             # Only return early if file exists AND has correct size
+#             if os.path.exists(save_file) and resume_byte_pos >= total_size and total_size > 0:
+#                 logger.info("File already downloaded completely.")
+#                 return
 
-            headers = {'Range': f'bytes={resume_byte_pos}-'} if resume_byte_pos else {}
-            response = requests.get(url=url, stream=True, headers=headers, timeout=timeout)
-            response.raise_for_status()
-            # total_size = int(response.headers.get("content-length", 0))
-            mode = 'ab' if resume_byte_pos else 'wb'
-            progress_bar = tqdm(total=total_size, unit="iB", unit_scale=True, initial=resume_byte_pos)
+#             headers = {'Range': f'bytes={resume_byte_pos}-'} if resume_byte_pos else {}
+#             response = requests.get(url=url, stream=True, headers=headers, timeout=timeout)
+#             response.raise_for_status()
+#             mode = 'ab' if resume_byte_pos else 'wb'
+#             progress_bar = tqdm(total=total_size, unit="iB", unit_scale=True, initial=resume_byte_pos)
             
-            with open(save_file, mode) as file:
-                for chunk_data in response.iter_content(chunk_size=1024):
-                    if chunk_data:
-                        size = file.write(chunk_data)
-                        progress_bar.update(size)
+#             with open(save_file, mode) as file:
+#                 for chunk_data in response.iter_content(chunk_size=1024):
+#                     if chunk_data:
+#                         size = file.write(chunk_data)
+#                         progress_bar.update(size)
             
-            progress_bar.close()
+#             progress_bar.close()
 
-            if os.path.getsize(save_file) >= (total_size + resume_byte_pos):
-                logger.info("Download completed successfully.")
-                break
-            else:
-                logger.warning("File size mismatch, retrying...")
-                time.sleep(5)
-        except (requests.ConnectionError, requests.Timeout) as e:
-            logger.warning(f"Download error: {e}. Retrying ({attempt+1}/{max_retries})...")
-            time.sleep(5)
-        except Exception as e:
-            error_message = f"Unexpected error: {e}"
-            logger.error(error_message)
-            raise ValueError(error_message)
-    else:
-        error_message = "Exceeded maximum retries. Download failed."
-        logger.error(error_message)
-        raise RuntimeError(error_message)
+#             # Verify file was downloaded correctly
+#             if os.path.exists(save_file) and os.path.getsize(save_file) >= total_size and total_size > 0:
+#                 logger.info("Download completed successfully.")
+#                 break
+#             else:
+#                 logger.warning("File size mismatch, retrying...")
+#                 if os.path.exists(save_file):
+#                     os.remove(save_file)
+#                 time.sleep(5)
+#         except (requests.ConnectionError, requests.Timeout) as e:
+#             logger.warning(f"Download error: {e}. Retrying ({attempt+1}/{max_retries})...")
+#             time.sleep(5)
+#         except Exception as e:
+#             error_message = f"Unexpected error: {e}"
+#             logger.error(error_message)
+#             raise ValueError(error_message)
+#     else:
+#         error_message = "Exceeded maximum retries. Download failed."
+#         logger.error(error_message)
+#         raise RuntimeError(error_message)

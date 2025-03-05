@@ -11,7 +11,7 @@ from ..core.registry import register_model
 from .model_configs import OpenAILLMConfig
 from .base_model import BaseLLM
 from .model_utils import Cost, cost_manager, get_openai_model_cost 
-
+from ..core.logging import logger
 
 @register_model(config_cls=OpenAILLMConfig, alias=["openai_llm"])
 class OpenAILLM(BaseLLM):
@@ -61,16 +61,16 @@ class OpenAILLM(BaseLLM):
             content = chunk.choices[0].delta.content
             if content:
                 if output_response:
-                    print(content, end="", flush=True)
+                    logger.info(content, flush=True)
                 output += content
         if output_response:
-            print("")
+            logger.info("")
         return output
 
     def get_completion_output(self, response: ChatCompletion, output_response: bool=True) -> str:
         output = response.choices[0].message.content
         if output_response:
-            print(output)
+            logger.info(output, flush=True)
         return output
 
     @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(5))
