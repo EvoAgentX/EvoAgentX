@@ -1,0 +1,23 @@
+# FastAPI and ASGI server
+fastapi==0.115.10
+uvicorn==0.22.0
+pydantic==2.7.0
+pydantic-settings==2.8.1
+
+# MongoDB ODM
+motor==3.3.1
+pymongo==4.6.0
+sqlalchemy-2.0.38
+
+python-jose==3.3.0
+passlib==1.7.4
+python-multipart==0.0.6
+bcrypt==4.0.1
+celery==5.3.4
+redis==5.0.0
+pytest==7.4.2
+pytest-asyncio==0.21.0
+httpx==0.24.1
+asgi-lifespan==1.0.1
+python-dotenv==1.0.0
+loguru==0.7.3
