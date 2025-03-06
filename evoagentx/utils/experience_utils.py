@@ -4,8 +4,8 @@ from collections import defaultdict
 
 # from metagpt.logs import logger
 # from metagpt.utils.common import read_json_file, write_json_file
-from evoagentx.core.logging import logger
-from evoagentx.utils.common import read_json_file, write_json_file
+from ..core.logging import logger
+from ..utils.common import read_json_file, write_json_file
 
 
 class ExperienceUtils:

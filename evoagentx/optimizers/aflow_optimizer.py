@@ -8,7 +8,7 @@ from ..utils.experience_utils import ExperienceUtils
 from ..utils.aflow_evaluation_utils import EvaluationUtils
 from ..utils.aflow_utils import GraphUtils
 from pydantic import BaseModel, Field
-from evoagentx.workflow.action_graph import HumanEvalActionGraph
+from ..workflow.action_graph import HumanEvalActionGraph
 from ..models.model_configs import LLMConfig
 
 
