@@ -7,8 +7,17 @@ from ..models.base_model import BaseLLM
 from ..models.base_model import LLMOutputParser
 from ..prompts.operators import (
     ANSWER_GENERATION_PROMPT,
-    SC_ENSEMBLE_PROMPT
+    SC_ENSEMBLE_PROMPT,
+    REFLECTION_ON_PUBLIC_TEST_PROMPT
 )
+from ..utils.utils import extract_test_cases_from_jsonl, test_case_2_test_function
+import sys
+import traceback
+import logging
+import re
+
+logger = logging.getLogger(__name__)
+
 
 class OperatorOutput(LLMOutputParser):
 
@@ -105,11 +114,11 @@ class ScEnsemble(Operator):
     def __init__(self, llm: BaseLLM, **kwargs):
         name = "ScEnsemble"
         description = "Uses self-consistency to select the solution that appears most frequently in the solution list, improve the selection to enhance the choice of the best solution."
-        interface = "sc_ensemble(solutions: List[str]) -> dict with key 'response' of type str"
+        interface = "sc_ensemble(solutions: List[str], problem: str) -> dict with key 'response' of type str"
         prompt = kwargs.pop("prompt", SC_ENSEMBLE_PROMPT)
         super().__init__(name=name, description=description, interface=interface, llm=llm, outputs_format=ScEnsembleOutput, prompt=prompt, **kwargs)
     
-    def execute(self, solutions: List[str]) -> dict:
+    def execute(self, solutions: List[str], problem: str = None) -> dict:
         answer_mapping = {} 
         solution_text = "" 
         for index, solution in enumerate(solutions):
@@ -121,3 +130,164 @@ class ScEnsemble(Operator):
         answer: str = response.get_structured_data().get("solution_letter", "")
         answer = answer.strip().upper()
         return {"response": solutions[answer_mapping[answer]]}
+
+
+class TestOutput(OperatorOutput):
+    result: bool = Field(default=False, description="The result of the test")
+    solution: str = Field(default="", description="The solution to the problem")
+    
+    @classmethod
+    def validate_result(cls, value):
+        """验证 result 字段，确保它是布尔值"""
+        if isinstance(value, bool):
+            return value
+        elif isinstance(value, str):
+            # 尝试将字符串转换为布尔值
+            if value.lower() in ('true', 'yes', '1'):
+                return True
+            elif value.lower() in ('false', 'no', '0'):
+                return False
+            # 如果无法转换，则默认为 False
+            return False
+        # 其他类型默认为 False
+        return False
+    
+    @classmethod
+    def model_validate(cls, obj, **kwargs):
+        """重写 model_validate 方法，确保 result 字段是布尔值"""
+        if isinstance(obj, dict) and "result" in obj:
+            obj["result"] = cls.validate_result(obj["result"])
+        return super().model_validate(obj, **kwargs)
+
+
+class Test(Operator):
+    
+    def __init__(self, llm: BaseLLM, **kwargs):
+        name = "Test"
+        description = "Test the solution with test cases, if the solution is correct, return 'no error', if the solution is incorrect, return reflect on the soluion and the error information"
+        interface = "test(problem: str, solution: str, entry_point: str) -> str"
+        super().__init__(name=name, description=description, interface=interface, llm=llm, outputs_format=TestOutput, **kwargs)
+        
+    def exec_code(self, solution, entry_point):
+
+        test_cases = extract_test_cases_from_jsonl(entry_point, dataset="HumanEval")
+                
+        fail_cases = []
+        for test_case in test_cases:
+            test_code = test_case_2_test_function(solution, test_case, entry_point)
+            try:
+                exec(test_code, globals())
+            except AssertionError as e:
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                tb_str = traceback.format_exception(exc_type, exc_value, exc_traceback)
+                with open("tester.txt", "a") as f:
+                    f.write("test_error of " + entry_point + "\n")
+                error_infomation = {
+                    "test_fail_case": {
+                        "test_case": test_case,
+                        "error_type": "AssertionError",
+                        "error_message": str(e),
+                        "traceback": tb_str,
+                    }
+                }
+                fail_cases.append(error_infomation)
+            except Exception as e:
+                with open("tester.txt", "a") as f:
+                    f.write(entry_point + " " + str(e) + "\n")
+                return {"exec_fail_case": str(e)}
+        if fail_cases != []:
+            return fail_cases
+        else:
+            return "no error"
+        
+    def _process_llm_response(self, response):
+        """
+        处理 LLM 的响应，确保返回的是有效的 TestOutput 格式
+        """
+        try:
+            # 尝试从响应中获取结构化数据
+            output = response.get_structured_data()
+            
+            # 检查是否有 reflection_and_solution 字段
+            if "reflection_and_solution" in output:
+                logger.info("Found reflection_and_solution field in LLM response")
+                return output["reflection_and_solution"]
+            
+            # 如果没有，则尝试从内容中提取代码
+            content = response.content
+            logger.info(f"Extracting code from LLM response content: {content[:100]}...")
+            
+            # 尝试提取代码块
+            code_blocks = re.findall(r'```python\s*(.*?)\s*```', content, re.DOTALL)
+            if code_blocks:
+                logger.info(f"Found {len(code_blocks)} code blocks in LLM response")
+                return code_blocks[0]  # 返回第一个代码块
+            
+            # 如果没有代码块，则返回原始内容
+            return content
+        except Exception as e:
+            # 如果出现异常，记录错误并返回原始内容
+            logger.error(f"Error processing LLM response: {e}")
+            return response.content
+        
+    def __call__(
+        self, problem, solution, entry_point, test_loop: int = 3
+    ):
+        try:
+            for _ in range(test_loop):
+                result = self.exec_code(solution, entry_point)
+                if result == "no error":
+                    return {"result": True, "solution": solution}
+                elif "exec_fail_case" in result:
+                    result = result["exec_fail_case"]
+                    prompt = REFLECTION_ON_PUBLIC_TEST_PROMPT.format(
+                        problem=problem,
+                        solution=solution,
+                        exec_pass=f"executed unsuccessfully, error: \n {result}",
+                        test_fail="executed unsucessfully",
+                    )
+                    response = self.llm.generate(prompt=prompt, parser=None, parse_mode="str")
+                    solution = self._process_llm_response(response)
+                else:
+                    prompt = REFLECTION_ON_PUBLIC_TEST_PROMPT.format(
+                        problem=problem,
+                        solution=solution,
+                        exec_pass="executed successfully",
+                        test_fail=result,
+                    )
+                    response = self.llm.generate(prompt=prompt, parser=None, parse_mode="str")
+                    solution = self._process_llm_response(response)
+            
+            result = self.exec_code(solution, entry_point)
+            if result == "no error":
+                return {"result": True, "solution": solution}
+            else:
+                # 确保返回的是有效的 TestOutput 格式
+                return {
+                    "result": False,  # 明确指定为布尔值 False
+                    "solution": solution
+                }
+        except Exception as e:
+            # 捕获所有异常，确保返回有效的 TestOutput 格式
+            print(f"Error in Test.__call__: {e}")
+            print(traceback.format_exc())
+            return {
+                "result": False,
+                "solution": solution
+            }
+        
+
+class CustomCodeGenerate(Operator):
+    def __init__(self, llm: BaseLLM, **kwargs):
+        name = "CustomCodeGenerate"
+        description = "Generates code based on customized input and instruction"
+        interface = "custom_code_generate(input: str, instruction: str) -> dict with key 'response' of type str"
+        super().__init__(name=name, description=description, interface=interface, llm=llm, outputs_format=CustomOutput, **kwargs)
+    
+    def execute(self, input: str, instruction: str) -> dict:
+        prompt = instruction + input
+        response = self.llm.generate(prompt=prompt, parser=self.outputs_format, parse_mode="str")
+        output = response.get_structured_data()
+        # logger.info(f"CustomCodeGenerate output is {output}")
+        # print(f"CustomCodeGenerate output is {output}")
+        return output 

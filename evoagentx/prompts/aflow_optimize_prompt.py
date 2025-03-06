@@ -48,12 +48,20 @@ Note: In custom, the input and instruction are directly concatenated(instruction
 """
 
 WORKFLOW_TEMPLATE = """from typing import Literal
-import evoagentx.ext.aflow.scripts.optimized.HumanEval.workflows.template.operator as operator
+import evoagentx.workflow.operators as operator
 from evoagentx.workflow.workflow_generator import WorkFlowGenerator
 from evoagentx.models.base_model import BaseLLM
 from evoagentx.models.model_utils import CostManager
+import evoagentx.prompts.aflow_optimize_prompt as prompt
 
 DatasetType = Literal["HumanEval", "MBPP", "GSM8K", "MATH", "HotpotQA", "DROP"]
 
 {graph}
+"""
+
+
+XXX_PROMPT = """
+
+Solve it.
+
 """

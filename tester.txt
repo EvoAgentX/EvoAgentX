@@ -1,0 +1,8 @@
+can_arrange invalid syntax (<string>, line 2)
+can_arrange invalid syntax (<string>, line 2)
+can_arrange invalid character '’' (U+2019) (<string>, line 4)
+can_arrange unterminated string literal (detected at line 4) (<string>, line 4)
+can_arrange invalid character '’' (U+2019) (<string>, line 4)
+can_arrange unterminated string literal (detected at line 4) (<string>, line 4)
+can_arrange unterminated string literal (detected at line 2) (<string>, line 2)
+can_arrange unterminated string literal (detected at line 2) (<string>, line 2)

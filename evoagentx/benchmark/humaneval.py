@@ -90,8 +90,8 @@ class AFlowHumanEval(HumanEval):
         # logger.info(f"graph is {graph}")
         # logger.info(f"prompt is {prompt}")
         # logger.info(f"entry_point is {entry_point}")
-        logger.info(f"prompt is {prompt}")
-        logger.info(f"entry_point is {entry_point}")
+        # logger.info(f"prompt is {prompt}")
+        # logger.info(f"entry_point is {entry_point}")
         """
         example prompt:
         def can_arrange(arr):
@@ -165,7 +165,7 @@ class AFlowHumanEval(HumanEval):
         thread.start()
         is_timeout = not stop_event.wait(timeout)
         
-        logger.info(f"result is {result}")
+        # logger.info(f"result is {result}")
 
         if is_timeout:
             raise self.TimeoutError("Function execution timed out")

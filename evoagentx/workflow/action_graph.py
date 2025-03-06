@@ -1,25 +1,15 @@
 import json
 from pydantic import Field
-<<<<<<< HEAD
-from typing import Any, Optional, Callable
+from typing import Any, Optional, Callable, Dict, List
 import re
-=======
-from typing import Dict, Any, List
->>>>>>> origin/main
-
 from ..core.logging import logger
 from ..core.module import BaseModule
 from ..core.registry import MODEL_REGISTRY, MODULE_REGISTRY
 from ..models.model_configs import LLMConfig
-<<<<<<< HEAD
 from .operators import AnswerGenerate, ScEnsemble
 from ..models.base_model import LLMOutputParser
 from pydantic import BaseModel
-from ..core.logging import logger
-=======
 from .operators import Operator, AnswerGenerate, ScEnsemble
->>>>>>> origin/main
-
 
 class ActionGraph(BaseModule):
 
@@ -116,7 +106,7 @@ class QAActionGraph(ActionGraph):
             response = self.answer_generate(input=problem)
             answer = response["answer"]
             solutions.append(answer)
-        ensemble_result = self.sc_ensemble(solutions=solutions)
+        ensemble_result = self.sc_ensemble(solutions=solutions, problem=problem)
         best_answer = ensemble_result["response"]
         return {"answer": best_answer}
     
@@ -170,10 +160,7 @@ class HumanEvalActionGraph(ActionGraph):
     def execute(self, problem: str) -> dict:
         
         response = self._llm.generate(prompt=problem, parser=GraphOptimize, parse_mode="xml")
-        # logger.info(f"modification is {response.modification}")
-        # logger.info(f"graph is {response.graph}")
-        # logger.info(f"prompt is {response.prompt}")
-        
+
         return {
             "modification": response.modification,
             "graph": response.graph,

@@ -3,22 +3,40 @@
 # @Author  : all
 # @Desc    : Evaluation for different datasets
 
-from typing import Dict, Literal, Tuple
-
+from typing import Dict, Literal, Tuple, Optional
 from ..benchmark.humaneval import AFlowHumanEval
 from ..benchmark.benchmark import Benchmark
-from ..core.logging import logger
+from ..models.base_model import BaseLLM
+from ..agents.agent_manager import AgentManager
+from .evaluator import Evaluator
 
 # If you want to customize tasks, add task types here and provide evaluation functions, just like the ones given above
 DatasetType = Literal["HumanEval", "MBPP", "GSM8K", "MATH", "HotpotQA", "DROP"]
 
 
-class Evaluator:
+class AFlowEvaluator(Evaluator):
     """
-    Complete the evaluation for different datasets here
+    AFlow-specific evaluator for different datasets
     """
-
-    def __init__(self, eval_path: str):
+    def __init__(
+        self, 
+        eval_path: str,
+        llm: Optional[BaseLLM] = None,
+        num_workers: int = 1, 
+        agent_manager: Optional[AgentManager] = None,
+        verbose: Optional[bool] = None,
+        **kwargs
+    ):
+        # Initialize the parent class
+        super().__init__(
+            llm=llm,
+            num_workers=num_workers,
+            agent_manager=agent_manager,
+            verbose=verbose,
+            **kwargs
+        )
+        
+        # Initialize AFlow-specific attributes
         self.eval_path = eval_path
         self.dataset_configs: Dict[DatasetType, Benchmark] = {
             # "GSM8K": GSM8KBenchmark,
@@ -40,14 +58,12 @@ class Evaluator:
             raise ValueError(f"Unsupported dataset: {dataset}")
 
         data_path = self._get_data_path(dataset, is_test)
-        # logger.info(f"data_path is {data_path}")
         benchmark_class = self.dataset_configs[dataset]
         benchmark = benchmark_class(file_path=data_path, 
                                     log_path=path,
                                     path=params.get("path", "evoagentx/ext/aflow/data"),
                                     mode=params.get("mode", "dev"))
-        # logger.info(f"benchmark self mode is {benchmark.mode}")
-        # Use params to configure the graph and benchmark
+
         configured_graph = self._configure_graph(dataset, 
                                                  graph, 
                                                  params)
@@ -55,9 +71,7 @@ class Evaluator:
             va_list = None  # For test data, generally use None to test all
         else:
             va_list = None  # Use None to test all Validation data, or set va_list (e.g., [1, 2, 3]) to use partial data
-        
-        # logger.info(f"configured_graph is {configured_graph}")
-        
+                
         return benchmark.run_evaluation(configured_graph, va_list)
 
     def _configure_graph(self, dataset, graph, params: dict):
@@ -66,9 +80,6 @@ class Evaluator:
         dataset_config = params.get("dataset", {})
         llm_config = params.get("llm", {})
         
-        logger.info(f"dataset_config is {dataset_config}")
-        logger.info(f"llm_config is {llm_config}")
-        logger.info(f"graph is {graph}")
         return graph(name=dataset, 
                      llm=llm_config, 
                      dataset=dataset_config)

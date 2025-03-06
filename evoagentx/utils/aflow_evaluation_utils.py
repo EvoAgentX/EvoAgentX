@@ -1,4 +1,4 @@
-from ..evaluators.aflow_evaluator import Evaluator
+from ..evaluators.aflow_evaluator import AFlowEvaluator
 from ..core.logging import logger
 
 
@@ -9,7 +9,7 @@ class EvaluationUtils:
     def evaluate_initial_round(self, optimizer, graph_path, directory, validation_n, data):
         # 使用 optimizer 的 graph_utils 来加载图
         optimizer.graph = optimizer.graph_utils.load_graph(optimizer.round, graph_path)
-        evaluator = Evaluator(eval_path=directory)
+        evaluator = AFlowEvaluator(eval_path=directory, llm=optimizer.optimizer_llm)
 
         for i in range(validation_n):
             score, avg_cost, total_cost = evaluator.graph_evaluate(
@@ -29,8 +29,8 @@ class EvaluationUtils:
         return data
 
     def evaluate_graph(self, optimizer, directory, validation_n, data, initial=False):
-        evaluator = Evaluator(eval_path=directory)
-        logger.info(f"evaluator is {evaluator}")
+        evaluator = AFlowEvaluator(eval_path=directory, llm=optimizer.optimizer_llm)
+        # logger.info(f"evaluator is {evaluator}")
         sum_score = 0
 
         for i in range(validation_n):
@@ -49,19 +49,21 @@ class EvaluationUtils:
             new_data = optimizer.data_utils.create_result_data(cur_round, score, avg_cost, total_cost)
             data.append(new_data)
 
-            result_path = optimizer.data_utils.get_results_file_path(f"{optimizer.root_path}/workflows")
+            result_path = optimizer.data_utils.get_results_file_path(self.root_path + "/workflows")
             optimizer.data_utils.save_results(result_path, data)
 
             sum_score += score
 
-        return sum_score / validation_n
+        avg_score = sum_score / validation_n
+        return avg_score
 
-    async def evaluate_graph_test(self, optimizer, directory, is_test=True):
-        evaluator = Evaluator(eval_path=directory)
-        return evaluator.graph_evaluate(
+    def evaluate_graph_test(self, optimizer, directory, is_test=True):
+        evaluator = AFlowEvaluator(eval_path=directory, llm=optimizer.optimizer_llm)
+        score, avg_cost, total_cost = evaluator.graph_evaluate(
             optimizer.dataset,
             optimizer.graph,
             {"dataset": optimizer.dataset, "llm": optimizer.optimizer_llm},
             directory,
             is_test=is_test,
         )
+        return score

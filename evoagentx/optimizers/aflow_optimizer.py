@@ -5,8 +5,8 @@ import time
 from ..utils.aflow_utils import GraphUtils
 from ..utils.aflow_evaluation_utils import EvaluationUtils
 from ..models.base_model import BaseLLM
-from evoagentx.ext.aflow.scripts.utils.data_utils import DataUtils
-from evoagentx.ext.aflow.scripts.utils.experience_utils import ExperienceUtils
+from ..utils.data_utils import DataUtils
+from ..utils.experience_utils import ExperienceUtils
 from pydantic import BaseModel, Field
 from evoagentx.workflow.action_graph import HumanEvalActionGraph
 from ..models.model_configs import LLMConfig
@@ -15,7 +15,6 @@ from ..models.model_configs import LLMConfig
 DatasetType = Literal["HumanEval", "MBPP", "GSM8K", "MATH", "HotpotQA", "DROP"]
 QuestionType = Literal["math", "code", "qa"]
 OptimizerType = Literal["Graph", "Test"]
-
 
 
 class ExperimentConfig:
@@ -153,7 +152,7 @@ class AFlowOptimizer(Optimizer):
         if self.round == 1:
             directory = self.graph_utils.create_round_directory(graph_path, self.round)
             self.graph = self.graph_utils.load_graph(self.round, graph_path)
-            logger.info(f"self graph is {self.graph}")
+            # logger.info(f"self graph is {self.graph}")
             avg_score = self.evaluation_utils.evaluate_graph(self, 
                                                              directory, 
                                                              validation_n, 
@@ -190,7 +189,7 @@ class AFlowOptimizer(Optimizer):
             # logger.info(f"graph_optimize_prompt is {graph_optimize_prompt}")
             
             response = self.action_graph.execute(graph_optimize_prompt)
-            logger.info(f"response is {response}")
+            # logger.info(f"response is {response}")
             
             check = self.experience_utils.check_modification(
                 processed_experience,
@@ -198,7 +197,7 @@ class AFlowOptimizer(Optimizer):
                 sample["round"]
             )
             
-            logger.info(f"check is {check}")      
+            # logger.info(f"check is {check}")      
             
             if check:
                 break
@@ -216,7 +215,7 @@ class AFlowOptimizer(Optimizer):
             response['modification']
         )
         
-        logger.info(f"experience is {experience}")
+        # logger.info(f"experience is {experience}")
         
 
         self.graph = self.graph_utils.load_graph(
@@ -224,7 +223,7 @@ class AFlowOptimizer(Optimizer):
             graph_path
         )
         
-        logger.info(f"self.graph is {self.graph}")
+        # logger.info(f"self.graph is {self.graph}")
         
         avg_score = self.evaluation_utils.evaluate_graph(
             self, directory,
@@ -233,7 +232,7 @@ class AFlowOptimizer(Optimizer):
             initial=False
         )
     
-        logger.info(f"Score for round {self.round + 1}: {avg_score}")
+        # logger.info(f"Score for round {self.round + 1}: {avg_score}")
         
         self.experience_utils.update_experience(
             directory,

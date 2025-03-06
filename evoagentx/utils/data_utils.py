@@ -6,13 +6,8 @@ import random
 import numpy as np
 import pandas as pd
 
-# from metagpt.logs import logger
-# from metagpt.utils.common import read_json_file, write_json_file
 from evoagentx.utils.common import read_json_file, write_json_file
-# from evoagentx.utils.logger import logger
 from evoagentx.core.logging import logger
-
-
 
 class DataUtils:
     def __init__(self, root_path: str):

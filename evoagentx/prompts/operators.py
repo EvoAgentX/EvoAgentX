@@ -17,3 +17,29 @@ In the "thought" field, provide a detailed explanation of your thought process. 
 
 You should format your output in xml format. For example, ouptut the thoughts in <thought>xxx</thought> format. 
 """
+
+REFLECTION_ON_PUBLIC_TEST_PROMPT = """
+Given a code problem and a python code solution which failed to pass test or execute, you need to analyze the reason for the failure and propose a better code solution.: 
+### problem
+{problem}
+
+### Code Solution
+{solution}
+
+### Execution Result
+{exec_pass}
+
+#### Failed Test Case
+{test_fail}
+
+Please provide a reflection on the failed test cases and code solution, followed by a better code solution without any additional text or test cases.
+
+Your response should be formatted as follows:
+```json
+{{
+  "reflection_and_solution": "Your improved code solution here"
+}}
+```
+
+Only include the improved code in the reflection_and_solution field, without any additional explanations or comments outside the code.
+"""
