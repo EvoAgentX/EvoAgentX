@@ -2,11 +2,11 @@ from .optimizer import Optimizer
 from typing import Literal, List, Dict
 from ..core.logging import logger
 import time
-from ..utils.aflow_utils import GraphUtils
-from ..utils.aflow_evaluation_utils import EvaluationUtils
 from ..models.base_model import BaseLLM
 from ..utils.data_utils import DataUtils
 from ..utils.experience_utils import ExperienceUtils
+from ..utils.aflow_evaluation_utils import EvaluationUtils
+from ..utils.aflow_utils import GraphUtils
 from pydantic import BaseModel, Field
 from evoagentx.workflow.action_graph import HumanEvalActionGraph
 from ..models.model_configs import LLMConfig
