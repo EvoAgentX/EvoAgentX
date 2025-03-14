@@ -146,13 +146,10 @@ class AFlowOptimizer(Optimizer):
         
         data = []
         
-        # We first set the check to True
-        # check = True
-        
         if self.round == 1:
             directory = self.graph_utils.create_round_directory(graph_path, self.round)
             self.graph = self.graph_utils.load_graph(self.round, graph_path)
-            # logger.info(f"self graph is {self.graph}")
+
             avg_score = self.evaluation_utils.evaluate_graph(self, 
                                                              directory, 
                                                              validation_n, 
@@ -166,18 +163,14 @@ class AFlowOptimizer(Optimizer):
             top_rounds = self.data_utils.get_top_rounds(self.sample)
             sample = self.data_utils.select_round(top_rounds)
             
-            # logger.info(f"sample is {sample}")  
-            # logger.info(f"graph_path is {graph_path}")
             prompt, graph_load = self.graph_utils.read_graph_files(sample["round"], graph_path)
-            # logger.info(f"graph_load is {graph_load}")
+
             graph = self.graph_utils.extract_solve_graph(graph_load)
-            # logger.info(f"graph is {graph}")
             
             processed_experience = self.experience_utils.load_experience()
             experience = self.experience_utils.format_experience(processed_experience, 
                                                                  sample["round"])
             
-            # logger.info(f"experience is {experience}")
             operator_description = self.graph_utils.load_operators_description(self.operators)
             log_data = self.data_utils.load_log(sample["round"])
             
@@ -186,18 +179,13 @@ class AFlowOptimizer(Optimizer):
                 self.type, log_data
             )
             
-            # logger.info(f"graph_optimize_prompt is {graph_optimize_prompt}")
-            
             response = self.action_graph.execute(graph_optimize_prompt)
-            # logger.info(f"response is {response}")
             
             check = self.experience_utils.check_modification(
                 processed_experience,
                 response['modification'],
                 sample["round"]
             )
-            
-            # logger.info(f"check is {check}")      
             
             if check:
                 break
@@ -214,16 +202,11 @@ class AFlowOptimizer(Optimizer):
             sample, 
             response['modification']
         )
-        
-        # logger.info(f"experience is {experience}")
-        
 
         self.graph = self.graph_utils.load_graph(
             self.round + 1, 
             graph_path
         )
-        
-        # logger.info(f"self.graph is {self.graph}")
         
         avg_score = self.evaluation_utils.evaluate_graph(
             self, directory,
@@ -232,8 +215,6 @@ class AFlowOptimizer(Optimizer):
             initial=False
         )
     
-        # logger.info(f"Score for round {self.round + 1}: {avg_score}")
-        
         self.experience_utils.update_experience(
             directory,
             experience,
