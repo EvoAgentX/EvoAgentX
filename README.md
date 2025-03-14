@@ -1,16 +1,28 @@
 
+<<<<<<< HEAD
 # EvoAgentX [Dev]
 an automatic agentic workflow generation and evolving framework. 
+=======
+# EvoAgentX 
+An automatic agentic workflow generation and evolving framework. 
+>>>>>>> origin/main
 
+## News
 
-## Setups 
+## Get Started
+
+### Installation
 create environment: 
 ```
 conda create -n agent python=3.10 
 pip install -r requirements.txt 
 ```
+### Configuration
+Todos:
+1. How to set up keys
+2. others
 
-## Automatic WorkFlow Generation 
+### Examples: Automatic WorkFlow Generation 
 ```python
 from evoagentx.models import OpenAILLMConfig, OpenAILLM
 from evoagentx.agents import AgentManager
@@ -40,3 +52,25 @@ workflow = WorkFlow(graph=workflow_graph, agent_manager=agent_manager, llm=model
 output = workflow.execute()
 print(output)
 ```
+
+### QuickStart & Demo Video
+Todos
+
+## Tutorial
+Todos
+## Support
+
+### Discord Join US
+
+📢 Join Our [Discord Channel](https://discord.gg/q5hBjHVz)! Looking forward to seeing you there! 🎉
+
+### Contact Information
+
+If you have any questions or feedback about this project, please feel free to contact us. We highly appreciate your suggestions!
+
+- **Email:** clayx.ai.co@gmail.com
+
+We will respond to all questions within 2-3 business days.
+
+## Contributing to EvoAgentX
+We appreciate your interest in contributing to our open-source initiative. We provide a document of [contributing guidelines](https://github.com/clayxai/EvoAgentX/blob/main/CONTRIBUTING.md) which outlines the steps for contributing to EvoAgentX. Please refer to this guide to ensure smooth collaboration and successful contributions. 🤝🚀

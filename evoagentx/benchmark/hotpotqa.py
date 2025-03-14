@@ -1,7 +1,7 @@
 import os 
 from typing import Any
 from .benchmark import Benchmark
-from .measures import exact_match_score, f1_score
+from .measures import exact_match_score, f1_score, acc_score
 from ..core.logging import logger
 from ..core.module_utils import load_json
 from ..utils.utils import download_file
@@ -34,7 +34,8 @@ class HotPotQA(Benchmark):
     }
     """
 
-    def __init__(self, path: str, mode: str = "all", **kwargs):
+    def __init__(self, path: str = None, mode: str = "all", **kwargs):
+        path = os.path.expanduser(path or "~/.evoagentx/data/hotpotqa")
         super().__init__(name=type(self).__name__, path=path, mode=mode, **kwargs)
 
     def _load_data_from_file(self, file_name: str):
@@ -43,7 +44,7 @@ class HotPotQA(Benchmark):
         file_path = os.path.join(self.path, file_name)
         if not os.path.exists(file_path):
             download_raw_hotpotqa_data(name=file_name, save_folder=self.path)
-        logger.info(f"loading data from {file_path} ...")
+        logger.info(f"loading HotPotQA data from {file_path} ...")
         return load_json(path=file_path, type="json")
 
     def _load_data(self):
@@ -63,7 +64,8 @@ class HotPotQA(Benchmark):
     def evaluate(self, prediction: Any, label: Any) -> dict:
         em = exact_match_score(prediction=prediction, ground_truth=label)
         f1 = f1_score(prediction=prediction, ground_truth=label)
-        return {"f1": f1, "em": em}
+        acc = acc_score(prediction=prediction, ground_truths=[label])
+        return {"f1": f1, "em": em, "acc": acc}
     
 
 class AFlowHotPotQA(HotPotQA):

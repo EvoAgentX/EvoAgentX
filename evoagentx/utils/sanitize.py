@@ -1,8 +1,14 @@
 """
+<<<<<<< HEAD
 @Time    : 2024/7/24 16:37
 @Author  : didi
 @File    : utils.py
 @Acknowledgement https://github.com/evalplus/evalplus/blob/master/evalplus/sanitize.py
+=======
+@Time    : 2025/3/12 18:37
+@File    : sanitize.py
+@Acknowledgement: https://github.com/geekan/MetaGPT/blob/main/metagpt/utils/sanitize.py 
+>>>>>>> origin/main
 """
 
 import ast

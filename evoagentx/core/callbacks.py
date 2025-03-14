@@ -1,5 +1,7 @@
+import stopit
 import threading
 import contextvars
+from typing import Optional, Union
 from contextlib import contextmanager
 
 class Callback:
@@ -80,3 +82,36 @@ def suppress_cost_logging():
         yield
     finally:
         suppress_cost_logs.reset(token)  # Restore the previous value
+
+
+class TimeoutException(Exception):
+    pass
+
+class TimeoutContext:
+    """
+    A reliable cross-platform timeout context manager using stopit
+    
+    Usage:
+        with TimeoutContext(seconds=5):
+            # code that may timeout
+            do_something()
+    """
+    def __init__(self, seconds: Union[int, float]):
+        self.seconds = float(seconds)
+        self._context: Optional[stopit.SignalTimeout] = None
+        
+    def __enter__(self):
+        self._context = stopit.ThreadingTimeout(self.seconds)
+        self._context.__enter__()
+        return self
+        
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        timeout_occurred = self._context.__exit__(exc_type, exc_val, exc_tb)
+        if timeout_occurred:
+            raise TimeoutException("Operation timed out")
+        return False
+
+@contextmanager
+def timeout(seconds: float):
+    with TimeoutContext(seconds):
+        yield

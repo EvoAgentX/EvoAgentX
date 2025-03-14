@@ -84,18 +84,21 @@ class TestHotPotQA(unittest.TestCase):
         benchmark = HotPotQA(path=self.temp_dir, mode="dev")
 
         result = benchmark.evaluate(prediction="Paris", label="Paris")
-        self.assertEqual(result["em"], 1)
-        self.assertEqual(result["f1"], 1)
+        self.assertEqual(result["em"], 1.0)
+        self.assertEqual(result["f1"], 1.0)
+        self.assertEqual(result["acc"], 1.0)
 
         # Test partial match case
-        result = benchmark.evaluate(prediction="Paris, France", label="Paris")
-        self.assertEqual(result["em"], 0)
-        self.assertTrue(result["f1"] > 0)
+        result = benchmark.evaluate(prediction="in Paris, France", label="Paris")
+        self.assertEqual(result["em"], 0.0)
+        self.assertTrue(abs(result["f1"] - 0.5) < 1e-5)
+        self.assertEqual(result["acc"], 1.0)
 
         # Test no match case
         result = benchmark.evaluate(prediction="London", label="Paris")
-        self.assertEqual(result["em"], 0)
-        self.assertEqual(result["f1"], 0)
+        self.assertEqual(result["em"], 0.0)
+        self.assertEqual(result["f1"], 0.0)
+        self.assertEqual(result["acc"], 0.0)
 
     def test_data_sampling(self):
         # Create test file

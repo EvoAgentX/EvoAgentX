@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import Optional, Union, List
 
-import torch 
+# import torch 
 
 from ..core.base_config import BaseConfig
 
@@ -149,7 +149,7 @@ class SiliconFlowConfig(LLMConfig):
         return self.model
 
 
-def get_default_device():
-    return "cuda" if torch.cuda.is_available() else "cpu"
+# def get_default_device():
+#     return "cuda" if torch.cuda.is_available() else "cpu"
 
 
