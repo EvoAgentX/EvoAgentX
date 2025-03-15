@@ -1,11 +1,14 @@
 import os 
 import gzip 
 import shutil
-from typing import Union, Any
+from typing import Union, Any, List, Callable, Tuple
 from .benchmark import CodingBenchmark
 from ..core.logging import logger 
 from ..utils.utils import download_file 
 from ..core.module_utils import load_json
+import pandas as pd
+from datetime import datetime
+from ..utils.aflow_utils import AFLOW_DATASET_FILES_MAP, download_aflow_benchmark_data
 
 
 def download_raw_humaneval_data(save_folder: str): 
@@ -21,6 +24,9 @@ def download_raw_humaneval_data(save_folder: str):
 
 def load_humaneval_data(data_path: str):
     data = load_json(data_path, type="jsonl") 
+    
+    logger.info(f"Loaded {len(data)} examples")
+    # breakpoint()
     # Handle 115 prompt to make its docstring well-formed
     for example in data:
         if example["task_id"] == "HumanEval/115":
@@ -48,6 +54,9 @@ class HumanEval(CodingBenchmark):
     def _load_data(self):
 
         data_path = os.path.join(self.path, "HumanEval.jsonl")
+        
+        logger.info(f"Loading HumanEval data from {data_path} ...")
+        
         if not os.path.exists(data_path):
             download_raw_humaneval_data(self.path)
         
@@ -58,6 +67,8 @@ class HumanEval(CodingBenchmark):
             self._dev_data = None 
         if self.mode == "test" or self.mode == "all":
             self._test_data = load_humaneval_data(data_path)
+            
+        logger.info(f"Loaded {len(self._test_data)} test examples")
 
     def _get_label(self, example: Any):
         # return the unit test code
@@ -126,7 +137,7 @@ class HumanEval(CodingBenchmark):
         
         return pass_at_k
     
-
+    
 class HumanEvaluPlus(HumanEval):
 
     """
@@ -143,3 +154,110 @@ class HumanEvaluPlus(HumanEval):
     }
     """
     pass 
+
+
+class AFlowHumanEval(HumanEval):
+    def __init__(self, path: str = None, log_path: str = None, mode: str = "all", timeout: int = 60, k: Union[int, list] = 1, **kwargs):
+        path = os.path.expanduser(path or "~/.evoagentx/data/humaneval")
+        self.k = k
+        self.log_path = log_path if log_path else os.path.join(path, "logs")
+        os.makedirs(self.log_path, exist_ok=True)
+        super().__init__(path=path, mode=mode, timeout=timeout, k=k, **kwargs)
+
+
+    def _load_data_from_file(self, file_name: str):
+        if file_name is None:
+            return None
+        file_path = os.path.join(self.path, file_name)
+        logger.info(f"file_path is {file_path}")
+        if not os.path.exists(file_path):
+            download_aflow_benchmark_data(dataset="humaneval", save_folder=self.path)
+        
+        return load_json(path=file_path, type="jsonl")
+        
+        
+    def _load_data(self):
+        
+        if self.mode == "train" or self.mode == "all":
+            self._train_data = self._load_data_from_file(file_name=AFLOW_DATASET_FILES_MAP["humaneval"]["train"])
+            self.data = self._train_data
+        if self.mode == "dev" or self.mode == "all":
+            self._dev_data = self._load_data_from_file(file_name=AFLOW_DATASET_FILES_MAP["humaneval"]["dev"])
+            self.data = self._dev_data
+            logger.info(f"self.data is {self.data}")
+        if self.mode == "test" or self.mode == "all":
+            self._test_data = self._load_data_from_file(file_name=AFLOW_DATASET_FILES_MAP["humaneval"]["test"])
+            self.data = self._test_data
+            
+        return self.data
+
+
+    def run_evaluation(self, graph: Callable, va_list: List[int]):
+        # The _load_data method in HumanEval doesn't return data, it populates self._test_data
+        # So we need to get the data from self._test_data instead
+        # if self._test_data is None:
+        #     self._load_data()  # Make sure data is loaded
+        
+        
+        # logger.info(f"self.mode is {self.mode}")
+        # data = self._test_data
+        data = self._load_data()
+        data = data[:1]
+        # logger.info(f"data is {data}")
+        
+        if data is None:
+            logger.error("No test data available. Make sure the data is properly loaded.")
+            return 0.0, 0.0, 0.0
+            
+        results = self.evaluate_all_problems(data, graph)
+        columns = self.get_result_columns()
+        average_score, average_cost, total_cost = self.save_results_to_csv(results, columns)
+        logger.info(f"Average score on {self.name} dataset: {average_score:.5f}")
+        logger.info(f"Total Cost: {total_cost:.5f}")
+        return average_score, average_cost, total_cost
+
+    def evaluate_all_problems(self, data: List[Any], graph: Callable, max_concurrent_tasks: int = 50):
+        results = []
+        for problem in data:
+            results.append(self.evaluate_problem(problem, graph))
+        return results
+
+    def evaluate_problem(self, data: dict, graph: Callable):
+        input_text = data["prompt"]
+        expected_output = (
+            "\nCorrect Solution:\ndef "
+            + data["entry_point"]
+            + "(params you should put here):"
+            + "\n\n"
+            + data["canonical_solution"]
+        )
+
+        try:
+            prediction, cost = self._generate_output(graph, input_text, data["entry_point"])
+            ret = self.check_solution(data["task_id"], prediction, data["test"], data["entry_point"])
+            test_case_details = ret[1]
+            expected_output = test_case_details + expected_output
+            score = 1.0 if ret[0] == self.SUCCESS else 0.0
+            return input_text, prediction, expected_output, score, cost
+
+        except Exception as e:
+            logger.info(f"Maximum retries reached. Skipping this sample. Error: {e}")
+            return input_text, str(e), expected_output, 0.0, 0.0
+
+    def _generate_output(self, graph: Callable, prompt: str, entry_point: str):
+        return graph(prompt, entry_point)
+
+    def get_result_columns(self) -> List[str]:
+        return ["inputs", "prediction", "expected_output", "score", "cost"]
+
+    def save_results_to_csv(self, results: List[Tuple[Any, ...]], columns: List[str]):
+        df = pd.DataFrame(results, columns=columns)
+        avg_score = df["score"].mean()
+        t_cost = df["cost"].max()
+        a_cost = t_cost / len(df) if len(df) > 0 else 0
+        current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"{avg_score:.5f}_{current_time}.csv"
+        output_file = os.path.join(self.log_path, filename)
+        df.to_csv(output_file, index=False)
+        logger.info(f"Results saved to {output_file}")
+        return avg_score, a_cost, t_cost

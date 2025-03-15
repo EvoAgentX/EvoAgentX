@@ -4,6 +4,7 @@
 # @Desc    : Evaluation for different datasets
 
 from typing import Dict, Literal, Tuple, Optional
+# from ..benchmark.humaneval_rh import AFlowHumanEval
 from ..benchmark.humaneval import AFlowHumanEval
 from ..benchmark.benchmark import Benchmark
 from ..models.base_model import BaseLLM
