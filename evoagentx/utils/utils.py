@@ -74,8 +74,20 @@ class CodeDataset(Enum):
 
 
 def extract_test_cases_from_jsonl(entry_point: str, dataset: CodeDataset = CodeDataset.HUMAN_EVAL):
+    # 尝试多个可能的路径位置
+    possible_paths = [
+        # 相对于项目根目录的路径
+        os.path.join("evoagentx", "ext", "aflow", "data", "HumanEval_test_cases.jsonl"),
+        # 相对于当前文件的路径
+        os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 
+                    "ext", "aflow", "data", "HumanEval_test_cases.jsonl"),
+        # 用户主目录下的路径
+        os.path.expanduser("~/.evoagentx/data/HumanEval/HumanEval_test_cases.jsonl"),
+        # 原始路径
+        "data/aflow_benchmark_data/HumanEval/HumanEval_test_cases.jsonl"
+    ]
+    
     if dataset == CodeDataset.HUMAN_EVAL.value:
-        file_path = "data/aflow_benchmark_data/humaneval_public_test.jsonl"
         # Retain the original hardcoded test cases
         hardcoded_cases = {
             "find_zero": "",
@@ -89,6 +101,22 @@ def extract_test_cases_from_jsonl(entry_point: str, dataset: CodeDataset = CodeD
             "sum_squares": "",
             "starts_one_ends": "",
         }
+        
+        # 如果有硬编码的测试用例，直接返回
+        if entry_point in hardcoded_cases:
+            return hardcoded_cases[entry_point]
+        
+        # 尝试所有可能的路径
+        file_path = None
+        for path in possible_paths:
+            if os.path.exists(path):
+                file_path = path
+                break
+        
+        if file_path is None:
+            logger.warning(f"Could not find HumanEval test cases file. Tried paths: {possible_paths}")
+            return None
+            
     elif dataset == CodeDataset.MBPP.value:
         file_path = "data/aflow_benchmark_data/mbpp_public_test.jsonl"
         hardcoded_cases = {
@@ -101,16 +129,24 @@ def extract_test_cases_from_jsonl(entry_point: str, dataset: CodeDataset = CodeD
             "sort_sublists": "",
             "unique_sublists": "",
         }
-    # Check if there are hardcoded test cases
-    if entry_point in hardcoded_cases:
-        return hardcoded_cases[entry_point]
-
-    # If there are no hardcoded test cases, read from the file
-    with open(file_path, "r") as file:
-        for line in file:
-            data = json.loads(line)
-            if data.get("entry_point") == entry_point:
-                return data.get("test")
+        
+        # 如果有硬编码的测试用例，直接返回
+        if entry_point in hardcoded_cases:
+            return hardcoded_cases[entry_point]
+    
+    # 尝试读取文件
+    try:
+        with open(file_path, "r") as file:
+            for line in file:
+                data = json.loads(line)
+                if data.get("entry_point") == entry_point:
+                    return data.get("test")
+    except FileNotFoundError:
+        logger.error(f"Test cases file not found: {file_path}")
+    except json.JSONDecodeError:
+        logger.error(f"Invalid JSON in test cases file: {file_path}")
+    except Exception as e:
+        logger.error(f"Error reading test cases file: {str(e)}")
 
     return None
 

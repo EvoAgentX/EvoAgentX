@@ -5,12 +5,12 @@ import time
 from ..models.base_model import BaseLLM
 from ..utils.data_utils import DataUtils
 from ..utils.experience_utils import ExperienceUtils
-from ..utils.aflow_evaluation_utils import EvaluationUtils
-from ..utils.aflow_utils import GraphUtils
+from ..utils.aflow.aflow_evaluation_utils import EvaluationUtils
+from ..utils.aflow.aflow_utils import GraphUtils
 from pydantic import BaseModel, Field
 from ..workflow.action_graph import HumanEvalActionGraph
 from ..models.model_configs import LLMConfig
-
+from ..utils.aflow.aflow_convergence_utils import ConvergenceUtils
 
 DatasetType = Literal["HumanEval", "MBPP", "GSM8K", "MATH", "HotpotQA", "DROP"]
 QuestionType = Literal["math", "code", "qa"]
@@ -99,6 +99,7 @@ class AFlowOptimizer(Optimizer):
         self.data_utils = DataUtils(self.root_path)
         self.evaluation_utils = EvaluationUtils(self.root_path)
         self.experience_utils = ExperienceUtils(self.root_path)
+        self.convergence_utils = ConvergenceUtils(self.root_path)
         
         self.workflow_graph = None
         self.evaluator = None
@@ -137,6 +138,19 @@ class AFlowOptimizer(Optimizer):
             
             self.round += 1
             logger.info(f"Score for round {self.round}: {score}")
+            
+            converged, convergence_round, final_round = self.convergence_utils.check_convergence(top_k=3)
+
+            logger.info(f"converged is {converged}, convergence_round is {convergence_round}, final_round is {final_round}")
+            
+            
+            if converged and self.check_convergence:
+                logger.info(
+                    f"Convergence detected, occurred in round {convergence_round}, final round is {final_round}"
+                )
+                # Print average scores and standard deviations for each round
+                self.convergence_utils.print_results()
+                break
         
         
     def _optimize_graph(self):

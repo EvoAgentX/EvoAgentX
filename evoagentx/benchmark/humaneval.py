@@ -8,7 +8,7 @@ from ..utils.utils import download_file
 from ..core.module_utils import load_json
 import pandas as pd
 from datetime import datetime
-from ..utils.aflow_utils import AFLOW_DATASET_FILES_MAP, download_aflow_benchmark_data
+from ..utils.aflow.aflow_utils import AFLOW_DATASET_FILES_MAP, download_aflow_benchmark_data
 
 
 def download_raw_humaneval_data(save_folder: str): 

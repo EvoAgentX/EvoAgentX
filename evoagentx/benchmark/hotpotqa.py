@@ -5,7 +5,7 @@ from .measures import exact_match_score, f1_score, acc_score
 from ..core.logging import logger
 from ..core.module_utils import load_json
 from ..utils.utils import download_file
-from ..utils.aflow_utils import AFLOW_DATASET_FILES_MAP, download_aflow_benchmark_data
+from ..utils.aflow.aflow_utils import AFLOW_DATASET_FILES_MAP, download_aflow_benchmark_data
 
 
 HOTPOTQA_FILES_MAP = {"train": "hotpot_train_v1.1.json", "dev": "hotpot_dev_distractor_v1.json", "test": None}

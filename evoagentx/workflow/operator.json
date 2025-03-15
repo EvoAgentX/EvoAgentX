@@ -1,18 +1,22 @@
 {
     "Custom": {
-        "description": "Generates anything based on customized input and instruction.",
+        "description": "Generates anything based on customized input and instruction. IMPORTANT: Must be initialized with llm parameter: operator.Custom(self.llm). DO NOT use operator.Custom() without llm parameter.",
         "interface": "custom(input: str, instruction: str) -> dict with key 'response' of type str"
     },
     "CustomCodeGenerate": {
-        "description": "Generates code based on customized input and instruction.",
-        "interface": "custom_code_generate(problem: str, entry_point: str, instruction: str) -> dict with key 'response' of type str"
+        "description": "Generates code based on customized input and instruction. IMPORTANT: Must be initialized with llm parameter: operator.CustomCodeGenerate(self.llm). DO NOT use operator.CustomCodeGenerate() without llm parameter.",
+        "interface": "custom_code_generate(input: str, instruction: str) -> dict with key 'response' of type str"
+    },
+    "AnswerGenerate": {
+        "description": "Generate step by step based on the input. The step by step thought process is in the field of 'thought', and the final answer is in the field of 'answer'. IMPORTANT: Must be initialized with llm parameter: operator.AnswerGenerate(self.llm). DO NOT use operator.AnswerGenerate() without llm parameter.",
+        "interface": "answer_generate(input: str) -> dict with key 'thought' of type str, 'answer' of type str"
     },
     "ScEnsemble": {
-        "description": "Uses self-consistency to select the solution that appears most frequently in the solution list, improve the selection to enhance the choice of the best solution.",
+        "description": "Uses self-consistency to select the solution that appears most frequently in the solution list, improve the selection to enhance the choice of the best solution. IMPORTANT: Must be initialized with llm parameter: operator.ScEnsemble(self.llm). DO NOT use operator.ScEnsemble() without llm parameter.",
         "interface": "sc_ensemble(solutions: List[str], problem: str) -> dict with key 'response' of type str"
     },
     "Test": {
-        "description": "Tests the solution using public test cases. If the solution fails, it reflects on the errors and attempts to modify the solution. Returns True and the solution if all tests pass after modifications. Returns False and the current solution if it still fails after modifications.",
+        "description": "Test the solution with test cases, if the solution is correct, return 'no error', if the solution is incorrect, return reflect on the soluion and the error information. IMPORTANT: Must be initialized with llm parameter: operator.Test(self.llm). DO NOT use operator.Test() without llm parameter.",
         "interface": "test(problem: str, solution: str, entry_point: str) -> dict with key 'result' of type bool and key 'solution' of type str"
     }
 }

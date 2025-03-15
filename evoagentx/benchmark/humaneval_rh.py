@@ -2,7 +2,7 @@ import os
 from ..core.logging import logger
 from ..core.module_utils import load_json
 from .benchmark import Benchmark
-from ..utils.aflow_utils import AFLOW_DATASET_FILES_MAP, download_aflow_benchmark_data
+from ..utils.aflow.aflow_utils import AFLOW_DATASET_FILES_MAP, download_aflow_benchmark_data
 from typing import Any, Callable, List, Dict, Tuple, Optional
 from ..utils.sanitize import sanitize
 import threading
