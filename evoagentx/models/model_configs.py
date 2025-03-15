@@ -87,7 +87,7 @@ class LiteLLMConfig(LLMConfig):
 class SiliconFlowConfig(LLMConfig):
 
     # LLM keys
-    llm_type: str = "SiliconFlow"
+    llm_type: str = "SiliconFlowLLM"
     siliconflow_key: Optional[str] = Field(default=None, description="the API key used to authenticate SiliconFlow requests") 
     
     # generation parameters 
@@ -120,7 +120,8 @@ class SiliconFlowConfig(LLMConfig):
 class SiliconFlowConfig(LLMConfig):
 
     # LLM keys
-    llm_type: str = "SiliconFlow"
+    # llm_type: str = "SiliconFlow"
+    llm_type: str = "SiliconFlowLLM"
     siliconflow_key: Optional[str] = Field(default=None, description="the API key used to authenticate SiliconFlow requests")
 
     # generation parameters 
@@ -147,6 +148,12 @@ class SiliconFlowConfig(LLMConfig):
 
     def __str__(self):
         return self.model
+
+
+class OpenRouterConfig(OpenAILLMConfig):
+
+    llm_type: str = "OpenRouterLLM"
+    openrouter_key: Optional[str] = Field(default=None, description="the API key used to authenticate OpenRouter requests")
 
 
 # def get_default_device():

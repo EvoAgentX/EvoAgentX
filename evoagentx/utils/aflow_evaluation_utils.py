@@ -1,5 +1,6 @@
 from ..evaluators.aflow_evaluator import AFlowEvaluator
 from ..core.logging import logger
+from tqdm import tqdm
 
 
 class EvaluationUtils:
@@ -33,7 +34,7 @@ class EvaluationUtils:
         # logger.info(f"evaluator is {evaluator}")
         sum_score = 0
 
-        for i in range(validation_n):
+        for _ in tqdm(range(validation_n), desc="Evaluating graph"):
             score, avg_cost, total_cost = evaluator.graph_evaluate(
                 optimizer.dataset,
                 optimizer.graph,

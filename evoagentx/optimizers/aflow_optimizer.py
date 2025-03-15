@@ -149,12 +149,16 @@ class AFlowOptimizer(Optimizer):
         if self.round == 1:
             directory = self.graph_utils.create_round_directory(graph_path, self.round)
             self.graph = self.graph_utils.load_graph(self.round, graph_path)
+            
+            logger.info(f"self.graph is {self.graph}")
 
             avg_score = self.evaluation_utils.evaluate_graph(self, 
                                                              directory, 
                                                              validation_n, 
                                                              data, 
                                                              initial=True)
+            
+            logger.info(f"avg_score is {avg_score}")
             
         while True:
             

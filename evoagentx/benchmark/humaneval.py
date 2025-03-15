@@ -169,7 +169,7 @@ class AFlowHumanEval(HumanEval):
         if file_name is None:
             return None
         file_path = os.path.join(self.path, file_name)
-        logger.info(f"file_path is {file_path}")
+        # logger.info(f"file_path is {file_path}")
         if not os.path.exists(file_path):
             download_aflow_benchmark_data(dataset="humaneval", save_folder=self.path)
         
@@ -184,7 +184,7 @@ class AFlowHumanEval(HumanEval):
         if self.mode == "dev" or self.mode == "all":
             self._dev_data = self._load_data_from_file(file_name=AFLOW_DATASET_FILES_MAP["humaneval"]["dev"])
             self.data = self._dev_data
-            logger.info(f"self.data is {self.data}")
+            # logger.info(f"self.data is {self.data}")
         if self.mode == "test" or self.mode == "all":
             self._test_data = self._load_data_from_file(file_name=AFLOW_DATASET_FILES_MAP["humaneval"]["test"])
             self.data = self._test_data
@@ -202,7 +202,7 @@ class AFlowHumanEval(HumanEval):
         # logger.info(f"self.mode is {self.mode}")
         # data = self._test_data
         data = self._load_data()
-        data = data[:1]
+        # data = data[:1]
         # logger.info(f"data is {data}")
         
         if data is None:
@@ -255,7 +255,7 @@ class AFlowHumanEval(HumanEval):
         avg_score = df["score"].mean()
         t_cost = df["cost"].max()
         a_cost = t_cost / len(df) if len(df) > 0 else 0
-        current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+        current_time = datetime.now().strftime("%Y%m%d_%H-%M-%S")
         filename = f"{avg_score:.5f}_{current_time}.csv"
         output_file = os.path.join(self.log_path, filename)
         df.to_csv(output_file, index=False)

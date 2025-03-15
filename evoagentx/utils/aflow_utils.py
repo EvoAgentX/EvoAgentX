@@ -133,6 +133,8 @@ class GraphUtils:
             log=log_data,
         )
         graph_system = WORKFLOW_OPTIMIZE_PROMPT.format(type=type)
+        
+        logger.info(f"graph_input is {graph_input}")
         return graph_input + WORKFLOW_CUSTOM_USE + graph_system
 
     def get_graph_optimize_response(self, graph_optimize_node):
