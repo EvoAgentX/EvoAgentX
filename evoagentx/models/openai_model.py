@@ -3,10 +3,12 @@ from tenacity import (
     stop_after_attempt,
     wait_random_exponential,
 )
-from openai import OpenAI, Stream 
+from openai import OpenAI, Stream, AsyncOpenAI
 from openai.types.chat import ChatCompletion
 from typing import Optional, List
 from litellm import token_counter, cost_per_token
+import asyncio
+import threading
 from ..core.registry import register_model
 from .model_configs import OpenAILLMConfig
 from .base_model import BaseLLM
@@ -19,9 +21,12 @@ class OpenAILLM(BaseLLM):
     def init_model(self):
         config: OpenAILLMConfig = self.config
         self._client = OpenAI(api_key=config.openai_key)
+        self._async_client = AsyncOpenAI(api_key=config.openai_key)
         self._default_ignore_fields = ["llm_type", "output_response", "openai_key", "deepseek_key", "anthropic_key"] # parameters in OpenAILLMConfig that are not OpenAI models' input parameters 
         if self.config.model not in get_openai_model_cost():
             raise KeyError(f"'{self.config.model}' is not a valid OpenAI model name!")
+        # Add a thread lock for thread safety
+        self._lock = threading.RLock()
 
     def formulate_messages(self, prompts: List[str], system_messages: Optional[List[str]] = None) -> List[List[dict]]:
         
@@ -70,7 +75,7 @@ class OpenAILLM(BaseLLM):
     def get_completion_output(self, response: ChatCompletion, output_response: bool=True) -> str:
         output = response.choices[0].message.content
         if output_response:
-            logger.info(output, flush=True)
+            logger.info("%s", str(output), flush=True)
         return output
 
     @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(5))
@@ -81,14 +86,15 @@ class OpenAILLM(BaseLLM):
 
         try:
             completion_params = self.get_completion_params(**kwargs)
-            response = self._client.chat.completions.create(messages=messages, 
-                                                            **completion_params)
-            if stream:
-                output = self.get_stream_output(response, output_response=output_response)
-                cost = self._stream_cost(messages=messages, output=output)
-            else:
-                output: str = self.get_completion_output(response=response, output_response=output_response)
-                cost = self._completion_cost(response) # calculate completion cost
+            with self._lock:  # Use the lock to prevent thread-local storage issues
+                response = self._client.chat.completions.create(messages=messages, 
+                                                              **completion_params)
+                if stream:
+                    output = self.get_stream_output(response, output_response=output_response)
+                    cost = self._stream_cost(messages=messages, output=output)
+                else:
+                    output: str = self.get_completion_output(response=response, output_response=output_response)
+                    cost = self._completion_cost(response) # calculate completion cost
             self._update_cost(cost=cost)
         except Exception as e:
             if "account balance is insufficient" in str(e):
@@ -124,4 +130,81 @@ class OpenAILLM(BaseLLM):
     
     def _update_cost(self, cost: Cost):
         cost_manager.update_cost(cost=cost, model=self.config.model)
+    
+    async def get_stream_output_async(self, response, output_response: bool=True) -> str:
+        output = ""
+        try:
+            async for chunk in response:
+                content = chunk.choices[0].delta.content
+                if content:
+                    if output_response:
+                        logger.info("%s", content, flush=True)
+                    output += content
+            if output_response:
+                logger.info("")
+        except Exception as e:
+            logger.error(f"Error processing stream response: {e}")
+        return output
+
+    async def single_generate_async(self, messages: List[dict], **kwargs) -> str:
+        stream = kwargs.get("stream", self.config.stream)
+        output_response = kwargs.get("output_response", self.config.output_response)
+
+        try:
+            # Create a completely new client instance to avoid thread-local storage issues
+            # This is a more aggressive approach than using a lock
+            from openai import OpenAI
+            isolated_client = OpenAI(api_key=self.config.openai_key)
+            
+            completion_params = self.get_completion_params(**kwargs)
+            
+            # Use synchronous client in async context to avoid issues
+            loop = asyncio.get_event_loop()
+            response = await loop.run_in_executor(
+                None, 
+                lambda: isolated_client.chat.completions.create(
+                    messages=messages, 
+                    **completion_params
+                )
+            )
+            
+            if stream:
+                # Process stream in synchronous context
+                if hasattr(response, "__aiter__"):
+                    # It's an async stream, convert to synchronous
+                    output = ""
+                    async for chunk in response:
+                        content = chunk.choices[0].delta.content
+                        if content:
+                            if output_response:
+                                logger.info("%s", content, flush=True)
+                            output += content
+                else:
+                    # It's a synchronous stream
+                    output = self.get_stream_output(response, output_response=output_response)
+                
+                cost = self._stream_cost(messages=messages, output=output)
+            else:
+                output: str = self.get_completion_output(response=response, output_response=output_response)
+                cost = self._completion_cost(response) # calculate completion cost
+                
+            self._update_cost(cost=cost)
+        except Exception as e:
+            if "account balance is insufficient" in str(e):
+                print("Warning: Account balance insufficient. Please recharge your account.")
+                return ""
+            raise RuntimeError(f"Error during single_generate_async of OpenAILLM: {str(e)}")
+        
+        return output
+        
+    async def batch_generate_async(self, batch_messages: List[List[dict]], **kwargs) -> List[str]:
+        results = []
+        for messages in batch_messages:
+            try:
+                result = await self.single_generate_async(messages=messages, **kwargs)
+                results.append(result)
+            except Exception as e:
+                logger.error(f"Error in batch_generate_async: {e}")
+                results.append("")  # Add empty string for failed generations
+        return results
     

@@ -9,6 +9,9 @@ from ..core.module_utils import load_json
 import pandas as pd
 from datetime import datetime
 from ..utils.aflow.aflow_utils import AFLOW_DATASET_FILES_MAP, download_aflow_benchmark_data
+from tqdm import tqdm
+import asyncio
+from tqdm.asyncio import tqdm_asyncio
 
 
 def download_raw_humaneval_data(save_folder: str): 
@@ -179,13 +182,16 @@ class AFlowHumanEval(HumanEval):
     def _load_data(self):
         
         if self.mode == "train" or self.mode == "all":
+            logger.info(f"Loading train data from {AFLOW_DATASET_FILES_MAP['humaneval']['train']}")
             self._train_data = self._load_data_from_file(file_name=AFLOW_DATASET_FILES_MAP["humaneval"]["train"])
             self.data = self._train_data
         if self.mode == "dev" or self.mode == "all":
+            logger.info(f"Loading dev data from {AFLOW_DATASET_FILES_MAP['humaneval']['dev']}")
             self._dev_data = self._load_data_from_file(file_name=AFLOW_DATASET_FILES_MAP["humaneval"]["dev"])
             self.data = self._dev_data
             # logger.info(f"self.data is {self.data}")
         if self.mode == "test" or self.mode == "all":
+            logger.info(f"Loading test data from {AFLOW_DATASET_FILES_MAP['humaneval']['test']}")
             self._test_data = self._load_data_from_file(file_name=AFLOW_DATASET_FILES_MAP["humaneval"]["test"])
             self.data = self._test_data
             
@@ -202,7 +208,8 @@ class AFlowHumanEval(HumanEval):
         # logger.info(f"self.mode is {self.mode}")
         # data = self._test_data
         data = self._load_data()
-        # data = data[:1]
+        # data = data[:2]
+        data = data[:1]
         # logger.info(f"data is {data}")
         
         if data is None:
@@ -218,10 +225,20 @@ class AFlowHumanEval(HumanEval):
 
     def evaluate_all_problems(self, data: List[Any], graph: Callable, max_concurrent_tasks: int = 50):
         results = []
-        for problem in data:
+        for problem in tqdm(data, desc="Evaluating problems"):
             results.append(self.evaluate_problem(problem, graph))
         return results
+    
+    async def evaluate_all_problems_async(self, data: List[Any], graph: Callable, max_concurrent_tasks: int = 50):
+        semaphore = asyncio.Semaphore(max_concurrent_tasks)
 
+        async def sem_evaluate(problem):
+            async with semaphore:
+                return await self.evaluate_problem_async(problem, graph)
+
+        tasks = [sem_evaluate(problem) for problem in data]
+        return await tqdm_asyncio.gather(*tasks, desc=f"Evaluating {self.name} problems", total=len(data))
+        
     def evaluate_problem(self, data: dict, graph: Callable):
         input_text = data["prompt"]
         expected_output = (
@@ -245,6 +262,7 @@ class AFlowHumanEval(HumanEval):
             return input_text, str(e), expected_output, 0.0, 0.0
 
     def _generate_output(self, graph: Callable, prompt: str, entry_point: str):
+        # breakpoint()
         return graph(prompt, entry_point)
 
     def get_result_columns(self) -> List[str]:
@@ -261,3 +279,100 @@ class AFlowHumanEval(HumanEval):
         df.to_csv(output_file, index=False)
         logger.info(f"Results saved to {output_file}")
         return avg_score, a_cost, t_cost
+
+    async def run_evaluation_async(self, graph: Callable, va_list: List[int]):
+        data = self._load_data()
+        # data = data[:5]
+        
+        if data is None:
+            logger.error("No test data available. Make sure the data is properly loaded.")
+            return 0.0, 0.0, 0.0
+            
+        results = await self.evaluate_all_problems_async(data, graph)
+        columns = self.get_result_columns()
+        average_score, average_cost, total_cost = self.save_results_to_csv(results, columns)
+        logger.info(f"Average score on {self.name} dataset: {average_score:.5f}")
+        logger.info(f"Total Cost: {total_cost:.5f}")
+        return average_score, average_cost, total_cost
+
+    # async def evaluate_all_problems_async(self, data: List[Any], graph: Callable, max_concurrent_tasks: int = 1):
+    #     results = []
+        
+    #     # Process tasks sequentially to avoid thread-local storage issues
+    #     for problem in data:
+    #         try:
+    #             result = await self.evaluate_problem_async(problem, graph, max_concurrent_tasks)
+    #             results.append(result)
+    #         except Exception as e:
+    #             logger.error(f"Error evaluating problem: {e}")
+    #             # Create a fallback result with error information
+    #             input_text = problem.get("prompt", "")
+    #             expected_output = ""
+    #             if "entry_point" in problem and "canonical_solution" in problem:
+    #                 expected_output = (
+    #                     "\nCorrect Solution:\ndef "
+    #                     + problem["entry_point"]
+    #                     + "(params you should put here):"
+    #                     + "\n\n"
+    #                     + problem["canonical_solution"]
+    #                 )
+    #             results.append((input_text, str(e), expected_output, 0.0, 0.0))
+                
+    #     return results
+    async def evaluate_all_problems_async(self, data: List[dict], graph: Callable, max_concurrent_tasks: int = 50):
+        semaphore = asyncio.Semaphore(max_concurrent_tasks)
+
+        async def sem_evaluate(problem):
+            async with semaphore:
+                return await self.evaluate_problem_async(problem, graph)
+
+        tasks = [sem_evaluate(problem) for problem in data]
+        return await tqdm_asyncio.gather(*tasks, desc=f"Evaluating {self.name} problems", total=len(data))
+
+    async def evaluate_problem_async(self, data: dict, graph: Callable):
+        input_text = data["prompt"]
+        expected_output = (
+            "\nCorrect Solution:\ndef "
+            + data["entry_point"]
+            + "(params you should put here):"
+            + "\n\n"
+            + data["canonical_solution"]
+        )
+
+        try:
+            prediction, cost = await self._generate_output_async(graph, input_text, data["entry_point"])
+            ret = self.check_solution(data["task_id"], prediction, data["test"], data["entry_point"])
+            test_case_details = ret[1]
+            expected_output = test_case_details + expected_output
+            score = 1.0 if ret[0] == self.SUCCESS else 0.0
+            return input_text, prediction, expected_output, score, cost
+
+        except Exception as e:
+            logger.info(f"Maximum retries reached. Skipping this sample. Error: {e}")
+            return input_text, str(e), expected_output, 0.0, 0.0
+    
+    async def _generate_output_async(self, graph: Callable, prompt: str, entry_point: str):
+        # Always run in executor to isolate thread-local storage issues
+        try:
+            # # 检查graph是否是异步函数
+            # import inspect
+            # is_async = inspect.iscoroutinefunction(graph) or inspect.isawaitable(graph)
+            
+            # if is_async:
+            # 如果是异步函数，直接调用并等待
+            from ..core.callbacks import callback_manager
+            callback_manager._initialize_callbacks()
+            return await graph(prompt, entry_point)
+            # else:
+            #     # 如果是普通函数，在executor中运行
+            #     loop = asyncio.get_event_loop()
+            #     def safe_graph_execution():
+            #         from ..core.callbacks import callback_manager
+            #         callback_manager._initialize_callbacks()
+            #         return graph(prompt, entry_point)
+                    
+            #     result = await loop.run_in_executor(None, safe_graph_execution)
+            #     return result
+        except Exception as e:
+            logger.error(f"Error in _generate_output_async: {str(e)}")
+            raise

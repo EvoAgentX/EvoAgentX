@@ -70,7 +70,7 @@ class AFlowHumanEval(HumanEval):
     
     def run_evaluation(self, graph: Callable, va_list: List[int]):
         data = self._load_data()
-        data = data[:1]
+        # data = data[:1]
         # logger.info(f"data is {data}")
         results = self.evaluate_all_problems(data, graph)
         columns = self.get_result_columns()
@@ -107,6 +107,7 @@ class AFlowHumanEval(HumanEval):
         example entry_point:
             can_arrange
         """
+        breakpoint()
         
         return graph(prompt, entry_point)
     

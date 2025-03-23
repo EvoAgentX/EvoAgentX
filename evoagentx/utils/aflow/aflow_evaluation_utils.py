@@ -1,6 +1,7 @@
-from ..evaluators.aflow_evaluator import AFlowEvaluator
-from ..core.logging import logger
+from evoagentx.evaluators.aflow_evaluator import AFlowEvaluator
+from ...core.logging import logger
 from tqdm import tqdm
+import asyncio
 
 
 class EvaluationUtils:
@@ -43,7 +44,7 @@ class EvaluationUtils:
                 is_test=False,
             )
             
-            logger.info(f"score is {score}, avg_cost is {avg_cost}, total_cost is {total_cost}")
+            logger.info("{}".format(f"score is {score}, avg_cost is {avg_cost}, total_cost is {total_cost}"), flush=True)
 
             cur_round = optimizer.round + 1 if initial is False else optimizer.round
 
@@ -63,8 +64,47 @@ class EvaluationUtils:
         score, avg_cost, total_cost = evaluator.graph_evaluate(
             optimizer.dataset,
             optimizer.graph,
-            {"dataset": optimizer.dataset, "llm": optimizer.optimizer_llm},
+            {"dataset": optimizer.dataset, "llm": optimizer.optimizer_llm, "mode": "dev"},
             directory,
             is_test=is_test,
         )
-        return score
+        return score, avg_cost, total_cost
+
+    async def evaluate_graph_async(self, optimizer, directory, validation_n, data, initial=False):
+        evaluator = AFlowEvaluator(eval_path=directory, llm=optimizer.optimizer_llm)
+        sum_score = 0
+        
+        for _ in range(validation_n):
+            score, avg_cost, total_cost = await evaluator.graph_evaluate_async(
+                optimizer.dataset,
+                optimizer.graph,
+                {"dataset": optimizer.dataset, "llm": optimizer.optimizer_llm},
+                directory,
+                is_test=False,
+            )
+            
+            logger.info("{}".format(f"score is {score}, avg_cost is {avg_cost}, total_cost is {total_cost}"), flush=True)
+
+            cur_round = optimizer.round + 1 if initial is False else optimizer.round
+
+            new_data = optimizer.data_utils.create_result_data(cur_round, score, avg_cost, total_cost)
+            data.append(new_data)
+
+            result_path = optimizer.data_utils.get_results_file_path(self.root_path + "/workflows")
+            optimizer.data_utils.save_results(result_path, data)
+            
+            sum_score += score
+            
+        return sum_score / validation_n
+
+
+    async def evaluate_graph_test_async(self, optimizer, directory, is_test=True):
+        evaluator = AFlowEvaluator(eval_path=directory, llm=optimizer.optimizer_llm)
+        score, avg_cost, total_cost = await evaluator.graph_evaluate_async(
+            optimizer.dataset,
+            optimizer.graph,
+            {"dataset": optimizer.dataset, "llm": optimizer.optimizer_llm, "mode": "test"},
+            directory,
+            is_test=is_test,
+        )
+        return score, avg_cost, total_cost

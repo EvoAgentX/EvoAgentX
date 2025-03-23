@@ -2,6 +2,7 @@ from .optimizer import Optimizer
 from typing import Literal, List, Dict
 from ..core.logging import logger
 import time
+import asyncio
 from ..models.base_model import BaseLLM
 from ..utils.data_utils import DataUtils
 from ..utils.experience_utils import ExperienceUtils
@@ -11,6 +12,7 @@ from pydantic import BaseModel, Field
 from ..workflow.action_graph import HumanEvalActionGraph
 from ..models.model_configs import LLMConfig
 from ..utils.aflow.aflow_convergence_utils import ConvergenceUtils
+from tqdm import tqdm
 
 DatasetType = Literal["HumanEval", "MBPP", "GSM8K", "MATH", "HotpotQA", "DROP"]
 QuestionType = Literal["math", "code", "qa"]
@@ -113,18 +115,27 @@ class AFlowOptimizer(Optimizer):
         
     def optimize(self, mode: OptimizerType = "Graph"):
         
+        logger.info(f"mode is {mode}")
+        
         if mode == "Test":
             # TODO
+            test_n = 1
+            for _ in tqdm(range(test_n)):
+                loop = asyncio.get_event_loop()
+                score = loop.run_until_complete(self.test())
             return None
         
         for _ in range(self.max_rounds):
- 
+            
+            loop = asyncio.get_event_loop()
+            
             retry_count = 0
             max_retries = 1
             
             while retry_count < max_retries:
                 try:
-                    score = self._optimize_graph()
+                    # score = await self._optimize_graph()
+                    score = loop.run_until_complete(self._optimize_graph())
                     break
                 except Exception as e:
                     retry_count += 1
@@ -135,6 +146,11 @@ class AFlowOptimizer(Optimizer):
 
                     wait_time = 5 * retry_count
                     time.sleep(wait_time)
+                
+                if retry_count < max_retries:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    
             
             self.round += 1
             logger.info(f"Score for round {self.round}: {score}")
@@ -153,7 +169,7 @@ class AFlowOptimizer(Optimizer):
                 break
         
         
-    def _optimize_graph(self):
+    async def _optimize_graph(self):
         
         validation_n = self.validation_rounds
         graph_path = f"{self.root_path}/workflows"
@@ -166,11 +182,11 @@ class AFlowOptimizer(Optimizer):
             
             logger.info(f"self.graph is {self.graph}")
 
-            avg_score = self.evaluation_utils.evaluate_graph(self, 
-                                                             directory, 
-                                                             validation_n, 
-                                                             data, 
-                                                             initial=True)
+            avg_score = await self.evaluation_utils.evaluate_graph_async(self, 
+                                                                   directory, 
+                                                                   validation_n, 
+                                                                   data, 
+                                                                   initial=True)
             
             logger.info(f"avg_score is {avg_score}")
             
@@ -197,7 +213,11 @@ class AFlowOptimizer(Optimizer):
                 self.type, log_data
             )
             
-            response = self.action_graph.execute(graph_optimize_prompt)
+            # This is where we make the LLM call - potentially async
+            response = await self.action_graph.execute_async(graph_optimize_prompt)
+        
+            
+            logger.info(f"response is {response}")
             
             check = self.experience_utils.check_modification(
                 processed_experience,
@@ -205,8 +225,12 @@ class AFlowOptimizer(Optimizer):
                 sample["round"]
             )
             
+            logger.info(f"check is {check}")
+            
             if check:
                 break
+        
+        logger.info(f"response is {response}")
             
         # Save the graph and evaluate
         self.graph_utils.write_graph_files(
@@ -226,7 +250,7 @@ class AFlowOptimizer(Optimizer):
             graph_path
         )
         
-        avg_score = self.evaluation_utils.evaluate_graph(
+        avg_score = await self.evaluation_utils.evaluate_graph_async(
             self, directory,
             validation_n,
             data,
@@ -240,8 +264,36 @@ class AFlowOptimizer(Optimizer):
         )
         
         return avg_score
+    
+    async def test(self):
+        
+        logger.info(f"Testing...")
+        
+        rounds = [7, 8]
+        data = []
+        
+        graph_path = f"{self.root_path}/workflows_test"
+        json_file_path = self.data_utils.get_results_file_path(graph_path)
+        
+        for round in tqdm(rounds, desc="Testing"):
+            directory = self.graph_utils.create_round_directory(
+                graph_path, round
+            )
+            self.graph = self.graph_utils.load_graph(
+                round, graph_path
+            )
             
-
+            logger.info(f"self.graph is {self.graph}")
+            logger.info(f"directory is {directory}")
+            
+            score, avg_cost, total_cost = await self.evaluation_utils.evaluate_graph_test_async(self, 
+                                                                                                directory, 
+                                                                                                is_test=True)
+            
+            new_data = self.data_utils.create_result_data(round, score, avg_cost, total_cost)
+            data.append(new_data)
+            
+            self.data_utils.save_results(json_file_path, data)
 
         
         

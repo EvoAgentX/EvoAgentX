@@ -1,6 +1,6 @@
 import json
 from pydantic import Field
-from typing import Type, Optional, List, Any
+from typing import Coroutine, Type, Optional, List, Any
 
 from ..core.module import BaseModule
 from ..models.base_model import BaseLLM
@@ -45,6 +45,12 @@ class Operator(BaseModule):
     def execute(self, *args, **kwargs) -> dict:
         raise NotImplementedError(f"The execute function for {type(self).__name__} is not implemented!")
     
+    # async def __call__(self, *args: Any, **kwargs: Any) -> dict:
+    #     return await self.execute_async(*args, **kwargs)
+    
+    async def execute_async(self, *args, **kwargs) -> dict:
+        raise NotImplementedError(f"The execute function for {type(self).__name__} is not implemented!")
+    
     def save_module(self, path: str, ignore: List[str] = [], **kwargs)-> str:
         ignore_fields = self._save_ignore_fields + ignore
         super().save_module(path=path, ignore=ignore_fields, **kwargs)
@@ -81,6 +87,17 @@ class Custom(Operator):
         response = self.llm.generate(prompt=prompt, parser=self.outputs_format, parse_mode="str")
         output = response.get_structured_data()
         return output 
+    
+    async def execute_async(self, input: str, instruction: str) -> dict:
+        prompt = instruction + input
+        response = await self.llm.generate_async(prompt=prompt, parser=self.outputs_format, parse_mode="str")
+        output = response.get_structured_data()
+        return output 
+    
+    # def execute
+    
+    # def execute_async(self, *args, **kwargs) -> Coroutine[Any, Any, dict]:
+    #     return super().execute_async(*args, **kwargs)   
 
 
 class AnswerGenerateOutput(OperatorOutput):
@@ -119,14 +136,30 @@ class ScEnsemble(Operator):
         super().__init__(name=name, description=description, interface=interface, llm=llm, outputs_format=ScEnsembleOutput, prompt=prompt, **kwargs)
     
     def execute(self, solutions: List[str], problem: str = None) -> dict:
+        # breakpoint()
         answer_mapping = {} 
         solution_text = "" 
         for index, solution in enumerate(solutions):
             answer_mapping[chr(65+index)] = index
             solution_text += f"{chr(65 + index)}: \n{str(solution)}\n\n\n"
         # prompt = SC_ENSEMBLE_PROMPT.format(solutions=solution_text)
+        # breakpoint()
         prompt = self.prompt.format(solutions=solution_text)
         response = self.llm.generate(prompt=prompt, parser=self.outputs_format, parse_mode="xml")
+        answer: str = response.get_structured_data().get("solution_letter", "")
+        answer = answer.strip().upper()
+        return {"response": solutions[answer_mapping[answer]]}
+    
+    async def execute_async(self, solutions: List[str], problem: str = None) -> dict:
+        # breakpoint()
+        answer_mapping = {} 
+        solution_text = "" 
+        for index, solution in enumerate(solutions):
+            answer_mapping[chr(65+index)] = index
+            solution_text += f"{chr(65 + index)}: \n{str(solution)}\n\n\n"
+        # prompt = SC_ENSEMBLE_PROMPT.format(solutions=solution_text)   
+        prompt = self.prompt.format(solutions=solution_text)
+        response = await self.llm.generate_async(prompt=prompt, parser=self.outputs_format, parse_mode="xml")
         answer: str = response.get_structured_data().get("solution_letter", "")
         answer = answer.strip().upper()
         return {"response": solutions[answer_mapping[answer]]}
@@ -171,10 +204,12 @@ class Test(Operator):
     def exec_code(self, solution, entry_point):
 
         test_cases = extract_test_cases_from_jsonl(entry_point, dataset="HumanEval")
+        # breakpoint()
                 
         fail_cases = []
         for test_case in test_cases:
             test_code = test_case_2_test_function(solution, test_case, entry_point)
+            # breakpoint()
             try:
                 exec(test_code, globals())
             except AssertionError as e:
@@ -201,28 +236,40 @@ class Test(Operator):
             return "no error"
         
     def _process_llm_response(self, response):
-        """
-        处理 LLM 的响应，确保返回的是有效的 TestOutput 格式
-        """
         try:
-            # 尝试从响应中获取结构化数据
-            output = response.get_structured_data()
-            
-            # 检查是否有 reflection_and_solution 字段
-            if "reflection_and_solution" in output:
-                logger.info("Found reflection_and_solution field in LLM response")
-                return output["reflection_and_solution"]
-            
-            # 如果没有，则尝试从内容中提取代码
             content = response.content
-            logger.info(f"Extracting code from LLM response content: {content[:100]}...")
             
-            # 尝试提取代码块
-            code_blocks = re.findall(r'```python\s*(.*?)\s*```', content, re.DOTALL)
-            if code_blocks:
-                logger.info(f"Found {len(code_blocks)} code blocks in LLM response")
-                return code_blocks[0]  # 返回第一个代码块
+            # 尝试提取JSON内容
+            import json
+            import re
             
+            # 1. 尝试直接解析完整的JSON
+            try:
+                data = json.loads(content)
+                if "reflection_and_solution" in data:
+                    return data["reflection_and_solution"]
+            except json.JSONDecodeError:
+                pass
+                
+            # 2. 尝试用正则表达式提取JSON部分
+            json_pattern = r'```json\s*([\s\S]*?)\s*```'
+            match = re.search(json_pattern, content)
+            if match:
+                try:
+                    json_str = match.group(1)
+                    data = json.loads(json_str)
+                    if "reflection_and_solution" in data:
+                        return data["reflection_and_solution"]
+                except json.JSONDecodeError:
+                    pass
+            
+            # 3. 直接查找代码块
+            code_pattern = r'```(?:python)?\s*([\s\S]*?)\s*```'
+            code_matches = re.findall(code_pattern, content)
+            if code_matches:
+                # 返回最后一个代码块
+                return code_matches[-1].strip()
+                
             # 如果没有代码块，则返回原始内容
             return content
         except Exception as e:
@@ -230,11 +277,12 @@ class Test(Operator):
             logger.error(f"Error processing LLM response: {e}")
             return response.content
         
-    def __call__(
+    async def execute_async(
         self, problem, solution, entry_point, test_loop: int = 3
     ):
         try:
             for _ in range(test_loop):
+                # breakpoint()
                 result = self.exec_code(solution, entry_point)
                 if result == "no error":
                     return {"result": True, "solution": solution}
@@ -246,7 +294,7 @@ class Test(Operator):
                         exec_pass=f"executed unsuccessfully, error: \n {result}",
                         test_fail="executed unsucessfully",
                     )
-                    response = self.llm.generate(prompt=prompt, parser=None, parse_mode="str")
+                    response = await self.llm.generate_async(prompt=prompt, parser=None, parse_mode="str")
                     solution = self._process_llm_response(response)
                 else:
                     prompt = REFLECTION_ON_PUBLIC_TEST_PROMPT.format(
@@ -255,7 +303,7 @@ class Test(Operator):
                         exec_pass="executed successfully",
                         test_fail=result,
                     )
-                    response = self.llm.generate(prompt=prompt, parser=None, parse_mode="str")
+                    response = await self.llm.generate_async    (prompt=prompt, parser=None, parse_mode="str")
                     solution = self._process_llm_response(response)
             
             result = self.exec_code(solution, entry_point)
@@ -290,4 +338,10 @@ class CustomCodeGenerate(Operator):
         output = response.get_structured_data()
         # logger.info(f"CustomCodeGenerate output is {output}")
         # print(f"CustomCodeGenerate output is {output}")
+        return output 
+    
+    async def execute_async(self, input: str, instruction: str) -> dict:
+        prompt = instruction + input
+        response = await self.llm.generate_async(prompt=prompt, parser=self.outputs_format, parse_mode="str")
+        output = response.get_structured_data()
         return output 

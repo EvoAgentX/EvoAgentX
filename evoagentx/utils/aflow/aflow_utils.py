@@ -1,8 +1,8 @@
 import os 
 import tarfile
-from .utils import download_file
-from ..core.logging import logger
-from ..prompts.aflow_optimize_prompt import WORKFLOW_INPUT, WORKFLOW_OPTIMIZE_PROMPT, WORKFLOW_CUSTOM_USE, WORKFLOW_TEMPLATE
+from ..utils import download_file
+from ...core.logging import logger
+from ...prompts.aflow_optimize_prompt import WORKFLOW_INPUT, WORKFLOW_OPTIMIZE_PROMPT, WORKFLOW_CUSTOM_USE, WORKFLOW_TEMPLATE
 from typing import List
 import re
 import json
@@ -134,7 +134,7 @@ class GraphUtils:
         )
         graph_system = WORKFLOW_OPTIMIZE_PROMPT.format(type=type)
         
-        logger.info(f"graph_input is {graph_input}")
+        # logger.info(f"graph_input is {graph_input}")
         return graph_input + WORKFLOW_CUSTOM_USE + graph_system
 
     def get_graph_optimize_response(self, graph_optimize_node):
@@ -158,6 +158,9 @@ class GraphUtils:
     def write_graph_files(self, directory: str, response: dict, round_number: int, dataset: str):
         graph = WORKFLOW_TEMPLATE.format(graph=response["graph"], round=round_number, dataset=dataset)
 
+        # logger.info(f"graph is {graph}")
+        
+        
         with open(os.path.join(directory, "graph.py"), "w", encoding="utf-8") as file:
             file.write(graph)
 

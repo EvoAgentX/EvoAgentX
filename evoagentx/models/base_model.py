@@ -2,6 +2,7 @@ import yaml
 from abc import ABC, abstractmethod
 from pydantic import Field
 from typing import Union, Optional, Type, Callable, List
+import asyncio
 
 from ..core.parser import Parser
 from .model_configs import LLMConfig
@@ -336,6 +337,104 @@ class BaseLLM(ABC):
                 raise ValueError(f"'prompt' must be a str or List[str], but found {type(prompt)}.")
         
         generated_texts = self.batch_generate(batch_messages=messages, **kwargs)
+        parsed_outputs = self.parse_generated_texts(texts=generated_texts, parser=parser, parse_mode=parse_mode, parse_func=parse_func, **kwargs)
+        output = parsed_outputs[0] if single_generate else parsed_outputs
+
+        return output
+
+    @abstractmethod
+    async def single_generate_async(self, messages: List[dict], **kwargs) -> str:
+        """
+        Async version of single_generate.
+        Generate LLM output for a given prompt asynchronously.
+
+        Args:
+            messages (List[dict]): the input messages to the LLM.
+            **kwargs: Additional keyword arguments for generation configuration.
+        
+        Returns:
+            str: the generated output from LLM.
+        """
+        # Default implementation for backward compatibility
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(None, self.single_generate, messages, **kwargs)
+        return result
+
+    @abstractmethod
+    async def batch_generate_async(self, batch_messages: List[List[dict]], **kwargs) -> List[str]:
+        """
+        Async version of batch_generate.
+        Generate outputs for a batch of prompts asynchronously.
+
+        Args: 
+            batch_messages (List[List[dict]]): a batch of input messages to the LLM.
+            **kwargs: Additional keyword arguments for generation configuration.
+        
+        Returns:
+            List[str]: a list of generated outputs from LLM.
+        """
+        # Default implementation for backward compatibility
+        tasks = [self.single_generate_async(messages, **kwargs) for messages in batch_messages]
+        return await asyncio.gather(*tasks)
+
+    async def generate_async(
+        self,
+        prompt: Optional[Union[str, List[str]]] = None,
+        system_message: Optional[Union[str, List[str]]] = None,
+        messages: Optional[Union[List[dict],List[List[dict]]]] = None,
+        parser: Optional[Type[LLMOutputParser]] = None,
+        parse_mode: Optional[str] = "json", 
+        parse_func: Optional[Callable] = None,
+        **kwargs
+    ) -> Union[LLMOutputParser, List[LLMOutputParser]]:
+        """
+        Async version of generate.
+        Generate LLM output(s) for (a) prompt(s)/messages and parse the result into an LLMOutputParser object.
+
+        Args:
+            prompt (Union[str, List[str]]): the input to the LLM. 
+            system_message (str): the system message for the LLM. 
+            messages: (Union[List[dict],List[List[dict]]]): the chat message for the LLM. 
+            parser (Optional[Type[LLMOutputParser]]): A LLMOutputParser (sub)class used to parse the LLM output.
+                This class should implement .parse() method to parse the output. If None, LLMOutputParser will be used by default.
+        
+        Returns:
+            Union[LLMOutputParser, List[LLMOutputParser]]: Parsed output(s) from the LLM.
+        """
+        if not (prompt or messages):
+            raise ValueError("Either 'prompt' or 'messages' must be provided.")
+        if prompt and messages:
+            raise ValueError("Both 'prompt' and 'messages' are provided. Please provide only one of them.")
+
+        single_generate = False
+        if messages is not None:
+            if not messages: # empty messages
+                return [] 
+            if isinstance(messages[0], dict):
+                single_generate = True
+                messages = [messages]
+        
+        if prompt is not None:
+            if isinstance(prompt, str):
+                single_generate = True
+                prompt = [prompt]
+                if system_message:
+                    if not isinstance(system_message, str):
+                        raise TypeError(f"'system_message' should be a string when passing a single prompt, but found {type(system_message)}.")
+                    system_message = [system_message]
+                messages = self.formulate_messages(prompts=prompt, system_messages=system_message)
+            elif isinstance(prompt, list) and all(isinstance(p, str) for p in prompt):
+                single_generate = False
+                if not prompt: # empty prompt
+                    return []
+                if system_message:
+                    if not isinstance(system_message, list) or len(prompt) != len(system_message):
+                        raise ValueError(f"'system_message' should be a list of string when passing multiple prompts and the number of prompts ({len(prompt)}) must match the number of system messages ({len(system_message)}).")
+                messages = self.formulate_messages(prompts=prompt, system_messages=system_message)
+            else:
+                raise ValueError(f"'prompt' must be a str or List[str], but found {type(prompt)}.")
+        
+        generated_texts = await self.batch_generate_async(batch_messages=messages, **kwargs)
         parsed_outputs = self.parse_generated_texts(texts=generated_texts, parser=parser, parse_mode=parse_mode, parse_func=parse_func, **kwargs)
         output = parsed_outputs[0] if single_generate else parsed_outputs
 

@@ -77,14 +77,14 @@ def extract_test_cases_from_jsonl(entry_point: str, dataset: CodeDataset = CodeD
     # 尝试多个可能的路径位置
     possible_paths = [
         # 相对于项目根目录的路径
-        os.path.join("evoagentx", "ext", "aflow", "data", "HumanEval_test_cases.jsonl"),
+        os.path.join("evoagentx", "ext", "aflow", "data", "humaneval_public_test.jsonl"),
         # 相对于当前文件的路径
         os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 
-                    "ext", "aflow", "data", "HumanEval_test_cases.jsonl"),
+                    "ext", "aflow", "data", "humaneval_test.jsonl"),
         # 用户主目录下的路径
-        os.path.expanduser("~/.evoagentx/data/HumanEval/HumanEval_test_cases.jsonl"),
+        os.path.expanduser("~/.evoagentx/data/HumanEval/humaneval_public_test.jsonl"),
         # 原始路径
-        "data/aflow_benchmark_data/HumanEval/HumanEval_test_cases.jsonl"
+        "data/aflow_benchmark_data/HumanEval/humaneval_public_test.jsonl"
     ]
     
     if dataset == CodeDataset.HUMAN_EVAL.value:
@@ -113,6 +113,7 @@ def extract_test_cases_from_jsonl(entry_point: str, dataset: CodeDataset = CodeD
                 file_path = path
                 break
         
+        # 如果找不到文件，尝试下载
         if file_path is None:
             logger.warning(f"Could not find HumanEval test cases file. Tried paths: {possible_paths}")
             return None
@@ -135,11 +136,13 @@ def extract_test_cases_from_jsonl(entry_point: str, dataset: CodeDataset = CodeD
             return hardcoded_cases[entry_point]
     
     # 尝试读取文件
+    # breakpoint()
     try:
         with open(file_path, "r") as file:
             for line in file:
                 data = json.loads(line)
                 if data.get("entry_point") == entry_point:
+                    # breakpoint()
                     return data.get("test")
     except FileNotFoundError:
         logger.error(f"Test cases file not found: {file_path}")

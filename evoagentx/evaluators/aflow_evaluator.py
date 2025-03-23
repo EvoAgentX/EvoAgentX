@@ -10,6 +10,8 @@ from ..benchmark.benchmark import Benchmark
 from ..models.base_model import BaseLLM
 from ..agents.agent_manager import AgentManager
 from .evaluator import Evaluator
+from ..core.logging import logger
+import asyncio
 
 # If you want to customize tasks, add task types here and provide evaluation functions, just like the ones given above
 DatasetType = Literal["HumanEval", "MBPP", "GSM8K", "MATH", "HotpotQA", "DROP"]
@@ -72,8 +74,41 @@ class AFlowEvaluator(Evaluator):
             va_list = None  # For test data, generally use None to test all
         else:
             va_list = None  # Use None to test all Validation data, or set va_list (e.g., [1, 2, 3]) to use partial data
-                
+        
+        
+        # logger.info(f"Configuring graph is {configured_graph}")
+         
         return benchmark.run_evaluation(configured_graph, va_list)
+
+    async def graph_evaluate_async(
+        self, dataset: DatasetType, 
+        graph, 
+        params: dict, 
+        path: str, 
+        is_test: bool = False
+    ) -> Tuple[float, float, float]:
+        if dataset not in self.dataset_configs:
+            raise ValueError(f"Unsupported dataset: {dataset}")
+
+        data_path = self._get_data_path(dataset, is_test)
+        benchmark_class = self.dataset_configs[dataset]
+        benchmark = benchmark_class(file_path=data_path, 
+                                    log_path=path,
+                                    path=params.get("path", "evoagentx/ext/aflow/data"),
+                                    mode=params.get("mode", "dev"))
+
+        configured_graph = self._configure_graph(dataset, 
+                                                 graph, 
+                                                 params)
+        if is_test:
+            va_list = None  # For test data, generally use None to test all
+        else:
+            va_list = None  # Use None to test all Validation data, or set va_list (e.g., [1, 2, 3]) to use partial data
+        
+        
+        # logger.info(f"Configuring graph is {configured_graph}")
+         
+        return await benchmark.run_evaluation_async(configured_graph, va_list)
 
     def _configure_graph(self, dataset, graph, params: dict):
         # Here you can configure the graph based on params

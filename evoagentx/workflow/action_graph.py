@@ -2,6 +2,7 @@ import json
 from pydantic import Field
 from typing import Any, Optional, Callable, Dict, List
 import re
+import asyncio
 from ..core.logging import logger
 from ..core.module import BaseModule
 from ..core.registry import MODEL_REGISTRY, MODULE_REGISTRY
@@ -27,6 +28,16 @@ class ActionGraph(BaseModule):
     
     def execute(self, *args, **kwargs) -> dict:
         raise NotImplementedError(f"The execute function for {type(self).__name__} is not implemented!")
+    
+    async def execute_async(self, *args, **kwargs) -> dict:
+        """
+        Async version of the execute method.
+        Default implementation for backward compatibility - override in subclasses for true async behavior.
+        """
+        # By default, just call the synchronous method - subclasses should override
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(None, self.execute, *args, **kwargs)
+        return result
     
     def get_graph_info(self, **kwargs) -> dict:
         """
@@ -160,6 +171,27 @@ class HumanEvalActionGraph(ActionGraph):
     def execute(self, problem: str) -> dict:
         
         response = self._llm.generate(prompt=problem, parser=GraphOptimize, parse_mode="xml")
+
+        return {
+            "modification": response.modification,
+            "graph": response.graph,
+            "prompt": response.prompt
+        }
+        
+    async def execute_async(self, problem: str) -> dict:
+        """
+        Async version of the execute method.
+        """
+        # Assuming the LLM has an async generate method, otherwise we'd need to use run_in_executor
+        # if hasattr(self._llm, 'generate_async'):
+        response = await self._llm.generate_async(prompt=problem, parser=GraphOptimize, parse_mode="xml")
+        # else:
+        #     # Fallback to synchronous method if async not available
+        #     loop = asyncio.get_event_loop()
+        #     response = await loop.run_in_executor(
+        #         None, 
+        #         lambda: self._llm.generate(prompt=problem, parser=GraphOptimize, parse_mode="xml")
+        #     )
 
         return {
             "modification": response.modification,
