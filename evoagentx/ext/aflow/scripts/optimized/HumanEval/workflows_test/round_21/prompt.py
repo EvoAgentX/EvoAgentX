@@ -1,0 +1,1 @@
+Log detailed error for analysis.

@@ -8967,3 +8967,1335 @@ test_error of tri
 test_error of tri
 test_error of tri
 test_error of tri
+below_threshold unterminated string literal (detected at line 4) (<string>, line 4)
+concatenate invalid syntax (<string>, line 2)
+strlen unterminated string literal (detected at line 2) (<string>, line 2)
+sorted_list_sum invalid character '’' (U+2019) (<string>, line 7)
+closest_integer unterminated string literal (detected at line 8) (<string>, line 8)
+decimal_to_binary unterminated string literal (detected at line 2) (<string>, line 2)
+rounded_avg unterminated string literal (detected at line 38) (<string>, line 38)
+get_row unterminated string literal (detected at line 2) (<string>, line 2)
+numerical_letter_grade invalid syntax (<string>, line 2)
+minSubArraySum invalid character '’' (U+2019) (<string>, line 4)
+separate_paren_groups invalid syntax (<string>, line 2)
+triples_sum_to_zero unterminated string literal (detected at line 2) (<string>, line 2)
+sort_array invalid character '’' (U+2019) (<string>, line 4)
+total_match unterminated string literal (detected at line 8) (<string>, line 8)
+tri unterminated string literal (detected at line 2) (<string>, line 2)
+factorize unterminated string literal (detected at line 2) (<string>, line 2)
+solution unterminated string literal (detected at line 4) (<string>, line 4)
+eat unterminated string literal (detected at line 2) (<string>, line 2)
+match_parens unterminated string literal (detected at line 4) (<string>, line 4)
+generate_integers unterminated string literal (detected at line 4) (<string>, line 4)
+next_smallest unterminated string literal (detected at line 2) (<string>, line 2)
+compare_one unterminated string literal (detected at line 8) (<string>, line 8)
+median unterminated string literal (detected at line 2) (<string>, line 2)
+prime_fib unterminated string literal (detected at line 7) (<string>, line 7)
+all_prefixes unterminated string literal (detected at line 2) (<string>, line 2)
+f unterminated string literal (detected at line 7) (<string>, line 7)
+find_closest_elements invalid syntax (<string>, line 2)
+count_nums invalid syntax (<string>, line 2)
+valid_date unterminated string literal (detected at line 9) (<string>, line 9)
+smallest_change unterminated string literal (detected at line 8) (<string>, line 8)
+any_int invalid character '’' (U+2019) (<string>, line 2)
+reverse_delete unterminated string literal (detected at line 2) (<string>, line 2)
+choose_num invalid character '’' (U+2019) (<string>, line 8)
+get_closest_vowel unterminated string literal (detected at line 8) (<string>, line 8)
+derivative invalid syntax (<string>, line 2)
+unique_digits unterminated string literal (detected at line 2) (<string>, line 2)
+maximum unterminated string literal (detected at line 8) (<string>, line 8)
+intersperse unterminated string literal (detected at line 2) (<string>, line 2)
+sorted_list_sum unterminated triple-quoted string literal (detected at line 14) (<string>, line 4)
+prod_signs unterminated string literal (detected at line 51) (<string>, line 51)
+sort_third invalid character '’' (U+2019) (<string>, line 9)
+test_error of closest_integer
+test_error of sort_array
+test_error of sort_array
+string_to_md5 unterminated string literal (detected at line 2) (<string>, line 2)
+max_element invalid character '’' (U+2019) (<string>, line 6)
+test_error of eat
+test_error of eat
+test_error of eat
+test_error of tri
+test_error of tri
+test_error of generate_integers
+modp invalid syntax (<string>, line 2)
+intersection unterminated string literal (detected at line 14) (<string>, line 14)
+test_error of count_nums
+double_the_difference invalid syntax (<string>, line 2)
+test_error of median
+test_error of get_closest_vowel
+make_a_pile unterminated string literal (detected at line 2) (<string>, line 2)
+sort_third '[' was never closed (<string>, line 12)
+unique unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of sort_array
+test_error of sort_array
+iscube unterminated string literal (detected at line 4) (<string>, line 4)
+is_happy unterminated string literal (detected at line 40) (<string>, line 40)
+filter_by_substring invalid character '’' (U+2019) (<string>, line 2)
+truncate_number invalid character '’' (U+2019) (<string>, line 4)
+test_error of closest_integer
+incr_list invalid character '’' (U+2019) (<string>, line 2)
+test_error of eat
+test_error of eat
+test_error of eat
+fib4 invalid syntax (<string>, line 2)
+pairs_sum_to_zero invalid character '’' (U+2019) (<string>, line 4)
+search invalid character '’' (U+2019) (<string>, line 2)
+skjkasdkd invalid character '’' (U+2019) (<string>, line 8)
+Strongest_Extension unterminated string literal (detected at line 2) (<string>, line 2)
+remove_duplicates invalid character '’' (U+2019) (<string>, line 2)
+file_name_check unterminated string literal (detected at line 41) (<string>, line 41)
+split_words unterminated string literal (detected at line 35) (<string>, line 35)
+strange_sort_list invalid character '’' (U+2019) (<string>, line 8)
+test_error of tri
+test_error of tri
+test_error of count_nums
+test_error of median
+prime_length unterminated string literal (detected at line 8) (<string>, line 8)
+encode unterminated string literal (detected at line 7) (<string>, line 7)
+fizz_buzz invalid syntax (<string>, line 2)
+is_bored unterminated string literal (detected at line 4) (<string>, line 4)
+filter_integers unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of intersection
+encrypt unterminated string literal (detected at line 2) (<string>, line 2)
+sort_third '[' was never closed (<string>, line 12)
+sum_product unterminated string literal (detected at line 2) (<string>, line 2)
+int_to_mini_roman invalid syntax (<string>, line 2)
+test_error of sort_array
+test_error of sort_array
+is_sorted unterminated string literal (detected at line 2) (<string>, line 2)
+bf invalid character '’' (U+2019) (<string>, line 2)
+test_error of closest_integer
+exchange unterminated string literal (detected at line 2) (<string>, line 2)
+odd_count unterminated string literal (detected at line 8) (<string>, line 8)
+fruit_distribution unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of eat
+test_error of eat
+test_error of eat
+multiply invalid character '’' (U+2019) (<string>, line 2)
+select_words unterminated string literal (detected at line 9) (<string>, line 9)
+greatest_common_divisor invalid syntax (<string>, line 2)
+circular_shift unterminated string literal (detected at line 2) (<string>, line 2)
+string_xor unterminated string literal (detected at line 9) (<string>, line 9)
+get_max_triples unterminated string literal (detected at line 21) (<string>, line 21)
+test_error of count_nums
+largest_prime_factor unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of median
+sort_third '[' was never closed (<string>, line 12)
+test_error of encode
+test_error of encode
+below_zero invalid syntax (<string>, line 2)
+test_error of intersection
+test_error of is_sorted
+anti_shuffle unterminated string literal (detected at line 8) (<string>, line 8)
+fix_spaces unterminated string literal (detected at line 2) (<string>, line 2)
+flip_case invalid syntax (<string>, line 2)
+test_error of exchange
+test_error of bf
+bf expected an indented block after function definition on line 19 (<string>, line 22)
+will_it_fly invalid syntax (<string>, line 2)
+parse_music invalid character '’' (U+2019) (<string>, line 8)
+words_in_sentence invalid character '’' (U+2019) (<string>, line 2)
+parse_nested_parens unterminated string literal (detected at line 2) (<string>, line 2)
+is_simple_power invalid syntax (<string>, line 2)
+x_or_y invalid character '’' (U+2019) (<string>, line 2)
+car_race_collision invalid character '’' (U+2019) (<string>, line 6)
+largest_prime_factor unterminated triple-quoted string literal (detected at line 29) (<string>, line 3)
+same_chars unterminated string literal (detected at line 7) (<string>, line 7)
+is_equal_to_sum_even expected 'else' after 'if' expression (<string>, line 2)
+closest_integer unterminated string literal (detected at line 8) (<string>, line 8)
+largest_smallest_integers invalid character '’' (U+2019) (<string>, line 8)
+sort_array invalid character '’' (U+2019) (<string>, line 4)
+mean_absolute_deviation invalid syntax (<string>, line 2)
+test_error of encode
+test_error of encode
+simplify invalid character '’' (U+2019) (<string>, line 8)
+eat unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of is_sorted
+even_odd_palindrome unterminated string literal (detected at line 9) (<string>, line 9)
+test_error of intersection
+is_palindrome unterminated string literal (detected at line 2) (<string>, line 2)
+count_nums invalid syntax (<string>, line 2)
+test_error of exchange
+test_error of bf
+bf expected an indented block after function definition on line 14 (<string>, line 17)
+fibfib unterminated string literal (detected at line 2) (<string>, line 2)
+pluck invalid character '’' (U+2019) (<string>, line 2)
+make_palindrome unterminated string literal (detected at line 2) (<string>, line 2)
+common invalid syntax (<string>, line 2)
+move_one_ball unterminated string literal (detected at line 2) (<string>, line 2)
+sort_array invalid syntax (<string>, line 2)
+sort_third invalid character '’' (U+2019) (<string>, line 9)
+median unterminated string literal (detected at line 2) (<string>, line 2)
+rescale_to_unit invalid syntax (<string>, line 2)
+monotonic unterminated string literal (detected at line 4) (<string>, line 4)
+histogram unterminated string literal (detected at line 9) (<string>, line 9)
+test_error of closest_integer
+test_error of sort_array
+test_error of sort_array
+test_error of car_race_collision
+test_error of car_race_collision
+test_error of car_race_collision
+test_error of car_race_collision
+count_up_to unterminated string literal (detected at line 7) (<string>, line 7)
+is_simple_power unterminated triple-quoted string literal (detected at line 14) (<string>, line 4)
+find_max unterminated string literal (detected at line 8) (<string>, line 8)
+test_error of encode
+test_error of encode
+test_error of eat
+test_error of eat
+test_error of eat
+sort_even invalid character '’' (U+2019) (<string>, line 4)
+minPath unterminated string literal (detected at line 8) (<string>, line 8)
+cycpattern_check unterminated string literal (detected at line 4) (<string>, line 4)
+test_error of is_sorted
+add_elements unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of exchange
+sort_third '[' was never closed (<string>, line 12)
+get_odd_collatz invalid syntax (<string>, line 2)
+test_error of bf
+bf expected an indented block after function definition on line 14 (<string>, line 17)
+test_error of sort_array
+test_error of sort_array
+specialFilter unterminated string literal (detected at line 7) (<string>, line 7)
+has_close_elements unterminated string literal (detected at line 4) (<string>, line 4)
+test_error of median
+test_error of eat
+test_error of eat
+test_error of eat
+test_error of sort_array
+test_error of sort_array
+sort_third '[' was never closed (<string>, line 12)
+vowels_count invalid syntax (<string>, line 2)
+intersection unterminated string literal (detected at line 14) (<string>, line 14)
+change_base unterminated string literal (detected at line 2) (<string>, line 2)
+median unterminated triple-quoted string literal (detected at line 14) (<string>, line 4)
+test_error of median
+test_error of eat
+test_error of eat
+test_error of eat
+test_error of intersection
+sort_third '[' was never closed (<string>, line 12)
+encode unterminated string literal (detected at line 7) (<string>, line 7)
+test_error of encode
+test_error of encode
+is_sorted unterminated string literal (detected at line 2) (<string>, line 2)
+exchange unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of encode
+test_error of encode
+test_error of intersection
+test_error of exchange
+test_error of is_sorted
+test_error of encode
+test_error of encode
+test_error of exchange
+bf invalid character '’' (U+2019) (<string>, line 2)
+test_error of is_sorted
+test_error of is_sorted
+test_error of bf
+bf expected an indented block after function definition on line 14 (<string>, line 17)
+test_error of exchange
+test_error of bf
+bf expected an indented block after function definition on line 14 (<string>, line 17)
+test_error of bf
+bf expected an indented block after function definition on line 14 (<string>, line 17)
+sort_array unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of sort_array
+test_error of sort_array
+test_error of sort_array
+test_error of sort_array
+test_error of sort_array
+test_error of sort_array
+median unterminated string literal (detected at line 2) (<string>, line 2)
+sort_third unterminated string literal (detected at line 2) (<string>, line 2)
+is_sorted invalid character '’' (U+2019) (<string>, line 2)
+test_error of median
+test_error of is_sorted
+bf unterminated string literal (detected at line 2) (<string>, line 2)
+sort_third '[' was never closed (<string>, line 21)
+sort_third '[' was never closed (<string>, line 12)
+test_error of is_sorted
+test_error of median
+test_error of bf
+bf expected an indented block after function definition on line 28 (<string>, line 31)
+sort_third '[' was never closed (<string>, line 12)
+test_error of is_sorted
+test_error of bf
+bf expected an indented block after function definition on line 13 (<string>, line 16)
+test_error of median
+test_error of bf
+bf expected an indented block after function definition on line 13 (<string>, line 16)
+below_threshold unterminated string literal (detected at line 2) (<string>, line 2)
+rounded_avg unterminated string literal (detected at line 10) (<string>, line 10)
+sorted_list_sum invalid syntax (<string>, line 2)
+concatenate invalid syntax (<string>, line 2)
+closest_integer unterminated string literal (detected at line 31) (<string>, line 31)
+specialFilter unterminated string literal (detected at line 4) (<string>, line 4)
+strlen unterminated string literal (detected at line 21) (<string>, line 21)
+change_base invalid character '’' (U+2019) (<string>, line 9)
+sort_even unterminated string literal (detected at line 8) (<string>, line 8)
+minSubArraySum unterminated string literal (detected at line 2) (<string>, line 2)
+tri unterminated string literal (detected at line 2) (<string>, line 2)
+triples_sum_to_zero invalid character '’' (U+2019) (<string>, line 2)
+separate_paren_groups invalid character '’' (U+2019) (<string>, line 4)
+match_parens unterminated string literal (detected at line 12) (<string>, line 12)
+decimal_to_binary invalid decimal literal (<string>, line 31)
+factorize invalid syntax (<string>, line 2)
+next_smallest unterminated string literal (detected at line 2) (<string>, line 2)
+numerical_letter_grade unterminated string literal (detected at line 2) (<string>, line 2)
+sort_array unterminated string literal (detected at line 7) (<string>, line 7)
+solution invalid syntax (<string>, line 2)
+total_match unterminated string literal (detected at line 8) (<string>, line 8)
+cycpattern_check unterminated string literal (detected at line 4) (<string>, line 4)
+count_nums unterminated string literal (detected at line 8) (<string>, line 8)
+generate_integers unterminated string literal (detected at line 2) (<string>, line 2)
+get_row unterminated string literal (detected at line 10) (<string>, line 10)
+prime_fib invalid syntax (<string>, line 2)
+eat unterminated string literal (detected at line 2) (<string>, line 2)
+all_prefixes unterminated string literal (detected at line 25) (<string>, line 25)
+median unterminated string literal (detected at line 8) (<string>, line 8)
+compare_one unterminated string literal (detected at line 8) (<string>, line 8)
+f invalid character '’' (U+2019) (<string>, line 4)
+choose_num invalid syntax (<string>, line 2)
+reverse_delete unterminated string literal (detected at line 2) (<string>, line 2)
+valid_date invalid character '’' (U+2019) (<string>, line 8)
+maximum unterminated string literal (detected at line 8) (<string>, line 8)
+any_int invalid character '’' (U+2019) (<string>, line 2)
+smallest_change unterminated string literal (detected at line 4) (<string>, line 4)
+string_to_md5 unterminated string literal (detected at line 4) (<string>, line 4)
+derivative invalid syntax (<string>, line 2)
+prod_signs invalid character '’' (U+2019) (<string>, line 2)
+unique_digits unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of closest_integer
+find_closest_elements unterminated string literal (detected at line 2) (<string>, line 2)
+make_a_pile unterminated string literal (detected at line 2) (<string>, line 2)
+sort_third unterminated string literal (detected at line 9) (<string>, line 9)
+intersperse unterminated string literal (detected at line 2) (<string>, line 2)
+intersection unterminated string literal (detected at line 8) (<string>, line 8)
+get_closest_vowel unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of sort_array
+test_error of sort_array
+test_error of tri
+test_error of tri
+test_error of count_nums
+test_error of generate_integers
+test_error of compare_one
+modp invalid syntax (<string>, line 2)
+test_error of closest_integer
+test_error of median
+double_the_difference invalid syntax (<string>, line 2)
+max_element invalid syntax (<string>, line 2)
+unique invalid syntax (<string>, line 2)
+iscube expected 'else' after 'if' expression (<string>, line 2)
+filter_by_substring unterminated string literal (detected at line 2) (<string>, line 2)
+is_happy invalid syntax (<string>, line 2)
+sort_third '[' was never closed (<string>, line 15)
+truncate_number invalid syntax (<string>, line 2)
+test_error of sort_array
+test_error of sort_array
+incr_list unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of get_closest_vowel
+test_error of tri
+test_error of tri
+search unterminated string literal (detected at line 8) (<string>, line 8)
+pairs_sum_to_zero unterminated string literal (detected at line 2) (<string>, line 2)
+skjkasdkd unterminated string literal (detected at line 9) (<string>, line 9)
+Strongest_Extension invalid character '’' (U+2019) (<string>, line 4)
+test_error of count_nums
+fib4 invalid character '’' (U+2019) (<string>, line 4)
+test_error of generate_integers
+select_words unterminated string literal (detected at line 9) (<string>, line 9)
+exchange unterminated string literal (detected at line 4) (<string>, line 4)
+split_words invalid syntax (<string>, line 2)
+strange_sort_list unterminated string literal (detected at line 4) (<string>, line 4)
+file_name_check invalid syntax (<string>, line 2)
+remove_duplicates invalid character '’' (U+2019) (<string>, line 2)
+is_bored unterminated string literal (detected at line 8) (<string>, line 8)
+encode unterminated string literal (detected at line 8) (<string>, line 8)
+prime_length unterminated string literal (detected at line 2) (<string>, line 2)
+fizz_buzz unterminated string literal (detected at line 9) (<string>, line 9)
+test_error of compare_one
+encrypt unterminated string literal (detected at line 2) (<string>, line 2)
+filter_integers unterminated string literal (detected at line 2) (<string>, line 2)
+sum_product invalid character '’' (U+2019) (<string>, line 8)
+bf unterminated string literal (detected at line 2) (<string>, line 2)
+multiply unterminated string literal (detected at line 4) (<string>, line 4)
+test_error of median
+get_max_triples unexpected character after line continuation character (<string>, line 2)
+int_to_mini_roman invalid syntax (<string>, line 2)
+test_error of sort_array
+test_error of sort_array
+string_xor invalid syntax (<string>, line 2)
+greatest_common_divisor invalid character '’' (U+2019) (<string>, line 2)
+odd_count invalid syntax (<string>, line 2)
+circular_shift unterminated string literal (detected at line 2) (<string>, line 2)
+is_sorted unterminated string literal (detected at line 7) (<string>, line 7)
+sort_third '[' was never closed (<string>, line 15)
+test_error of get_closest_vowel
+fruit_distribution unterminated string literal (detected at line 4) (<string>, line 4)
+largest_prime_factor unterminated string literal (detected at line 38) (<string>, line 38)
+test_error of exchange
+test_error of count_nums
+test_error of generate_integers
+test_error of tri
+test_error of encode
+test_error of encode
+test_error of bf
+bf expected an indented block after function definition on line 13 (<string>, line 16)
+test_error of compare_one
+test_error of median
+flip_case invalid syntax (<string>, line 2)
+anti_shuffle unterminated string literal (detected at line 4) (<string>, line 4)
+below_zero invalid character '’' (U+2019) (<string>, line 4)
+fix_spaces unterminated string literal (detected at line 8) (<string>, line 8)
+will_it_fly unterminated string literal (detected at line 7) (<string>, line 7)
+test_error of get_closest_vowel
+sort_third '[' was never closed (<string>, line 15)
+parse_nested_parens invalid syntax (<string>, line 2)
+test_error of circular_shift
+parse_music unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of exchange
+words_in_sentence unterminated string literal (detected at line 5) (<string>, line 5)
+is_simple_power invalid syntax (<string>, line 2)
+sort_array unterminated string literal (detected at line 7) (<string>, line 7)
+fibfib invalid character '’' (U+2019) (<string>, line 4)
+largest_smallest_integers unterminated string literal (detected at line 2) (<string>, line 2)
+x_or_y unterminated string literal (detected at line 2) (<string>, line 2)
+car_race_collision unterminated string literal (detected at line 4) (<string>, line 4)
+same_chars unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of encode
+test_error of encode
+test_error of bf
+bf expected an indented block after function definition on line 13 (<string>, line 16)
+count_nums unterminated string literal (detected at line 8) (<string>, line 8)
+is_palindrome unterminated string literal (detected at line 4) (<string>, line 4)
+even_odd_palindrome unterminated string literal (detected at line 4) (<string>, line 4)
+simplify unterminated string literal (detected at line 4) (<string>, line 4)
+mean_absolute_deviation invalid character '’' (U+2019) (<string>, line 8)
+common unterminated string literal (detected at line 9) (<string>, line 9)
+is_equal_to_sum_even unexpected character after line continuation character (<string>, line 2)
+test_error of anti_shuffle
+pluck invalid syntax (<string>, line 2)
+generate_integers unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of fix_spaces
+test_error of fix_spaces
+move_one_ball expected 'else' after 'if' expression (<string>, line 2)
+rescale_to_unit invalid syntax (<string>, line 2)
+make_palindrome unterminated string literal (detected at line 7) (<string>, line 7)
+test_error of circular_shift
+monotonic unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of exchange
+histogram unterminated string literal (detected at line 2) (<string>, line 2)
+tri unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of sort_array
+test_error of sort_array
+sort_array invalid syntax (<string>, line 2)
+count_up_to unterminated string literal (detected at line 4) (<string>, line 4)
+add_elements invalid character '’' (U+2019) (<string>, line 2)
+compare_one unterminated string literal (detected at line 8) (<string>, line 8)
+test_error of car_race_collision
+test_error of car_race_collision
+test_error of car_race_collision
+test_error of car_race_collision
+has_close_elements unterminated string literal (detected at line 9) (<string>, line 9)
+find_max unterminated string literal (detected at line 4) (<string>, line 4)
+test_error of bf
+bf expected an indented block after function definition on line 13 (<string>, line 16)
+test_error of encode
+test_error of encode
+common unterminated triple-quoted string literal (detected at line 14) (<string>, line 3)
+median unterminated string literal (detected at line 8) (<string>, line 8)
+get_odd_collatz unterminated string literal (detected at line 2) (<string>, line 2)
+get_closest_vowel unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of count_nums
+test_error of circular_shift
+test_error of anti_shuffle
+test_error of fix_spaces
+test_error of fix_spaces
+test_error of fix_spaces
+sort_third unterminated string literal (detected at line 9) (<string>, line 9)
+vowels_count unterminated string literal (detected at line 8) (<string>, line 8)
+test_error of sort_array
+test_error of sort_array
+test_error of generate_integers
+test_error of median
+test_error of fix_spaces
+test_error of fix_spaces
+test_error of sort_array
+test_error of sort_array
+sort_third '[' was never closed (<string>, line 15)
+test_error of count_nums
+test_error of median
+test_error of tri
+test_error of tri
+minPath unexpected character after line continuation character (<string>, line 2)
+test_error of generate_integers
+test_error of anti_shuffle
+sort_third '[' was never closed (<string>, line 15)
+test_error of count_nums
+test_error of median
+test_error of get_closest_vowel
+test_error of get_closest_vowel
+test_error of compare_one
+test_error of compare_one
+test_error of tri
+test_error of tri
+test_error of generate_integers
+minPath name 'min_path' is used prior to nonlocal declaration (<string>, line 9)
+sort_third '[' was never closed (<string>, line 15)
+exchange unterminated string literal (detected at line 4) (<string>, line 4)
+test_error of get_closest_vowel
+test_error of tri
+test_error of tri
+test_error of exchange
+bf unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of get_closest_vowel
+test_error of get_closest_vowel
+test_error of compare_one
+test_error of compare_one
+test_error of compare_one
+circular_shift unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of exchange
+test_error of bf
+bf expected an indented block after function definition on line 18 (<string>, line 21)
+fix_spaces unterminated string literal (detected at line 8) (<string>, line 8)
+encode unterminated string literal (detected at line 8) (<string>, line 8)
+test_error of compare_one
+test_error of compare_one
+test_error of exchange
+test_error of circular_shift
+test_error of bf
+bf expected an indented block after function definition on line 14 (<string>, line 17)
+anti_shuffle unterminated string literal (detected at line 4) (<string>, line 4)
+test_error of circular_shift
+test_error of circular_shift
+test_error of bf
+bf expected an indented block after function definition on line 14 (<string>, line 17)
+test_error of encode
+test_error of encode
+test_error of encode
+test_error of encode
+test_error of encode
+test_error of encode
+count_nums unterminated string literal (detected at line 2) (<string>, line 2)
+median invalid syntax (<string>, line 2)
+sort_array unterminated string literal (detected at line 2) (<string>, line 2)
+sort_third unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of sort_array
+test_error of sort_array
+median '{' was never closed (<string>, line 3)
+test_error of sort_array
+test_error of sort_array
+test_error of median
+sort_third '[' was never closed (<string>, line 29)
+test_error of sort_array
+test_error of sort_array
+sort_third '[' was never closed (<string>, line 15)
+test_error of median
+sort_third '[' was never closed (<string>, line 15)
+get_closest_vowel unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of get_closest_vowel
+test_error of get_closest_vowel
+test_error of get_closest_vowel
+strlen unterminated string literal (detected at line 2) (<string>, line 2)
+concatenate unterminated string literal (detected at line 2) (<string>, line 2)
+below_threshold unterminated string literal (detected at line 2) (<string>, line 2)
+sorted_list_sum unterminated string literal (detected at line 29) (<string>, line 29)
+numerical_letter_grade unterminated string literal (detected at line 2) (<string>, line 2)
+decimal_to_binary invalid binary literal (<string>, line 2)
+closest_integer unterminated string literal (detected at line 5) (<string>, line 5)
+rounded_avg unterminated string literal (detected at line 2) (<string>, line 2)
+get_row invalid decimal literal (<string>, line 2)
+tri unterminated string literal (detected at line 2) (<string>, line 2)
+triples_sum_to_zero invalid character '’' (U+2019) (<string>, line 8)
+match_parens unterminated string literal (detected at line 2) (<string>, line 2)
+factorize invalid syntax (<string>, line 2)
+total_match unterminated string literal (detected at line 2) (<string>, line 2)
+separate_paren_groups invalid syntax (<string>, line 2)
+next_smallest invalid character '’' (U+2019) (<string>, line 2)
+solution unterminated string literal (detected at line 4) (<string>, line 4)
+generate_integers unterminated string literal (detected at line 2) (<string>, line 2)
+count_nums unterminated string literal (detected at line 31) (<string>, line 31)
+prime_fib unterminated string literal (detected at line 2) (<string>, line 2)
+eat invalid character '’' (U+2019) (<string>, line 2)
+sort_array unterminated string literal (detected at line 7) (<string>, line 7)
+median invalid syntax (<string>, line 2)
+compare_one unterminated string literal (detected at line 2) (<string>, line 2)
+find_closest_elements unterminated string literal (detected at line 9) (<string>, line 9)
+f unterminated string literal (detected at line 34) (<string>, line 34)
+minSubArraySum invalid syntax (<string>, line 2)
+valid_date unterminated string literal (detected at line 4) (<string>, line 4)
+all_prefixes unterminated string literal (detected at line 2) (<string>, line 2)
+choose_num unterminated string literal (detected at line 9) (<string>, line 9)
+sort_third invalid character '’' (U+2019) (<string>, line 8)
+string_to_md5 invalid syntax (<string>, line 2)
+maximum invalid character '’' (U+2019) (<string>, line 8)
+smallest_change unterminated string literal (detected at line 2) (<string>, line 2)
+derivative invalid syntax (<string>, line 2)
+any_int invalid syntax (<string>, line 2)
+reverse_delete invalid syntax (<string>, line 2)
+intersperse unterminated string literal (detected at line 2) (<string>, line 2)
+concatenate '{' was never closed (<string>, line 3)
+prod_signs unterminated string literal (detected at line 2) (<string>, line 2)
+double_the_difference invalid syntax (<string>, line 2)
+make_a_pile invalid character '’' (U+2019) (<string>, line 2)
+unique_digits unterminated string literal (detected at line 4) (<string>, line 4)
+intersection invalid character '’' (U+2019) (<string>, line 9)
+modp invalid syntax (<string>, line 2)
+test_error of generate_integers
+test_error of sort_array
+test_error of sort_array
+get_closest_vowel unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of eat
+test_error of eat
+test_error of eat
+max_element unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of median
+test_error of choose_num
+prime_fib unterminated triple-quoted string literal (detected at line 14) (<string>, line 4)
+is_happy unterminated string literal (detected at line 2) (<string>, line 2)
+truncate_number invalid syntax (<string>, line 2)
+sort_third '[' was never closed (<string>, line 15)
+iscube expected 'else' after 'if' expression (<string>, line 2)
+test_error of generate_integers
+unique unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of sort_array
+test_error of sort_array
+test_error of eat
+test_error of eat
+test_error of eat
+incr_list unterminated string literal (detected at line 2) (<string>, line 2)
+search invalid syntax (<string>, line 2)
+Strongest_Extension invalid character '’' (U+2019) (<string>, line 4)
+skjkasdkd invalid syntax (<string>, line 2)
+split_words unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of choose_num
+remove_duplicates unterminated string literal (detected at line 2) (<string>, line 2)
+pairs_sum_to_zero unterminated string literal (detected at line 2) (<string>, line 2)
+filter_by_substring unterminated string literal (detected at line 2) (<string>, line 2)
+strange_sort_list invalid character '—' (U+2014) (<string>, line 5)
+fib4 invalid syntax (<string>, line 2)
+file_name_check invalid syntax (<string>, line 2)
+test_error of median
+select_words invalid character '’' (U+2019) (<string>, line 9)
+is_bored unterminated string literal (detected at line 8) (<string>, line 8)
+filter_integers invalid character '’' (U+2019) (<string>, line 4)
+prime_length unterminated string literal (detected at line 2) (<string>, line 2)
+multiply unterminated string literal (detected at line 8) (<string>, line 8)
+exchange invalid syntax (<string>, line 2)
+sum_product invalid character '’' (U+2019) (<string>, line 4)
+fizz_buzz unterminated string literal (detected at line 2) (<string>, line 2)
+encode unterminated string literal (detected at line 58) (<string>, line 58)
+is_sorted unterminated string literal (detected at line 2) (<string>, line 2)
+fruit_distribution unterminated string literal (detected at line 2) (<string>, line 2)
+bf invalid character '’' (U+2019) (<string>, line 4)
+sort_third '[' was never closed (<string>, line 12)
+string_xor unterminated string literal (detected at line 4) (<string>, line 4)
+encrypt unterminated string literal (detected at line 2) (<string>, line 2)
+odd_count unterminated string literal (detected at line 8) (<string>, line 8)
+largest_prime_factor invalid syntax (<string>, line 2)
+test_error of sort_array
+test_error of sort_array
+test_error of eat
+test_error of eat
+test_error of eat
+fix_spaces unterminated string literal (detected at line 2) (<string>, line 2)
+below_zero unterminated string literal (detected at line 2) (<string>, line 2)
+int_to_mini_roman unterminated string literal (detected at line 2) (<string>, line 2)
+circular_shift invalid syntax (<string>, line 2)
+anti_shuffle invalid syntax (<string>, line 2)
+flip_case unterminated string literal (detected at line 4) (<string>, line 4)
+greatest_common_divisor unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of median
+parse_nested_parens unterminated string literal (detected at line 4) (<string>, line 4)
+test_error of exchange
+get_max_triples unexpected character after line continuation character (<string>, line 2)
+test_error of is_sorted
+test_error of bf
+bf expected an indented block after function definition on line 16 (<string>, line 19)
+sum_product '{' was never closed (<string>, line 3)
+sort_third '[' was never closed (<string>, line 12)
+will_it_fly unterminated string literal (detected at line 6) (<string>, line 6)
+test_error of encode
+test_error of encode
+is_simple_power invalid syntax (<string>, line 2)
+parse_music invalid character '’' (U+2019) (<string>, line 9)
+test_error of circular_shift
+words_in_sentence unterminated string literal (detected at line 9) (<string>, line 9)
+same_chars unterminated string literal (detected at line 2) (<string>, line 2)
+is_equal_to_sum_even unexpected character after line continuation character (<string>, line 2)
+mean_absolute_deviation invalid syntax (<string>, line 2)
+largest_smallest_integers unterminated string literal (detected at line 2) (<string>, line 2)
+even_odd_palindrome invalid character '’' (U+2019) (<string>, line 9)
+sort_array unterminated string literal (detected at line 7) (<string>, line 7)
+fibfib unterminated string literal (detected at line 4) (<string>, line 4)
+test_error of exchange
+car_race_collision invalid character '’' (U+2019) (<string>, line 4)
+simplify unterminated string literal (detected at line 4) (<string>, line 4)
+common unterminated string literal (detected at line 2) (<string>, line 2)
+is_palindrome invalid syntax (<string>, line 2)
+eat invalid character '’' (U+2019) (<string>, line 2)
+test_error of is_sorted
+median invalid syntax (<string>, line 2)
+test_error of bf
+bf expected an indented block after function definition on line 16 (<string>, line 19)
+x_or_y unterminated string literal (detected at line 4) (<string>, line 4)
+sort_array invalid syntax (<string>, line 2)
+rescale_to_unit invalid syntax (<string>, line 2)
+histogram unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of encode
+test_error of encode
+count_up_to invalid character '’' (U+2019) (<string>, line 7)
+monotonic invalid syntax (<string>, line 2)
+move_one_ball unterminated string literal (detected at line 4) (<string>, line 4)
+test_error of circular_shift
+find_max unterminated string literal (detected at line 2) (<string>, line 2)
+pluck unterminated string literal (detected at line 2) (<string>, line 2)
+add_elements unterminated string literal (detected at line 4) (<string>, line 4)
+has_close_elements unterminated string literal (detected at line 2) (<string>, line 2)
+make_palindrome invalid syntax (<string>, line 2)
+sort_even unterminated string literal (detected at line 8) (<string>, line 8)
+test_error of exchange
+get_odd_collatz invalid character '’' (U+2019) (<string>, line 2)
+vowels_count invalid syntax (<string>, line 2)
+test_error of eat
+test_error of eat
+test_error of eat
+cycpattern_check invalid syntax (<string>, line 2)
+test_error of sort_array
+test_error of sort_array
+common unterminated triple-quoted string literal (detected at line 26) (<string>, line 3)
+change_base invalid syntax (<string>, line 2)
+test_error of car_race_collision
+test_error of car_race_collision
+test_error of car_race_collision
+test_error of car_race_collision
+test_error of is_sorted
+minPath unterminated string literal (detected at line 2) (<string>, line 2)
+specialFilter unterminated string literal (detected at line 4) (<string>, line 4)
+test_error of bf
+bf expected an indented block after function definition on line 16 (<string>, line 19)
+test_error of circular_shift
+test_error of encode
+test_error of encode
+test_error of median
+test_error of sort_array
+test_error of sort_array
+test_error of eat
+test_error of eat
+test_error of eat
+test_error of sort_array
+test_error of sort_array
+test_error of eat
+test_error of eat
+test_error of eat
+test_error of median
+sort_third invalid character '’' (U+2019) (<string>, line 8)
+test_error of median
+exchange invalid syntax (<string>, line 2)
+sort_third '[' was never closed (<string>, line 12)
+is_sorted unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of exchange
+sort_third '[' was never closed (<string>, line 12)
+bf invalid character '’' (U+2019) (<string>, line 4)
+test_error of exchange
+circular_shift invalid syntax (<string>, line 2)
+test_error of is_sorted
+sort_third '[' was never closed (<string>, line 13)
+test_error of bf
+bf expected an indented block after function definition on line 16 (<string>, line 19)
+encode unterminated string literal (detected at line 58) (<string>, line 58)
+test_error of is_sorted
+test_error of circular_shift
+test_error of bf
+bf expected an indented block after function definition on line 16 (<string>, line 19)
+test_error of encode
+test_error of encode
+test_error of is_sorted
+test_error of bf
+bf expected an indented block after function definition on line 16 (<string>, line 19)
+test_error of encode
+test_error of encode
+test_error of encode
+test_error of encode
+sort_array unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of sort_array
+test_error of sort_array
+test_error of sort_array
+test_error of sort_array
+test_error of sort_array
+test_error of sort_array
+median unterminated string literal (detected at line 51) (<string>, line 51)
+eat unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of median
+test_error of eat
+test_error of eat
+test_error of eat
+test_error of median
+is_sorted unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of eat
+test_error of eat
+test_error of eat
+test_error of eat
+test_error of median
+sort_third unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of eat
+test_error of eat
+test_error of eat
+test_error of is_sorted
+sort_third '[' was never closed (<string>, line 13)
+test_error of is_sorted
+sort_third '[' was never closed (<string>, line 13)
+sort_third '[' was never closed (<string>, line 13)
+test_error of is_sorted
+car_race_collision unterminated string literal (detected at line 6) (<string>, line 6)
+decimal_to_binary unterminated string literal (detected at line 4) (<string>, line 4)
+unique unterminated string literal (detected at line 2) (<string>, line 2)
+next_smallest invalid character '’' (U+2019) (<string>, line 4)
+smallest_change unterminated string literal (detected at line 2) (<string>, line 2)
+f invalid syntax (<string>, line 2)
+odd_count unterminated string literal (detected at line 4) (<string>, line 4)
+modp invalid syntax (<string>, line 2)
+triples_sum_to_zero unterminated string literal (detected at line 2) (<string>, line 2)
+pluck unterminated string literal (detected at line 6) (<string>, line 6)
+valid_date unterminated string literal (detected at line 57) (<string>, line 57)
+maximum unterminated string literal (detected at line 8) (<string>, line 8)
+fib4 unterminated string literal (detected at line 10) (<string>, line 10)
+reverse_delete unterminated string literal (detected at line 2) (<string>, line 2)
+minSubArraySum invalid syntax (<string>, line 2)
+filter_integers invalid syntax (<string>, line 2)
+largest_smallest_integers invalid syntax (<string>, line 2)
+sort_third unterminated string literal (detected at line 8) (<string>, line 8)
+median unterminated string literal (detected at line 8) (<string>, line 8)
+simplify unterminated string literal (detected at line 8) (<string>, line 8)
+prod_signs unterminated string literal (detected at line 40) (<string>, line 40)
+separate_paren_groups unterminated string literal (detected at line 4) (<string>, line 4)
+string_to_md5 unterminated string literal (detected at line 2) (<string>, line 2)
+circular_shift invalid syntax (<string>, line 2)
+sum_product invalid character '’' (U+2019) (<string>, line 8)
+anti_shuffle unterminated string literal (detected at line 2) (<string>, line 2)
+count_up_to invalid syntax (<string>, line 2)
+make_a_pile unterminated string literal (detected at line 2) (<string>, line 2)
+bf unterminated string literal (detected at line 2) (<string>, line 2)
+find_closest_elements unterminated string literal (detected at line 9) (<string>, line 9)
+compare_one unterminated string literal (detected at line 2) (<string>, line 2)
+derivative unexpected character after line continuation character (<string>, line 2)
+concatenate unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of car_race_collision
+test_error of car_race_collision
+test_error of car_race_collision
+test_error of car_race_collision
+mean_absolute_deviation invalid syntax (<string>, line 2)
+prime_length invalid character '’' (U+2019) (<string>, line 7)
+words_in_sentence unterminated string literal (detected at line 2) (<string>, line 2)
+double_the_difference unterminated string literal (detected at line 9) (<string>, line 9)
+eat unterminated string literal (detected at line 30) (<string>, line 30)
+is_palindrome invalid character '’' (U+2019) (<string>, line 2)
+closest_integer invalid syntax (<string>, line 2)
+count_nums invalid character '’' (U+2019) (<string>, line 2)
+any_int unterminated string literal (detected at line 2) (<string>, line 2)
+total_match unterminated string literal (detected at line 42) (<string>, line 42)
+specialFilter unterminated string literal (detected at line 7) (<string>, line 7)
+sort_third '[' was never closed (<string>, line 15)
+test_error of median
+prime_fib invalid syntax (<string>, line 2)
+skjkasdkd unterminated string literal (detected at line 4) (<string>, line 4)
+fib4 invalid syntax (<string>, line 2)
+test_error of bf
+bf expected an indented block after function definition on line 17 (<string>, line 20)
+test_error of eat
+test_error of eat
+test_error of eat
+all_prefixes unterminated string literal (detected at line 2) (<string>, line 2)
+count_nums unterminated triple-quoted string literal (detected at line 14) (<string>, line 4)
+parse_music invalid character '’' (U+2019) (<string>, line 10)
+get_closest_vowel unterminated string literal (detected at line 4) (<string>, line 4)
+pairs_sum_to_zero unterminated string literal (detected at line 2) (<string>, line 2)
+rounded_avg invalid syntax (<string>, line 2)
+is_simple_power unterminated string literal (detected at line 2) (<string>, line 2)
+generate_integers unterminated string literal (detected at line 8) (<string>, line 8)
+vowels_count invalid character '’' (U+2019) (<string>, line 2)
+test_error of median
+intersection unterminated string literal (detected at line 9) (<string>, line 9)
+tri unterminated string literal (detected at line 2) (<string>, line 2)
+common unterminated string literal (detected at line 8) (<string>, line 8)
+sort_array unterminated string literal (detected at line 2) (<string>, line 2)
+below_threshold invalid syntax (<string>, line 2)
+sort_third '[' was never closed (<string>, line 15)
+sorted_list_sum invalid character '’' (U+2019) (<string>, line 4)
+int_to_mini_roman invalid syntax (<string>, line 2)
+add_elements unterminated string literal (detected at line 2) (<string>, line 2)
+fruit_distribution unterminated string literal (detected at line 7) (<string>, line 7)
+will_it_fly invalid character '’' (U+2019) (<string>, line 7)
+fib4 invalid syntax (<string>, line 2)
+test_error of bf
+bf expected an indented block after function definition on line 17 (<string>, line 20)
+solution unterminated string literal (detected at line 2) (<string>, line 2)
+below_zero unterminated string literal (detected at line 4) (<string>, line 4)
+encode unterminated string literal (detected at line 2) (<string>, line 2)
+filter_by_substring invalid character '’' (U+2019) (<string>, line 2)
+is_equal_to_sum_even expected 'else' after 'if' expression (<string>, line 2)
+strlen invalid syntax (<string>, line 2)
+iscube unterminated string literal (detected at line 2) (<string>, line 2)
+choose_num unterminated string literal (detected at line 2) (<string>, line 2)
+file_name_check unterminated string literal (detected at line 36) (<string>, line 36)
+rescale_to_unit invalid syntax (<string>, line 2)
+max_element unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of eat
+test_error of eat
+test_error of eat
+is_happy invalid syntax (<string>, line 2)
+intersperse invalid character '’' (U+2019) (<string>, line 2)
+get_row unterminated string literal (detected at line 4) (<string>, line 4)
+histogram invalid character '’' (U+2019) (<string>, line 9)
+test_error of generate_integers
+select_words unterminated string literal (detected at line 9) (<string>, line 9)
+is_sorted invalid character '’' (U+2019) (<string>, line 7)
+test_error of sort_array
+test_error of sort_array
+test_error of median
+sort_third '[' was never closed (<string>, line 15)
+test_error of intersection
+test_error of sorted_list_sum
+test_error of sorted_list_sum
+same_chars unterminated string literal (detected at line 6) (<string>, line 6)
+fruit_distribution invalid literal for int() with base 10: 'and'
+iscube type complex doesn't define __round__ method
+numerical_letter_grade unterminated string literal (detected at line 2) (<string>, line 2)
+make_palindrome unterminated string literal (detected at line 4) (<string>, line 4)
+test_error of bf
+bf expected an indented block after function definition on line 17 (<string>, line 20)
+test_error of encode
+test_error of encode
+test_error of eat
+test_error of eat
+test_error of eat
+string_xor unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of generate_integers
+cycpattern_check unterminated string literal (detected at line 9) (<string>, line 9)
+move_one_ball unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of is_sorted
+test_error of sort_array
+test_error of sort_array
+Strongest_Extension invalid syntax (<string>, line 2)
+get_max_triples invalid syntax (<string>, line 2)
+x_or_y invalid syntax (<string>, line 2)
+test_error of intersection
+unique_digits unterminated string literal (detected at line 4) (<string>, line 4)
+fibfib invalid character '’' (U+2019) (<string>, line 2)
+remove_duplicates unterminated string literal (detected at line 7) (<string>, line 7)
+incr_list unterminated string literal (detected at line 2) (<string>, line 2)
+get_odd_collatz invalid character '’' (U+2019) (<string>, line 10)
+test_error of iscube
+fizz_buzz unterminated string literal (detected at line 36) (<string>, line 36)
+minPath unterminated string literal (detected at line 4) (<string>, line 4)
+multiply invalid character '’' (U+2019) (<string>, line 4)
+is_bored unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of make_palindrome
+test_error of make_palindrome
+sort_even invalid character '’' (U+2019) (<string>, line 8)
+test_error of encode
+test_error of encode
+flip_case invalid syntax (<string>, line 2)
+parse_nested_parens unterminated string literal (detected at line 2) (<string>, line 2)
+find_max unterminated string literal (detected at line 4) (<string>, line 4)
+fix_spaces invalid character '’' (U+2019) (<string>, line 2)
+even_odd_palindrome unterminated string literal (detected at line 4) (<string>, line 4)
+factorize invalid character '’' (U+2019) (<string>, line 4)
+sort_third unterminated string literal (detected at line 8) (<string>, line 8)
+match_parens unterminated string literal (detected at line 14) (<string>, line 14)
+sort_array unterminated string literal (detected at line 2) (<string>, line 2)
+encrypt invalid syntax (<string>, line 2)
+test_error of generate_integers
+test_error of is_sorted
+test_error of sort_array
+test_error of sort_array
+split_words unterminated string literal (detected at line 2) (<string>, line 2)
+median unterminated string literal (detected at line 8) (<string>, line 8)
+greatest_common_divisor invalid character '’' (U+2019) (<string>, line 2)
+has_close_elements unterminated string literal (detected at line 4) (<string>, line 4)
+search unterminated string literal (detected at line 9) (<string>, line 9)
+bf unterminated string literal (detected at line 2) (<string>, line 2)
+largest_prime_factor unterminated string literal (detected at line 9) (<string>, line 9)
+truncate_number invalid syntax (<string>, line 2)
+iscube type complex doesn't define __round__ method
+test_error of intersection
+change_base unterminated string literal (detected at line 4) (<string>, line 4)
+strange_sort_list unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of make_palindrome
+test_error of make_palindrome
+test_error of encode
+test_error of encode
+monotonic invalid character '’' (U+2019) (<string>, line 2)
+test_error of is_sorted
+exchange unterminated string literal (detected at line 2) (<string>, line 2)
+sort_third '[' was never closed (<string>, line 15)
+eat unterminated string literal (detected at line 30) (<string>, line 30)
+test_error of bf
+bf expected an indented block after function definition on line 17 (<string>, line 20)
+test_error of median
+test_error of make_palindrome
+test_error of make_palindrome
+test_error of eat
+test_error of eat
+test_error of eat
+sort_third '[' was never closed (<string>, line 15)
+test_error of median
+test_error of eat
+test_error of eat
+test_error of eat
+test_error of eat
+test_error of bf
+bf expected an indented block after function definition on line 17 (<string>, line 20)
+test_error of eat
+test_error of eat
+test_error of eat
+sort_third '[' was never closed (<string>, line 15)
+generate_integers unterminated string literal (detected at line 8) (<string>, line 8)
+test_error of median
+test_error of bf
+bf expected an indented block after function definition on line 17 (<string>, line 20)
+test_error of generate_integers
+sort_array unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of generate_integers
+iscube unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of sort_array
+test_error of sort_array
+intersection unterminated string literal (detected at line 9) (<string>, line 9)
+iscube type complex doesn't define __round__ method
+is_sorted invalid character '’' (U+2019) (<string>, line 7)
+test_error of sort_array
+test_error of sort_array
+make_palindrome unterminated string literal (detected at line 4) (<string>, line 4)
+test_error of sort_array
+test_error of sort_array
+test_error of is_sorted
+encode unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of make_palindrome
+test_error of make_palindrome
+test_error of is_sorted
+test_error of make_palindrome
+test_error of make_palindrome
+test_error of is_sorted
+test_error of encode
+test_error of encode
+test_error of encode
+test_error of encode
+test_error of make_palindrome
+test_error of make_palindrome
+test_error of encode
+test_error of encode
+sort_third unterminated string literal (detected at line 2) (<string>, line 2)
+sort_third '[' was never closed (<string>, line 23)
+sort_third '[' was never closed (<string>, line 15)
+sort_third '[' was never closed (<string>, line 15)
+eat unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of eat
+test_error of eat
+test_error of eat
+bf invalid character '’' (U+2019) (<string>, line 2)
+sort_array unterminated string literal (detected at line 4) (<string>, line 4)
+test_error of eat
+test_error of eat
+test_error of eat
+test_error of bf
+bf expected an indented block after function definition on line 17 (<string>, line 20)
+test_error of eat
+test_error of eat
+test_error of eat
+test_error of bf
+bf expected an indented block after function definition on line 17 (<string>, line 20)
+is_sorted unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of sort_array
+test_error of sort_array
+test_error of bf
+bf expected an indented block after function definition on line 17 (<string>, line 20)
+test_error of sort_array
+test_error of sort_array
+test_error of is_sorted
+test_error of sort_array
+test_error of sort_array
+test_error of is_sorted
+test_error of is_sorted
+rounded_avg unterminated string literal (detected at line 39) (<string>, line 39)
+eat unterminated string literal (detected at line 2) (<string>, line 2)
+sum_product unterminated string literal (detected at line 2) (<string>, line 2)
+choose_num invalid character '’' (U+2019) (<string>, line 2)
+filter_by_substring unterminated string literal (detected at line 2) (<string>, line 2)
+sorted_list_sum invalid syntax (<string>, line 2)
+closest_integer unterminated string literal (detected at line 2) (<string>, line 2)
+same_chars unterminated string literal (detected at line 4) (<string>, line 4)
+monotonic unterminated string literal (detected at line 2) (<string>, line 2)
+valid_date unterminated string literal (detected at line 2) (<string>, line 2)
+double_the_difference invalid syntax (<string>, line 2)
+get_closest_vowel unterminated string literal (detected at line 2) (<string>, line 2)
+sort_array invalid character '’' (U+2019) (<string>, line 4)
+int_to_mini_roman unterminated string literal (detected at line 15) (<string>, line 15)
+common unterminated string literal (detected at line 2) (<string>, line 2)
+decimal_to_binary invalid binary literal (<string>, line 2)
+next_smallest invalid character '’' (U+2019) (<string>, line 9)
+max_element unterminated string literal (detected at line 2) (<string>, line 2)
+unique_digits unterminated string literal (detected at line 2) (<string>, line 2)
+is_happy invalid syntax (<string>, line 2)
+tri invalid syntax (<string>, line 2)
+median invalid syntax (<string>, line 2)
+even_odd_palindrome unterminated string literal (detected at line 4) (<string>, line 4)
+truncate_number unterminated string literal (detected at line 2) (<string>, line 2)
+parse_music unterminated string literal (detected at line 11) (<string>, line 11)
+derivative invalid syntax (<string>, line 2)
+prime_fib unterminated string literal (detected at line 2) (<string>, line 2)
+fib4 invalid character '’' (U+2019) (<string>, line 4)
+generate_integers unterminated string literal (detected at line 2) (<string>, line 2)
+search invalid character '’' (U+2019) (<string>, line 8)
+incr_list invalid character '’' (U+2019) (<string>, line 2)
+Strongest_Extension invalid character '’' (U+2019) (<string>, line 4)
+largest_smallest_integers unterminated string literal (detected at line 2) (<string>, line 2)
+all_prefixes unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of eat
+test_error of eat
+test_error of eat
+skjkasdkd unterminated string literal (detected at line 2) (<string>, line 2)
+reverse_delete unterminated string literal (detected at line 2) (<string>, line 2)
+largest_prime_factor invalid character '’' (U+2019) (<string>, line 8)
+greatest_common_divisor invalid syntax (<string>, line 2)
+file_name_check unterminated string literal (detected at line 2) (<string>, line 2)
+remove_duplicates unterminated string literal (detected at line 2) (<string>, line 2)
+any_int invalid syntax (<string>, line 2)
+test_error of closest_integer
+find_closest_elements unterminated string literal (detected at line 2) (<string>, line 2)
+encode unterminated string literal (detected at line 2) (<string>, line 2)
+separate_paren_groups unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of get_closest_vowel
+test_error of get_closest_vowel
+select_words unterminated string literal (detected at line 8) (<string>, line 8)
+median unterminated triple-quoted string literal (detected at line 24) (<string>, line 3)
+sort_even invalid character '’' (U+2019) (<string>, line 2)
+test_error of generate_integers
+test_error of tri
+test_error of tri
+test_error of eat
+test_error of eat
+test_error of eat
+prime_fib unexpected character after line continuation character (<string>, line 2)
+get_max_triples unexpected character after line continuation character (<string>, line 2)
+file_name_check unterminated triple-quoted string literal (detected at line 14) (<string>, line 4)
+test_error of closest_integer
+x_or_y invalid syntax (<string>, line 2)
+test_error of encode
+test_error of encode
+fizz_buzz unterminated string literal (detected at line 9) (<string>, line 9)
+filter_integers invalid syntax (<string>, line 2)
+iscube invalid syntax (<string>, line 2)
+test_error of get_closest_vowel
+intersection unterminated string literal (detected at line 7) (<string>, line 7)
+multiply unterminated string literal (detected at line 2) (<string>, line 2)
+is_sorted unterminated string literal (detected at line 46) (<string>, line 46)
+prime_length unterminated string literal (detected at line 7) (<string>, line 7)
+test_error of median
+string_xor unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of generate_integers
+find_max unterminated string literal (detected at line 2) (<string>, line 2)
+count_nums unterminated string literal (detected at line 4) (<string>, line 4)
+flip_case unterminated string literal (detected at line 2) (<string>, line 2)
+circular_shift unterminated string literal (detected at line 9) (<string>, line 9)
+parse_nested_parens unterminated string literal (detected at line 4) (<string>, line 4)
+anti_shuffle unterminated string literal (detected at line 8) (<string>, line 8)
+get_row invalid decimal literal (<string>, line 4)
+fruit_distribution unterminated string literal (detected at line 7) (<string>, line 7)
+smallest_change unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of eat
+test_error of eat
+test_error of eat
+is_bored invalid syntax (<string>, line 2)
+is_simple_power expected 'else' after 'if' expression (<string>, line 2)
+numerical_letter_grade invalid syntax (<string>, line 2)
+maximum unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of closest_integer
+fix_spaces invalid syntax (<string>, line 2)
+rescale_to_unit invalid syntax (<string>, line 2)
+solution invalid syntax (<string>, line 2)
+mean_absolute_deviation unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of encode
+test_error of encode
+iscube type complex doesn't define __round__ method
+car_race_collision invalid character '’' (U+2019) (<string>, line 4)
+test_error of intersection
+test_error of is_sorted
+test_error of get_closest_vowel
+test_error of generate_integers
+is_palindrome unterminated string literal (detected at line 2) (<string>, line 2)
+string_to_md5 invalid syntax (<string>, line 2)
+test_error of median
+bf unterminated string literal (detected at line 2) (<string>, line 2)
+count_nums invalid literal for int() with base 10: '-'
+is_equal_to_sum_even expected 'else' after 'if' expression (<string>, line 2)
+simplify unterminated string literal (detected at line 4) (<string>, line 4)
+match_parens unmatched ')' (<string>, line 4)
+make_a_pile unterminated string literal (detected at line 2) (<string>, line 2)
+below_zero unterminated string literal (detected at line 4) (<string>, line 4)
+cycpattern_check unterminated string literal (detected at line 9) (<string>, line 9)
+split_words unterminated string literal (detected at line 8) (<string>, line 8)
+test_error of encode
+test_error of encode
+test_error of car_race_collision
+test_error of car_race_collision
+test_error of car_race_collision
+test_error of car_race_collision
+test_error of is_sorted
+strlen unterminated string literal (detected at line 17) (<string>, line 17)
+f unterminated string literal (detected at line 4) (<string>, line 4)
+fibfib unterminated string literal (detected at line 40) (<string>, line 40)
+compare_one unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of intersection
+exchange invalid syntax (<string>, line 2)
+make_palindrome unterminated string literal (detected at line 4) (<string>, line 4)
+count_up_to invalid character '’' (U+2019) (<string>, line 2)
+test_error of count_nums
+closest_integer unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of bf
+bf expected an indented block after function definition on line 16 (<string>, line 19)
+eat unterminated string literal (detected at line 2) (<string>, line 2)
+pluck unterminated string literal (detected at line 4) (<string>, line 4)
+move_one_ball unterminated string literal (detected at line 4) (<string>, line 4)
+sort_third unterminated string literal (detected at line 8) (<string>, line 8)
+get_odd_collatz invalid character '’' (U+2019) (<string>, line 2)
+pairs_sum_to_zero unterminated string literal (detected at line 4) (<string>, line 4)
+intersperse unterminated string literal (detected at line 2) (<string>, line 2)
+has_close_elements invalid character '’' (U+2019) (<string>, line 4)
+median invalid syntax (<string>, line 2)
+total_match unterminated string literal (detected at line 10) (<string>, line 10)
+vowels_count unterminated string literal (detected at line 4) (<string>, line 4)
+generate_integers unterminated string literal (detected at line 2) (<string>, line 2)
+add_elements unterminated string literal (detected at line 2) (<string>, line 2)
+odd_count unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of split_words
+test_error of split_words
+histogram unterminated string literal (detected at line 4) (<string>, line 4)
+change_base invalid syntax (<string>, line 2)
+words_in_sentence unterminated string literal (detected at line 6) (<string>, line 6)
+sort_array unterminated string literal (detected at line 4) (<string>, line 4)
+get_closest_vowel unterminated string literal (detected at line 2) (<string>, line 2)
+concatenate unterminated string literal (detected at line 2) (<string>, line 2)
+will_it_fly unterminated string literal (detected at line 4) (<string>, line 4)
+test_error of is_sorted
+test_error of is_sorted
+test_error of is_sorted
+test_error of is_sorted
+test_error of is_sorted
+test_error of intersection
+test_error of count_nums
+test_error of eat
+test_error of eat
+test_error of eat
+test_error of bf
+bf expected an indented block after function definition on line 16 (<string>, line 19)
+modp invalid syntax (<string>, line 2)
+specialFilter invalid character '’' (U+2019) (<string>, line 6)
+sort_third '[' was never closed (<string>, line 13)
+triples_sum_to_zero invalid character '’' (U+2019) (<string>, line 2)
+minSubArraySum unterminated string literal (detected at line 2) (<string>, line 2)
+prod_signs unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of generate_integers
+strange_sort_list invalid character '’' (U+2019) (<string>, line 8)
+unique unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of split_words
+test_error of split_words
+test_error of sort_array
+test_error of sort_array
+minPath unterminated string literal (detected at line 4) (<string>, line 4)
+test_error of median
+encode unterminated string literal (detected at line 2) (<string>, line 2)
+encrypt unterminated string literal (detected at line 4) (<string>, line 4)
+factorize invalid syntax (<string>, line 2)
+test_error of get_closest_vowel
+test_error of get_closest_vowel
+below_threshold unterminated string literal (detected at line 31) (<string>, line 31)
+test_error of eat
+test_error of eat
+test_error of eat
+sort_third '[' was never closed (<string>, line 13)
+modp unterminated triple-quoted string literal (detected at line 14) (<string>, line 4)
+test_error of generate_integers
+test_error of bf
+bf expected an indented block after function definition on line 16 (<string>, line 19)
+test_error of sort_array
+test_error of sort_array
+median unterminated triple-quoted string literal (detected at line 14) (<string>, line 4)
+test_error of encrypt
+test_error of encrypt
+test_error of encrypt
+test_error of encrypt
+test_error of get_closest_vowel
+sort_third '[' was never closed (<string>, line 13)
+test_error of encode
+test_error of encode
+test_error of sort_array
+test_error of sort_array
+test_error of eat
+test_error of eat
+test_error of eat
+test_error of generate_integers
+test_error of median
+test_error of get_closest_vowel
+test_error of encode
+test_error of encode
+count_nums unterminated string literal (detected at line 4) (<string>, line 4)
+is_sorted unterminated string literal (detected at line 46) (<string>, line 46)
+intersection unterminated string literal (detected at line 7) (<string>, line 7)
+sort_array unterminated string literal (detected at line 4) (<string>, line 4)
+sort_third unterminated string literal (detected at line 8) (<string>, line 8)
+bf unterminated string literal (detected at line 2) (<string>, line 2)
+sort_third '[' was never closed (<string>, line 13)
+test_error of sort_array
+test_error of sort_array
+test_error of count_nums
+test_error of count_nums
+test_error of bf
+bf expected an indented block after function definition on line 16 (<string>, line 19)
+test_error of is_sorted
+test_error of sort_array
+test_error of sort_array
+sort_third '[' was never closed (<string>, line 13)
+test_error of is_sorted
+test_error of sort_array
+test_error of sort_array
+test_error of bf
+bf expected an indented block after function definition on line 16 (<string>, line 19)
+test_error of intersection
+test_error of is_sorted
+sort_third '[' was never closed (<string>, line 13)
+test_error of bf
+bf expected an indented block after function definition on line 16 (<string>, line 19)
+test_error of intersection
+test_error of intersection
+get_closest_vowel invalid character '’' (U+2019) (<string>, line 2)
+test_error of get_closest_vowel
+test_error of get_closest_vowel
+test_error of get_closest_vowel
+test_error of get_closest_vowel
+test_error of get_closest_vowel
+median unterminated string literal (detected at line 2) (<string>, line 2)
+generate_integers invalid syntax (<string>, line 2)
+test_error of median
+test_error of generate_integers
+test_error of generate_integers
+eat unterminated string literal (detected at line 2) (<string>, line 2)
+test_error of median
+sort_array invalid character '’' (U+2019) (<string>, line 2)
+test_error of eat
+test_error of eat
+test_error of eat
+test_error of sort_array
+test_error of sort_array
+test_error of sort_array
+test_error of sort_array
+test_error of median
+test_error of eat
+test_error of eat
+test_error of eat
+test_error of sort_array
+test_error of sort_array
+test_error of eat
+test_error of eat
+test_error of eat

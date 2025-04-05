@@ -1,0 +1,7 @@
+{
+    "father node": 6,
+    "modification": "(modify: adding a step to log and store the error information for further analysis)",
+    "before": 0.806060606060606,
+    "after": 0.7878787878787878,
+    "succeed": false
+}
