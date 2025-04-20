@@ -205,6 +205,16 @@ class BaseModule(BaseModel, metaclass=MetaModule):
         """
         Construct the BaseModule from a JSON string.
         
+        This method uses yaml.safe_load to parse the JSON string into a Python object,
+        which supports more flexible parsing than standard json.loads (including handling
+        single quotes, trailing commas, etc). The parsed data is then passed to from_dict
+        to create the instance.
+        
+        Implementation details:
+        1. Attempts to parse the input string with yaml.safe_load
+        2. Validates that the parsed data is a dictionary or list
+        3. Calls from_dict with the parsed data to create the instance
+        
         Args:
             content: JSON string
             **kwargs: Additional keyword arguments, can include log to control logging output
@@ -236,6 +246,18 @@ class BaseModule(BaseModel, metaclass=MetaModule):
     def from_str(cls, content: str, **kwargs):
         """
         Construct the BaseModule from a string that may contain JSON.
+        
+        This method is more forgiving than from_json as it can extract valid JSON
+        objects embedded within larger text. It uses parse_json_from_text to extract 
+        all potential JSON strings from the input text, then tries to create an instance 
+        from each extracted JSON string until successful.
+        
+        Implementation details:
+        1. Extracts all potential JSON strings from the input text using parse_json_from_text
+        2. Iterates through each extracted JSON string
+        3. Attempts to create an instance using from_json for each JSON string
+        4. Returns the first successfully created instance
+        5. Raises an error if no valid JSON string can be used to create an instance
         
         Args:
             content: Text that may contain JSON strings
@@ -278,6 +300,9 @@ class BaseModule(BaseModel, metaclass=MetaModule):
         """
         Load the values for a module from a file.
         
+        Opens the specified file and uses yaml.safe_load to parse its contents 
+        into a Python object (typically a dictionary).
+        
         Args:
             path: The path of the file
             **kwargs: Additional keyword arguments
@@ -293,6 +318,18 @@ class BaseModule(BaseModel, metaclass=MetaModule):
     def from_file(cls, path: str, load_function: Callable=None, **kwargs):
         """
         Construct the BaseModule from a file.
+        
+        This method reads and parses a file into a data structure, then creates
+        a module instance from that data. It first verifies that the file exists,
+        then uses either the provided load_function or the default load_module
+        method to read and parse the file content, and finally calls from_dict
+        to create the instance.
+        
+        Implementation details:
+        1. Checks if the specified file exists
+        2. Uses the provided load_function or defaults to cls.load_module
+        3. Loads the file content and parses it into a Python object
+        4. Calls from_dict with the parsed content to create the instance
         
         Args:
             path: The path of the file
