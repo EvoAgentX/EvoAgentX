@@ -19,6 +19,14 @@ from ..prompts.workflow.sew_workflow import SEW_WORKFLOW
 
 
 class WorkFlowNodeState(str, Enum):
+    """Enumeration of possible states for workflow nodes.
+    
+    This enum defines the lifecycle states of a workflow node:
+    - PENDING: The node is waiting to be executed
+    - RUNNING: The node is currently being executed
+    - COMPLETED: The node has been successfully executed
+    - FAILED: The node execution has failed
+    """
     PENDING="pending"
     RUNNING="running"
     COMPLETED = "completed"
@@ -26,6 +34,22 @@ class WorkFlowNodeState(str, Enum):
 
 
 class WorkFlowNode(BaseModule):
+    """Represents a node in a workflow graph.
+    
+    A workflow node represents a specific task in the workflow with its
+    inputs, outputs, and execution metadata. It can have associated agents
+    that execute the task and track its execution status.
+    
+    Attributes:
+        name: A unique identifier for the task within a workflow
+        description: Detailed description of what the task does
+        inputs: List of input parameters required by the task
+        outputs: List of output parameters produced by the task
+        reason: Optional justification for this task's existence
+        agents: Optional list of agents that can execute this task
+        action_graph: Optional graph of actions to execute this task
+        status: Current execution state of the task
+    """
 
     name: str # A short name of the task. Should be unique in a single workflow
     description: str # A detailed description of the task
@@ -39,6 +63,21 @@ class WorkFlowNode(BaseModule):
     @field_validator('agents')
     @classmethod
     def check_agent_format(cls, agents: List[Union[str, dict]]):
+        """Validate the format of agent specifications.
+        
+        Ensures that when agents are specified as dictionaries, they always 
+        contain the required 'name' and 'description' fields.
+        
+        Args:
+            agents: List of agent specifications, either as strings (agent names)
+                   or dictionaries (detailed agent specifications)
+        
+        Returns:
+            The validated agents list
+            
+        Raises:
+            AssertionError: If an agent dictionary is missing name or description
+        """
         for agent in agents:
             if isinstance(agent, dict):
                 assert "name" in agent and "description" in agent, \
@@ -46,8 +85,16 @@ class WorkFlowNode(BaseModule):
         return agents
 
     def get_agents(self) -> List[str]:
-        """
-        return the agent names specified in the self.agents. 
+        """Return the names of all agents associated with this node.
+        
+        Extracts agent names from the agents list, handling both string
+        and dictionary agent specifications.
+        
+        Returns:
+            List of agent names
+            
+        Raises:
+            TypeError: If an agent specification is neither a string nor a dictionary
         """
         agent_names = []
         if not self.agents:
@@ -63,19 +110,48 @@ class WorkFlowNode(BaseModule):
         return agent_names
     
     def set_agents(self, agents: List[Union[str, dict]]):
+        """Assign agents to this workflow node.
+        
+        Args:
+            agents: List of agent specifications, either as strings (agent names)
+                   or dictionaries (detailed agent specifications)
+        """
         self.agents = agents
 
     def get_status(self) -> WorkFlowNodeState:
+        """Get the current execution status of this node.
+        
+        Returns:
+            The current node state (PENDING, RUNNING, COMPLETED, or FAILED)
+        """
         return self.status
     
     def set_status(self, state: WorkFlowNodeState):
+        """Update the execution status of this node.
+        
+        Args:
+            state: The new state to set
+        """
         self.status = state
     
     @property
     def is_complete(self) -> bool:
+        """Check if this node has completed execution.
+        
+        Returns:
+            True if the node status is COMPLETED, False otherwise
+        """
         return self.status == WorkFlowNodeState.COMPLETED
     
     def get_task_info(self) -> str:
+        """Generate a human-readable description of this task.
+        
+        Creates a formatted string containing the task's name, description,
+        inputs, and outputs.
+        
+        Returns:
+            A multi-line string with the task's details
+        """
 
         def format_parameters(params: List[Parameter]) -> str:
             if not params:
@@ -92,6 +168,17 @@ class WorkFlowNode(BaseModule):
 
 
 class WorkFlowEdge(BaseModule):
+    """Represents a directed edge in a workflow graph.
+    
+    Workflow edges connect tasks (nodes) in the workflow graph, establishing
+    execution dependencies and data flow relationships. Each edge has a source
+    node, target node, and optional priority to influence execution order.
+    
+    Attributes:
+        source: Name of the source node (where the edge starts)
+        target: Name of the target node (where the edge ends)
+        priority: Numeric priority value for this edge (higher means higher priority)
+    """
 
     source: str 
     target: str 
@@ -120,6 +207,14 @@ class WorkFlowEdge(BaseModule):
         super().__init__(**data)
     
     def init_from_tuple(self, edge_tuple: tuple) -> dict:
+        """Convert an edge tuple to a dictionary of attributes.
+        
+        Args:
+            edge_tuple: Tuple containing (source, target, priority)
+            
+        Returns:
+            Dictionary with named attributes corresponding to the tuple values
+        """
         if not edge_tuple:
             return {}
         keys = ["source", "target", "priority"]
@@ -127,10 +222,24 @@ class WorkFlowEdge(BaseModule):
         return data
     
     def compare_attrs(self):
+        """Get a tuple of the edge's core attributes for comparison.
+        
+        Returns:
+            Tuple of (source, target, priority)
+        """
         return (self.source, self.target, self.priority)
     
     def __eq__(self, other: "WorkFlowEdge"):
-
+        """Check if this edge is equal to another edge.
+        
+        Edges are considered equal if they have the same source, target, and priority.
+        
+        Args:
+            other: Another WorkFlowEdge instance to compare with
+            
+        Returns:
+            True if the edges are equal, False otherwise
+        """
         if not isinstance(other, WorkFlowEdge):
             return NotImplemented
         self_compare_attrs = self.compare_attrs()
@@ -138,10 +247,30 @@ class WorkFlowEdge(BaseModule):
         return all(self_attr==other_attr for self_attr, other_attr in zip(self_compare_attrs, other_compare_attrs))
 
     def __hash__(self):
+        """Calculate a hash value for this edge.
+        
+        Returns:
+            Hash value based on the edge's core attributes
+        """
         return hash(self.compare_attrs())
-    
+
 
 class WorkFlowGraph(BaseModule):
+    """Represents a complete workflow as a directed graph.
+    
+    WorkFlowGraph models a workflow as a directed graph where nodes represent tasks
+    and edges represent dependencies and data flow between tasks. It provides
+    methods for constructing, validating, traversing, and executing workflows.
+    
+    The graph structure supports advanced features like detecting and handling loops,
+    determining execution order, and tracking execution state.
+    
+    Attributes:
+        goal: The high-level objective of this workflow
+        nodes: List of WorkFlowNode instances representing tasks
+        edges: List of WorkFlowEdge instances representing dependencies
+        graph: Internal NetworkX MultiDiGraph or another WorkFlowGraph
+    """
 
     goal: str
     nodes: Optional[List[WorkFlowNode]] = []
@@ -149,7 +278,12 @@ class WorkFlowGraph(BaseModule):
     graph: Optional[Union[MultiDiGraph, "WorkFlowGraph"]] = Field(default=None, exclude=True)
 
     def init_module(self):
-
+        """Initialize the workflow graph.
+        
+        Creates the internal graph representation based on the provided nodes and edges,
+        or from another graph. Validates the workflow structure and initializes internal
+        state tracking for loops and dependencies.
+        """
         self._lock = threading.Lock()
         if not self.graph:
             self._init_from_nodes_and_edges(self.nodes, self.edges)
@@ -163,15 +297,24 @@ class WorkFlowGraph(BaseModule):
         self.update_graph()
     
     def update_graph(self):
+        """Update internal graph state after modifications.
+        
+        This method should be called after modifying nodes or edges to ensure
+        that internal state like loop detection is updated.
+        """
         # call this function when modifying nodes or edges!
         self._loops = self._find_all_loops()
 
     def _init_from_nodes_and_edges(self, nodes: List[WorkFlowNode] = [], edges: List[WorkFlowEdge] = []):
-
-        """
-        Initialize the WorkFlowGraph from a set of nodes and edges. 
-        """
+        """Initialize the workflow graph from explicit nodes and edges.
         
+        Args:
+            nodes: List of workflow nodes
+            edges: List of workflow edges
+            
+        Raises:
+            ValueError: If edges are provided without nodes
+        """
         if edges and not nodes:
             raise ValueError("edges cannot be passed without nodes or a graph")
         
@@ -182,7 +325,16 @@ class WorkFlowGraph(BaseModule):
         self.add_edges(*edges, update_graph=False)
 
     def _init_from_multidigraph(self, graph: MultiDiGraph, nodes: List[WorkFlowNode] = [], edges: List[WorkFlowEdge] = []):
+        """Initialize the workflow graph from a NetworkX MultiDiGraph.
         
+        Extracts nodes and edges from the provided MultiDiGraph, merges them with
+        any additional nodes and edges, and initializes the workflow graph.
+        
+        Args:
+            graph: NetworkX MultiDiGraph containing the workflow structure
+            nodes: Additional nodes to include in the workflow
+            edges: Additional edges to include in the workflow
+        """
         graph_nodes = [deepcopy(node_attrs["ref"]) for _, node_attrs in graph.nodes(data=True)]
         graph_edges = [deepcopy(edge_attrs["ref"]) for *_, edge_attrs in graph.edges(data=True)]
         graph_nodes = self.merge_nodes(graph_nodes, nodes)
@@ -190,7 +342,16 @@ class WorkFlowGraph(BaseModule):
         self._init_from_nodes_and_edges(nodes=graph_nodes, edges=graph_edges)
 
     def _init_from_workflowgraph(self, graph: "WorkFlowGraph", nodes: List[WorkFlowNode] = [], edges: List[WorkFlowEdge] = []):
+        """Initialize the workflow graph from another WorkFlowGraph.
         
+        Copies nodes and edges from the provided WorkFlowGraph, merges them with
+        any additional nodes and edges, and initializes the workflow graph.
+        
+        Args:
+            graph: Existing WorkFlowGraph to copy structure from
+            nodes: Additional nodes to include in the workflow
+            edges: Additional edges to include in the workflow
+        """
         graph_nodes = deepcopy(graph.nodes)
         graph_edges = deepcopy(graph.edges)
         graph_nodes = self.merge_nodes(graph_nodes, nodes)
@@ -198,7 +359,14 @@ class WorkFlowGraph(BaseModule):
         self._init_from_nodes_and_edges(nodes=graph_nodes, edges=graph_edges)
     
     def _validate_workflow_structure(self):
-
+        """Validate the workflow graph structure.
+        
+        Checks for issues like isolated nodes, missing initial nodes,
+        or missing end nodes, and logs warnings or raises errors as appropriate.
+        
+        Raises:
+            ValueError: If there are no initial nodes in a non-empty workflow
+        """
         isolated_nodes = list(nx.isolates(self.graph))
         if len(self.graph.nodes) > 1 and isolated_nodes:
             logger.warning(f"The workflow contains isolated nodes: {isolated_nodes}")
@@ -214,16 +382,40 @@ class WorkFlowGraph(BaseModule):
             logger.warning("There are no end nodes in the workflow")
     
     def find_initial_nodes(self) -> List[str]:
+        """Find all initial nodes in the workflow graph.
+        
+        Initial nodes are those without any incoming edges, meaning they
+        have no dependencies and can be executed first.
+        
+        Returns:
+            List of node names that have no incoming edges
+        """
         initial_nodes = [node for node, in_degree in self.graph.in_degree() if in_degree==0]
         return initial_nodes
     
     def find_end_nodes(self) -> List[str]:
+        """Find all end nodes in the workflow graph.
+        
+        End nodes are those without any outgoing edges, meaning they
+        produce the final outputs of the workflow.
+        
+        Returns:
+            List of node names that have no outgoing edges
+        """
         end_nodes = [node for node, out_degree in self.graph.out_degree() if out_degree==0]
         return end_nodes
     
     def _find_loops(self, start_node: Union[str, WorkFlowNode]) -> Dict[str, list]:
-        """
-        得到从一个节点出发进行深度遍历搜索能够得到的所有环, 并存储为: start_node: [a sequence of loop nodes]的形式
+        """Find all loops starting from a specific node.
+        
+        Performs a depth-first search from the start node to identify all cycles
+        in the graph, returning them organized by their starting nodes.
+        
+        Args:
+            start_node: Node to start the search from (either node name or WorkFlowNode)
+            
+        Returns:
+            Dictionary mapping start nodes to lists of loops
         """
         if isinstance(start_node, str):
             start_node = self.get_node(node_name=start_node)
@@ -246,7 +438,15 @@ class WorkFlowGraph(BaseModule):
         return loops
 
     def _find_all_loops(self) -> Dict[str, list]:
-
+        """Find all loops in the workflow graph.
+        
+        Searches from all initial nodes to identify all loops in the graph.
+        For loops with multiple possible starting points, it selects the most
+        appropriate starting point based on traversal order.
+        
+        Returns:
+            Dictionary mapping start nodes to lists of loops
+        """
         initial_nodes = self.find_initial_nodes()
         if not initial_nodes:
             return {} 
@@ -508,15 +708,77 @@ class WorkFlowGraph(BaseModule):
         return flag
     
     def pending(self, node: Union[str, WorkFlowNode]) -> bool:
+        """Set a node's status to PENDING.
+        
+        Marks a workflow node as waiting to be executed.
+        
+        Args:
+            node: Either node name (str) or WorkFlowNode instance
+            
+        Returns:
+            bool: True if the status was successfully set, False otherwise
+            
+        Notes:
+            - Equivalent to set_node_status(node, WorkFlowNodeState.PENDING)
+            - Used when resetting a node that needs to be re-executed
+            - Important for handling loops or re-execution scenarios
+        """
         return self.set_node_status(node=node, new_state=WorkFlowNodeState.PENDING)
     
     def running(self, node: Union[str, WorkFlowNode]) -> bool:
+        """Set a node's status to RUNNING.
+        
+        Marks a workflow node as currently being executed.
+        
+        Args:
+            node: Either node name (str) or WorkFlowNode instance
+            
+        Returns:
+            bool: True if the status was successfully set, False otherwise
+            
+        Notes:
+            - Equivalent to set_node_status(node, WorkFlowNodeState.RUNNING)
+            - Used when a task begins execution
+            - Prevents other tasks from trying to execute this node simultaneously
+        """
         return self.set_node_status(node=node, new_state=WorkFlowNodeState.RUNNING)
     
     def completed(self, node: Union[str, WorkFlowNode]) -> bool:
+        """Set a node's status to COMPLETED.
+        
+        Marks a workflow node as successfully completed execution.
+        
+        Args:
+            node: Either node name (str) or WorkFlowNode instance
+            
+        Returns:
+            bool: True if the status was successfully set, False otherwise
+            
+        Notes:
+            - Equivalent to set_node_status(node, WorkFlowNodeState.COMPLETED)
+            - Used when a task has successfully finished execution
+            - Allows dependent tasks to start executing
+            - Impacts workflow progression through is_complete checks
+        """
         return self.set_node_status(node=node, new_state=WorkFlowNodeState.COMPLETED)
     
     def failed(self, node: Union[str, WorkFlowNode]) -> bool:
+        """Set a node's status to FAILED.
+        
+        Marks a workflow node as failed during execution.
+        
+        Args:
+            node: Either node name (str) or WorkFlowNode instance
+            
+        Returns:
+            bool: True if the status was successfully set, False otherwise
+            
+        Notes:
+            - Equivalent to set_node_status(node, WorkFlowNodeState.FAILED)
+            - Used when a task has encountered an error during execution
+            - May trigger error handling or recovery processes
+            - Prevents dependent tasks from starting
+        """
         return self.set_node_status(node=node, new_state=WorkFlowNodeState.FAILED)
     
     def get_node_children(self, node: Union[str, WorkFlowNode]) -> List[str]:
@@ -543,8 +805,27 @@ class WorkFlowGraph(BaseModule):
         return uncomplete_initial_nodes 
     
     def get_all_paths_from_node(self, start_node: Union[str, WorkFlowNode]) -> List[List[str]]:
-        """
-        get all paths starting from a node
+       """Get all possible paths from start node to end node or all end nodes.
+        
+        Performs a depth-first search to find all possible execution paths through the workflow.
+        If no end_node is specified, finds paths to all end nodes (nodes with no outgoing edges).
+        This is useful for analyzing workflow execution possibilities and dependencies.
+        
+        Args:
+            start_node: Starting node (either node name or WorkFlowNode object)
+            end_node: Optional end node; if None, finds paths to all end nodes
+            
+        Returns:
+            List of paths, where each path is a list of node names
+            
+        Notes:
+            - Uses a depth-first search (DFS) algorithm with cycle detection
+            - Each path represents a possible sequence of task executions in the workflow
+            - Empty result indicates no valid paths exist from start_node
+            
+        Examples:
+            >>> paths = graph.get_all_paths_from_node("start_task")
+            >>> paths_to_specific = graph.get_all_paths_from_node("start_task", "end_task")
         """
         if isinstance(start_node, str):
             start_node = self.get_node(node_name=start_node)

@@ -9,6 +9,17 @@ from ..workflow.workflow_graph import WorkFlowNode
 
 
 class TaskPlanningInput(ActionInput):
+    """Input specification for the task planning action.
+    
+    This class defines the parameters required and optional for the task planning
+    process, which breaks down a high-level goal into a series of manageable
+    sub-tasks that form a complete workflow.
+    
+    Attributes:
+        goal: The primary objective that needs to be broken down into sub-tasks.
+        history: Optional information about previously generated task plans.
+        suggestion: Optional guidance or constraints to influence the planning process.
+    """
 
     goal: str = Field(description="A clear and detailed description of the user's goal, specifying what needs to be achieved.")
     history: Optional[str] = Field(default=None, description="Optional field containing previously generated task plan.")
@@ -16,14 +27,39 @@ class TaskPlanningInput(ActionInput):
 
 
 class TaskPlanningOutput(ActionOutput):
+    """Output structure for the task planning action.
+    
+    This class defines the structure of the output produced by the task planning
+    process, which consists primarily of a list of sub-tasks that collectively
+    achieve the user's goal.
+    
+    Attributes:
+        sub_tasks: List of workflow nodes representing the sub-tasks, with their
+                  dependencies, inputs, and outputs properly defined.
+    """
 
     sub_tasks: List[WorkFlowNode] = Field(description="A list of sub-tasks that collectively achieve user's goal.")
     
 
 class TaskPlanning(Action):
+    """Action for planning a series of tasks to achieve a goal.
+    
+    This action analyzes a user goal and decomposes it into a structured
+    series of sub-tasks that can be executed as a workflow. It uses a 
+    language model to generate the task breakdown.
+    
+    The resulting task plan can be used to construct a workflow graph
+    that represents the full sequence of operations needed to accomplish
+    the goal.
+    """
 
     def __init__(self, **kwargs):
-
+        """Initialize the TaskPlanning action.
+        
+        Args:
+            **kwargs: Keyword arguments that can override default name, description,
+                     prompt, and input/output formats.
+        """
         name = kwargs.pop("name") if "name" in kwargs else TASK_PLANNING_ACTION["name"]
         description = kwargs.pop("description") if "description" in kwargs else TASK_PLANNING_ACTION["description"]
         prompt = kwargs.pop("prompt") if "prompt" in kwargs else TASK_PLANNING_ACTION["prompt"]
@@ -32,7 +68,25 @@ class TaskPlanning(Action):
         super().__init__(name=name, description=description, prompt=prompt, inputs_format=inputs_format, outputs_format=outputs_format, **kwargs)
     
     def execute(self, llm: Optional[BaseLLM] = None, inputs: Optional[dict] = None, sys_msg: Optional[str]=None, return_prompt: bool = False, **kwargs) -> TaskPlanningOutput:
-
+        """Execute the task planning process.
+        
+        This method uses the provided language model to generate a structured
+        plan of sub-tasks based on the user's goal and any additional context.
+        
+        Args:
+            llm: The language model to use for planning.
+            inputs: Input data containing the goal and optional context.
+            sys_msg: Optional system message for the language model.
+            return_prompt: Whether to return both the task plan and the prompt used.
+            **kwargs: Additional keyword arguments.
+            
+        Returns:
+            If return_prompt is False (default): The generated task plan.
+            If return_prompt is True: A tuple of (task plan, prompt used).
+            
+        Raises:
+            ValueError: If the inputs are None or empty.
+        """
         if not inputs:
             logger.error("TaskPlanning action received invalid `inputs`: None or empty.")
             raise ValueError('The `inputs` to TaskPlanning action is None or empty.')

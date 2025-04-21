@@ -10,6 +10,14 @@ from .model_configs import LLMConfig
 from ..models.base_model import BaseLLM 
 
 def get_openai_model_cost() -> dict:
+    """Retrieves the pricing information for OpenAI models.
+    
+    This function loads the model cost data from litellm's internal pricing file,
+    which contains token costs for various models.
+    
+    Returns:
+        A dictionary mapping model names to their pricing information.
+    """
     import json 
     import importlib.resources
     with importlib.resources.open_text('litellm', 'model_prices_and_context_window_backup.json') as f:
@@ -19,6 +27,17 @@ def get_openai_model_cost() -> dict:
 
 @dataclass
 class Cost:
+    """Data class for tracking token usage and associated costs.
+    
+    This class stores both token counts and monetary costs for 
+    a single LLM interaction.
+    
+    Attributes:
+        input_tokens: Number of tokens in the prompt/input.
+        output_tokens: Number of tokens in the completion/output.
+        input_cost: Cost in USD for the input tokens.
+        output_cost: Cost in USD for the output tokens.
+    """
     input_tokens: int 
     output_tokens: int
     input_cost: float 
@@ -26,9 +45,23 @@ class Cost:
 
 
 class CostManager:
+    """Manages and tracks token usage and costs across different models.
+    
+    This class provides thread-safe tracking of token counts and costs,
+    along with utilities to display and summarize usage statistics.
+    
+    Attributes:
+        total_input_tokens: Dictionary mapping model names to their total input token count.
+        total_output_tokens: Dictionary mapping model names to their total output token count.
+        total_tokens: Dictionary mapping model names to their total token count.
+        total_input_cost: Dictionary mapping model names to their total input cost.
+        total_output_cost: Dictionary mapping model names to their total output cost.
+        total_cost: Dictionary mapping model names to their total cost.
+        _lock: Threading lock for thread-safe operations.
+    """
 
     def __init__(self):
-
+        """Initialize a new CostManager instance with empty tracking dictionaries."""
         self.total_input_tokens = {}
         self.total_output_tokens = {} 
         self.total_tokens = {} 
@@ -40,6 +73,12 @@ class CostManager:
         self._lock = threading.Lock()
 
     def compute_total_cost(self):
+        """Computes the grand total of tokens and costs across all models.
+        
+        Returns:
+            tuple: (total_tokens, total_cost) pair containing the sum of all tokens 
+                  and the sum of all costs in USD across all tracked models.
+        """
         total_tokens, total_cost = 0, 0.0
         for _, value in self.total_tokens.items():
             total_tokens += value
@@ -49,7 +88,15 @@ class CostManager:
 
     @atomic_method
     def update_cost(self, cost: Cost, model: str):
-
+        """Updates the cost and token tracking with new usage data.
+        
+        This method is thread-safe and will update all relevant tracking dictionaries.
+        If cost logging is not suppressed, it will also log the updated totals.
+        
+        Args:
+            cost: A Cost object containing the token counts and costs to add.
+            model: The name of the model to attribute this cost to.
+        """
         self.total_input_tokens[model] = self.total_input_tokens.get(model, 0) + cost.input_tokens
         self.total_output_tokens[model] = self.total_output_tokens.get(model, 0) + cost.output_tokens
         current_total_tokens = cost.input_tokens + cost.output_tokens
@@ -65,7 +112,12 @@ class CostManager:
             logger.info(f"Total cost: ${total_cost:.3f} | Total tokens: {total_tokens} | Current cost: ${current_total_cost:.3f} | Current tokens: {current_total_tokens}")
 
     def display_cost(self):
-
+        """Displays a formatted table of all cost and token usage statistics.
+        
+        Creates a pandas DataFrame with usage statistics for each model
+        and prints it as a formatted table. If multiple models are tracked,
+        a summary row with totals is included.
+        """
         data = {
             "Model": [],
             "Total Cost (USD)": [], 
@@ -104,18 +156,33 @@ class CostManager:
         print(df.to_string(index=False))
 
     def get_total_cost(self):
+        """Returns the total cost across all models.
         
+        Returns:
+            float: The sum of all costs in USD across all tracked models.
+        """
         total_cost = 0.0
         for model in self.total_cost.keys():
             total_cost += self.total_cost[model]
         return total_cost
 
 
+# Global instance of the CostManager for tracking costs across the application
 cost_manager = CostManager()
 
 
 def create_llm_instance(llm_config: LLMConfig) -> BaseLLM:
-
+    """Creates an LLM instance from a configuration object.
+    
+    This function looks up the appropriate LLM implementation class based on
+    the llm_type specified in the configuration and instantiates it.
+    
+    Args:
+        llm_config: Configuration object containing the LLM parameters.
+        
+    Returns:
+        An instantiated BaseLLM implementation ready for use.
+    """
     llm_cls = MODEL_REGISTRY.get_model(llm_config.llm_type)
     llm = llm_cls(config=llm_config)
     return llm 

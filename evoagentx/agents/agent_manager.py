@@ -30,6 +30,22 @@ class AgentManager(BaseModule):
     # agent_generator: Optional[AgentGenerator] = None # used to generate agents for a specific subtask
 
     def init_module(self):
+        """Initialize the agent manager module.
+        
+        Sets up internal state tracking for agents, including thread locks and conditions
+        for thread-safe agent state management. Also performs validation of existing agents.
+        
+        Notes:
+            - Creates a thread lock for atomic operations
+            - Initializes condition variables for each agent for state change notifications
+            - Sets initial states for existing agents
+            - Validates agent uniqueness and state consistency
+            
+        初始化代理管理器模块。
+        
+        设置代理的内部状态跟踪，包括线程锁和线程安全的代理状态管理条件变量。
+        同时对现有代理进行验证。
+        """
         self._lock = threading.Lock()
         self._state_conditions = {}
         if self.agents:
@@ -40,6 +56,25 @@ class AgentManager(BaseModule):
             self.check_agents()
     
     def check_agents(self):
+        """Validate agent list integrity and state consistency.
+        
+        Performs thorough validation of the agent manager's internal state:
+        1. Checks for duplicate agent names
+        2. Verifies that agent states exist for all agents
+        3. Ensures agent list and state dictionary sizes match
+        
+        Raises:
+            ValueError: If duplicate agent names are found
+            ValueError: If agent states dictionary size doesn't match agents list
+            ValueError: If any agent is missing its state entry
+            
+        验证代理列表的完整性和状态一致性。
+        
+        对代理管理器的内部状态进行全面验证：
+        1. 检查重复的代理名称
+        2. 验证所有代理都存在状态记录
+        3. 确保代理列表和状态字典大小匹配
+        """
         # check that the names of self.agents should be unique
         duplicate_agent_names = self.find_duplicate_agents(self.agents)
         if duplicate_agent_names:
@@ -52,6 +87,24 @@ class AgentManager(BaseModule):
             raise ValueError(f"The following agents' states were not found: {missing_agents}")
 
     def find_duplicate_agents(self, agents: List[Agent]) -> List[str]:
+        """Find duplicate agent names in a list of agents.
+        
+        Scans a list of Agent objects and identifies any duplicate names.
+        
+        Args:
+            agents: List of Agent objects to check for duplicates
+            
+        Returns:
+            List of agent names that appear more than once
+            
+        Notes:
+            - Uses sets for efficient duplicate detection
+            - Important for maintaining agent name uniqueness
+            
+        查找代理列表中的重复代理名称。
+        
+        扫描Agent对象列表并识别任何重复的名称。
+        """
         # return the names of duplicate agents based on agent.name 
         unique_agent_names = set()
         duplicate_agent_names = set()
@@ -63,6 +116,21 @@ class AgentManager(BaseModule):
         return list(duplicate_agent_names)
 
     def find_missing_agent_states(self):
+        """Find agents that don't have corresponding state entries.
+        
+        Identifies any agents in the agents list that don't have corresponding
+        entries in the agent_states dictionary.
+        
+        Returns:
+            List of agent names missing from the state dictionary
+            
+        Notes:
+            - Critical for ensuring agent state tracking consistency
+            
+        查找没有对应状态条目的代理。
+        
+        识别代理列表中没有在agent_states字典中对应条目的任何代理。
+        """
         missing_agents = [agent.name for agent in self.agents if agent.name not in self.agent_states]
         return missing_agents
 
@@ -73,6 +141,20 @@ class AgentManager(BaseModule):
         return [agent.name for agent in self.agents]
     
     def has_agent(self, agent_name: str) -> bool:
+        """Check if an agent with the given name exists in the manager.
+        
+        Args:
+            agent_name: The name of the agent to check
+            
+        Returns:
+            True if an agent with the given name exists, False otherwise
+            
+        Notes:
+            - Used for checking agent existence before operations
+            - Helps prevent duplicate agent creation
+            
+        检查具有给定名称的代理是否存在于管理器中。
+        """
         all_agent_names = self.list_agents()
         return agent_name in all_agent_names
     
@@ -81,15 +163,27 @@ class AgentManager(BaseModule):
         return len(self.agents)
     
     def load_agent(self, agent_name: str, **kwargs) -> Agent:
-
-        """
-        load an agent from local storage through self.storage_handler
-
+        """Load an agent from local storage through storage_handler.
+        
+        Retrieves agent data from storage and creates an Agent instance.
+        
         Args:
-            agent (str): the name of the agent.
+            agent_name: The name of the agent to load
+            **kwargs: Additional parameters for agent creation
         
         Returns:
-            Agent: the agent instance with the data loaded from local storage. 
+            Agent instance with data loaded from storage
+            
+        Raises:
+            ValueError: If storage_handler is not provided
+            
+        Notes:
+            - Requires storage_handler to be set
+            - Creates agent using create_customize_agent
+            
+        通过storage_handler从本地存储加载代理。
+        
+        从存储中检索代理数据并创建一个Agent实例。
         """
         if not self.storage_handler:
             raise ValueError("must provide ``self.storage_handler`` to use ``load_agent``")
@@ -104,22 +198,51 @@ class AgentManager(BaseModule):
         pass 
     
     def create_customize_agent(self, agent_data: dict, **kwargs) -> Agent:
-        """
-        create a customized agent from the provided `agent_data`. 
-
+        """Create a customized agent from the provided agent_data.
+        
+        Factory method for creating Agent instances from dictionary specifications.
+        
         Args:
-            agent_data (dict): the data used to create an Agent instance, must contain the `name` and `description` keys.
+            agent_data: The data used to create an Agent instance, must contain
+                       'name' and 'description' keys
+            **kwargs: Additional parameters for agent creation
         
         Returns:
             Agent: the instantiated agent instance.
         
         Notes: 
-            - use CustomizeAgent.from_dict() to create the agent instance.
+            - Uses CustomizeAgent.from_dict() to create the agent instance
+            - Enables dynamic agent creation from configuration data
+            
+        从提供的agent_data创建定制代理。
+        
+        从字典规范创建Agent实例的工厂方法。
         """
         return CustomizeAgent.from_dict(data=agent_data)
     
     def get_agent_name(self, agent: Union[str, dict, Agent]):
-
+        """Extract agent name from different agent representations.
+        
+        Handles different ways to specify an agent (string name, dictionary, or
+        Agent instance) and extracts the agent name.
+        
+        Args:
+            agent: Agent specified as a string name, dictionary with 'name' key,
+                  or Agent instance
+                  
+        Returns:
+            The extracted agent name as a string
+            
+        Raises:
+            ValueError: If agent is not of a supported type
+            
+        Notes:
+            - Provides flexibility in specifying agents throughout the API
+            
+        从不同的代理表示中提取代理名称。
+        
+        处理指定代理的不同方式（字符串名称、字典或Agent实例）并提取代理名称。
+        """
         if isinstance(agent, str):
             agent_name = agent
         elif isinstance(agent, dict):
@@ -131,7 +254,33 @@ class AgentManager(BaseModule):
         return agent_name
     
     def create_agent(self, agent: Union[str, dict, Agent], **kwargs) -> Agent:
-
+        """Create an Agent instance from different representations.
+        
+        Converts various agent specifications into concrete Agent instances:
+        - String names are loaded from storage
+        - Dictionaries are converted using create_customize_agent
+        - Agent instances are returned as-is
+        
+        Args:
+            agent: Agent specification as string name, dictionary, or Agent instance
+            **kwargs: Additional parameters passed to underlying creation methods
+            
+        Returns:
+            An instantiated Agent object
+            
+        Raises:
+            ValueError: If agent is not of a supported type
+            
+        Notes:
+            - Central factory method for creating agents in the system
+            
+        从不同表示创建Agent实例。
+        
+        将各种代理规范转换为具体的Agent实例：
+        - 字符串名称从存储中加载
+        - 字典使用create_customize_agent转换
+        - Agent实例按原样返回
+        """
         if isinstance(agent, str):
             agent_instance = self.load_agent(agent_name=agent)
         elif isinstance(agent, dict):
@@ -144,18 +293,26 @@ class AgentManager(BaseModule):
     
     @atomic_method
     def add_agent(self, agent: Union[str, dict, Agent], **kwargs):
-        """
-        add a single agent, ignore if the agent already exists (judged by the name of an agent).
-
+        """Add a single agent to the manager.
+        
+        Adds an agent to the manager if it doesn't already exist. The agent can be
+        specified in multiple formats, and will be created appropriately based on the format.
+        
         Args:
-            agent (Union[str, dict, Agent]): The agent to be added.
-                - Determine whether this agent should be added:
-                    - If the agent's name is different from existing agents, add the agent. 
-                    - If the agent's name already exists:
-                        - check whether the data of this agent (if provided) is the same with existing one. If they are the same, ignore 
-                - If a string is provided, it is treated as the agent's name. The agent will be loaded from storage using self.storage_handler.
-                - If a dictionary is provided, CustomizeAgent.from_dict() will be used to create an Agent instance.
-                - If an Agent instance is provided, it will be directly added to self.agents.
+            agent: The agent to be added, specified as:
+                - String: Agent name to load from storage
+                - Dictionary: Agent specification to create a CustomizeAgent
+                - Agent: Existing Agent instance to add directly
+            **kwargs: Additional parameters for agent creation
+            
+        Notes:
+            - Atomic operation protected by threading lock
+            - Ignores agents with names that already exist in the manager
+            - Automatically sets the agent's initial state to AVAILABLE
+            - Creates a condition variable for the agent for thread synchronization
+            - Validates agent manager's state after addition
+            
+
         """
         agent_name = self.get_agent_name(agent=agent)
         if self.has_agent(agent_name=agent_name):
@@ -175,14 +332,23 @@ class AgentManager(BaseModule):
             self.add_agent(agent=agent, **kwargs)
     
     def add_agents_from_workflow(self, workflow_graph, **kwargs):
-        """
-        Initialize agents from the nodes of a given WorkFlowGraph and add these agents to self.agents. 
-
-        Args:
-            workflow_graph (WorkFlowGraph): The workflow graph containing nodes with agents information.
+        """Initialize agents from the nodes of a given WorkFlowGraph and add these agents to self.agents. 
         
+        Extracts agent information from workflow nodes and adds them to the agent manager.
+        This allows automatic integration of workflow requirements with agent management.
+        
+        Args:
+            workflow_graph: The workflow graph containing nodes with agent information
+            **kwargs: Additional parameters passed to add_agent
+            
+        Raises:
+            TypeError: If workflow_graph is not a WorkFlowGraph instance
+            
         Notes:
-            - The agent information is in workflow_graph.nodes: List[WorkFlowNode].
+            - Iterates through all nodes in the workflow graph
+            - For each node, adds all associated agents
+            - Useful for automatically initializing all agents needed for a workflow
+            
         """
         from ..workflow.workflow_graph import WorkFlowGraph
         if not isinstance(workflow_graph, WorkFlowGraph):
@@ -193,8 +359,24 @@ class AgentManager(BaseModule):
                     self.add_agent(agent=agent, **kwargs)
 
     def get_agent(self, agent_name: str, **kwargs) -> Agent:
-        """
-        Retrieve an agent by its name from self.agents. 
+        """Retrieve an agent by its name from managed agents.
+        
+        Searches the list of managed agents for an agent with the specified name.
+        
+        Args:
+            agent_name: The name of the agent to retrieve
+            **kwargs: Additional parameters (unused)
+            
+        Returns:
+            The Agent instance with the specified name
+            
+        Raises:
+            ValueError: If no agent with the given name exists
+            
+        Notes:
+            - O(n) search through the agents list
+            - Important for accessing agent capabilities during workflow execution
+            
         """
         for agent in self.agents:
             if agent.name == agent_name:
@@ -203,12 +385,24 @@ class AgentManager(BaseModule):
     
     @atomic_method
     def remove_agent(self, agent_name: str, remove_from_storage: bool=False, **kwargs):
-        """
-        remove an agent from self.agents (and storage). 
-
+        """Remove an agent from the manager and optionally from storage.
+        
+        Removes an agent from the internal agents list, state tracking, and
+        optionally from persistent storage.
+        
         Args:
-            agent_name (str): the name of the agent to be removed. 
-            remove_from_storage (boo): if True, remove the agent from storage if the agent is already in the storage.
+            agent_name: The name of the agent to remove
+            remove_from_storage: If True, also remove the agent from storage
+            **kwargs: Additional parameters passed to storage_handler.remove_agent
+            
+        Notes:
+            - Atomic operation protected by threading lock
+            - Removes agent from the agents list
+            - Removes agent from the state dictionary
+            - Removes agent's condition variable
+            - Optionally removes from storage if remove_from_storage is True
+            - Validates agent manager state after removal
+            
         """
         self.agents = [agent for agent in self.agents if agent.name != agent_name]
         self.agent_states.pop(agent_name, None)
@@ -231,15 +425,24 @@ class AgentManager(BaseModule):
     
     @atomic_method
     def set_agent_state(self, agent_name: str, new_state: AgentState) -> bool:
-        """
-        Update the state of a specific agent by its name.
-
+        """Update the state of a specific agent by its name.
+        
+        Changes an agent's state and notifies any threads waiting on that agent's state.
+        Thread-safe operation for coordinating multi-threaded agent execution.
+        
         Args:
-            agent_name (str): The name of the agent.
-            new_state (AgentState): The new state to set.
+            agent_name: The name of the agent
+            new_state: The new state to set
         
         Returns:
-            bool: True if the state was updated successfully, False otherwise.
+            True if the state was updated successfully, False otherwise
+            
+        Notes:
+            - Atomic operation protected by threading lock
+            - Uses condition variables to notify waiting threads
+            - Creates condition variable if it doesn't exist
+            - Critical for synchronizing agent execution across threads
+            
         """
         # if agent_name in self.agent_states and isinstance(new_state, AgentState):
         #     # self.agent_states[agent_name] = new_state
@@ -277,8 +480,20 @@ class AgentManager(BaseModule):
     
     @atomic_method
     def clear_agents(self):
-        """
-        Remove all agents from the manager.
+        """Remove all agents from the manager.
+        
+        Completely resets the agent manager's state by clearing:
+        - The list of managed agents
+        - The agent state dictionary
+        - The state condition variables
+        
+        After clearing, validates the empty state with check_agents().
+        
+        Notes:
+            - Atomic operation protected by threading lock
+            - Use with caution as it completely resets manager state
+            - Useful for reinitializing the agent manager
+            
         """
         self.agents = [] 
         self.agent_states = {}
@@ -286,15 +501,25 @@ class AgentManager(BaseModule):
         self.check_agents()
 
     def wait_for_agent_available(self, agent_name: str, timeout: Optional[float] = None) -> bool:
-        """
-        Wait for an agent to be available.
-
+        """Wait for an agent to be available.
+        
+        Blocks the calling thread until the specified agent becomes available
+        or the timeout is reached. Uses condition variables for efficient waiting
+        without busy-waiting.
+        
         Args:
-            agent_name (str): The name of the agent.
-            timeout (Optional[float]): The maximum time to wait for the agent to be available.
-
+            agent_name: The name of the agent to wait for
+            timeout: Maximum time to wait in seconds, or None to wait indefinitely
+            
         Returns:
-            bool: True if the agent is available, False otherwise.
+            True if the agent became available, False if timed out
+            
+        Notes:
+            - Creates condition variable if it doesn't exist
+            - Used for synchronizing workflows that depend on agent availability
+            - Efficiently waits without consuming CPU cycles
+            - Critical for coordinating agent usage across threads
+            
         """
         if agent_name not in self._state_conditions:
             self._state_conditions[agent_name] = threading.Condition()
