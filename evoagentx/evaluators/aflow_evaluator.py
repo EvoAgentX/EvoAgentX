@@ -12,18 +12,70 @@ from ..models.model_utils import cost_manager
 # If you want to customize tasks, add task types here and provide evaluation functions, just like the ones given above
 
 class AFlowEvaluator:
-
-    """
-    AFlow-specific evaluator
+    """AFlow-specific evaluator for workflow performance assessment.
+    
+    This evaluator measures the performance of AFlow workflow graphs against benchmarks.
+    It supports both synchronous and asynchronous evaluation, handles resource tracking,
+    and provides detailed performance metrics including accuracy and cost analysis.
+    
+    The evaluator can configure workflow graphs with benchmark specifications,
+    execute evaluation tasks concurrently with controlled parallelism,
+    and aggregate performance metrics across a dataset.
+    
+    Attributes:
+        llm: The language model to use for evaluation, if needed by the graph
     """
 
     def __init__( self, llm: Optional[BaseLLM] = None):
+        """Initialize the AFlow evaluator.
+        
+        Args:
+            llm: Optional language model to be used during evaluation.
+                 If provided, this model will be used by the workflow graph.
+        """
         self.llm = llm 
     
     def _configure_graph(self, graph, benchmark):
+        """Configure a workflow graph with benchmark and model settings.
+        
+        Initializes the workflow graph with the benchmark name, language model
+        configuration, and benchmark instance for data access and evaluation.
+        
+        Args:
+            graph: The workflow graph class or callable to configure
+            benchmark: The benchmark instance to use for configuration
+            
+        Returns:
+            A configured workflow graph instance ready for evaluation
+        """
         return graph(name=benchmark.name, llm_config=self.llm.config, benchmark=benchmark)
     
     async def graph_evaluate_async(self, benchmark: Benchmark, graph: Callable, is_test: bool = False, max_concurrent_tasks: int = 20) -> Tuple[float, float, float]:
+        """Asynchronously evaluate a workflow graph against a benchmark.
+        
+        Configures the graph with benchmark settings, processes all examples in the
+        dataset concurrently (up to max_concurrent_tasks), and calculates
+        performance metrics including average score, cost per example, and total cost.
+        
+        Args:
+            benchmark: The benchmark to evaluate against
+            graph: The workflow graph to evaluate
+            is_test: Whether to use test data (True) or validation data (False)
+            max_concurrent_tasks: Maximum number of concurrent evaluation tasks
+            
+        Returns:
+            A tuple containing:
+              - average_metrics: Mean performance score across all examples
+              - avg_cost: Average cost per example
+              - total_cost: Total cost for all examples
+              - all_failed: Boolean indicating if all evaluations failed
+              
+        Notes:
+            - Uses a semaphore to control concurrent task execution
+            - Tracks costs before and after evaluation to calculate resource usage
+            - Handles evaluation failures gracefully, replacing failed results with 0
+            - Returns zeros if no data is available for evaluation
+        """
         
         configured_graph = self._configure_graph(graph=graph, benchmark=benchmark)
 
@@ -40,6 +92,14 @@ class AFlowEvaluator:
         semaphore = asyncio.Semaphore(max_concurrent_tasks)
         
         async def evaluate_with_semaphore(example):
+            """Evaluate a single example with semaphore-controlled concurrency.
+            
+            Args:
+                example: The benchmark example to evaluate
+                
+            Returns:
+                The evaluation result or None if evaluation failed
+            """
             async with semaphore:
                 try:
                     return await benchmark.evaluate_async(configured_graph, example)
