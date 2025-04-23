@@ -27,6 +27,26 @@ from .lcb_utils.utils import extract_test_output_code, extract_execution_code
 VALID_SCENARIO = ["code_generation", "test_output_prediction", "code_execution"]
 
 class LiveCodeBench(CodingBenchmark):
+    """Benchmark class for evaluating LLM capabilities on real-world programming tasks.
+    
+    LiveCodeBench provides a framework for evaluating different scenarios of code-related tasks:
+    1. Code Generation: generating code from problem descriptions
+    2. Test Output Prediction: predicting test outputs given test code
+    3. Code Execution: generating code that executes correctly
+    
+    The benchmark supports different evaluation modes, metrics, and can be customized
+    with various parameters like timeouts, sample dates, and processing options.
+    
+    Attributes:
+        k: An integer or list of integers specifying which pass@k metrics to compute
+        version: Release version of the dataset to use
+        num_process: Number of processes to use for evaluation
+        start_date: Filter problems to those after this date
+        end_date: Filter problems to those before this date
+        scenario: Type of programming task to evaluate ("code_generation", 
+                  "test_output_prediction", or "code_execution")
+        use_cot_for_execution: Whether to use chain-of-thought processing for code execution
+    """
 
     def __init__(
         self, 
@@ -42,6 +62,24 @@ class LiveCodeBench(CodingBenchmark):
         use_cot_for_execution: bool = False, 
         **kwargs
     ):
+        """Initialize the LiveCodeBench benchmark.
+        
+        Args:
+            path: Directory path to store/load benchmark data. Defaults to "~/.evoagentx/data/livecodebench"
+            mode: Dataset mode to load ("train", "dev", "test", or "all"). Defaults to "all"
+            timeout: Execution timeout in seconds for code evaluation. Defaults to 60
+            k: Integer or list of integers specifying which pass@k metrics to compute. Defaults to 1
+            num_process: Number of processes to use for parallel evaluation. Defaults to 6
+            scenario: Type of programming task to evaluate. Defaults to "code_generation"
+            version: Version of dataset to use. Defaults to "release_latest"
+            start_date: Start date for filtering problems (format: "YYYY-MM-DD"). Defaults to None
+            end_date: End date for filtering problems (format: "YYYY-MM-DD"). Defaults to None
+            use_cot_for_execution: Whether to use chain-of-thought for code execution. Defaults to False
+            **kwargs: Additional arguments passed to the parent class
+            
+        Raises:
+            AssertionError: If the specified scenario is not valid
+        """
         path = os.path.expanduser(path or "~/.evoagentx/data/livecodebench")
         self.k = k 
         self.version = version
@@ -54,6 +92,11 @@ class LiveCodeBench(CodingBenchmark):
         super().__init__(name=type(self).__name__, path=path, mode=mode, timeout=timeout, **kwargs)
     
     def _load_data(self):
+        """Load benchmark dataset based on the specified mode.
+        
+        Sets appropriate data attributes (_train_data, _dev_data, _test_data)
+        based on the specified mode. Currently only test data is supported.
+        """
         if self.mode == "train" or self.mode == "all":
             self._train_data = None 
         if self.mode == "dev" or self.mode == "all":
@@ -62,7 +105,18 @@ class LiveCodeBench(CodingBenchmark):
             self._test_data = self._load_test_data()
     
     def _load_test_data(self):
-
+        """Load test data for the specified scenario.
+        
+        Loads problem data based on the selected scenario (code generation,
+        test output prediction, or code execution) with appropriate filtering
+        options like date range and version.
+        
+        Returns:
+            List of problem objects specific to the selected scenario
+            
+        Raises:
+            ValueError: If the specified scenario is not valid
+        """
         if self.scenario == "code_generation":
             logger.info(f"Loading code generation dataset from {self.path} with version {self.version}.")
             data: List[CodeGenerationProblem] = load_code_generation_dataset(
@@ -83,21 +137,46 @@ class LiveCodeBench(CodingBenchmark):
         return data 
     
     def _get_id(self, example: Union[CodeGenerationProblem, TestOutputPredictionProblem]) -> str:
+        """Extract the unique identifier from a benchmark example.
+        
+        Args:
+            example: A LiveCodeBench problem object
+            
+        Returns:
+            The question ID string
+        """
         return example.question_id  
     
     def _get_label(self, example: Union[CodeGenerationProblem, TestOutputPredictionProblem]) -> dict:
+        """Extract the evaluation sample (label) from a benchmark example.
+        
+        Args:
+            example: A LiveCodeBench problem object
+            
+        Returns:
+            A dictionary containing test cases and expected outputs
+        """
         return example.get_evaluation_sample()
     
     def evaluate(self, prediction: Any, label: Any) -> dict:
-        """
-        Evaluate the solution code.
-
+        """Evaluate the proposed solution against benchmark test cases.
+        
+        Processes the prediction and evaluates it according to the current scenario:
+        - For code generation: Extracts code blocks and tests their correctness
+        - For test output prediction: Evaluates predicted test outputs
+        - For code execution: Evaluates the execution of generated code
+        
+        Computes pass@k metrics, where k can be a single value or a list of values.
+        
         Args:
-            prediction (str | List[str]): The solution code(s).
-            label (dict | List[dict]): The test cases and expected outputs. 
-
+            prediction: The solution code or output as a string or list of strings
+            label: The test cases and expected outputs as a dictionary or list of dictionaries
+            
         Returns:
-            dict: The evaluation metrics (pass@k).
+            Dictionary with pass@k metrics
+            
+        Raises:
+            ValueError: If the specified scenario is not valid
         """
         prediction, label = self._check_evaluation_inputs(prediction, label)
         k_list = [self.k] if isinstance(self.k, int) else self.k
