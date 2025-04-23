@@ -10,6 +10,18 @@ NQ_FILES_MAP = {"train": "nq-train.qa.csv", "dev": "nq-dev.qa.csv", "test": "nq-
 VALID_RAW_NQ_FILES = [file for file in list(NQ_FILES_MAP.values()) if file is not None]
 
 def download_raw_nq_data(name: str, save_folder: str):
+    """Download raw Natural Questions dataset from Facebook AI's DPR repository.
+    
+    Fetches the specified NQ file (train, dev, or test) from the DPR
+    public repository and saves it to the specified folder.
+    
+    Args:
+        name: Name of the file to download (must be in VALID_RAW_NQ_FILES)
+        save_folder: Directory path where the data should be saved
+        
+    Raises:
+        AssertionError: If the specified file name is not valid
+    """
     assert name in VALID_RAW_NQ_FILES, f"'{name}' is an invalid nq file name. Available file names: {VALID_RAW_NQ_FILES}"
     file_type_map = {file_name: typ for typ, file_name in NQ_FILES_MAP.items()}
     typ = file_type_map[name]
@@ -19,7 +31,21 @@ def download_raw_nq_data(name: str, save_folder: str):
 
 
 def load_tsv_data(file_path: str) -> List[dict]:
-
+    """Load Natural Questions data from a TSV file.
+    
+    Processes the tab-separated file containing questions and answers, 
+    converting it into a list of structured examples with IDs, questions, 
+    and answer lists.
+    
+    Args:
+        file_path: Path to the TSV file containing NQ data
+        
+    Returns:
+        List of dictionaries, each containing an ID, question, and list of answers
+        
+    Raises:
+        AssertionError: If the specified file name is not valid
+    """
     base_name = os.path.basename(file_path)
     file_type_map = {file_name: typ for typ, file_name in NQ_FILES_MAP.items()}
     assert base_name in file_type_map, f"'{base_name}' is an invalid nq file name. Available file names: {VALID_RAW_NQ_FILES}"
@@ -36,20 +62,45 @@ def load_tsv_data(file_path: str) -> List[dict]:
 
 
 class NQ(Benchmark):
-
-    """
+    """Benchmark class for evaluating question answering on Natural Questions dataset.
+    
+    Natural Questions (NQ) is a dataset for open-domain question answering,
+    containing real questions from Google Search and answers from Wikipedia.
+    This class handles loading the dataset, evaluating answers, and computing
+    metrics like exact match and F1 score.
+    
+    Each NQ example has the following structure:
     {
         "id": str, 
         "question": str, 
         "answers": List[str]
     }
+    
+    The benchmark evaluates answers using exact match, F1 score, and accuracy metrics.
     """
 
     def __init__(self, path: str = None, mode: str = "all", **kwargs):
+        """Initialize the NQ benchmark.
+        
+        Args:
+            path: Directory path to store/load NQ data. Defaults to "~/.evoagentx/data/nq"
+            mode: Dataset mode to load ("train", "dev", "test", or "all"). Defaults to "all"
+            **kwargs: Additional arguments passed to the parent class
+        """
         path = os.path.expanduser(path or "~/.evoagentx/data/nq")
         super().__init__(name=type(self).__name__, path=path, mode=mode, **kwargs)
 
     def _load_data_from_file(self, file_name: str):
+        """Load NQ data from a specific file.
+        
+        Downloads the file if not already present in the specified path.
+        
+        Args:
+            file_name: Name of the file to load
+            
+        Returns:
+            Loaded data as a list of objects, or None if file_name is None
+        """
         if file_name is None:
             return None
         file_path = os.path.join(self.path, file_name)
@@ -59,6 +110,11 @@ class NQ(Benchmark):
         return load_tsv_data(file_path=file_path)
             
     def _load_data(self):
+        """Load NQ dataset based on the specified mode.
+        
+        Downloads data files if not already present and loads train/dev/test
+        data based on the specified mode.
+        """
         if self.mode == "train" or self.mode == "all":
             self._train_data = self._load_data_from_file(file_name=NQ_FILES_MAP["train"])
         if self.mode == "dev" or self.mode == "all":
@@ -67,12 +123,42 @@ class NQ(Benchmark):
             self._test_data = self._load_data_from_file(file_name=NQ_FILES_MAP["test"])
 
     def _get_label(self, example: Any) -> Any:
+        """Extract the list of answers (labels) from an NQ example.
+        
+        Args:
+            example: An NQ problem object
+            
+        Returns:
+            The list of acceptable answers from the example
+        """
         return example["answers"]
     
     def _get_id(self, example: Any) -> Any:
+        """Extract the unique identifier from an NQ example.
+        
+        Args:
+            example: An NQ problem object
+            
+        Returns:
+            The example ID string
+        """
         return example["id"]
     
     def evaluate(self, prediction: Any, label: Any) -> dict:
+        """Evaluate a predicted answer against ground truth answers.
+        
+        Computes multiple metrics to assess the quality of the prediction:
+        - Exact match: Binary score for exact string match with any answer
+        - F1 score: Maximum token overlap F1 score across all answers
+        - Accuracy: Binary score based on string matching
+        
+        Args:
+            prediction: The model's predicted answer
+            label: List of acceptable ground truth answers
+            
+        Returns:
+            Dictionary with f1, em (exact match), and acc (accuracy) scores
+        """
         em = ems(prediction=prediction, ground_truths=label)
         f1 = max(f1_score(prediction=prediction, ground_truth=one_answer) for one_answer in label)
         acc = acc_score(prediction=prediction, ground_truths=label)
