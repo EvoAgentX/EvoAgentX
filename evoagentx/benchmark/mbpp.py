@@ -9,18 +9,42 @@ from ..utils.aflow_utils.data_utils import AFLOW_DATASET_FILES_MAP, download_afl
 
 
 def download_raw_mbpp_data(name: str, save_folder: str):
+    """Download raw MBPP dataset from the Google Research GitHub repository.
+    
+    Fetches the sanitized MBPP (Mostly Basic Python Programming) benchmark
+    dataset file from Google Research's GitHub and saves it to the specified folder.
+    
+    Args:
+        name: Name to use for the saved file
+        save_folder: Directory path where the data should be saved
+    """
     url = "https://raw.githubusercontent.com/google-research/google-research/master/mbpp/sanitized-mbpp.json"
     logger.info(f"Downloading MBPP data from: {url}")
     download_file(url=url, save_file=os.path.join(save_folder, name))
 
 
 def load_mbpp_data(data_path: str):
-
-    """
-    load MBPP data from the given path and convert to HumanEval format
+    """Load MBPP data from the given path and convert to HumanEval-compatible format.
+    
+    Processes the MBPP dataset to make it compatible with the HumanEval benchmark format.
+    This includes extracting function headers, function names, and reformatting test cases.
+    
+    Args:
+        data_path: Path to the MBPP JSON file
+        
+    Returns:
+        List of processed MBPP problem objects with added fields for compatibility
     """
 
     def extract_func_name(func_header: str) -> str:
+        """Extract the function name from a Python function header.
+        
+        Args:
+            func_header: A string containing a Python function definition
+            
+        Returns:
+            The extracted function name or None if not found
+        """
         func_name_pattern = r"def\s+([a-zA-Z_]\w*)\s*\("
         match = regex.search(func_name_pattern, func_header)
         if match:
@@ -29,6 +53,15 @@ def load_mbpp_data(data_path: str):
             return None
 
     def extract_func_header(code: str, test_list: List[str]) -> str:
+        """Extract the function header and imports from code that matches the test cases.
+        
+        Args:
+            code: The full Python code solution
+            test_list: List of test assertions to match against
+            
+        Returns:
+            A string containing imports and function header
+        """
         lines = code.split("\n")
         imports, defs = [], []
         for line in lines:
@@ -79,8 +112,17 @@ def load_mbpp_data(data_path: str):
 
 
 class MBPP(CodingBenchmark):
-
-    """
+    """Benchmark class for evaluating code generation on the MBPP dataset.
+    
+    MBPP (Mostly Basic Python Programming) is a collection of Python programming 
+    problems designed to test a model's ability to generate functionally correct 
+    code from natural language descriptions. This class handles loading the dataset, 
+    evaluating solutions, and computing metrics such as pass@k.
+    
+    The original MBPP format is transformed to be compatible with the HumanEval
+    benchmark format, allowing for consistent evaluation infrastructure.
+    
+    Each MBPP example has the following structure:
     {
         "task_id" (int): 2, 
         "prompt" (str): "Write a function to find the shared elements from the given two lists.",
@@ -88,15 +130,32 @@ class MBPP(CodingBenchmark):
         "test_imports": [] 
         "test_list" (List[str]): ['assert set(similar_elements((3, 4, 5, 6),(5, 7, 4, 10))) == set((4, 5))', 'assert set(similar_elements((1, 2, 3, 4),(5, 4, 3, 7))) == set((3, 4))', 'assert set(similar_elements((11, 12, 14, 13),(17, 15, 14, 13))) == set((13, 14))']
     }
+    
+    Attributes:
+        k: An integer or list of integers specifying which pass@k metrics to compute
     """
 
     def __init__(self, path: str = None, mode: str = "all", timeout: int = 60, k: Union[int, list] = 1,**kwargs):
+        """Initialize the MBPP benchmark.
+        
+        Args:
+            path: Directory path to store/load MBPP data. Defaults to "~/.evoagentx/data/mbpp"
+            mode: Dataset mode to load ("train", "dev", "test", or "all"). Defaults to "all"
+            timeout: Execution timeout in seconds for code evaluation. Defaults to 60
+            k: Integer or list of integers specifying which pass@k metrics to compute. Defaults to 1
+            **kwargs: Additional arguments passed to the parent class
+        """
         path = os.path.expanduser(path or "~/.evoagentx/data/mbpp")
         self.k = k 
         super().__init__(name=type(self).__name__, path=path, mode=mode, timeout=timeout, **kwargs)
     
     def _load_data(self):
-
+        """Load MBPP dataset based on the specified mode.
+        
+        Downloads the data if not already present at the specified path.
+        Sets the appropriate data attributes (_train_data, _dev_data, _test_data)
+        based on the specified mode. Currently only test data is available in the MBPP dataset.
+        """
         data_path = os.path.join(self.path, "sanitized-mbpp.json")
         if not os.path.exists(data_path):
             download_raw_mbpp_data(name="sanitized-mbpp.json", save_folder=self.path)
@@ -110,9 +169,25 @@ class MBPP(CodingBenchmark):
             self._test_data = load_mbpp_data(data_path)
     
     def _get_id(self, example: Any) -> Any:
+        """Extract the unique identifier from an MBPP example.
+        
+        Args:
+            example: An MBPP problem object
+            
+        Returns:
+            The task ID from the example
+        """
         return example["task_id"]
 
     def _get_label(self, example: Any) -> Any:
+        """Extract the evaluation data (label) from an MBPP example.
+        
+        Args:
+            example: An MBPP problem object
+            
+        Returns:
+            A dictionary containing task ID, solution code, test code, and entry point
+        """
         # return the unit test code
         return {
             "task_id": example["task_id"],
@@ -122,15 +197,18 @@ class MBPP(CodingBenchmark):
         }
     
     def evaluate(self, prediction: Any, label: Any) -> dict:
-        """
-        Evaluate the solution code.
-
+        """Evaluate the solution code against MBPP test cases.
+        
+        Executes the solution code against test cases and computes the pass@k
+        metric, which measures the probability that at least one correct solution
+        appears in k randomly sampled solutions.
+        
         Args:
-            prediction (str | List[str]): The solution code(s).
-            label (dict | List[dict]): The unit test code(s).
-
+            prediction: Solution code as a string or list of strings
+            label: Test code and metadata as a dictionary or list of dictionaries
+            
         Returns:
-            dict: The evaluation metrics (pass@k).
+            Dictionary with pass@k metrics
         """
         prediction, label = self._check_evaluation_inputs(prediction, label)
 
@@ -161,12 +239,41 @@ class MBPP(CodingBenchmark):
 
 
 class AFlowMBPP(MBPP):
+    """AFlow-specific implementation of MBPP benchmark.
+    
+    This class extends the MBPP benchmark with features specific to the
+    AFlow framework, including loading from AFlow-formatted data files,
+    supporting asynchronous evaluation for workflows, and handling
+    AFlow-specific test case formats.
+    
+    Attributes:
+        Same as MBPP, with additional support for AFlow structures
+    """
 
     def __init__(self, path: str = None, mode: str = "all", timeout: int = 60, k: Union[int, list] = 1,**kwargs):
+        """Initialize the AFlow-specific MBPP benchmark.
+        
+        Args:
+            path: Directory path to store/load data. Defaults to "~/.evoagentx/data/aflow/mbpp"
+            mode: Dataset mode to load ("train", "dev", "test", or "all"). Defaults to "all"
+            timeout: Execution timeout in seconds for code evaluation. Defaults to 60
+            k: Integer or list of integers specifying which pass@k metrics to compute. Defaults to 1
+            **kwargs: Additional arguments passed to the parent class
+        """
         path = os.path.expanduser(path or "~/.evoagentx/data/aflow/mbpp")
         super().__init__(path=path, mode=mode, timeout=timeout, k=k, **kwargs)
 
     def _load_data_from_file(self, file_name: str):
+        """Load data from a specific AFlow benchmark file.
+        
+        Downloads the file if not already present in the specified path.
+        
+        Args:
+            file_name: Name of the file to load
+            
+        Returns:
+            Loaded data as a list of objects, or None if file_name is None
+        """
         if file_name is None:
             return None
         file_path = os.path.join(self.path, file_name)
@@ -176,7 +283,12 @@ class AFlowMBPP(MBPP):
         return load_json(path=file_path, type="jsonl")
 
     def _load_data(self):
-
+        """Load AFlow-formatted MBPP dataset based on the specified mode.
+        
+        Downloads data if not already present, and loads train/dev/test
+        data from AFlow-specific files based on the specified mode.
+        Additionally loads test cases for evaluation.
+        """
         if self.mode == "train" or self.mode == "all":
             logger.info(f"Loading train data from {AFLOW_DATASET_FILES_MAP['mbpp']['train']}")
             self._train_data = self._load_data_from_file(file_name=AFLOW_DATASET_FILES_MAP["mbpp"]["train"])
@@ -191,6 +303,14 @@ class AFlowMBPP(MBPP):
         self._test_cases = self._load_data_from_file(file_name=AFLOW_DATASET_FILES_MAP["mbpp"]["test_cases"])
     
     def _get_label(self, example: Any):
+        """Extract the evaluation data (label) from an AFlow MBPP example.
+        
+        Args:
+            example: An AFlow MBPP problem object
+            
+        Returns:
+            A dictionary containing task ID, solution code, test code, and entry point
+        """
         return {
             "task_id": example["task_id"], 
             "canonical_solution": example["code"], 
@@ -199,7 +319,17 @@ class AFlowMBPP(MBPP):
         }
     
     def extract_test_cases_with_entry_point(self, entry_point: str):
-
+        """Extract test cases for a specific function entry point.
+        
+        Some entry points have hardcoded empty test cases, while others are
+        looked up in the loaded test cases.
+        
+        Args:
+            entry_point: The function name to find test cases for
+            
+        Returns:
+            Test code as a string, or None if no test cases are found
+        """
         hardcoded_cases = {
             "remove_odd": "",
             "replace_spaces": "",
@@ -220,7 +350,18 @@ class AFlowMBPP(MBPP):
         return None
     
     async def evaluate_async(self, graph: Callable, example: Any) -> float:
-
+        """Asynchronously evaluate a workflow graph on an MBPP example.
+        
+        This method is specifically designed for AFlow workflows, allowing
+        asynchronous evaluation of solutions generated by workflow graphs.
+        
+        Args:
+            graph: A callable workflow graph that generates solutions
+            example: An MBPP problem object
+            
+        Returns:
+            pass@1 score (0.0 or 1.0) indicating whether the solution passed
+        """
         # generate solution 
         prompt, entry_point = example["prompt"], example["entry_point"]
         solution = await graph(prompt, entry_point)
@@ -229,15 +370,18 @@ class AFlowMBPP(MBPP):
         return metrics["pass@1"]
     
     def evaluate(self, prediction: Any, label: Any) -> dict:
-        """
-        Evaluate the solution code.
-
+        """Evaluate the solution code against AFlow MBPP test cases.
+        
+        Similar to the base MBPP evaluation, but with a key difference:
+        use_entrypoint_as_input is set to False, which changes how
+        function parameters are handled during execution.
+        
         Args:
-            prediction (str | List[str]): The solution code(s).
-            label (dict | List[dict]): The unit test code(s).
-
+            prediction: Solution code as a string or list of strings
+            label: Test code and metadata as a dictionary or list of dictionaries
+            
         Returns:
-            dict: The evaluation metrics (pass@k).
+            Dictionary with pass@k metrics
         """
         prediction, label = self._check_evaluation_inputs(prediction, label)
 
