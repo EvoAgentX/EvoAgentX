@@ -1,6 +1,19 @@
 
 def extract_test_output_code(model_output: str):
-
+    """Extract test code from model output, prioritizing assert statements.
+    
+    This function tries to extract test output code from the model's text output
+    using two strategies:
+    1. Find the last line that starts with "assert"
+    2. If no assert lines are found, look for code blocks within ```python or ``` markers
+    
+    Args:
+        model_output: Raw string output from the model
+        
+    Returns:
+        String containing either an assert statement or code block contents,
+        or an empty string if nothing is found
+    """
     outputlines = model_output.split("\n")
     # find the last line startwith assert...
     indexlines = [i for i, line in enumerate(outputlines) if line.startswith("assert")]
@@ -28,6 +41,20 @@ def extract_test_output_code(model_output: str):
 
 
 def extract_execution_code(model_output: str, cot: bool = False):
+    """Extract execution code from model output for the code execution task.
+    
+    This function extracts the actual code execution output from the model's response,
+    handling various formatting patterns including chain-of-thought (CoT) responses
+    and delimiters like "==" or "[ANSWER]"/"[/ANSWER]" tags.
+    
+    Args:
+        model_output: Raw string output from the model
+        cot: Boolean indicating whether the output uses chain-of-thought format
+            with "[ANSWER]" tag (default: False)
+        
+    Returns:
+        String containing the cleaned execution code
+    """
     if cot:
         if "[ANSWER]" in model_output:
             model_output = model_output.split("[ANSWER]")[1].strip()
