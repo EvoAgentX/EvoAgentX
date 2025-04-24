@@ -20,9 +20,26 @@ logger = logging.getLogger(__name__)
 
 # Agent Service
 class AgentService:
+    """Service for managing AI agents in the system.
+    
+    This service provides methods for creating, retrieving, updating, and
+    deleting agents, as well as listing agents with filtering and pagination.
+    All agent-related business logic should be implemented here.
+    """
     @staticmethod
     async def create_agent(agent_data: AgentCreate, user_id: Optional[str] = None) -> Dict[str, Any]:
-        """Create a new agent."""
+        """Create a new agent in the system.
+        
+        Args:
+            agent_data: Agent creation data containing name, description, and configuration
+            user_id: Optional ID of the user creating the agent
+            
+        Returns:
+            Dictionary containing the created agent data
+            
+        Raises:
+            ValueError: If an agent with the same name already exists
+        """
         agent_dict = agent_data.dict()
         agent_dict["created_by"] = user_id
         agent_dict["created_at"] = datetime.utcnow()
@@ -43,7 +60,17 @@ class AgentService:
     
     @staticmethod
     async def get_agent(agent_id: str) -> Optional[Dict[str, Any]]:
-        """Get an agent by ID."""
+        """Retrieve an agent by its ID.
+        
+        Args:
+            agent_id: ID of the agent to retrieve
+            
+        Returns:
+            Dictionary containing the agent data if found, None otherwise
+            
+        Raises:
+            ValueError: If the agent ID is not valid
+        """
         if not ObjectId.is_valid(agent_id):
             raise ValueError(f"Invalid agent ID: {agent_id}")
             
@@ -52,12 +79,30 @@ class AgentService:
     
     @staticmethod
     async def get_agent_by_name(name: str) -> Optional[Dict[str, Any]]:
-        """Get an agent by name."""
+        """Retrieve an agent by its name.
+        
+        Args:
+            name: Name of the agent to retrieve
+            
+        Returns:
+            Dictionary containing the agent data if found, None otherwise
+        """
         return await Database.agents.find_one({"name": name})
     
     @staticmethod
     async def update_agent(agent_id: str, agent_data: AgentUpdate) -> Optional[Dict[str, Any]]:
-        """Update an agent."""
+        """Update an existing agent.
+        
+        Args:
+            agent_id: ID of the agent to update
+            agent_data: Agent update data containing fields to modify
+            
+        Returns:
+            Dictionary containing the updated agent data if found, None otherwise
+            
+        Raises:
+            ValueError: If the agent ID is not valid or if the new name already exists
+        """
         if not ObjectId.is_valid(agent_id):
             raise ValueError(f"Invalid agent ID: {agent_id}")
             
@@ -89,7 +134,17 @@ class AgentService:
     
     @staticmethod
     async def delete_agent(agent_id: str) -> bool:
-        """Delete an agent."""
+        """Delete an agent.
+        
+        Args:
+            agent_id: ID of the agent to delete
+            
+        Returns:
+            Boolean indicating whether the agent was successfully deleted
+            
+        Raises:
+            ValueError: If the agent ID is not valid or if the agent is used in workflows
+        """
         if not ObjectId.is_valid(agent_id):
             raise ValueError(f"Invalid agent ID: {agent_id}")
             
@@ -109,7 +164,15 @@ class AgentService:
         params: PaginationParams, 
         search: Optional[SearchParams] = None
     ) -> Tuple[List[Dict[str, Any]], int]:
-        """List agents with pagination and search."""
+        """List agents with pagination and search/filter options.
+        
+        Args:
+            params: Pagination parameters (skip, limit)
+            search: Optional search parameters (query text, tags, status, date range)
+            
+        Returns:
+            Tuple containing a list of agent dictionaries and the total count
+        """
         query = {}
         
         if search:
@@ -144,9 +207,26 @@ class AgentService:
 
 # Workflow Service
 class WorkflowService:
+    """Service for managing workflows in the system.
+    
+    This service provides methods for creating, retrieving, updating, and
+    deleting workflows, as well as listing workflows with filtering and pagination.
+    All workflow-related business logic should be implemented here.
+    """
     @staticmethod
     async def create_workflow(workflow_data: WorkflowCreate, user_id: Optional[str] = None) -> Dict[str, Any]:
-        """Create a new workflow."""
+        """Create a new workflow.
+        
+        Args:
+            workflow_data: Workflow creation data containing name, description, and definition
+            user_id: Optional ID of the user creating the workflow
+            
+        Returns:
+            Dictionary containing the created workflow data
+            
+        Raises:
+            ValueError: If a workflow with the same name exists or if referenced agents don't exist
+        """
         workflow_dict = workflow_data.dict()
         workflow_dict["created_by"] = user_id
         workflow_dict["created_at"] = datetime.utcnow()
@@ -184,7 +264,17 @@ class WorkflowService:
     
     @staticmethod
     async def get_workflow(workflow_id: str) -> Optional[Dict[str, Any]]:
-        """Get a workflow by ID."""
+        """Retrieve a workflow by its ID.
+        
+        Args:
+            workflow_id: ID of the workflow to retrieve
+            
+        Returns:
+            Dictionary containing the workflow data if found, None otherwise
+            
+        Raises:
+            ValueError: If the workflow ID is not valid
+        """
         if not ObjectId.is_valid(workflow_id):
             raise ValueError(f"Invalid workflow ID: {workflow_id}")
         workflow = await Database.workflows.find_one({"_id": ObjectId(workflow_id)})
@@ -192,12 +282,31 @@ class WorkflowService:
     
     @staticmethod
     async def get_workflow_by_name(name: str) -> Optional[Dict[str, Any]]:
-        """Get a workflow by name."""
+        """Retrieve a workflow by its name.
+        
+        Args:
+            name: Name of the workflow to retrieve
+            
+        Returns:
+            Dictionary containing the workflow data if found, None otherwise
+        """
         return await Database.workflows.find_one({"name": name})
     
     @staticmethod
     async def update_workflow(workflow_id: str, workflow_data: WorkflowUpdate) -> Optional[Dict[str, Any]]:
-        """Update a workflow."""
+        """Update an existing workflow.
+        
+        Args:
+            workflow_id: ID of the workflow to update
+            workflow_data: Workflow update data containing fields to modify
+            
+        Returns:
+            Dictionary containing the updated workflow data if found, None otherwise
+            
+        Raises:
+            ValueError: If the workflow ID is not valid, if the new name already exists,
+                or if referenced agents don't exist
+        """
         if not ObjectId.is_valid(workflow_id):
             raise ValueError(f"Invalid workflow ID: {workflow_id}")
             
@@ -247,7 +356,17 @@ class WorkflowService:
     
     @staticmethod
     async def delete_workflow(workflow_id: str) -> bool:
-        """Delete a workflow."""
+        """Delete a workflow.
+        
+        Args:
+            workflow_id: ID of the workflow to delete
+            
+        Returns:
+            Boolean indicating whether the workflow was successfully deleted
+            
+        Raises:
+            ValueError: If the workflow ID is not valid or if the workflow has active executions
+        """
         if not ObjectId.is_valid(workflow_id):
             raise ValueError(f"Invalid workflow ID: {workflow_id}")
         
@@ -278,7 +397,15 @@ class WorkflowService:
         params: PaginationParams, 
         search: Optional[SearchParams] = None
     ) -> Tuple[List[Dict[str, Any]], int]:
-        """List workflows with pagination and search."""
+        """List workflows with pagination and search/filter options.
+        
+        Args:
+            params: Pagination parameters (skip, limit)
+            search: Optional search parameters (query text, tags, status, date range)
+            
+        Returns:
+            Tuple containing a list of workflow dictionaries and the total count
+        """
         query = {}
         
         if search:
@@ -313,9 +440,26 @@ class WorkflowService:
 
 # Workflow Execution Service
 class WorkflowExecutionService:
+    """Service for managing workflow executions in the system.
+    
+    This service provides methods for creating, retrieving, and monitoring
+    workflow executions, as well as logging execution events and retrieving logs.
+    All execution-related business logic should be implemented here.
+    """
     @staticmethod
     async def create_execution(execution_data: ExecutionCreate, user_id: Optional[str] = None) -> Dict[str, Any]:
-        """Create a new workflow execution."""
+        """Create a new workflow execution.
+        
+        Args:
+            execution_data: Execution creation data containing workflow ID and input parameters
+            user_id: Optional ID of the user initiating the execution
+            
+        Returns:
+            Dictionary containing the created execution data
+            
+        Raises:
+            ValueError: If the referenced workflow does not exist
+        """
         # Validate workflow exists
         workflow = await WorkflowService.get_workflow(execution_data.workflow_id)
         if not workflow:
@@ -349,7 +493,17 @@ class WorkflowExecutionService:
     
     @staticmethod
     async def get_execution(execution_id: str) -> Optional[Dict[str, Any]]:
-        """Get a workflow execution by ID."""
+        """Retrieve a workflow execution by its ID.
+        
+        Args:
+            execution_id: ID of the execution to retrieve
+            
+        Returns:
+            Dictionary containing the execution data if found, None otherwise
+            
+        Raises:
+            ValueError: If the execution ID is not valid
+        """
         if not ObjectId.is_valid(execution_id):
             raise ValueError(f"Invalid execution ID: {execution_id}")
             
@@ -358,7 +512,19 @@ class WorkflowExecutionService:
     
     @staticmethod
     async def update_execution_status(execution_id: str, status: ExecutionStatus, error_message: Optional[str] = None) -> Optional[Dict[str, Any]]:
-        """Update execution status."""
+        """Update the status of a workflow execution.
+        
+        Args:
+            execution_id: ID of the execution to update
+            status: New status for the execution
+            error_message: Optional error message if the execution failed
+            
+        Returns:
+            Dictionary containing the updated execution data if found, None otherwise
+            
+        Raises:
+            ValueError: If the execution ID is not valid
+        """
         if not ObjectId.is_valid(execution_id):
             raise ValueError(f"Invalid execution ID: {execution_id}")
         
@@ -387,7 +553,16 @@ class WorkflowExecutionService:
         params: PaginationParams = PaginationParams(), 
         search: Optional[SearchParams] = None
     ) -> Tuple[List[Dict[str, Any]], int]:
-        """List workflow executions with pagination and search."""
+        """List workflow executions with pagination and search/filter options.
+        
+        Args:
+            workflow_id: Optional ID to filter executions by workflow
+            params: Pagination parameters (skip, limit)
+            search: Optional search parameters (status, date range)
+            
+        Returns:
+            Tuple containing a list of execution dictionaries and the total count
+        """
         query = {}
         
         if workflow_id:
@@ -427,7 +602,23 @@ class WorkflowExecutionService:
         level: str = "INFO", 
         details: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
-        """Log an event in a workflow execution."""
+        """Log an event in a workflow execution.
+        
+        Creates a log entry for a workflow execution event, which can be
+        used for monitoring, debugging, and auditing.
+        
+        Args:
+            workflow_id: ID of the workflow being executed
+            execution_id: ID of the execution
+            message: Log message text
+            step_id: Optional ID of the workflow step
+            agent_id: Optional ID of the agent
+            level: Log level (INFO, WARNING, ERROR, etc.)
+            details: Optional additional structured details
+            
+        Returns:
+            Dictionary containing the created log entry
+        """
         log_entry = {
             "workflow_id": workflow_id,
             "execution_id": execution_id,
@@ -449,7 +640,15 @@ class WorkflowExecutionService:
         execution_id: str, 
         params: PaginationParams = PaginationParams()
     ) -> Tuple[List[Dict[str, Any]], int]:
-        """Retrieve logs for a specific execution."""
+        """Retrieve logs for a specific execution.
+        
+        Args:
+            execution_id: ID of the execution to retrieve logs for
+            params: Pagination parameters (skip, limit)
+            
+        Returns:
+            Tuple containing a list of log entry dictionaries and the total count
+        """
         query = {"execution_id": execution_id}
         
         total = await Database.logs.count_documents(query)
