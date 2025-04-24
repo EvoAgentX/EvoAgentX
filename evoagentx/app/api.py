@@ -36,12 +36,38 @@ system_router = APIRouter(prefix=settings.API_PREFIX)
 # Authentication Routes
 @auth_router.post("/auth/register", response_model=UserResponse, tags=["Authentication"])
 async def register_user(user: UserCreate):
-    """Register a new user."""
+    """Register a new user in the system.
+    
+    Creates a new user account with the provided information and returns
+    the created user details. Password is hashed before storage.
+    
+    Args:
+        user: User creation data including email, password, and name
+        
+    Returns:
+        UserResponse: Details of the newly created user
+        
+    Raises:
+        HTTPException: If user registration fails (e.g., email already exists)
+    """
     return await create_user(user)
 
 @auth_router.post("/auth/login", response_model=Token, tags=["Authentication"])
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    """Login and return access token."""
+    """Authenticate a user and issue an access token.
+    
+    Verifies the username (email) and password, and returns a JWT token
+    for authenticated API access.
+    
+    Args:
+        form_data: OAuth2 form containing username and password
+        
+    Returns:
+        Token: Access token and token type
+        
+    Raises:
+        HTTPException: If authentication fails with 401 Unauthorized
+    """
     user = await authenticate_user(form_data.username, form_data.password)
     if not user:
         raise HTTPException(
@@ -67,7 +93,21 @@ async def create_agent(
     agent: AgentCreate, 
     current_user: Dict[str, Any] = Depends(get_current_active_user)
 ):
-    """Create a new agent."""
+    """Create a new agent.
+    
+    Creates a new agent with the specified configuration, associated with
+    the current authenticated user.
+    
+    Args:
+        agent: Agent creation data including name, description, and configuration
+        current_user: Current authenticated user (injected by dependency)
+        
+    Returns:
+        AgentResponse: Details of the newly created agent
+        
+    Raises:
+        HTTPException: If agent creation fails with 400 Bad Request
+    """
     try:
         created_agent = await AgentService.create_agent(
             agent, 
@@ -84,7 +124,20 @@ async def get_agent(
     agent_id: str, 
     current_user: Dict[str, Any] = Depends(get_current_active_user)
 ):
-    """Retrieve a specific agent by ID."""
+    """Retrieve a specific agent by ID.
+    
+    Gets the details of an agent with the specified ID if it exists.
+    
+    Args:
+        agent_id: Unique identifier of the agent to retrieve
+        current_user: Current authenticated user (injected by dependency)
+        
+    Returns:
+        AgentResponse: Details of the requested agent
+        
+    Raises:
+        HTTPException: If agent is not found with 404 Not Found
+    """
     agent = await AgentService.get_agent(agent_id)
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
@@ -97,7 +150,22 @@ async def update_agent(
     agent_update: AgentUpdate, 
     current_user: Dict[str, Any] = Depends(get_current_active_user)
 ):
-    """Update an existing agent."""
+    """Update an existing agent.
+    
+    Updates the specified agent with new configuration data.
+    
+    Args:
+        agent_id: Unique identifier of the agent to update
+        agent_update: New agent data for update
+        current_user: Current authenticated user (injected by dependency)
+        
+    Returns:
+        AgentResponse: Details of the updated agent
+        
+    Raises:
+        HTTPException: If agent is not found with 404 Not Found or
+            if update data is invalid with 400 Bad Request
+    """
     try:
         updated_agent = await AgentService.update_agent(agent_id, agent_update)
         if not updated_agent:
@@ -113,7 +181,18 @@ async def list_agents(
     search: SearchParams = Depends(),
     current_user: Dict[str, Any] = Depends(get_current_active_user)
 ):
-    """List agents with optional pagination and search."""
+    """List agents with optional pagination and search.
+    
+    Retrieves a paginated list of agents, with optional search filtering.
+    
+    Args:
+        pagination: Pagination parameters (page, limit)
+        search: Search parameters (query, field)
+        current_user: Current authenticated user (injected by dependency)
+        
+    Returns:
+        List[AgentResponse]: List of agents matching the criteria
+    """
     agents, total = await AgentService.list_agents(pagination, search)
     # Convert _id to string for each agent in the list
     for agent in agents:
@@ -125,7 +204,22 @@ async def delete_agent(
     agent_id: str, 
     current_user: Dict[str, Any] = Depends(get_current_admin_user)
 ):
-    """Delete an agent (admin-only)."""
+    """Delete an agent (admin-only).
+    
+    Permanently removes an agent from the system.
+    This operation requires administrator privileges.
+    
+    Args:
+        agent_id: Unique identifier of the agent to delete
+        current_user: Current authenticated admin user (injected by dependency)
+        
+    Returns:
+        None: Returns 204 No Content on success
+        
+    Raises:
+        HTTPException: If agent is not found with 404 Not Found or
+            if deletion fails with 400 Bad Request
+    """
     try:
         success = await AgentService.delete_agent(agent_id)
         if not success:
@@ -142,7 +236,21 @@ async def create_workflow(
     workflow: WorkflowCreate, 
     current_user: Dict[str, Any] = Depends(get_current_active_user)
 ):
-    """Create a new workflow."""
+    """Create a new workflow.
+    
+    Creates a new workflow with the specified configuration, associated with
+    the current authenticated user. Workflows define a sequence of agent interactions.
+    
+    Args:
+        workflow: Workflow creation data including name, description, and steps
+        current_user: Current authenticated user (injected by dependency)
+        
+    Returns:
+        WorkflowResponse: Details of the newly created workflow
+        
+    Raises:
+        HTTPException: If workflow creation fails with 400 Bad Request
+    """
     try:
         created_workflow = await WorkflowService.create_workflow(
             workflow, 
@@ -161,7 +269,20 @@ async def get_workflow(
     workflow_id: str, 
     current_user: Dict[str, Any] = Depends(get_current_active_user)
 ):
-    """Retrieve a specific workflow by ID."""
+    """Retrieve a specific workflow by ID.
+    
+    Gets the details of a workflow with the specified ID if it exists.
+    
+    Args:
+        workflow_id: Unique identifier of the workflow to retrieve
+        current_user: Current authenticated user (injected by dependency)
+        
+    Returns:
+        WorkflowResponse: Details of the requested workflow
+        
+    Raises:
+        HTTPException: If workflow is not found with 404 Not Found
+    """
     workflow = await WorkflowService.get_workflow(workflow_id)
     if not workflow:
         raise HTTPException(status_code=404, detail="Workflow not found")
@@ -175,7 +296,22 @@ async def update_workflow(
     workflow_update: WorkflowUpdate, 
     current_user: Dict[str, Any] = Depends(get_current_active_user)
 ):
-    """Update an existing workflow."""
+    """Update an existing workflow.
+    
+    Updates the specified workflow with new configuration data.
+    
+    Args:
+        workflow_id: Unique identifier of the workflow to update
+        workflow_update: New workflow data for update
+        current_user: Current authenticated user (injected by dependency)
+        
+    Returns:
+        WorkflowResponse: Details of the updated workflow
+        
+    Raises:
+        HTTPException: If workflow is not found with 404 Not Found or
+            if update data is invalid with 400 Bad Request
+    """
     try:
         updated_workflow = await WorkflowService.update_workflow(workflow_id, workflow_update)
         if not updated_workflow:
@@ -191,7 +327,22 @@ async def delete_workflow(
     workflow_id: str, 
     current_user: Dict[str, Any] = Depends(get_current_admin_user)
 ):
-    """Delete a workflow (admin-only)."""
+    """Delete a workflow (admin-only).
+    
+    Permanently removes a workflow from the system.
+    This operation requires administrator privileges.
+    
+    Args:
+        workflow_id: Unique identifier of the workflow to delete
+        current_user: Current authenticated admin user (injected by dependency)
+        
+    Returns:
+        Response: Returns 204 No Content on success
+        
+    Raises:
+        HTTPException: If workflow is not found with 404 Not Found or
+            if deletion fails with 400 Bad Request
+    """
     try:
         success = await WorkflowService.delete_workflow(workflow_id)
         if not success:
@@ -207,7 +358,18 @@ async def list_workflows(
     search: SearchParams = Depends(),
     current_user: Dict[str, Any] = Depends(get_current_active_user)
 ):
-    """List workflows with optional pagination and search."""
+    """List workflows with optional pagination and search.
+    
+    Retrieves a paginated list of workflows, with optional search filtering.
+    
+    Args:
+        pagination: Pagination parameters (page, limit)
+        search: Search parameters (query, field)
+        current_user: Current authenticated user (injected by dependency)
+        
+    Returns:
+        List[WorkflowResponse]: List of workflows matching the criteria
+    """
     workflows, total = await WorkflowService.list_workflows(pagination, search)
     
     # Convert ObjectId to string for each workflow
@@ -226,7 +388,23 @@ async def create_execution(
     background_tasks: BackgroundTasks,
     current_user: Dict[str, Any] = Depends(get_current_active_user)
 ):
-    """Create and start a workflow execution."""
+    """Create and start a workflow execution.
+    
+    Initiates the execution of a workflow with the specified input parameters.
+    The execution runs asynchronously, and the response is returned immediately
+    with a 202 Accepted status.
+    
+    Args:
+        execution: Execution creation data including workflow ID and inputs
+        background_tasks: FastAPI background tasks handler for async processing
+        current_user: Current authenticated user (injected by dependency)
+        
+    Returns:
+        ExecutionResponse: Initial details of the execution
+        
+    Raises:
+        HTTPException: If execution creation fails with 400 Bad Request
+    """
     try:
         execution_result = await WorkflowExecutionService.create_execution(
             execution_data=execution,
@@ -244,7 +422,22 @@ async def get_execution(
     execution_id: str,
     current_user: Dict[str, Any] = Depends(get_current_active_user)
 ):
-    """Retrieve a specific workflow execution by ID."""
+    """Retrieve a specific workflow execution by ID.
+    
+    Gets the details of a workflow execution with the specified ID,
+    including its current status and results if available.
+    
+    Args:
+        execution_id: Unique identifier of the execution to retrieve
+        current_user: Current authenticated user (injected by dependency)
+        
+    Returns:
+        ExecutionResponse: Details of the requested execution
+        
+    Raises:
+        HTTPException: If execution is not found with 404 Not Found or
+            if retrieval fails with 400 Bad Request
+    """
     try:
         execution = await WorkflowExecutionService.get_execution(execution_id)
         if not execution:
@@ -260,7 +453,22 @@ async def stop_execution(
     execution_id: str,
     current_user: Dict[str, Any] = Depends(get_current_active_user)
 ):
-    """Stop (cancel) a workflow execution."""
+    """Stop (cancel) a workflow execution.
+    
+    Cancels an in-progress workflow execution, preventing further steps
+    from being executed.
+    
+    Args:
+        execution_id: Unique identifier of the execution to stop
+        current_user: Current authenticated user (injected by dependency)
+        
+    Returns:
+        ExecutionResponse: Updated details of the execution with CANCELLED status
+        
+    Raises:
+        HTTPException: If execution is not found with 404 Not Found or
+            if cancellation fails with 400 Bad Request
+    """
     try:
         updated_execution = await WorkflowExecutionService.update_execution_status(
             execution_id=execution_id,
@@ -281,7 +489,18 @@ async def list_executions(
     search: SearchParams = Depends(), 
     current_user: Dict[str, Any] = Depends(get_current_active_user)
 ):
-    """List workflow executions with optional pagination and search."""
+    """List workflow executions with optional pagination and search.
+    
+    Retrieves a paginated list of workflow executions, with optional search filtering.
+    
+    Args:
+        pagination: Pagination parameters (page, limit)
+        search: Search parameters (query, field)
+        current_user: Current authenticated user (injected by dependency)
+        
+    Returns:
+        List[ExecutionResponse]: List of executions matching the criteria
+    """
     executions, total = await WorkflowExecutionService.list_executions(
         params=pagination, 
         search=search
@@ -298,7 +517,20 @@ async def get_execution_logs(
     pagination: PaginationParams = Depends(),
     current_user: Dict[str, Any] = Depends(get_current_active_user)
 ):
-    """Retrieve logs for a specific execution."""
+    """Retrieve logs for a specific execution.
+    
+    Gets the detailed logs for a workflow execution, including
+    step-by-step information about what occurred during execution.
+    Results are paginated.
+    
+    Args:
+        execution_id: Unique identifier of the execution
+        pagination: Pagination parameters (page, limit)
+        current_user: Current authenticated user (injected by dependency)
+        
+    Returns:
+        List[Dict[str, Any]]: List of log entries for the execution
+    """
     logs, total = await WorkflowExecutionService.get_execution_logs(execution_id, params=pagination)
     # Convert _id in each log entry to string
     for log in logs:
@@ -308,7 +540,17 @@ async def get_execution_logs(
 # Health Check Route
 @system_router.get("/health", tags=["System"])
 async def health_check():
-    """Simple health check endpoint."""
+    """Simple health check endpoint.
+    
+    Verifies that the API and its database connection are functioning properly.
+    This endpoint can be used by monitoring systems to check service health.
+    
+    Returns:
+        Dict: Health status information including version
+        
+    Raises:
+        HTTPException: If the database connection fails with 500 Internal Server Error
+    """
     try:
         # You can add more comprehensive health checks here
         await Database.db.command('ping')
