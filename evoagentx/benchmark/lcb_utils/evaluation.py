@@ -34,15 +34,40 @@ import_string = "from string import *\nfrom re import *\nfrom datetime import *\
 #--------------------------------
 
 class TimeoutException(Exception):
+    """Exception raised when code execution exceeds the time limit.
+    
+    This custom exception is used in conjunction with the signal module
+    to handle timeout situations during code evaluation.
+    """
     pass
 
 
 class CODE_TYPE(Enum):
+    """Enumeration of code execution types.
+    
+    Defines the different ways code can be executed during evaluation:
+    
+    Attributes:
+        call_based: For code where specific functions are called with arguments
+        standard_input: For code that reads from standard input
+    """
     call_based = 0
     standard_input = 1
 
 
 def timeout_handler(signum, frame):
+    """Signal handler for timeout events.
+    
+    Invoked when a signal.alarm goes off, raising a TimeoutException
+    to interrupt code execution that's taking too long.
+    
+    Args:
+        signum: Signal number
+        frame: Current stack frame
+        
+    Raises:
+        TimeoutException: Always raised to indicate the timeout
+    """
     print("timeout occured: alarm went off")
     raise TimeoutException
 
@@ -134,6 +159,17 @@ def reliability_guard(maximum_memory_bytes=None):
 
 
 def get_function(compiled_sol, fn_name: str):  # type: ignore
+    """Retrieve a function from a compiled module.
+    
+    Attempts to get a function by name from a compiled solution module.
+    
+    Args:
+        compiled_sol: A compiled module containing functions
+        fn_name: Name of the function to retrieve
+        
+    Returns:
+        The requested function if it exists, otherwise None
+    """
     try:
         assert hasattr(compiled_sol, fn_name)
         return getattr(compiled_sol, fn_name)
@@ -142,6 +178,21 @@ def get_function(compiled_sol, fn_name: str):  # type: ignore
 
 
 def compile_code(code: str, timeout: int):
+    """Compile provided code and return the compiled module.
+    
+    Executes the code in a fresh module namespace with a timeout to prevent
+    infinite execution. Handles LeetCode-style solutions that create a Solution class.
+    
+    Args:
+        code: Python code to compile
+        timeout: Maximum execution time in seconds
+        
+    Returns:
+        A compiled module containing the executed code
+        
+    Raises:
+        TimeoutException: If code compilation exceeds the timeout
+    """
     signal.alarm(timeout)
     try:
         tmp_sol = ModuleType("tmp_sol", "")
@@ -164,6 +215,19 @@ def compile_code(code: str, timeout: int):
 
 
 def truncatefn(s, length=300):
+    """Truncate a string to a specified length for display purposes.
+    
+    If the string is longer than the specified length, it will be truncated
+    with an indicator in the middle. This is useful for displaying long
+    outputs in error messages.
+    
+    Args:
+        s: String to truncate
+        length: Maximum length of the output string (default: 300)
+        
+    Returns:
+        Truncated string
+    """
     if isinstance(s, str):
         pass
     else:
@@ -177,6 +241,27 @@ def truncatefn(s, length=300):
 def grade_call_based(
     code: str, all_inputs: list, all_outputs: list, fn_name: str, timeout: int
 ):
+    """Grade code that uses function calls for testing.
+    
+    Compiles the code, extracts the specified function, and tests it against
+    provided inputs and outputs. This method is used for call-based code
+    evaluation (e.g., LeetCode-style problems).
+    
+    Args:
+        code: Python code to grade
+        all_inputs: List of inputs to test against
+        all_outputs: List of expected outputs
+        fn_name: Name of the function to test
+        timeout: Maximum execution time per test in seconds
+        
+    Returns:
+        Tuple containing:
+        - List of results for each test case (True for pass, error code for failure)
+        - Dictionary with execution details or error information
+        
+    Raises:
+        TimeoutException: If execution exceeds the timeout
+    """
     # call-based clean up logic
     # need to wrap in try-catch logic after to catch the correct errors, but for now this is fine.
     code = import_string + "\n\n" + code
@@ -256,6 +341,18 @@ def grade_call_based(
 
 
 def clean_if_name(code: str) -> str:
+    """Remove the if __name__ == '__main__' block from code.
+    
+    Many Python scripts have code that runs only when the script is executed directly.
+    This function removes that pattern for evaluation purposes since we need to execute
+    the code programmatically.
+    
+    Args:
+        code: Python code to clean
+        
+    Returns:
+        Python code with the if __name__ == '__main__' block removed
+    """
     try:
         astree = ast.parse(code)
         last_block = astree.body[-1]
@@ -272,6 +369,18 @@ def clean_if_name(code: str) -> str:
 
 
 def make_function(code: str) -> str:
+    """Wrap code into a function for more controlled execution.
+    
+    Takes arbitrary Python code and wraps it in a function called 'wrapped_function'.
+    This allows for more controlled execution, especially for standard input-based
+    code evaluation.
+    
+    Args:
+        code: Python code to wrap
+        
+    Returns:
+        Python code wrapped in a function
+    """
     try:
         import_stmts = []
         all_other_stmts = []
@@ -307,7 +416,22 @@ def make_function(code: str) -> str:
 # from https://stackoverflow.com/a/16571630/6416660
 # alternative use redirect_stdout() from contextlib
 class Capturing(list):
+    """Context manager to capture stdout output as a list.
+    
+    Captures all output to stdout while in context and stores it in a list.
+    This is used for evaluating code that writes to standard output.
+    
+    Example:
+        with Capturing() as output:
+            print("Hello")
+        assert output == ["Hello"]
+    """
     def __enter__(self):
+        """Set up the stdout capture.
+        
+        Returns:
+            self: The list that will contain captured output
+        """
         self._stdout = sys.stdout
         sys.stdout = self._stringio = StringIO()
         # Make closing the StringIO a no-op
@@ -315,13 +439,29 @@ class Capturing(list):
         return self
 
     def __exit__(self, *args):
+        """Restore stdout and store captured output in the list.
+        
+        Args:
+            *args: Exception information if an exception occurred
+        """
         self.append(self._stringio.getvalue())
         del self._stringio  # free up some memory
         sys.stdout = self._stdout
 
 
 def call_method(method, inputs):
-
+    """Execute a method with mocked standard input.
+    
+    Sets up a test environment where standard input is mocked to return the
+    provided inputs. This allows testing code that reads from stdin.
+    
+    Args:
+        method: The function to call
+        inputs: String or list of strings to provide as standard input
+        
+    Returns:
+        The result of calling the method
+    """
     if isinstance(inputs, list):
         inputs = "\n".join(inputs)
 
@@ -348,6 +488,17 @@ def call_method(method, inputs):
 
 
 def get_stripped_lines(val: str):
+    """Split a string into stripped lines.
+    
+    Takes a string, strips it, and splits it into lines, then strips each line.
+    This is useful for normalizing output for comparison.
+    
+    Args:
+        val: String to process
+        
+    Returns:
+        List of stripped lines
+    """
     ## you don't want empty lines to add empty list after splitlines!
     val = val.strip()
 
@@ -355,6 +506,18 @@ def get_stripped_lines(val: str):
 
 
 def convert_line_to_decimals(line: str) -> tuple[bool, list[Decimal]]:
+    """Convert a space-separated string of numbers to Decimal objects.
+    
+    Attempts to parse each space-separated element as a Decimal,
+    which is useful for accurate floating-point comparisons.
+    
+    Args:
+        line: Space-separated string of numbers
+        
+    Returns:
+        Tuple of (success, list_of_decimals) where success is False if
+        any conversion failed
+    """
     try:
         decimal_line = [Decimal(elem) for elem in line.split()]
     except Exception:
@@ -368,6 +531,26 @@ def grade_stdio(
     all_outputs: list,
     timeout: int,
 ):
+    """Grade code that uses standard input/output for testing.
+    
+    Compiles the code, wraps it in a function, and tests it against provided
+    inputs and expected outputs by capturing stdout. This method is used for 
+    standard I/O code evaluation (e.g., competitive programming problems).
+    
+    Args:
+        code: Python code to grade
+        all_inputs: List of inputs to test against
+        all_outputs: List of expected outputs
+        timeout: Maximum execution time per test in seconds
+        
+    Returns:
+        Tuple containing:
+        - List of results for each test case (True for pass, error code for failure)
+        - Dictionary with execution details or error information
+        
+    Raises:
+        TimeoutException: If execution exceeds the timeout
+    """
     ## runtime doesn't interact well with __name__ == '__main__'
     code = clean_if_name(code)
 
@@ -481,9 +664,24 @@ def grade_stdio(
 
 
 def run_test(sample, test=None, debug=False, timeout=6):
-    """
-    if test(generated_code) is not None it'll try to run the code.
-    otherwise it'll just return an input and output pair.
+    """Run a test on the generated code.
+    
+    Executes the provided code against test cases from the sample,
+    using the appropriate execution method (call-based or standard I/O).
+    
+    Args:
+        sample: Dictionary containing the problem and test cases
+        test: The generated code to test
+        debug: Whether to print debug information
+        timeout: Maximum execution time per test in seconds
+        
+    Returns:
+        Tuple containing:
+        - List of results for each test case
+        - Dictionary with execution details or error information
+        
+    Raises:
+        Various exceptions that might occur during code execution
     """
     signal.signal(signal.SIGALRM, timeout_handler)
 
@@ -562,6 +760,19 @@ def run_test(sample, test=None, debug=False, timeout=6):
 
 
 def _temp_run(sample, generation, debug, result, metadata_list, timeout):
+    """Run a test in a separate process.
+    
+    Helper function for multi-processing to run a test with the provided code
+    and store the results in shared lists.
+    
+    Args:
+        sample: Dictionary containing the problem and test cases
+        generation: The generated code to test
+        debug: Whether to print debug information
+        result: Shared list to store test results
+        metadata_list: Shared list to store test metadata
+        timeout: Maximum execution time per test in seconds
+    """
     res, metadata = run_test(sample, test=generation, debug=debug, timeout=timeout)
     result.append(res)
     metadata_list.append(metadata)
@@ -569,9 +780,22 @@ def _temp_run(sample, generation, debug, result, metadata_list, timeout):
 
 def check_correctness(sample, generation, timeout, debug=True):
     """Check correctness of code generation with a global timeout.
+    
     The global timeout is to catch some extreme/rare cases not handled by the timeouts
-    inside `run_test`"""
-
+    inside `run_test`. This function runs the test in a separate process to ensure
+    it can be safely terminated if it exceeds the time limit.
+    
+    Args:
+        sample: Dictionary containing the problem and test cases
+        generation: The generated code to test
+        timeout: Maximum execution time per test in seconds
+        debug: Whether to print debug information
+        
+    Returns:
+        Tuple containing:
+        - List of results for each test case
+        - Dictionary with execution details or error information
+    """
     manager = multiprocessing.Manager()
     result = manager.list()
     metadata_list = manager.list()
@@ -595,6 +819,23 @@ def check_correctness(sample, generation, timeout, debug=True):
 
 
 def evaluate_generations_by_problem(args):
+    """Evaluate multiple code generations for a single problem.
+    
+    Tests each generated solution against the problem and returns
+    the results for all of them.
+    
+    Args:
+        args: Tuple containing:
+            - List of code generations for a problem
+            - The problem sample
+            - Debug flag
+            - Timeout value
+        
+    Returns:
+        Tuple containing:
+        - List of results for each generation
+        - List of metadata for each generation
+    """
     problem_generations: list[str] = args[0]
     sample = args[1]
     debug: bool = args[2]
@@ -653,17 +894,23 @@ def evaluate_generations(
     num_process_evaluate: int = 16,
     timeout=6,
 ):
-    """We take the list of code generations and try to compile them
-     and the run their corresponding unit tests which are retrieved from the APPS dataset.
-
+    """Evaluate code generations across multiple problems in parallel.
+    
+    Distributes the evaluation of code generations across multiple processes
+    to speed up testing. Each problem's generations are evaluated independently.
+    
     Args:
-        generations: list of code generations (same order as samples in APPS dataset)
-        level: difficulty level used in the generation, can be "all", "introductory", "interview" or "competition"
-
+        samples_list: List of problem samples
+        generations_list: List of lists of code generations (one list per problem)
+        debug: Whether to print debug information
+        num_process_evaluate: Number of parallel processes to use
+        timeout: Maximum execution time per test in seconds
+        
     Returns:
-        results: dictionary of results, key is the problem index, value is a list of results for each generation
+        Tuple containing:
+        - Dictionary mapping problem indices to lists of test results
+        - Dictionary mapping problem indices to lists of test metadata
     """
-
     # generations are code generations in the same order of the dataset
 
     inputs = [
@@ -709,8 +956,19 @@ def evaluate_generations(
 
 
 def estimate_pass_at_k(num_samples, num_correct, k):
-    """Estimates pass@k of each problem and returns them in an array."""
-
+    """Estimates pass@k metric using the unbiased estimator.
+    
+    Calculates the probability that at least one of k samples will solve the
+    problem, given n samples with c correct samples.
+    
+    Args:
+        num_samples: Number of samples generated per problem (n)
+        num_correct: Number of correct solutions per problem (c)
+        k: The k in pass@k, must be <= n
+        
+    Returns:
+        Array of estimated pass@k values for each problem
+    """
     def estimator(n: int, c: int, k: int) -> float:
         """Calculates 1 - comb(n - c, k) / comb(n, k)."""
         if n - c < k:
@@ -731,6 +989,20 @@ def estimate_pass_at_k(num_samples, num_correct, k):
 
 
 def compute_metrics_from_results(results, k_list=[1, 5]):
+    """Compute pass@k metrics from test results.
+    
+    Processes the test results to calculate pass@k metrics for each
+    specified k value, where pass@k is the probability that at least
+    one of k samples will solve the problem.
+    
+    Args:
+        results: Dictionary mapping problem indices to lists of test results
+        k_list: List of k values to calculate pass@k for
+        
+    Returns:
+        Dictionary mapping metric names (pass@k) to their values, with
+        detailed per-problem results in the 'detail' field
+    """
     total = []
     correct = []
     task_ids = []
@@ -768,7 +1040,26 @@ def codegen_metrics(
     timeout=6,
     debug=False,
 ):
-
+    """Calculate code generation metrics for a set of problems and solutions.
+    
+    This is the main entry point for evaluating code generation performance.
+    It tests each generated solution against its problem and computes
+    various metrics including pass@k for different values of k.
+    
+    Args:
+        samples_list: List of problem samples
+        generations_list: List of lists of code generations (one list per problem)
+        k_list: List of k values to calculate pass@k for
+        num_process_evaluate: Number of parallel processes to use
+        timeout: Maximum execution time per test in seconds
+        debug: Whether to print debug information
+        
+    Returns:
+        List containing:
+        - Dictionary of metrics including pass@k values
+        - Dictionary mapping problem indices to lists of test results
+        - List of metadata for each generation
+    """
     samples_linear = []
     generations_linear = []
     remap_index = []
@@ -823,12 +1114,16 @@ def codegen_metrics(
 #--------------------------------
 
 def parse_assert_statement(statement):
-    """
-    Parse a Python assert statement and extract the expected output
-    from the right side of the '==' operator as a string.
-
-    :param statement: A string containing the assert statement.
-    :return: The expected output from the assert statement as a string.
+    """Parse a Python assert statement to extract the expected output.
+    
+    Extracts the expected output from the right side of the '==' operator
+    in an assert statement.
+    
+    Args:
+        statement: A string containing the assert statement
+        
+    Returns:
+        The expected output from the assert statement as a string
     """
     try:
         parsed = ast.parse(statement, mode="exec")
@@ -853,7 +1148,18 @@ def parse_assert_statement(statement):
 
 
 def check_testcase_output(testcase_str, expected_output):
-
+    """Check if a test case output matches the expected output.
+    
+    Parses the test case string (which might be an assert statement)
+    and compares the extracted output with the expected output.
+    
+    Args:
+        testcase_str: The test case string, possibly containing an assert statement
+        expected_output: The expected output as a string
+        
+    Returns:
+        Boolean indicating whether the test case output matches the expected output
+    """
     if len(testcase_str.splitlines()) > 1:
         for line in testcase_str.splitlines():
             if line.startswith("#"):
@@ -896,6 +1202,21 @@ def test_output_metrics(
     generations,
     k_list=[1, 5],
 ):
+    """Calculate metrics for test output prediction.
+    
+    Evaluates the predicted test outputs against the expected outputs
+    and computes metrics such as pass@k.
+    
+    Args:
+        samples: List of problem samples containing expected outputs
+        generations: List of lists of predicted outputs
+        k_list: List of k values to calculate pass@k for
+        
+    Returns:
+        List containing:
+        - Dictionary of metrics including pass@k values
+        - Dictionary mapping problem indices to lists of test results
+    """
     num_samples = len(samples)
     results = []
     # for idx in tqdm.tqdm(list(range(num_samples))):
@@ -960,6 +1281,14 @@ import sys
 
 @contextlib.contextmanager
 def chdir(root):
+    """Context manager for changing the current working directory.
+    
+    Args:
+        root: The directory to change to
+        
+    Yields:
+        None: The context is active within the directory
+    """
     if root == ".":
         yield
         return
@@ -974,6 +1303,13 @@ def chdir(root):
 
 @contextlib.contextmanager
 def create_tempdir():
+    """Create and use a temporary directory.
+    
+    Creates a temporary directory, changes to it, and cleans it up afterwards.
+    
+    Yields:
+        str: The path to the temporary directory
+    """
     with tempfile.TemporaryDirectory() as dirname:
         with chdir(dirname):
             yield dirname
@@ -981,6 +1317,19 @@ def create_tempdir():
 
 @contextlib.contextmanager
 def time_limit(seconds):
+    """Set a time limit for executing code.
+    
+    Uses signal.SIGALRM to enforce a timeout on the code execution.
+    
+    Args:
+        seconds: Maximum execution time in seconds
+        
+    Yields:
+        None: The context is active with the time limit enforced
+        
+    Raises:
+        TimeoutException: If the time limit is exceeded
+    """
     def signal_handler(signum, frame):
         raise TimeoutException("Timed out!")
 
@@ -993,28 +1342,63 @@ def time_limit(seconds):
 
 
 class WriteOnlyStringIO(io.StringIO):
-    """StringIO that throws an exception when it's read from"""
-
+    """StringIO that throws an exception when it's read from.
+    
+    This class is used to prevent code from reading from standard input
+    during testing, by overriding read methods to raise exceptions.
+    """
     def read(self, *args, **kwargs):
+        """Override read to raise an exception.
+        
+        Raises:
+            OSError: Always raised when called
+        """
         raise OSError
 
     def readline(self, *args, **kwargs):
+        """Override readline to raise an exception.
+        
+        Raises:
+            OSError: Always raised when called
+        """
         raise OSError
 
     def readlines(self, *args, **kwargs):
+        """Override readlines to raise an exception.
+        
+        Raises:
+            OSError: Always raised when called
+        """
         raise OSError
 
     def readable(self, *args, **kwargs):
+        """Returns False to indicate the IO object cannot be read.
+        
+        Returns:
+            bool: Always False
+        """
         """Returns True if the IO object can be read."""
         return False
     
 
 class redirect_stdin(contextlib._RedirectStream):  # type: ignore
+    """Context manager for redirecting stdin.
+    
+    Similar to redirect_stdout but for stdin.
+    """
     _stream = "stdin"
 
 
 @contextlib.contextmanager
 def swallow_io():
+    """Context manager to suppress all I/O.
+    
+    Redirects stdout, stderr, and stdin to a WriteOnlyStringIO instance,
+    effectively preventing I/O operations during execution.
+    
+    Yields:
+        None: The context is active with I/O suppressed
+    """
     stream = WriteOnlyStringIO()
     with contextlib.redirect_stdout(stream):
         with contextlib.redirect_stderr(stream):
@@ -1023,7 +1407,19 @@ def swallow_io():
 
 
 def unsafe_execute(check_program, result, timeout):
-
+    """Execute a Python program in a controlled environment.
+    
+    Runs the provided Python program with various safety measures:
+    - Uses a temporary directory
+    - Disables destructive system calls
+    - Enforces a time limit
+    - Captures and suppresses I/O
+    
+    Args:
+        check_program: The Python program to execute
+        result: A shared list to store the execution result
+        timeout: Maximum execution time in seconds
+    """
     with create_tempdir():
 
         # These system calls are needed when cleaning up tempdir.
@@ -1056,12 +1452,17 @@ def unsafe_execute(check_program, result, timeout):
 
 
 def check_execution_correctness(check_program, timeout=3):
-    """
-    Evaluates the functional correctness of a completion by running the test
-    suite provided in the problem.
-
-    :param completion_id: an optional completion ID so we can match
-        the results later even if execution finishes asynchronously.
+    """Check if a Python program executes correctly.
+    
+    Executes the provided program and checks if it completes without errors.
+    The execution is done in a separate process with a timeout.
+    
+    Args:
+        check_program: The Python program to check
+        timeout: Maximum execution time in seconds
+        
+    Returns:
+        Boolean indicating whether the program executed correctly
     """
     manager = multiprocessing.Manager()
     result = manager.list()
@@ -1079,6 +1480,19 @@ def check_execution_correctness(check_program, timeout=3):
 
 
 def evaluate_score(args) -> list[bool]:
+    """Evaluate the correctness of generated code against a problem.
+    
+    Tests each generated solution against the problem by constructing a
+    test program that includes the solution and an assertion.
+    
+    Args:
+        args: Tuple containing:
+            - List of generated solutions
+            - Tuple of (code, input, output) for the problem
+            
+    Returns:
+        List of booleans indicating whether each solution passed the test
+    """
     gs, (c, i, o) = args
 
     execution_results = []
@@ -1094,6 +1508,19 @@ def evaluate_score(args) -> list[bool]:
 
 
 def pass_at_k(n, c, k):
+    """Calculate pass@k metric directly.
+    
+    Simpler version of the pass@k calculation that doesn't use the
+    unbiased estimator. Used in the code execution metrics section.
+    
+    Args:
+        n: Number of samples
+        c: Number of correct samples
+        k: The k in pass@k
+        
+    Returns:
+        pass@k value
+    """
     if n - c < k: 
         return 1.0
     return 1.0 - np.prod(1.0 - k / np.arange(n - c + 1, n + 1))
@@ -1103,6 +1530,20 @@ def code_execution_metrics(
     samples,
     generations,
 ):
+    """Calculate code execution metrics for a set of problems and solutions.
+    
+    Executes each generated solution against its problem and computes
+    the pass@1 metric.
+    
+    Args:
+        samples: List of problem samples containing code, input, and output
+        generations: List of lists of generated solutions
+        
+    Returns:
+        List containing:
+        - Dictionary of metrics including pass@1
+        - Dictionary mapping problem indices to lists of test results
+    """
     # execute the code
     references = [(doc["code"], doc["input"], doc["output"]) for doc in samples]
     with ProcessPoolExecutor() as executor:
