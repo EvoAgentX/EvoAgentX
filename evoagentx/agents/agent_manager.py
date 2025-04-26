@@ -197,18 +197,10 @@ class AgentManager(BaseModule):
         """
         pass 
     
-<<<<<<< HEAD
-    def create_customize_agent(self, agent_data: dict, **kwargs) -> Agent:
-        """Create a customized agent from the provided agent_data.
-        
-        Factory method for creating Agent instances from dictionary specifications.
-        
-=======
     def create_customize_agent(self, agent_data: dict, llm_config: Optional[LLMConfig]=None, **kwargs) -> Agent:
         """
         create a customized agent from the provided `agent_data`. 
 
->>>>>>> origin/main
         Args:
             agent_data: The data used to create an Agent instance, must contain
                        'name' and 'description' keys
@@ -259,32 +251,8 @@ class AgentManager(BaseModule):
             raise ValueError(f"{type(agent)} is not a supported type for ``get_agent_name``. Supported types: [str, dict, Agent].")
         return agent_name
     
-<<<<<<< HEAD
-    def create_agent(self, agent: Union[str, dict, Agent], **kwargs) -> Agent:
-        """Create an Agent instance from different representations.
-        
-        Converts various agent specifications into concrete Agent instances:
-        - String names are loaded from storage
-        - Dictionaries are converted using create_customize_agent
-        - Agent instances are returned as-is
-        
-        Args:
-            agent: Agent specification as string name, dictionary, or Agent instance
-            **kwargs: Additional parameters passed to underlying creation methods
-            
-        Returns:
-            An instantiated Agent object
-            
-        Raises:
-            ValueError: If agent is not of a supported type
-            
-        Notes:
-            - Central factory method for creating agents in the system
-        """
-=======
     def create_agent(self, agent: Union[str, dict, Agent], llm_config: Optional[LLMConfig]=None, **kwargs) -> Agent:
 
->>>>>>> origin/main
         if isinstance(agent, str):
             if self.storage_handler is None:
                 # if self.storage_handler is None, the agent (str) must exist in self.agents. Otherwise, a dictionary or an Agent instance should be provided.
@@ -305,19 +273,10 @@ class AgentManager(BaseModule):
         return agent_instance
     
     @atomic_method
-<<<<<<< HEAD
-    def add_agent(self, agent: Union[str, dict, Agent], **kwargs):
-        """Add a single agent to the manager.
-        
-        Adds an agent to the manager if it doesn't already exist. The agent can be
-        specified in multiple formats, and will be created appropriately based on the format.
-        
-=======
     def add_agent(self, agent: Union[str, dict, Agent], llm_config: Optional[LLMConfig]=None, **kwargs):
         """
         add a single agent, ignore if the agent already exists (judged by the name of an agent).
 
->>>>>>> origin/main
         Args:
             agent: The agent to be added, specified as:
                 - String: Agent name to load from storage
@@ -342,36 +301,13 @@ class AgentManager(BaseModule):
             self._state_conditions[agent_instance.name] = threading.Condition()
         self.check_agents()
 
-<<<<<<< HEAD
-    def add_agents(self, agents: List[Union[str, dict, Agent]], **kwargs):
-        """Add multiple agents to the manager.
-        
-        Convenience method to add several agents at once by iteratively
-        calling add_agent for each one.
-        
-        Args:
-            agents: List of agents to add, where each agent can be specified as:
-                - String: Agent name to load from storage
-                - Dictionary: Agent specification to create a CustomizeAgent
-                - Agent: Existing Agent instance to add directly
-            **kwargs: Additional parameters passed to add_agent
-            
-        Notes:
-            - Sequential operation, not atomic as a whole
-            - Each individual add_agent call is atomic
-=======
     def add_agents(self, agents: List[Union[str, dict, Agent]], llm_config: Optional[LLMConfig]=None, **kwargs):
         """
         add several agents by using self.add_agent().
->>>>>>> origin/main
         """
         for agent in agents:
             self.add_agent(agent=agent, llm_config=llm_config, **kwargs)
     
-<<<<<<< HEAD
-    def add_agents_from_workflow(self, workflow_graph, **kwargs):
-        """Initialize agents from the nodes of a given WorkFlowGraph and add these agents to self.agents. 
-=======
     def add_agents_from_workflow(self, workflow_graph, llm_config: Optional[LLMConfig]=None, **kwargs):
         """
         Initialize agents from the nodes of a given WorkFlowGraph and add these agents to self.agents. 
@@ -379,7 +315,6 @@ class AgentManager(BaseModule):
         Args:
             workflow_graph (WorkFlowGraph): The workflow graph containing nodes with agents information.
             llm_config (Optional[LLMConfig]): The LLM configuration to be used for the agents.
->>>>>>> origin/main
         
         Extracts agent information from workflow nodes and adds them to the agent manager.
         This allows automatic integration of workflow requirements with agent management.
@@ -493,6 +428,7 @@ class AgentManager(BaseModule):
             - Creates condition variable if it doesn't exist
             - Critical for synchronizing agent execution across threads
         """
+        
         # if agent_name in self.agent_states and isinstance(new_state, AgentState):
         #     # self.agent_states[agent_name] = new_state
         #     with self._state_conditions[agent_name]:
