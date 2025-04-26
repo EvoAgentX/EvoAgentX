@@ -8,12 +8,8 @@ from ..prompts.code_extraction import CODE_EXTRACTION
 
 
 class CodeExtractionInput(ActionInput):
-    """Input parameters for the CodeExtraction action.
-    
-    Attributes:
-        code_string: The string containing code blocks to extract
-        target_directory: The directory path where extracted code files will be saved
-        project_name: Optional name for the project folder
+    """
+    Input parameters for the CodeExtraction action.
     """
     code_string: str = Field(description="The string containing code blocks to extract")
     target_directory: str = Field(description="The directory path where extracted code files will be saved")
@@ -21,25 +17,17 @@ class CodeExtractionInput(ActionInput):
 
 
 class CodeExtractionOutput(ActionOutput):
-    """Output of the CodeExtraction action.
-    
-    Attributes:
-        extracted_files: Map of filename to file path of saved files
-        main_file: Path to the main file if identified
-        error: Error message if any operation failed
+    """
+    Output of the CodeExtraction action.
     """
     extracted_files: Dict[str, str] = Field(description="Map of filename to file path of saved files")
     main_file: Optional[str] = Field(default=None, description="Path to the main file if identified")
-    error: Optional[str] = Field(default=None, description="Error message if any")
+    error: Optional[str] = Field(default=None, description="Error message if any operation failed")
 
 
 class CodeBlockInfo(LLMOutputParser):
-    """Information about an extracted code block.
-    
-    Attributes:
-        language: Programming language of the code block
-        filename: Suggested filename for the code block
-        content: The actual code content
+    """
+    Information about an extracted code block.
     """
     language: str = Field(description="Programming language of the code block")
     filename: str = Field(description="Suggested filename for the code block")
@@ -47,16 +35,15 @@ class CodeBlockInfo(LLMOutputParser):
 
 
 class CodeBlockList(LLMOutputParser):
-    """List of code blocks extracted from text.
-    
-    Attributes:
-        code_blocks: List of CodeBlockInfo objects containing extracted code
+    """
+    List of code blocks extracted from text.
     """
     code_blocks: List[CodeBlockInfo] = Field(description="List of code blocks")
 
 
 class CodeExtraction(Action):
-    """An action that extracts and organizes code blocks from text.
+    """
+    An action that extracts and organizes code blocks from text.
     
     This action uses an LLM to analyze text containing code blocks, extract them,
     suggest appropriate filenames, and save them to a specified directory. It can
@@ -67,12 +54,7 @@ class CodeExtraction(Action):
     """
 
     def __init__(self, **kwargs):
-        """Initialize the CodeExtraction action.
         
-        Args:
-            **kwargs: Keyword arguments including optional overrides for name,
-                     description, prompt, inputs_format, and outputs_format.
-        """
         name = kwargs.pop("name") if "name" in kwargs else CODE_EXTRACTION["name"]
         description = kwargs.pop("description") if "description" in kwargs else CODE_EXTRACTION["description"]
         prompt = kwargs.pop("prompt") if "prompt" in kwargs else CODE_EXTRACTION["prompt"]
@@ -218,7 +200,7 @@ class CodeExtraction(Action):
         saves them to the target directory, and identifies the main file.
         
         Args:
-            llm: The language model to use for code extraction
+            llm: The LLM to use for code extraction
             inputs: Dictionary containing:
                 - code_string: The string with code blocks to extract
                 - target_directory: Where to save the files

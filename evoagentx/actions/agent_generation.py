@@ -16,15 +16,6 @@ class AgentGenerationInput(ActionInput):
     This class defines the required and optional parameters for generating
     agents in the EvoAgentX framework. It provides information about the
     workflow goal, tasks, and optional contextual information.
-    
-    Attributes:
-        goal: The overall goal of the workflow that the agents will support.
-        workflow: A description of the entire workflow with all sub-tasks.
-        task: JSON representation of the specific sub-task requiring agent generation.
-        history: Optional information about previously selected or generated agents.
-        suggestion: Optional suggestions to guide the agent generation process.
-        existing_agents: Optional description of predefined agents that could be selected.
-        tools: Optional description of tools that generated agents can use.
     """
 
     goal: str = Field(description="A detailed statement of the workflow's goal, explaining the objectives the entire workflow aims to achieve")
@@ -38,20 +29,13 @@ class AgentGenerationInput(ActionInput):
 
 
 class GeneratedAgent(BaseModule):
-    """Representation of a generated agent with validation capabilities.
+    """
+    Representation of a generated agent with validation capabilities.
     
     This class stores the details of an agent that has been created by the
     agent generation process, including its properties, inputs, outputs,
     and the prompt template it will use. It also provides validation logic
     to ensure the prompt correctly references all inputs and outputs.
-    
-    Attributes:
-        name: Unique identifier for the agent.
-        description: Human-readable description of the agent's purpose.
-        inputs: List of input parameters the agent accepts.
-        outputs: List of output parameters the agent produces.
-        prompt: Template string that will be used to generate the agent's instructions.
-        tools: Optional list of tool names the agent can use.
     """
 
     name: str 
@@ -63,18 +47,6 @@ class GeneratedAgent(BaseModule):
 
     @classmethod
     def find_output_name(cls, text: str, outputs: List[str]):
-        """Find the most similar output name from the available outputs.
-        
-        Uses a simple word overlap similarity measure to identify which
-        of the available output names most closely matches the given text.
-        
-        Args:
-            text: The text to match against output names.
-            outputs: List of available output names.
-            
-        Returns:
-            The output name with the highest similarity score.
-        """
         def sim(t1: str, t2: str):
             t1_words = normalize_text(t1).split()
             t2_words = normalize_text(t2).split()
@@ -104,8 +76,7 @@ class GeneratedAgent(BaseModule):
             The validated and potentially modified GeneratedAgent.
             
         Raises:
-            ValueError: If inputs are missing from the prompt or output sections
-                      don't match the defined outputs.
+            ValueError: If inputs are missing from the prompt or output sections don't match the defined outputs.
         """
         # check whether all the inputs are present in the prompt 
         input_names = [inp.name for inp in agent.inputs]
@@ -154,39 +125,21 @@ class GeneratedAgent(BaseModule):
 
 
 class AgentGenerationOutput(ActionOutput):
-    """Output structure for the agent generation action.
-    
-    This class defines the structure of the output produced by the
-    agent generation action, including both selected existing agents
-    and newly generated agent specifications.
-    
-    Attributes:
-        selected_agents: List of names of existing agents that were selected.
-        generated_agents: List of newly generated agent specifications.
-    """
 
     selected_agents: List[str] = Field(description="A list of selected agent's names")
     generated_agents: List[GeneratedAgent] = Field(description="A list of generated agetns to address a sub-task")
     
 
 class AgentGeneration(Action):
-    """Action for generating agent specifications for workflow tasks.
+    """
+    Action for generating agent specifications for workflow tasks.
     
     This action analyzes task requirements and generates appropriate agent
     specifications, including their prompts, inputs, and outputs. It can either
     select from existing agents or create new ones tailored to the task.
-    
-    The action uses a language model to generate the agent specifications based
-    on provided workflow context and task details.
     """
 
     def __init__(self, **kwargs):
-        """Initialize the AgentGeneration action.
-        
-        Args:
-            **kwargs: Keyword arguments that can override default name, description,
-                     prompt, and input/output formats.
-        """
         name = kwargs.pop("name") if "name" in kwargs else AGENT_GENERATION_ACTION["name"]
         description = kwargs.pop("description") if "description" in kwargs else AGENT_GENERATION_ACTION["description"]
         prompt = kwargs.pop("prompt") if "prompt" in kwargs else AGENT_GENERATION_ACTION["prompt"]

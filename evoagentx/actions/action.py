@@ -1,6 +1,6 @@
 import json
 from pydantic_core import PydanticUndefined
-from typing import Optional, Type, Union, List
+from typing import Optional, Type, Tuple, Union, List
 
 from ..core.module import BaseModule
 from ..core.module_utils import get_type_name
@@ -35,7 +35,7 @@ class ActionInput(LLMOutputParser):
         they are required.
         
         Args:
-            ignore_fields: List of field names to exclude from the specification.
+            ignore_fields (List[str]): List of field names to exclude from the specification.
             
         Returns:
             A JSON string containing the input specification, or an empty string
@@ -71,7 +71,7 @@ class ActionOutput(LLMOutputParser):
     """Output representation for actions.
     
     This class handles the structured output of actions, providing methods
-    to convert the output to various formats. It inherits from LLMOutputParser
+    to convert the output to structured data. It inherits from LLMOutputParser
     to support parsing of LLM outputs into structured action results.
     """
     
@@ -92,12 +92,12 @@ class Action(BaseModule):
     use tools to accomplish their tasks.
     
     Attributes:
-        name: Unique identifier for the action.
-        description: Human-readable description of what the action does.
-        prompt: Optional template for generating prompts for this action.
-        tools: Optional list of tools that can be used by this action.
-        inputs_format: Optional class defining the expected input structure.
-        outputs_format: Optional class defining the expected output structure.
+        name (str): Unique identifier for the action.
+        description (str): Human-readable description of what the action does.
+        prompt (Optional[str]): Optional prompt template for this action.
+        tools (Optional[List[Tool]]): Optional list of tools that can be used by this action.
+        inputs_format (Optional[Type[ActionInput]]): Optional class defining the expected input structure.
+        outputs_format (Optional[Type[Parser]]): Optional class defining the expected output structure.
     """
 
     name: str
@@ -115,22 +115,23 @@ class Action(BaseModule):
         """
         pass 
 
-    def execute(self, llm: Optional[BaseLLM] = None, inputs: Optional[dict] = None, sys_msg: Optional[str]=None, return_prompt: bool = False, **kwargs) -> Optional[Parser]:
+    def execute(self, llm: Optional[BaseLLM] = None, inputs: Optional[dict] = None, sys_msg: Optional[str]=None, return_prompt: bool = False, **kwargs) -> Optional[Union[Parser, Tuple[Parser, str]]]:
         """Execute the action to produce a result.
         
         This is the main entry point for executing an action. Subclasses must
         implement this method to define the action's behavior.
 
         Args:
-            llm: The language model used to execute the action.
-            inputs: Input data for the action execution.
-            sys_msg: Optional system message for the language model.
-            return_prompt: Whether to return the generated prompt instead of executing it.
+            llm (Optional[BaseLLM]): The LLM used to execute the action.
+            inputs (Optional[dict]): Input data for the action execution. The input data should be a dictionary that matches the input format of the provided prompt. 
+                For example, if the prompt contains a variable `{input_var}`, the `inputs` dictionary should have a key `input_var`, otherwise the variable will be set to empty string. 
+            sys_msg (Optional[str]): Optional system message for the LLM.
+            return_prompt (bool): Whether to return the complete prompt passed to the LLM.
             **kwargs: Additional keyword arguments for the execution.
         
         Returns:
-            A Parser object containing the structured result of the action,
-            or None if the action does not produce a result.
+            If `return_prompt` is False, the method returns a Parser object containing the structured result of the action.
+            If `return_prompt` is True, the method returns a tuple containing the Parser object and the complete prompt passed to the LLM.
         """
         pass
 
@@ -155,14 +156,6 @@ class ContextExtraction(Action):
         super().__init__(name=name, description=description, **kwargs)
 
     def get_context_from_messages(self, messages: List[Message]) -> str:
-        """Convert a list of messages into a single context string.
-        
-        Args:
-            messages: List of Message objects representing the conversation context.
-            
-        Returns:
-            A string representation of the context, with messages separated by newlines.
-        """
         str_context = "\n\n".join([str(msg) for msg in messages])
         return str_context 
     
@@ -174,7 +167,7 @@ class ContextExtraction(Action):
         
         Args:
             llm: The language model to use for extraction.
-            action: The target action whose input requirements define what to extract.
+            action: The target action whose input requirements (`inputs_format`) define what to extract.
             context: List of messages providing the conversation context.
             **kwargs: Additional keyword arguments.
             

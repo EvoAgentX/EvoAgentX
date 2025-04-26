@@ -9,16 +9,12 @@ from ..workflow.workflow_graph import WorkFlowNode
 
 
 class TaskPlanningInput(ActionInput):
-    """Input specification for the task planning action.
+    """
+    Input specification for the task planning action.
     
     This class defines the parameters required and optional for the task planning
     process, which breaks down a high-level goal into a series of manageable
     sub-tasks that form a complete workflow.
-    
-    Attributes:
-        goal: The primary objective that needs to be broken down into sub-tasks.
-        history: Optional information about previously generated task plans.
-        suggestion: Optional guidance or constraints to influence the planning process.
     """
 
     goal: str = Field(description="A clear and detailed description of the user's goal, specifying what needs to be achieved.")
@@ -27,22 +23,20 @@ class TaskPlanningInput(ActionInput):
 
 
 class TaskPlanningOutput(ActionOutput):
-    """Output structure for the task planning action.
+    """
+    Output structure for the task planning action.
     
     This class defines the structure of the output produced by the task planning
     process, which consists primarily of a list of sub-tasks that collectively
     achieve the user's goal.
-    
-    Attributes:
-        sub_tasks: List of workflow nodes representing the sub-tasks, with their
-                  dependencies, inputs, and outputs properly defined.
     """
 
     sub_tasks: List[WorkFlowNode] = Field(description="A list of sub-tasks that collectively achieve user's goal.")
     
 
 class TaskPlanning(Action):
-    """Action for planning a series of tasks to achieve a goal.
+    """
+    Action for planning a series of tasks to achieve a goal.
     
     This action analyzes a user goal and decomposes it into a structured
     series of sub-tasks that can be executed as a workflow. It uses a 
@@ -54,12 +48,7 @@ class TaskPlanning(Action):
     """
 
     def __init__(self, **kwargs):
-        """Initialize the TaskPlanning action.
-        
-        Args:
-            **kwargs: Keyword arguments that can override default name, description,
-                     prompt, and input/output formats.
-        """
+
         name = kwargs.pop("name") if "name" in kwargs else TASK_PLANNING_ACTION["name"]
         description = kwargs.pop("description") if "description" in kwargs else TASK_PLANNING_ACTION["description"]
         prompt = kwargs.pop("prompt") if "prompt" in kwargs else TASK_PLANNING_ACTION["prompt"]
