@@ -805,7 +805,7 @@ class WorkFlowGraph(BaseModule):
         return uncomplete_initial_nodes 
     
     def get_all_paths_from_node(self, start_node: Union[str, WorkFlowNode]) -> List[List[str]]:
-       """Get all possible paths from start node to end node or all end nodes.
+        """Get all possible paths from start node to end node or all end nodes.
         
         Performs a depth-first search to find all possible execution paths through the workflow.
         If no end_node is specified, finds paths to all end nodes (nodes with no outgoing edges).
