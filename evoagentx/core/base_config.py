@@ -13,6 +13,7 @@ class BaseConfig(BaseModule):
             No specific attributes
     """
     def save(self, path: str, **kwargs)-> str:
+        super().save_module(path, **kwargs)
         """Save configuration to the specified path.
         
         Args:
