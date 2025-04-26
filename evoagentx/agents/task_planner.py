@@ -12,30 +12,12 @@ class TaskPlanner(Agent):
     
     Attributes:
         name (str): Name of the task planner agent, defaults to the value in TASK_PLANNER
-        description (str): Description of the agent's purpose and capabilities,
-                          defaults to the value in TASK_PLANNER
-        system_prompt (str): System prompt guiding the agent's behavior,
-                            defaults to the value in TASK_PLANNER
-        actions (List[Action]): List of actions the agent can perform,
-                              defaults to [TaskPlanning()]
+        description (str): Description of the agent's purpose and capabilities, defaults to the value in TASK_PLANNER
+        system_prompt (str): System prompt guiding the agent's behavior, defaults to the value in TASK_PLANNER
+        actions (List[Action]): List of actions the agent can perform, defaults to [TaskPlanning()]
     """
     def __init__(self, **kwargs):
-        """Initialize a TaskPlanner agent with configurable attributes.
-        
-        Creates a TaskPlanner agent with default values from the TASK_PLANNER
-        configuration, which can be overridden by explicitly provided parameters.
-        
-        Args:
-            **kwargs: Configuration parameters for the agent, including:
-                name: Custom name for the agent (default: TASK_PLANNER["name"])
-                description: Custom description (default: TASK_PLANNER["description"])
-                system_prompt: Custom system prompt (default: TASK_PLANNER["system_prompt"])
-                actions: Custom list of actions (default: [TaskPlanning()])
-                
-        Notes:
-            - The TaskPlanner primarily uses the TaskPlanning action
-            - Additional parameters are passed to the parent Agent class
-        """
+
         name = kwargs.pop("name") if "name" in kwargs else TASK_PLANNER["name"]
         description = kwargs.pop("description") if "description" in kwargs else TASK_PLANNER["description"]
         system_prompt = kwargs.pop("system_prompt") if "system_prompt" in kwargs else TASK_PLANNER["system_prompt"]
@@ -48,10 +30,6 @@ class TaskPlanner(Agent):
         
         Returns:
             The name of the TaskPlanning action in this agent's action registry
-            
-        Notes:
-            - Uses get_action_name to find the action by its class type
-            - Useful for executing the TaskPlanning action directly
         """
         return self.get_action_name(action_cls=TaskPlanning)
     

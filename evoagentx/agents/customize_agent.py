@@ -39,12 +39,6 @@ Now, based on the text and the instructions above, provide your final JSON outpu
 def customize_action_execute(self, llm: Optional[BaseLLM] = None, inputs: Optional[dict] = None, sys_msg: Optional[str]=None, return_prompt: bool = False, **kwargs) -> ActionOutput:
     """Execute a customized action using the language model.
     
-    This function handles the execution of customized actions by:
-    1. Formatting the prompt with provided input parameters
-    2. Sending the prompt to the language model
-    3. Parsing the output according to the specified format
-    4. Falling back to a structured extraction approach if parsing fails
-    
     Args:
         self: The action instance
         llm: Language model to use for generating outputs
@@ -96,11 +90,7 @@ def customize_action_execute(self, llm: Optional[BaseLLM] = None, inputs: Option
 
 class CustomizeAgent(Agent):
     """Agent implementation that can be dynamically customized with specific actions and capabilities.
-    
-    The CustomizeAgent class enables the creation of specialized agents with custom actions,
-    defined by structured input/output specifications. This allows for the creation of
-    purpose-built agents without needing to create new Agent subclasses.
-    
+
     A CustomizeAgent is configured using a structured dictionary or direct parameters that define:
     - Basic agent details (name, description)
     - The prompt template for the agent's primary action
@@ -113,7 +103,7 @@ class CustomizeAgent(Agent):
         "name": str, 
         "description": str, 
         "prompt": str, 
-        "llm_config": dict, / "llm": BaseLLM, 
+        "llm_config": dict, # or "llm": BaseLLM, 
         "inputs": [
             {name: str, type: str, description: str, [required: bool]},
         ],
@@ -135,15 +125,15 @@ class CustomizeAgent(Agent):
         
         Args:
             **kwargs: Agent configuration parameters including:
-                name: Name of the agent
-                description: Description of the agent
-                prompt: Prompt template for the primary action
-                inputs: List of input field specifications
-                outputs: List of output field specifications
-                system_prompt: Optional system prompt for the LLM
-                parse_mode: Mode to use for parsing LLM output (default: "title")
-                parse_func: Custom parsing function
-                output_parser: Custom output parser class
+            name: Name of the agent
+            description: Description of the agent
+            prompt: Prompt template for the primary action
+            inputs: List of input field specifications
+            outputs: List of output field specifications
+            system_prompt: Optional system prompt for the LLM
+            parse_mode: Mode to use for parsing LLM output (default: "title")
+            parse_func: Custom parsing function
+            output_parser: Custom output parser class
                 
         Raises:
             ValueError: If required parameters are missing or invalid

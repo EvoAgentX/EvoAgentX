@@ -202,8 +202,8 @@ class AgentManager(BaseModule):
         create a customized agent from the provided `agent_data`. 
 
         Args:
-            agent_data: The data used to create an Agent instance, must contain
-                       'name' and 'description' keys
+            agent_data: The data used to create an Agent instance, must contain 'name' and 'description' keys
+            llm_config (Optional[LLMConfig]): The LLM configuration to be used for the agent. If not provided, the `agent_data` should contain a `llm_config` key.  
             **kwargs: Additional parameters for agent creation
         
         Returns:
@@ -282,6 +282,7 @@ class AgentManager(BaseModule):
                 - String: Agent name to load from storage
                 - Dictionary: Agent specification to create a CustomizeAgent
                 - Agent: Existing Agent instance to add directly
+            llm_config (Optional[LLMConfig]): The LLM configuration to be used for the agent. Only used when the `agent` is a dictionary, used to create a CustomizeAgent. 
             **kwargs: Additional parameters for agent creation
             
         Notes:

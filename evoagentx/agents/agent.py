@@ -17,31 +17,21 @@ from ..actions.action import ContextExtraction
 
 
 class Agent(BaseModule):
-    """Represents an intelligent agent capable of executing actions and maintaining conversation memory.
-    
-    An Agent serves as the main executor of actions in the workflow, with capabilities to:
-    - Execute actions using an underlying language model
-    - Maintain short-term memory of conversation context
-    - Optionally use long-term memory for persistent information
-    - Extract context for action execution
-    - Manage a collection of available actions
+    """
+    Base class for all agents. 
     
     Attributes:
         name (str): Unique identifier for the agent
         description (str): Human-readable description of the agent's purpose
-        llm_config (LLMConfig): Configuration for the language model
-        llm (BaseLLM): Language model instance 
-        agent_id (str): Unique ID for the agent, auto-generated if not provided
-        system_prompt (str): System prompt for the language model
-        short_term_memory (ShortTermMemory): Memory for current conversation
-        use_long_term_memory (bool): Whether to use persistent memory
-        storage_handler (StorageHandler): Handler for storage operations
-        long_term_memory (LongTermMemory): Persistent memory storage
-        long_term_memory_manager (MemoryManager): Manager for long-term memory
+        llm_config (Optional[LLMConfig]): Configuration for the language model. If provided, a new LLM instance will be created. 
+            Otherwise, the existing LLM instance specified in the `llm` field will be used.   
+        llm (Optional[BaseLLM]): Language model instance. If provided, the existing LLM instance will be used. 
+        agent_id (Optional[str]): Unique ID for the agent, auto-generated if not provided
+        system_prompt (Optional[str]): System prompt for the Agent.
         actions (List[Action]): List of available actions
-        n (int): Number of latest messages to use for context
+        n (Optional[int]): Number of latest messages used to provide context for action execution. It uses all the messages in short term memory by default. 
         is_human (bool): Whether this agent represents a human user
-        version (int): Version number of the agent
+        version (int): Version number of the agent, default is 0. 
     """
 
     name: str # should be unique
@@ -68,11 +58,6 @@ class Agent(BaseModule):
         - Long-term memory (if enabled)
         - Actions list and map
         - Context extractor for action execution
-        
-        Notes:
-            - Called automatically during instantiation
-            - Sets up internal data structures for efficient operation
-            - Creates a mapping of action names to action objects for quick lookup
         """
         if not self.is_human:
             self.init_llm()
