@@ -274,25 +274,7 @@ def parse_json_from_llm_output(text: str) -> dict:
         raise ValueError(f"The follwoing generated text does not contain JSON string!\n{text}")
     return data
 
-<<<<<<< HEAD
-def extract_code_blocks(text: str) -> List[str]:
-    """Extract code blocks enclosed in triple backticks from text.
-    
-    Finds and extracts all code blocks delimited by triple backticks (```),
-    commonly used in Markdown to denote code sections.
-    
-    Args:
-        text: The text containing code blocks
-        
-    Returns:
-        A list of extracted code blocks with the triple backticks removed.
-        If no code blocks are found, returns a list containing the original text.
-        
-    Notes:
-        - Handles optional language specification after opening backticks
-        - Removes leading and trailing whitespace from code blocks
-        - If no code blocks are found, returns the original text as a single element list
-=======
+
 def extract_code_blocks(text: str, return_type: bool = False) -> Union[List[str], List[tuple]]:
     """
     Extract code blocks from text enclosed in triple backticks.
@@ -303,7 +285,6 @@ def extract_code_blocks(text: str, return_type: bool = False) -> Union[List[str]
         
     Returns:
         Union[List[str], List[tuple]]: Either list of code blocks or list of (language, code) tuples
->>>>>>> origin/main
     """
     # Regular expression to match code blocks enclosed in triple backticks
     code_block_pattern = r"```((?:[a-zA-Z]*)?)\n*(.*?)\n*```"
