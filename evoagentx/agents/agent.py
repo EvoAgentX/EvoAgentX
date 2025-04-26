@@ -93,65 +93,6 @@ class Agent(BaseModule):
             wf_task = kwargs.get("wf_task", None),
             wf_task_desc = kwargs.get("wf_task_desc", None)
         )
-        print(message)
-
-        # update short-term memory
-        self.short_term_memory.add_message(message)
-
-        return message
-    
-    async def execute_async(
-        self, 
-        action_name: str, 
-        msgs: Optional[List[Message]] = None, 
-        action_input_data: Optional[dict] = None, 
-        return_msg_type: Optional[MessageType] = MessageType.UNKNOWN,
-        history: Optional[List[Message]] = None,
-        sys_msg: Optional[str] = None,
-        **kwargs
-    ) -> Message:
-        """
-        Execute an action.
-
-        Args:
-            action_name (str): the name of the action to execute. 
-            msgs (List[Message]): the context for the current task. 
-        
-        Returns:
-            Message: a message that contains the execution results. 
-        """
-        assert msgs is not None or action_input_data is not None, "must provide either `msgs` or `action_input_data` in execute(...)"
-        action = self.get_action(action_name=action_name)
-
-        # update short-term memory
-        if msgs is not None:
-            self.short_term_memory.add_messages(msgs)
-        
-        # obtain action input data from short term memory
-        action_input_data = action_input_data or self.get_action_inputs(action=action)
-        history = history if history else self.short_term_memory.get(n=self.n)
-        sys_msg = sys_msg if sys_msg else self.system_prompt
-        # execute action
-        execution_results: Tuple[Parser, str] = await action.execute(
-            llm=self.llm, 
-            inputs=action_input_data, 
-            sys_msg=sys_msg,
-            history=history,
-            return_prompt=True
-        )
-        action_output, prompt = execution_results
-
-        # formulate a message
-        message = Message(
-            content=action_output,
-            agent=self.name,
-            action=action_name,
-            prompt=prompt, 
-            msg_type=return_msg_type,
-            wf_goal = kwargs.get("wf_goal", None),
-            wf_task = kwargs.get("wf_task", None),
-            wf_task_desc = kwargs.get("wf_task_desc", None)
-        )
 
         # update short-term memory
         self.short_term_memory.add_message(message)
@@ -240,3 +181,9 @@ class Agent(BaseModule):
     def save_module(self, path: str, ignore: List[str] = [], **kwargs)-> str:
         ignore_fields = self._save_ignore_fields + ignore
         super().save_module(path=path, ignore=ignore_fields, **kwargs)
+
+    @classmethod
+    def load_module(cls, path: str, llm_config: LLMConfig, **kwargs):
+        agent = super().load_module(path=path, **kwargs)
+        agent["llm_config"] = llm_config.to_dict()
+        return agent 
