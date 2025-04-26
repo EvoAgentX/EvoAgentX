@@ -43,9 +43,46 @@ nav:
   - Key Modules:
     - LLM: modules/llm.md 
     - Agent: modules/agent.md
-  - API: api.md
+  - API:
+    - Core: api/core.md
+    - Actions: api/actions.md
+    - App: api/app.md
+    - Evaluators: api/evaluators.md
+    - Agents: api/agents.md
+    - Memory: api/memory.md
+    - Workflow: api/workflow.md
+    - Models: api/models.md
+    - Tools: api/tools.md
+    - RAG: api/rag.md
+    - Storages: api/storages.md
+    - Benchmark: api/benchmark.md
+    - Optimizers: api/optimizers.md
+    - Prompts: api/prompts.md
+    - Utils: api/utils.md
+
+# plugins:
+#   - search
+#   - mkdocstrings:
+#       default_handler: python
 
 plugins:
   - search
   - mkdocstrings:
-      default_handler: python
+      handlers:
+        python:
+          options:
+            heading_level: 3
+            show_root_heading: true
+            show_source: false
+            merge_init_into_class: true
+            show_signature: true
+            show_docstring: true
+            separate_signature: true
+            members_order: source
+
+markdown_extensions:
+  - admonition
+  - pymdownx.superfences
+  - pymdownx.inlinehilite
+  - pymdownx.highlight
+  - pymdownx.snippets

@@ -1,99 +1,306 @@
-## 2. Building Your First Agent
+# Build Your First Agent
 
-In EvoAgentX, agents are the building blocks that perform specific tasks. Let's create a simple agent:
+In EvoAgentX, agents are intelligent components designed to complete specific tasks autonomously. This tutorial will walk you through the essential concepts of creating and using agents in EvoAgentX:
 
-### Basic Agent Creation
+1. **Creating a Simple Agent with CustomizeAgent**: Learn how to create a basic agent with custom prompts and input/output formats
+2. **Working with Multiple Actions**: Create more complex agents that can perform multiple tasks
+3. **Saving and Loading Agents**: Learn how to save and load your agents
+
+By the end of this tutorial, you'll be able to create both simple and complex agents, understand how they process inputs and outputs, and know how to save and reuse them in your projects.
+
+## 1. Creating a Simple Agent with CustomizeAgent
+
+The easiest way to create an agent is using `CustomizeAgent`, which allows you to quickly define an agent with a specific prompt and input/output format. 
+
+First, let's import the necessary components and setup the LLM:
 
 ```python
-from evoagentx.agents import Agent, AgentManager
+import os 
+from dotenv import load_dotenv
+from evoagentx.models import OpenAILLMConfig
+from evoagentx.agents import CustomizeAgent
 
-# Create an agent manager to handle your agents
-agent_manager = AgentManager()
+load_dotenv()
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-# Define a simple agent
-simple_agent = Agent(
+# Configure LLM
+openai_config = OpenAILLMConfig(
+    model="gpt-4o-mini", 
+    openai_key=OPENAI_API_KEY, 
+    stream=True
+)
+``` 
+
+Now, let's create a simple code-writing agent. There are two ways to create a CustomizeAgent:
+
+### Method 1: Direct Initialization
+
+```python
+code_writer = CustomizeAgent(
     name="CodeWriter",
-    description="Writes clean Python code based on requirements",
-    system_prompt="You are an expert Python developer specialized in writing clean, efficient code. Respond only with code and brief explanations when necessary."
+    description="Writes Python code based on requirements",
+    prompt="Write Python code that implements the following requirement: {requirement}",
+    inputs=[
+        {"name": "requirement", "type": "string", "description": "The coding requirement"} # currently only support string type
+    ],
+    outputs=[
+        {"name": "code", "type": "string", "description": "The generated Python code"} # currently only support string type
+    ],
+    system_prompt="You are an expert Python developer specialized in writing clean, efficient code. Respond only with code and brief explanations when necessary.",
+    llm_config=openai_config,
+    parse_mode="str" 
 )
-
-# Add the agent to the manager
-agent_manager.add_agent(simple_agent)
 ```
 
-### Agent with Custom Tools
+### Method 2: Creating from Dictionary
 
-Agents can use tools to extend their capabilities:
+You can also create an agent by defining its configuration in a dictionary:
 
 ```python
-from evoagentx.tools import Tool
+agent_data = {
+    "name": "CodeWriter",
+    "description": "Writes Python code based on requirements",
+    "inputs": [
+        {"name": "requirement", "type": "string", "description": "The coding requirement"}
+    ],
+    "outputs": [
+        {"name": "code", "type": "string", "description": "The generated Python code"}
+    ],
+    "prompt": "Write Python code that implements the following requirement: {requirement}",
+    "system_prompt": "You are an expert Python developer specialized in writing clean, efficient code. Respond only with code and brief explanations when necessary.",
+    "llm_config": openai_config,
+    "parse_mode": "str"
+}
 
-# Define a simple calculator tool
-def calculator(expression):
-    """Evaluate a mathematical expression"""
-    try:
-        return eval(expression)
-    except Exception as e:
-        return f"Error: {str(e)}"
-
-# Create a tool from the function
-calc_tool = Tool(
-    name="calculator",
-    description="Evaluates mathematical expressions",
-    function=calculator
-)
-
-# Create an agent with the tool
-math_agent = Agent(
-    name="MathSolver",
-    description="Solves mathematical problems",
-    system_prompt="You are a mathematics expert. Use the calculator tool to solve math problems.",
-    tools=[calc_tool]
-)
-
-# Add to the agent manager
-agent_manager.add_agent(math_agent)
+code_writer = CustomizeAgent.from_dict(agent_data) # use .from_dict() to create an agent. 
 ```
 
-## 3. Agent Execution
+### Using the Agent
 
-Once you've created your agents, you can execute them to perform tasks:
-
-### Running a Single Agent
+Once created, you can use the agent to generate code. You should put all the input data specified in the `prompt` in a dictionary and pass it to the `inputs`. 
 
 ```python
-# Get the agent from the manager
-code_writer = agent_manager.get_agent("CodeWriter")
-
-# Execute the agent with a specific task
-response = code_writer.run(
-    user_input="Write a function to find the nth Fibonacci number using dynamic programming."
+# Execute the agent with input. The agent will return a Message object containing the results. 
+message = code_writer(
+    inputs={"requirement": "Write a function that returns the sum of two numbers"}
 )
 
-# Print the response
-print(response)
+print(f"Generated code from {code_writer.name}:")
+print(message.content.code)
+```
+The raw response from LLM will be parsed into a structured format with attributes specified in the `outputs` field. Therefore, you can access the output fields using the `.code` attribute. 
+
+You can control how the LLM response is parsed by setting the `parse_mode` parameter. `CustomizeAgent` supports different ways to parse the LLM output:
+
+- `parse_mode="str"`: Uses the raw LLM output as the value for each output field
+- `parse_mode="title" (default)`: Extracts content between titles matching output field names, the default title pattern is `## output_name`. If you use this parse_mode, you should instruct the model to output the content in the following format: 
+```
+## output_name that matches the keys in the outputs field
+[content]
+
+## another_output_name 
+[content]
+```
+If you want to use a different pattern, you can set the `title_pattern` parameter, such as `title_pattern="# {title}"` (should include `{title}` in the pattern). 
+
+- `parse_mode="json"`: Parses the LLM output as JSON. The LLM should be instructed to respond with a valid JSON string with keys matching the output field names. 
+
+- `parse_mode="custom"`: Uses a custom parsing function. For example, we can use the `extract_code_blocks` function to extract the code blocks from the LLM output:
+```python
+from evoagentx.core.module_utils import extract_code_blocks
+
+code_writer = CustomizeAgent(
+    # ... other parameters same as above ...
+    parse_mode="custom",
+    parse_func=lambda content: {"code": extract_code_blocks(content)[0]}
+)
+```
+The `parse_func` needs to have a single argument `content`, which receives the raw LLM output, and returns a dictionary with keys matching the output field names. 
+
+For a complete example, please refer to the [CustomizeAgent example](https://github.com/EvoAgentX/EvoAgentX/blob/main/examples/customize_agent.py).
+
+
+## 2. Creating an Agent with Multiple Actions
+
+In EvoAgentX, you can create an agent with multiple predefined actions. This allows you to build more complex agents that can perform multiple tasks. Here's an example showing how to create an agent with `TestCodeGeneration` and `TestCodeReview` actions:
+
+### Defining Actions
+First, we need to define the actions, which are subclasses of `Action`: 
+```python
+from evoagentx.agents import Agent
+from evoagentx.actions import Action, ActionInput, ActionOutput
+
+# Define the CodeGeneration action inputs
+class TestCodeGenerationInput(ActionInput):
+    requirement: str = Field(description="The requirement for the code generation")
+
+# Define the CodeGeneration action outputs
+class TestCodeGenerationOutput(ActionOutput):
+    code: str = Field(description="The generated code")
+
+# Define the CodeGeneration action
+class TestCodeGeneration(Action): 
+
+    def __init__(
+        self, 
+        name: str="TestCodeGeneration", 
+        description: str="Generate code based on requirements", 
+        prompt: str="Generate code based on requirements: {requirement}",
+        inputs_format: ActionInput=None, 
+        outputs_format: ActionOutput=None, 
+        **kwargs
+    ):
+        inputs_format = inputs_format or TestCodeGenerationInput
+        outputs_format = outputs_format or TestCodeGenerationOutput
+        super().__init__(
+            name=name, 
+            description=description, 
+            prompt=prompt, 
+            inputs_format=inputs_format, 
+            outputs_format=outputs_format, 
+            **kwargs
+        )
+    
+    def execute(self, llm: Optional[BaseLLM] = None, inputs: Optional[dict] = None, sys_msg: Optional[str]=None, return_prompt: bool = False, **kwargs) -> TestCodeGenerationOutput:
+        action_input_attrs = self.inputs_format.get_attrs() # obtain the attributes of the action input 
+        action_input_data = {attr: inputs.get(attr, "undefined") for attr in action_input_attrs}
+        prompt = self.prompt.format(**action_input_data) # format the prompt with the action input data 
+        output = llm.generate(
+            prompt=prompt, 
+            system_message=sys_msg, 
+            parser=self.outputs_format, 
+            parse_mode="str" # specify how to parse the output 
+        )
+        if return_prompt:
+            return output, prompt
+        return output
+
+
+# Define the CodeReview action inputs
+class TestCodeReviewInput(ActionInput):
+    code: str = Field(description="The code to be reviewed")
+    requirements: str = Field(description="The requirements for the code review")
+
+# Define the CodeReview action outputs
+class TestCodeReviewOutput(ActionOutput):
+    review: str = Field(description="The review of the code")
+
+# Define the CodeReview action
+class TestCodeReview(Action):
+    def __init__(
+        self, 
+        name: str="TestCodeReview", 
+        description: str="Review the code based on requirements", 
+        prompt: str="Review the following code based on the requirements:\n\nRequirements: {requirements}\n\nCode:\n{code}. You should output a JSON object with the following fields: 'review'.", 
+        inputs_format: ActionInput=None, 
+        outputs_format: ActionOutput=None, 
+        **kwargs
+    ):
+        inputs_format = inputs_format or TestCodeReviewInput
+        outputs_format = outputs_format or TestCodeReviewOutput
+        super().__init__(
+            name=name, 
+            description=description, 
+            prompt=prompt, 
+            inputs_format=inputs_format, 
+            outputs_format=outputs_format, 
+            **kwargs
+        )
+    
+    def execute(self, llm: Optional[BaseLLM] = None, inputs: Optional[dict] = None, sys_msg: Optional[str]=None, return_prompt: bool = False, **kwargs) -> TestCodeReviewOutput:
+        action_input_attrs = self.inputs_format.get_attrs()
+        action_input_data = {attr: inputs.get(attr, "undefined") for attr in action_input_attrs}
+        prompt = self.prompt.format(**action_input_data)
+        output = llm.generate(
+            prompt=prompt, 
+            system_message=sys_msg,
+            parser=self.outputs_format, 
+            parse_mode="json" # specify how to parse the output 
+        ) 
+        if return_prompt:
+            return output, prompt
+        return output
 ```
 
-### Agent with Memory
+From the above example, we can see that in order to define an action, we need to:
 
-Agents can maintain memory of past interactions:
+1. Define the action inputs and outputs using `ActionInput` and `ActionOutput` classes
+2. Create an action class that inherits from `Action`
+3. Implement the `execute` method which formulates the prompt with the action input data and uses the LLM to generate output, and specify how to parse the output using `parse_mode`.
+
+### Defining an Agent 
+
+Once we have defined the actions, we can create an agent by adding the actions to it:
 
 ```python
-from evoagentx.memory import ConversationMemory
+# Initialize the LLM
+openai_config = OpenAILLMConfig(model="gpt-4o-mini", openai_key=os.getenv("OPENAI_API_KEY"))
 
-# Create an agent with memory
-assistant = Agent(
-    name="Assistant",
-    description="A helpful assistant that remembers past interactions",
-    system_prompt="You are a helpful assistant. Remember details from previous interactions.",
-    memory=ConversationMemory()  # Add conversation memory
+# Define the agent 
+developer = Agent(
+    name="Developer", 
+    description="A developer who can write code and review code",
+    actions=[TestCodeGeneration(), TestCodeReview()], 
+    llm_config=openai_config
+)
+```
+
+### Executing Different Actions
+
+Once you've created an agent with multiple actions, you can execute specific actions:
+
+```python
+# List all available actions on the agent
+actions = developer.get_all_actions()
+print(f"Available actions of agent {developer.name}:")
+for action in actions:
+    print(f"- {action.name}: {action.description}")
+
+# Generate some code using the CodeGeneration action
+generation_result = developer.execute(
+    action_name="TestCodeGeneration", # specify the action name
+    action_input_data={ 
+        "requirement": "Write a function that returns the sum of two numbers"
+    }
 )
 
-# First interaction
-response1 = assistant.run("My name is Alice.")
-print(response1)
+# Access the generated code
+generated_code = generation_result.content.code
+print("Generated code:")
+print(generated_code)
 
-# Second interaction (agent will remember the name)
-response2 = assistant.run("What's my name?")
-print(response2)  # Should output something like "Your name is Alice."
+# Review the generated code using the CodeReview action
+review_result = developer.execute(
+    action_name="TestCodeReview",
+    action_input_data={
+        "requirements": "Write a function that returns the sum of two numbers",
+        "code": generated_code
+    }
+)
+
+# Access the review results
+review = review_result.content.review
+print("\nReview:")
+print(review)
+```
+
+This example demonstrates how to:
+1. List all available actions on an agent
+2. Generate code using the TestCodeGeneration action
+3. Review the generated code using the TestCodeReview action
+4. Access the results from each action execution
+
+For a complete working example, please refer to the [Agent example](https://github.com/EvoAgentX/EvoAgentX/blob/main/examples/agent_with_multiple_actions.py). 
+
+
+## 3. Saving and Loading Agents
+
+You can save an agent to a file and load it later:
+
+```python
+# Save the agent to a file
+developer.save_module("examples/output/developer.json", ignore=["llm_config"]) # ignore the LLM config to avoid saving the API key 
+
+# Load the agent from a file
+developer = Agent.from_file("examples/output/developer.json", llm_config=openai_config)
 ```

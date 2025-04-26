@@ -1,0 +1,38 @@
+{
+    "class_name": "Agent",
+    "name": "Developer",
+    "description": "A developer who can write code and review code",
+    "agent_id": "ab50ff832a84430ea9f1bada3ae31743",
+    "short_term_memory": {
+        "class_name": "ShortTermMemory",
+        "messages": [],
+        "memory_id": "4e472792b17c4d9f82860f9a3bfe3bde",
+        "timestamp": "2025-04-19 23:08:54"
+    },
+    "use_long_term_memory": false,
+    "actions": [
+        {
+            "class_name": "TestCodeGeneration",
+            "name": "TestCodeGeneration",
+            "description": "Generate code based on requirements",
+            "prompt": "Generate code based on requirements: {requirement}",
+            "inputs_format": null,
+            "outputs_format": null
+        },
+        {
+            "class_name": "TestCodeReview",
+            "name": "TestCodeReview",
+            "description": "Review the code based on requirements",
+            "prompt": "Review the following code based on the requirements:\n\nRequirements: {requirements}\n\nCode:\n{code}.\n\nYou should output a JSON object with the following format:\n```json\n{{\n'review': '...'\n}}\n```",
+            "inputs_format": null,
+            "outputs_format": null
+        },
+        {
+            "class_name": "ContextExtraction",
+            "name": "ContextExtraction",
+            "description": "ContextExtraction is designed to extract necessary input data required to perform a specific action from a given context."
+        }
+    ],
+    "is_human": false,
+    "version": 0
+}

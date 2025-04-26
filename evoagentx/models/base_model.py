@@ -143,6 +143,18 @@ class LLMOutputParser(Parser):
             json_str = extracted_json_list[0] # only use the first JSON
             try:
                 data = yaml.safe_load(json_str)
+                if not isinstance(data, dict):
+                    if isinstance(data, list):
+                        # LLM returns a list of JSON strings, without specifying the attribute name
+                        attrs = cls.get_attrs()
+                        if len(attrs) == 1:
+                            # if there is only one attribute, use it as the attribute name 
+                            return {attrs[0]: data}
+                        else:
+                            # if there are multiple attributes, raise an error
+                            raise ValueError("The generated content is a list of JSON strings, but the attribute name for the list is not specified. You should instruct the LLM to specify the attribute name for the list.")
+                    else:
+                        raise ValueError(f"The generated content is not a valid JSON string:\n{json_str}")
             except Exception:
                 raise ValueError(f"The generated content is not a valid JSON string:\n{json_str}")
         else:

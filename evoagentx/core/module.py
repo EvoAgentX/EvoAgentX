@@ -350,7 +350,7 @@ class BaseModule(BaseModel, metaclass=MetaModule):
             raise ValueError(error_message)
         
         function = load_function or cls.load_module
-        content = function(path)
+        content = function(path, **kwargs)
         module = cls.from_dict(content, log=use_logger)
 
         return module

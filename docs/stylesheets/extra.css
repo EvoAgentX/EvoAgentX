@@ -1,4 +1,4 @@
-.md-nav__title {
+/* .md-nav__title {
     font-weight: bold;
     color: black;
     border-bottom: 1px solid rgba(0, 0, 0, 0.1);
@@ -19,4 +19,40 @@
 .md-nav__list > .md-nav__item--section:last-child {
   border-bottom: none;
 }
+ */
 
+ .md-nav__title {
+  font-weight: bold;
+  color: black;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+}
+
+:root {
+  font-size: 21px;
+}
+
+.md-nav__item--section {
+border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+margin-bottom: 8px;
+padding-bottom: 8px;
+}
+
+.md-nav__list > .md-nav__item--section:last-child {
+border-bottom: none;
+}
+
+
+/* 调整 mkdocstrings / pygments 代码块字体大小 */
+.md-typeset pre > code {
+  font-size: 16px;        /* 可调大小 */
+  line-height: 1.6;
+  font-family: "Fira Code", "Courier New", monospace;
+}
+
+/* 可选：调整代码块边框圆角、padding 等视觉效果 */
+.md-typeset pre {
+  border-radius: 6px;
+  padding: 1em;
+}

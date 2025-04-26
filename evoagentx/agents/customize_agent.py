@@ -344,6 +344,19 @@ class CustomizeAgent(Agent):
             self._action_output_types[field["name"]] = field["type"]
             self._action_output_required[field["name"]] = required
     
+    def __call__(self, inputs: dict, **kwargs) -> ActionOutput:
+        """
+        Call the customize action.
+
+        Args:
+            inputs (dict): The inputs to the customize action.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            ActionOutput: The output of the customize action.
+        """
+        return self.execute(action_name=self.customize_action_name, action_input_data=inputs, **kwargs) 
+    
     def save_module(self, path: str, ignore: List[str] = [], **kwargs)-> str:
         """Save the customize agent's configuration to a JSON file.
         

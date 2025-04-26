@@ -421,3 +421,9 @@ class Agent(BaseModule):
         """
         ignore_fields = self._save_ignore_fields + ignore
         super().save_module(path=path, ignore=ignore_fields, **kwargs)
+
+    @classmethod
+    def load_module(cls, path: str, llm_config: LLMConfig, **kwargs):
+        agent = super().load_module(path=path, **kwargs)
+        agent["llm_config"] = llm_config.to_dict()
+        return agent 

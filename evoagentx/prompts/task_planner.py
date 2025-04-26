@@ -1,4 +1,3 @@
-
 TASK_PLANNER_DESC = "TaskPlanner is an intelligent task planning agent designed to assist users in achieving their goals. \
     It specializes in breaking down complex tasks into clear, manageable sub-tasks and organizing them in the most efficient sequence." 
 
@@ -122,14 +121,14 @@ Output:
 """
 
 TASK_PLANNING_ACTION_INST = """
-Given a user's goal, analyze the task and create a workflow by breaking it down into actionable sub-tasks. Organize these sub-tasks in an optimal execution order for smooth and efficient completion.
+Your Task: Given a user's goal, break it down into clear, manageable sub-tasks that are easy to follow and efficient to execute. 
 
 ### Instructions:
-1. **Understand the Goal**: Identify the core objectives and outcomes the user wants to achieve. 
+1. **Understand the Goal**: Identify the core objective the user is trying to achieve. 
 2. **Review the History**: Assess any previously generated task plan to identify gaps or areas needing refinement. 
 3. **Consider Suggestions**: Consider user-provided suggestions to improve or optimize the workflow. 
 
-4. **Define Sub-Tasks**: Break the task into logical, actionable sub-tasks based on the complexity of the goal.
+4. **Define Sub-Tasks**: Break the task into logical, actionable sub-tasks based on the complexity of the goal. 
 
 4.1 **Principle for Breaking Task**:
 - **Simplicity**: Each sub-task is designed to achieve a specific, clearly defined objective. Avoid overloading sub-tasks with multiple objectives. 
@@ -169,9 +168,8 @@ Each sub-task should follow the structure below:
 
 ### Special Instructions for Programming Tasks
 - **Environment Setup and Deployment**: For programming-related tasks, **do not** include sub-tasks related to setting up environments or deployment unless explicitly requested.
-- Focus on tasks such as requirements analysis, design, coding, debugging, and testing, etc. 
-- Ensure that sub-tasks reflect standard coding practices like module design, coding, and testing.
-
+- **Complete Code Generation**: For programming-related tasks, ensure that the final sub-task outputs a complete and working solution.
+- **IMPORTANT - Include Full Requirements**: For EVERY code generation tasks, in addition to the outputs from previous sub-tasks, the overall goal (and analysed requirements if any) MUST be included as inputs. This ensures each code generation step maintains full context of what's being built, even when split across multiple steps.
 
 ### Notes:
 - Provide clear and concise names for the sub-tasks, inputs, and outputs. 
@@ -264,6 +262,12 @@ Explanation: The minimum window substring "BANC" includes 'A', 'B', and 'C' from
             "reason": "This step ensures an initial solution is implemented based on the problem analysis.", 
             "inputs": [
                 {{
+                    "name": "goal",
+                    "type": "string", 
+                    "required": true, 
+                    "description": "The original full programming task requirements."
+                }},
+                {{
                     "name": "problem_analysis",
                     "type": "string", 
                     "required": true, 
@@ -276,165 +280,6 @@ Explanation: The minimum window substring "BANC" includes 'A', 'B', and 'C' from
                     "type": "string", 
                     "required": true, 
                     "description": "The generated Python function that finds the minimum window substring."
-                }}
-            ]
-        }}, 
-        {{
-            "name": "code_review", 
-            "description": "Review the generated function for correctness, efficiency, and edge case coverage.", 
-            "reason": "Ensures the function meets correctness and performance expectations.", 
-            "inputs": [
-                {{
-                    "name": "problem_analysis",
-                    "type": "string", 
-                    "required": true, 
-                    "description": "The clear and detailed analysis of the problem."
-                }},
-                {{
-                    "name": "function_code",
-                    "type": "string", 
-                    "required": true, 
-                    "description": "The generated Python function."
-                }}
-            ],
-            "outputs": [
-                {{
-                    "name": "code_feedback",
-                    "type": "string", 
-                    "required": true, 
-                    "description": "Feedback, suggestions, and identified issues in the initial code."
-                }}
-            ]
-        }}, 
-        {{
-            "name": "code_refinement", 
-            "description": "Refine the implementation based on review feedback.", 
-            "reason": "Improves code quality by addressing identified issues and optimizing performance.", 
-            "inputs": [
-                {{
-                    "name": "function_code",
-                    "type": "string", 
-                    "required": true, 
-                    "description": "The generated Python function."
-                }},
-                {{
-                    "name": "code_feedback", 
-                    "type": "string", 
-                    "required": true, 
-                    "description": "Feedback or suggestions to refine the generated code."
-                }}
-            ],
-            "outputs": [
-                {{
-                    "name": "optimized_function_code",
-                    "type": "string", 
-                    "required": true, 
-                    "description": "The final, optimized python code."
-                }}
-            ]
-        }}
-    ]
-}}
-
-Example 3 (include loops):
-### User's goal: 
-Create a Tetris game using Python
-### Generated Workflow: 
-{{
-    "sub_tasks": [
-        {{
-            "name": "requirement_analysis", 
-            "description": "Define the specifications and technical requirements for the Tetris game.", 
-            "reason": "Understanding the game mechanics, required features, and development constraints ensures a well-structured implementation.", 
-            "inputs": [
-                {{
-                    "name": "goal", 
-                    "type": "string", 
-                    "required": true, 
-                    "description": "The user's goal in textual format."
-                }}
-            ],
-            "outputs": [
-                {{
-                    "name": "game_requirements", 
-                    "type": "string", 
-                    "required": true, 
-                    "description": "A detailed specification of the game's features, mechanics, and technical constraints."
-                }}
-            ]
-        }},
-        {{
-            "name": "code_generation", 
-            "description": "Generate Python code for the Tetris game based on the defined requirements.", 
-            "reason": "This step involves writing the initial implementation of the game. If previous code exists, the task will refine it based on debugging feedback to improve functionality and correctness.", 
-            "inputs": [
-                {{
-                    "name": "game_requirements", 
-                    "type": "string", 
-                    "required": true, 
-                    "description": "Specifications and constraints for the Tetris game."
-                }},
-                {{
-                    "name": "generated_code", 
-                    "type": "string", 
-                    "required": false, 
-                    "description": "Previously generated Tetris code. If provided, the task will refine it instead of starting from scratch." 
-                }},
-                {{
-                    "name": "debugging_feedback", 
-                    "type": "string",
-                    "required": false, 
-                    "description": "Feedback and identified issues from the debugging phase. If provided, the task will improve implementation by addressing detected problems."
-                }}
-            ],
-            "outputs": [
-                {{
-                    "name": "generated_code", 
-                    "type": "string", 
-                    "required": true, 
-                    "description": "The implementation of the Tetris game. If previous generated code and debugging feedback exists, it is the improved implementation."
-                }}
-            ]
-        }},
-        {{
-            "name": "code_debugging", 
-            "description": "Test and debug the generated code to identify and fix any issues.", 
-            "reason": "Ensuring the game functions correctly by catching errors and iterating on the implementation.", 
-            "inputs": [
-                {{
-                    "name": "generated_code", 
-                    "type": "string", 
-                    "required": true, 
-                    "description": "The python code for the Tetris game."
-                }}
-            ],
-            "outputs": [
-                {{
-                    "name": "debugging_feedback", 
-                    "type": "string", 
-                    "required": true, 
-                    "description": "Identified issues and necessary fixes for the generated code."
-                }}
-            ]
-        }},
-        {{
-            "name": "documentation", 
-            "description": "Create documentation for the Tetris game, including user instructions and developer notes.", 
-            "reason": "Providing clear explanations of the game's functionality and code structure helps future development and maintenance.", 
-            "inputs": [
-                {{
-                    "name": "generated_code", 
-                    "type": "string", 
-                    "required": true, 
-                    "description": "The final implementation of the Tetris game."
-                }}
-            ],
-            "outputs": [
-                {{
-                    "name": "documentation", 
-                    "type": "string", 
-                    "required": true, 
-                    "description": "Written documentation for users and developers."
                 }}
             ]
         }}

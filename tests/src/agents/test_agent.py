@@ -62,8 +62,8 @@ class TestModule(unittest.TestCase):
                 }
             ]
         )
-        agent.save_module(path=self.save_file)
-        loaded_agent = Agent.from_file(path=self.save_file)
+        agent.save_module(path=self.save_file, ignore=["llm_config"])
+        loaded_agent = Agent.from_file(path=self.save_file, llm_config=llm_config)
         self.assertEqual(agent, loaded_agent)
 
     def tearDown(self):

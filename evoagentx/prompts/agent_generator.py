@@ -253,7 +253,7 @@ provide a description for this output
 You should STRICTLY use the above template to generate the `prompt` field of the agent. You should follow these principles to formuate the prompt: 
 - In the '### Objective' section, you should provide a clear description of the agent's goal. 
 - In the '### Instructions' section, you should generate step-by-step instructions based on the following principles: 
-    - Provide a clear and logical sequence of actions the agent should follow to complete its task. 
+    - Provide a clear and logical sequence of actions the agent should follow to complete its task. You should provide **meaningful, insightful, and detailed instructions** that can help the agent to achieve the objective. 
     - Reference the input variables using placeholders (e.g., <input>{{input_name}}</input>) that match the agent's `inputs`. You MUST use a SINGLE pair of curly brace warpped by "<input>xxx</input>" to reference the inputs.
     - Include instructions on how the agent can use relevant tools from the "### Tools" section to assist with its task if applicable. 
 - In the '### Output Format' section, 
@@ -271,6 +271,7 @@ You should STRICTLY use the above template to generate the `prompt` field of the
 - Ensure that ALL `inputs` defined in the sub-task are used by at least on created agent. 
 - Ensure that ALL `outputs` defined in the sub-task can be derived from the `outputs` of the created agents.
 - Ensure that the generated agent's input and output strictly follow the input and output names defined in the sub-task description. Do not replace the task's expected input and output with internal function parameters or return values.  
+- If only one agent is needed, you should ensure that ALLL `inputs` are used in the `prompt` of the agent. 
 - You must use a SINGLE pair of curly brace warpped by "<input>xxx</input>" to reference inputs in the "### Instructions" of an agent's prompt.
 - Below is **a generated agent** that follows the given instructions:
 ```json

@@ -65,7 +65,7 @@ class WorkFlowGenerator(BaseModule):
                 raise ValueError("Must provide `llm` when `agent_generator` is None")
             self.agent_generator = AgentGenerator(llm=self.llm)
         
-        # TODO  完成WorkFlowReviewer之后解开注释
+        # TODO add WorkFlowReviewer
         # if self.workflow_reviewer is None:
         #     if self.llm is None:
         #         raise ValueError(f"Must provide `llm` when `workflow_reviewer` is None")
@@ -173,7 +173,7 @@ class WorkFlowGenerator(BaseModule):
             generated_agents = []
             for agent in agents.generated_agents:
                 agent_dict = agent.to_dict(ignore=["class_name"])
-                agent_dict["llm_config"] = self.llm.config.to_dict()
+                # agent_dict["llm_config"] = self.llm.config.to_dict()
                 generated_agents.append(agent_dict)
             subtask.set_agents(agents=generated_agents)
         return workflow
