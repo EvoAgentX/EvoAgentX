@@ -21,17 +21,11 @@ VALID_SCHEMES = ["python", "yaml", "code", "core", "bpmn"]
 
 class SEWWorkFlowScheme:
 
-    """
-    The scheme of the workflow for SEW optimizer.
-    """
     def __init__(self, graph: SequentialWorkFlowGraph, **kwargs):
         self.graph = graph # the workflow graph to be transformed
         self.kwargs = kwargs
 
     def convert_to_scheme(self, scheme: str) -> str:
-        """
-        Transform the WorkflowGraph to the desired scheme.
-        """
         if scheme not in VALID_SCHEMES:
             raise ValueError(f"Invalid scheme: {scheme}. The scheme should be one of {VALID_SCHEMES}.") 
         if scheme == "python":
@@ -47,9 +41,6 @@ class SEWWorkFlowScheme:
         return repr
 
     def parse_from_scheme(self, scheme: str, repr: str) -> SequentialWorkFlowGraph:
-        """
-        Parse the SequentialWorkFlowGraph from the given scheme and representation.
-        """
         if scheme not in VALID_SCHEMES:
             raise ValueError(f"Invalid scheme: {scheme}. The scheme should be one of {VALID_SCHEMES}.")
         if scheme == "python":
@@ -65,9 +56,6 @@ class SEWWorkFlowScheme:
         return graph
 
     def _get_workflow_repr_info(self) -> List[dict]:
-        """
-        Get the information for the workflow representation.
-        """
         info = []
         for node in self.graph.nodes:
             task_name = node.name
@@ -82,9 +70,6 @@ class SEWWorkFlowScheme:
         return info
     
     def _convert_to_func_name(self, name: str) -> str:
-        """
-        Convert the task name to the function name.
-        """
         name = name.lower().strip()
         name = name.replace(' ', '_').replace('-', '_')
         name = ''.join(c for c in name if c.isalnum() or c == '_')
@@ -232,16 +217,7 @@ class SEWWorkFlowScheme:
         return "\n".join(workflow_lines)
 
     def _find_task_index(self, step: dict, graph_repr_info: List[dict]) -> int:
-        """
-        Find the index of the task in the original workflow graph. If the task is not found, return -1. 
 
-        Args:
-            step (dict): The step of the workflow.
-            graph_repr_info (List[dict]): The information of the original workflow graph.
-        
-        Returns:
-            int: The index of the task.
-        """
         def _is_task_name_match(task_name: str, another_name: str) -> bool:
             return self._convert_to_func_name(task_name) == self._convert_to_func_name(another_name)
 
@@ -601,17 +577,12 @@ class SEWWorkFlowScheme:
 
 
 class SimplePromptBreeder:
-    """
-    The simple prompt breeder for SEW optimizer.
-    """
+
     def __init__(self, llm: BaseLLM, **kwargs):
         self.llm = llm
         self.kwargs = kwargs
 
     def generate_mutation_prompt(self, task_description: str, **kwargs) -> str:
-        """
-        Generate the mutation prompt for optimization.
-        """
         thinking_style = random.choice(thinking_styles)
         hyper_mutation_prompt = thinking_style + "\n\nProblem Description: " + task_description + ".\n" + "Output: "
         # print(">>>>>>>>>> Hyper mutation prompt: <<<<<<<<<<<\n", hyper_mutation_prompt)
@@ -622,9 +593,6 @@ class SimplePromptBreeder:
         return mutation_prompt
     
     def get_mutation_prompt(self, task_description: str, order: Literal["zero-order", "first-order"], **kwargs) -> str:
-        """
-        Get the mutation prompt for optimization.
-        """
         if order == "zero-order":
             mutation_prompt = self.generate_mutation_prompt(task_description=task_description)
         elif order == "first-order":
@@ -675,9 +643,7 @@ class SEWOptimizer(Optimizer):
                 )
 
     def optimize(self, dataset: Benchmark, **kwargs):
-        """
-        Optimize the workflow.
-        """
+
         if isinstance(self.graph, SequentialWorkFlowGraph):
             logger.info(f"Optimizing the {type(self.graph).__name__} workflow with {self.repr_scheme} representation.")
         elif isinstance(self.graph, ActionGraph):
@@ -715,9 +681,6 @@ class SEWOptimizer(Optimizer):
         self.restore_best_graph()
     
     def step(self, **kwargs) -> Union[SequentialWorkFlowGraph, ActionGraph]:
-        """
-        Take a step of optimization and return the optimized graph.
-        """
         graph = self._select_graph_with_highest_score(return_metrics=False)
         if isinstance(graph, SequentialWorkFlowGraph):
             new_graph = self._workflow_graph_step(graph)
@@ -776,9 +739,7 @@ class SEWOptimizer(Optimizer):
         return avg_metrics
     
     def log_snapshot(self, graph: Union[SequentialWorkFlowGraph, ActionGraph], metrics: dict):
-        """
-        Log the snapshot of the workflow.
-        """
+        
         if isinstance(graph, SequentialWorkFlowGraph):
             graph_info = graph.get_graph_info()
         elif isinstance(graph, ActionGraph):
@@ -796,9 +757,7 @@ class SEWOptimizer(Optimizer):
         )
 
     def _select_graph_with_highest_score(self, return_metrics: bool = False) -> Union[SequentialWorkFlowGraph, ActionGraph]:
-        """
-        Select the graph in `self._snapshot` with the highest score.
-        """
+
         if len(self._snapshot) == 0:
             return self.graph
         snapshot_scores = [np.mean(list(snapshot["metrics"].values())) for snapshot in self._snapshot]
@@ -817,22 +776,13 @@ class SEWOptimizer(Optimizer):
         return graph
     
     def restore_best_graph(self):
-        """
-        Restore the best graph from the snapshot and set it to `self.graph`.
-        """
+
         best_graph, best_metrics = self._select_graph_with_highest_score(return_metrics=True)
         logger.info(f"Restore the best graph from snapshot with metrics {best_metrics} ...")
         self.graph = best_graph
 
     def _wfg_structure_optimization_step(self, graph: SequentialWorkFlowGraph) -> SequentialWorkFlowGraph:
-        """
-        optinize the structure of the workflow graph and return the optimized graph.
-        Args:
-            graph (SequentialWorkFlowGraph): The workflow graph to optimize.
-        
-        Returns:
-            SequentialWorkFlowGraph: The optimized workflow graph.  
-        """
+
         graph_scheme = SEWWorkFlowScheme(graph=graph)
         graph_repr = graph_scheme.convert_to_scheme(scheme=self.repr_scheme)
         if self.repr_scheme == "python":
@@ -853,9 +803,7 @@ class SEWOptimizer(Optimizer):
         return new_graph
     
     def _wfg_prompt_optimization_step(self, graph: SequentialWorkFlowGraph) -> SequentialWorkFlowGraph:
-        """
-        optinize the prompt of the workflow graph and return the optimized graph.
-        """
+
         task_description = graph.goal
         graph_scheme = SEWWorkFlowScheme(graph=graph)
         graph_repr = graph_scheme.convert_to_scheme(scheme=self.repr_scheme)
@@ -872,9 +820,7 @@ class SEWOptimizer(Optimizer):
         return new_graph
         
     def _workflow_graph_step(self, graph: SequentialWorkFlowGraph) -> SequentialWorkFlowGraph:
-        """
-        Take a step of optimization on the workflow graph and return the optimized graph.
-        """
+
         if self.optimize_mode == "structure" or self.optimize_mode == "all":
             # optimize the structure of the graph    
             graph = self._wfg_structure_optimization_step(graph)
@@ -885,9 +831,7 @@ class SEWOptimizer(Optimizer):
         return graph
     
     def _action_graph_prompt_optimization_step(self, graph: ActionGraph) -> ActionGraph:
-        """
-        Optimize the prompts of the action graph. 
-        """
+
         task_description = graph.description
         graph_info = graph.get_graph_info()
         graph_steps = inspect.getsource(getattr(graph, "execute"))
@@ -906,9 +850,7 @@ class SEWOptimizer(Optimizer):
         return new_graph
 
     def _action_graph_step(self, graph: ActionGraph) -> ActionGraph:
-        """
-        Take a step of optimization on the action graph and return the optimized graph.
-        """
+        
         if self.optimize_mode == "prompt":
             graph = self._action_graph_prompt_optimization_step(graph)
         else:
@@ -917,9 +859,7 @@ class SEWOptimizer(Optimizer):
         return graph
 
     def convergence_check(self, **kwargs) -> bool:
-        """
-        Check if the optimization has converged.
-        """
+        
         if not self._snapshot:
             logger.warning("No snapshots available for convergence check")
             return False

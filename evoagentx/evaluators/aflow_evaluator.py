@@ -20,12 +20,6 @@ class AFlowEvaluator:
     """
 
     def __init__( self, llm: Optional[BaseLLM] = None):
-        """Initialize the AFlow evaluator.
-        
-        Args:
-            llm: Optional language model to be used during evaluation.
-                 If provided, this model will be used by the workflow graph.
-        """
         self.llm = llm 
     
     def _configure_graph(self, graph, benchmark):
@@ -67,14 +61,6 @@ class AFlowEvaluator:
         semaphore = asyncio.Semaphore(max_concurrent_tasks)
         
         async def evaluate_with_semaphore(example):
-            """Evaluate a single example with semaphore-controlled concurrency.
-            
-            Args:
-                example: The benchmark example to evaluate
-                
-            Returns:
-                The evaluation result or None if evaluation failed
-            """
             async with semaphore:
                 try:
                     return await benchmark.evaluate_async(configured_graph, example)

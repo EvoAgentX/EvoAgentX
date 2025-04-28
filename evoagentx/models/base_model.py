@@ -286,21 +286,14 @@ class LLMOutputParser(Parser):
         return parser
 
     def __str__(self) -> str:
-        """Returns a string representation of the parser.
-        
-        Returns:
-            The string representation, which is the raw content.
+        """
+        Returns a string representation of the parser.
         """
         return self.to_str()
     
     def to_str(self, **kwargs) -> str:
-        """Converts the parser to a string.
-        
-        Args:
-            **kwargs: Additional arguments (not used).
-            
-        Returns:
-            The raw content as a string.
+        """
+        Converts the parser to a string.
         """
         return self.content
     
@@ -585,19 +578,6 @@ class BaseLLM(ABC):
         
         This is the async version of the generate method. It works identically but
         performs the generation asynchronously.
-        
-        Args:
-            prompt: Input prompt(s) to the LLM.
-            system_message: System message(s) for the LLM.
-            messages: Chat message(s) for the LLM, already in the required format.
-            parser: Parser class to use for processing the output.
-            parse_mode: The mode to use for parsing, must be the `parse_mode` supported by the `parser`. 
-            parse_func: Custom function for parsing when parse_mode is "custom".
-            **kwargs: Additional generation configuration parameters.
-        
-        Returns:
-            For single generation: An LLMOutputParser instance.
-            For batch generation: A list of LLMOutputParser instances.
         """
         prepared_messages, single_generate = self._prepare_messages(prompt, system_message, messages)
         if not prepared_messages:  # Handle empty messages case

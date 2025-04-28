@@ -20,16 +20,7 @@ from ..utils.aflow_utils.convergence_utils import ConvergenceUtils
 
 
 class GraphOptimizeOutput(LLMOutputParser):
-    """Output parser for graph optimization results.
-    
-    This class parses the structured output from the LLM optimizer, extracting
-    the modification description, updated graph structure, and updated prompt.
-    
-    Attributes:
-        modification: Description of the modifications made by the optimizer
-        graph: Updated graph structure code after optimization
-        prompt: Updated prompt template after optimization
-    """
+
     modification: str = Field(default="", description="modification")
     graph: str = Field(default="", description="graph")
     prompt: str = Field(default="", description="prompt")
@@ -143,19 +134,7 @@ class AFlowOptimizer(BaseModule):
             loop.run_until_complete(self._run_test(test_rounds))
     
     async def _execute_with_retry(self, func: callable, max_retries: int = 3) -> Any:
-        """Execute an async function with retry logic.
-        
-        Attempts to execute the function up to max_retries times, with
-        exponential backoff between retries. Used to handle transient errors
-        in LLM API calls or other operations.
-        
-        Args:
-            func: The async function to execute
-            max_retries: Maximum number of retry attempts
-            
-        Returns:
-            The result of the function if successful, None otherwise
-        """
+
         retry_count = 0
         while retry_count < max_retries:
             try:
@@ -171,15 +150,6 @@ class AFlowOptimizer(BaseModule):
         return None
     
     def _check_convergence(self) -> bool:
-        """Check if the optimization process has converged.
-        
-        Uses the convergence utility to analyze performance trends
-        and determine if further optimization rounds are unlikely
-        to yield significant improvements.
-        
-        Returns:
-            True if convergence is detected, False otherwise
-        """
         if not self.check_convergence:
             return False
 
@@ -193,15 +163,7 @@ class AFlowOptimizer(BaseModule):
         return False
 
     async def _optimize_graph(self) -> float:
-        """Optimize the graph for one round.
         
-        Core optimization function that handles both initial round evaluation
-        and subsequent optimization rounds. Coordinates the optimization process
-        and returns the performance score for the current round.
-        
-        Returns:
-            The average performance score for the current optimization round
-        """
         validation_n = self.validation_rounds
         graph_path = self.root_path
         data = self.data_utils.load_results(graph_path)
@@ -212,38 +174,12 @@ class AFlowOptimizer(BaseModule):
         return await self._handle_optimization_round(graph_path, validation_n, data)
 
     async def _handle_initial_round(self, graph_path: str, validation_n: int, data: list) -> float:
-        """Handle the initial round of optimization.
-        
-        Creates the initial round directory, loads the graph,
-        and evaluates it to establish a baseline performance.
-        
-        Args:
-            graph_path: Path to the graph directory
-            validation_n: Number of validation runs
-            data: Dataset to evaluate against
-            
-        Returns:
-            Average score from initial evaluation
-        """
         self.graph_utils.create_round_directory(graph_path, self.round)
         self.graph = self.graph_utils.load_graph(self.round, graph_path)
         return await self.evaluation_utils.evaluate_graph_async(self, validation_n, data, initial=True)
 
     async def _handle_optimization_round(self, graph_path: str, validation_n: int, data: list) -> float:
-        """Handle subsequent optimization rounds.
-        
-        Creates a new round directory, samples from previous rounds,
-        generates optimizations using the LLM, and evaluates the result.
-        Continues trying until a valid, novel optimization is found.
-        
-        Args:
-            graph_path: Path to the graph directory
-            validation_n: Number of validation runs
-            data: Dataset to evaluate against
-            
-        Returns:
-            Average score for the optimized round
-        """
+
         directory = self.graph_utils.create_round_directory(graph_path, self.round + 1)
 
         while True:
@@ -275,33 +211,12 @@ class AFlowOptimizer(BaseModule):
         return avg_score
     
     def _get_optimization_sample(self) -> dict:
-        """Get sample data for optimization.
-        
-        Selects a sample from the top-performing rounds to use as a base
-        for the next optimization attempt. This implements a form of
-        evolutionary selection.
-        
-        Returns:
-            Dictionary with round number and score information
-        """
+
         top_rounds = self.data_utils.get_top_rounds(self.sample)
         return self.data_utils.select_round(top_rounds)
 
     def _parse_optimizer_llm_output(self, content: str, orig_graph: str, orig_prompt: str) -> dict:
-        """Parse unstructured LLM output into structured optimization data.
-        
-        Uses regex patterns to extract modification description, graph code,
-        and prompt code from the LLM's text output. Falls back to original
-        values if parsing fails.
-        
-        Args:
-            content: Raw text output from the LLM
-            orig_graph: Original graph code (fallback)
-            orig_prompt: Original prompt code (fallback)
-            
-        Returns:
-            Dictionary with modification, graph, and prompt fields
-        """
+
         response = {"modification": "", "graph": "", "prompt": ""}
 
         # Extract content between <modification> tags
@@ -334,22 +249,7 @@ class AFlowOptimizer(BaseModule):
         return response
     
     async def _evaluate_and_save_optimization_results(self, directory: str, response: dict, sample: dict, data: list, validation_n: int):
-        """Save and evaluate optimization results.
-        
-        Writes the optimized graph and prompt to files, creates experience
-        data for this optimization round, loads the new graph, and evaluates
-        its performance.
-        
-        Args:
-            directory: Directory to save results in
-            response: Optimization response data
-            sample: Sample data used for optimization
-            data: Dataset to evaluate against
-            validation_n: Number of validation runs
-            
-        Returns:
-            Average score from evaluation
-        """
+
         # Write optimized files
         self.graph_utils.write_graph_files(directory, response)
 
@@ -364,25 +264,11 @@ class AFlowOptimizer(BaseModule):
         return avg_score
 
     def _load_best_round(self) -> int:
-        """Load the number of the best-performing round.
-        
-        Retrieves ranked scores and returns the round number with the highest score.
-        
-        Returns:
-            The round number with the highest performance score
-        """
         ranked_scores = self.data_utils._load_scores()
         return ranked_scores[0]["round"]
 
     async def _run_test(self, test_rounds: List[int]):
-        """Run test evaluation on specified rounds.
-        
-        Evaluates each specified round against the test dataset and
-        saves the results to the results file.
-        
-        Args:
-            test_rounds: List of round numbers to evaluate
-        """
+
         logger.info("Running test evaluation...")
 
         graph_path = self.root_path

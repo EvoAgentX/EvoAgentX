@@ -34,7 +34,7 @@ class Evaluator:
 
         Args:
             llm (BaseLLM): The LLM to use for evaluation.
-            num_workers (int): The number of parallel workers to use for evaluation.
+            num_workers (int): The number of parallel workers to use for evaluation. Default is 1. 
             agent_manager (AgentManager, optional): The agent manager used to construct the workflow. Only used when the workflow graph is a WorkFlowGraph.
             collate_func (Callable, optional): A function to collate the benchmark data. 
                 It receives a single example from the benchmark and the output (which should be a dictionary) will serve as inputs  
@@ -59,9 +59,7 @@ class Evaluator:
         self.kwargs = kwargs
 
     def _get_eval_data(self, benchmark: Benchmark, eval_mode: str = "test", indices: Optional[List[int]] = None, sample_k: Optional[int] = None, seed: Optional[int] = None) -> List[dict]:
-        """
-        Get the evaluation data from the benchmark.
-        """
+
         assert eval_mode in ["test", "dev", "train"], f"Invalid eval_mode: {eval_mode}. Choices: ['test', 'dev', 'train']"
         if eval_mode == "test":
             data = benchmark.get_test_data(indices=indices, sample_k=sample_k, seed=seed)
@@ -105,14 +103,6 @@ class Evaluator:
     def _execute_workflow_graph(self, graph: WorkFlowGraph, inputs: dict, return_trajectory: bool = False, **kwargs) -> Union[str, Tuple[str, List[Message]]]:
         """
         Execute the workflow graph and return the output.
-
-        Args:
-            graph (WorkFlowGraph): The workflow graph to execute
-            inputs (dict): The inputs to the workflow graph
-            **kwargs: Additional arguments for workflow graph execution
-
-        Returns:
-            str: The output of the workflow graph
         """
         if self.agent_manager is None:
             raise ValueError("`agent_manager` is not provided. Please provide an agent manager when evaluating a WorkFlowGraph.")
@@ -129,14 +119,6 @@ class Evaluator:
     def _execute_action_graph(self, graph: ActionGraph, inputs: dict, **kwargs) -> dict:
         """
         Execute the action graph and return the output.
-
-        Args:
-            graph (ActionGraph): The action graph to execute
-            inputs (dict): The inputs to the action graph
-            **kwargs: Additional arguments for action graph execution
-
-        Returns:
-            dict: The output of the action graph
         """
         output: dict = graph.execute(**inputs, **kwargs)
         return output
@@ -144,14 +126,6 @@ class Evaluator:
     def _evaluate_single_example(self, graph: Union[WorkFlowGraph, ActionGraph], example: dict, benchmark: Benchmark, **kwargs) -> Optional[dict]:
         """
         Evaluate a single data example through the workflow and save the evaluation metrics to the evaluation records.
-
-        Args:
-            graph (WorkFlowGraph or ActionGraph): The workflow to execute
-            example (dict): Single input data example
-            **kwargs: Additional arguments for workflow execution
-
-        Returns:
-            Optional[dict]: Evaluation metrics for this example, None if failed
         """
         try:
             # collate the example   
@@ -287,33 +261,13 @@ class Evaluator:
         return results
 
     def _calculate_average_score(self, scores: List[dict]) -> dict:
-        """
-        Calculate the average score from a list of scores.
 
-        Args:
-            scores (List[dict]): List of evaluation scores
-
-        Returns:
-            dict: Average metrics
-        """
         if not scores:
             return {}
         return {k: sum(d[k] for d in scores) / len(scores) for k in scores[0]}
 
     def _evaluate_graph(self, graph: Union[WorkFlowGraph, ActionGraph], data: List[dict], benchmark: Benchmark, verbose: Optional[bool] = None, **kwargs) -> dict:
-        """
-        Evaluate the workflow on the data.
 
-        Args:
-            graph (WorkFlowGraph or ActionGraph): The workflow to evaluate
-            data (List[dict]): List of input data to evaluate
-            benchmark (Benchmark): The benchmark to evaluate the workflow on
-            verbose (bool, optional): Whether to print the evaluation progress. If not provided, the `self.verbose` will be used.
-            **kwargs: Additional arguments passed to workflow execution
-
-        Returns:
-            dict: The average metrics of the workflow evaluation
-        """
         if not data:
             return {}
         
@@ -326,22 +280,13 @@ class Evaluator:
         return self._calculate_average_score(results)
     
     def get_example_evaluation_record(self, benchmark: Benchmark, example: Any) -> Optional[dict]:
-        """
-        Get the evaluation record for a given example.
-        """
         example_id = benchmark.get_id(example=example)
         return self._evaluation_records.get(example_id, None)
     
     def get_evaluation_record_by_id(self, benchmark: Benchmark, example_id: str, eval_mode: str = "test") -> Optional[dict]:
-        """
-        Get the evaluation record for a given example id.
-        """
         example = benchmark.get_example_by_id(example_id=example_id, mode=eval_mode)
         return self.get_example_evaluation_record(benchmark=benchmark, example=example)
     
     def get_all_evaluation_records(self) -> dict:
-        """
-        Get all the evaluation records.
-        """
         return self._evaluation_records.copy()
     
