@@ -10,14 +10,7 @@ from .model_configs import LLMConfig
 from ..models.base_model import BaseLLM 
 
 def get_openai_model_cost() -> dict:
-    """Retrieves the pricing information for OpenAI models.
-    
-    This function loads the model cost data from litellm's internal pricing file,
-    which contains token costs for various models.
-    
-    Returns:
-        A dictionary mapping model names to their pricing information.
-    """
+
     import json 
     import importlib.resources
     with importlib.resources.open_text('litellm', 'model_prices_and_context_window_backup.json') as f:
@@ -27,17 +20,7 @@ def get_openai_model_cost() -> dict:
 
 @dataclass
 class Cost:
-    """Data class for tracking token usage and associated costs.
-    
-    This class stores both token counts and monetary costs for 
-    a single LLM interaction.
-    
-    Attributes:
-        input_tokens: Number of tokens in the prompt/input.
-        output_tokens: Number of tokens in the completion/output.
-        input_cost: Cost in USD for the input tokens.
-        output_cost: Cost in USD for the output tokens.
-    """
+
     input_tokens: int 
     output_tokens: int
     input_cost: float 
@@ -45,23 +28,8 @@ class Cost:
 
 
 class CostManager:
-    """Manages and tracks token usage and costs across different models.
-    
-    This class provides thread-safe tracking of token counts and costs,
-    along with utilities to display and summarize usage statistics.
-    
-    Attributes:
-        total_input_tokens: Dictionary mapping model names to their total input token count.
-        total_output_tokens: Dictionary mapping model names to their total output token count.
-        total_tokens: Dictionary mapping model names to their total token count.
-        total_input_cost: Dictionary mapping model names to their total input cost.
-        total_output_cost: Dictionary mapping model names to their total output cost.
-        total_cost: Dictionary mapping model names to their total cost.
-        _lock: Threading lock for thread-safe operations.
-    """
 
     def __init__(self):
-        """Initialize a new CostManager instance with empty tracking dictionaries."""
         self.total_input_tokens = {}
         self.total_output_tokens = {} 
         self.total_tokens = {} 

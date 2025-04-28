@@ -9,38 +9,14 @@ from typing import Union, Any, List, Set
 from ..core.logging import logger
 
 def make_parent_folder(path: str):
-    """Create parent directory for a file path if it doesn't exist.
-    
-    Ensures that the directory structure needed for a specified file path
-    exists, creating any necessary parent directories.
-    
-    Args:
-        path: Full file path for which to create parent directory
-        
-    Notes:
-        - Creates all intermediate directories as needed
-        - Uses exist_ok=True to avoid race conditions
-        - Logs directory creation with info level
-    """
+
     dir_folder = os.path.dirname(path)
     if not os.path.exists(dir_folder):
         logger.info(f"creating folder {dir_folder} ...")
         os.makedirs(dir_folder, exist_ok=True)
 
 def safe_remove(data: Union[List[Any], Set[Any]], remove_value: Any):
-    """Remove an item from a list or set without raising exceptions.
-    
-    Attempts to remove the specified value from the collection, but
-    doesn't raise an exception if the value is not found.
-    
-    Args:
-        data: Collection (list or set) to remove the value from
-        remove_value: Value to be removed from the collection
-        
-    Notes:
-        - Silently ignores ValueError exceptions when the value isn't present
-        - Useful for cleaning up collections when unsure if values exist
-    """
+
     try:
         data.remove(remove_value)
     except ValueError:

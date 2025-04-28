@@ -24,12 +24,6 @@ class WorkFlowGenerator(BaseModule):
     subtasks, creates the necessary dependency connections between tasks,
     and assigns or generates appropriate agents for each task.
     
-    The workflow generation process includes:
-    1. Task planning: breaking down high-level goals into manageable subtasks
-    2. Workflow construction: creating a workflow graph with proper dependencies
-    3. Agent generation: assigning appropriate agents to each subtask
-    4. (Optional) Workflow review: refining the workflow for better performance
-    
     Attributes:
         llm: Language model used for generation and planning
         task_planner: Component responsible for breaking down goals into subtasks
@@ -45,15 +39,6 @@ class WorkFlowGenerator(BaseModule):
     num_turns: Optional[PositiveInt] = Field(default=0, description="Specifies the number of refinement iterations for the generated workflow.")
 
     def init_module(self):
-        """Initialize the workflow generator module.
-        
-        Ensures all required components (task planner, agent generator, etc.)
-        are properly initialized. If components are not explicitly provided,
-        they will be created automatically using the provided language model.
-        
-        Raises:
-            ValueError: If required components are missing and no language model is provided
-        """
 
         if self.task_planner is None:
             if self.llm is None:

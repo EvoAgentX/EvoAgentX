@@ -42,13 +42,6 @@ class AFlowOptimizer(BaseModule):
     using large language models. It evaluates workflow performance, identifies improvement
     opportunities, and applies optimizations based on experience and convergence metrics.
     
-    The optimizer works by:
-    1. Evaluating the initial workflow
-    2. Sampling from top-performing workflows
-    3. Generating optimizations using LLMs
-    4. Evaluating the optimized workflows
-    5. Repeating until convergence or max rounds reached
-    
     Attributes:
         question_type: Type of task to optimize for (e.g., qa, match, code)
         graph_path: Path to the workflow graph directory (must contain graph.py and prompt.py)
@@ -78,18 +71,7 @@ class AFlowOptimizer(BaseModule):
     check_convergence: bool = Field(default=True, description="Whether to check for convergence.")
 
     def init_module(self, **kwargs):
-        """Initialize the optimizer module.
-        
-        Sets up the directory structure, utilities, and initial workflow state.
-        If starting from round 0, copies the base graph and prompt files to the 
-        optimization directory.
-        
-        Args:
-            **kwargs: Additional keyword arguments passed to the module
-            
-        Raises:
-            ValueError: If the specified round doesn't exist or required LLMs are missing
-        """
+
         self.root_path = self.optimized_path or self.graph_path
         os.makedirs(self.root_path, exist_ok=True)
 
