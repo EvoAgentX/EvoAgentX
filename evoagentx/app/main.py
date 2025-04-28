@@ -32,21 +32,7 @@ logger = logging.getLogger(__name__)
 # Lifespan context manager for startup and shutdown events
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Manage application lifecycle events.
     
-    This async context manager handles startup and shutdown events for the FastAPI application.
-    On startup, it initializes database connections and creates required collections.
-    On shutdown, it ensures all connections are properly closed.
-    
-    Args:
-        app: The FastAPI application instance
-        
-    Yields:
-        None: Control is yielded back to FastAPI after startup is complete
-        
-    Raises:
-        Exception: If startup fails, the exception is logged and re-raised
-    """
     # Startup tasks
     try:
         # Connect to database
@@ -97,18 +83,6 @@ app.include_router(system_router)
 # Global exception handlers
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    """Handle validation errors with a standardized response format.
-    
-    Captures Pydantic validation errors and returns them in a consistent format
-    for API consumers.
-    
-    Args:
-        request: The incoming request that caused the validation error
-        exc: The validation error exception
-        
-    Returns:
-        JSONResponse: A structured JSON response with validation error details
-    """
     return JSONResponse(
         status_code=422,
         content={
@@ -120,18 +94,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
-    """Handle HTTP exceptions with a standardized response format.
-    
-    Provides consistent error responses for all HTTP exceptions thrown
-    by route handlers.
-    
-    Args:
-        request: The incoming request that caused the exception
-        exc: The HTTP exception
-        
-    Returns:
-        JSONResponse: A structured JSON response with error details
-    """
+
     return JSONResponse(
         status_code=exc.status_code,
         content={
@@ -143,14 +106,6 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 # Root endpoint for health check
 @app.get("/")
 async def root():
-    """Provide basic application information and health status.
-    
-    This endpoint serves as a simple health check to verify that the
-    application is running correctly.
-    
-    Returns:
-        dict: Application name, status, and version information
-    """
     return {
         "app_name": settings.APP_NAME,
         "status": "healthy",
@@ -160,17 +115,7 @@ async def root():
 # Workflow logging and monitoring endpoint
 @app.get("/metrics")
 async def get_metrics():
-    """Retrieve system metrics about agents, workflows, and executions.
     
-    Collects and returns statistics about the number of agents, workflows,
-    and executions in various states.
-    
-    Returns:
-        dict: Statistics about agents, workflows, and executions
-        
-    Raises:
-        Exception: If metrics collection fails, returns an error message
-    """
     # Collect metrics from different services
     try:
         # Collect agent metrics
