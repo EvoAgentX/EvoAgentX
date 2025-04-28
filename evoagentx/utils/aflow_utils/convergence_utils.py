@@ -16,9 +16,6 @@ class ConvergenceUtils:
         self.avg_scores, self.stds = None, None
 
     def load_data(self, root_path):
-        """
-        Read JSON file, create a new file if it doesn't exist, then return the data.
-        """
         rounds_dir = self.root_path
         result_file = os.path.join(rounds_dir, "results.json")
 
@@ -35,9 +32,6 @@ class ConvergenceUtils:
             return json.load(file)
 
     def process_rounds(self):
-        """
-        Organize data by round, return a dictionary of scores by round.
-        """
         self.data = self.load_data(root_path=self.root_path)
         rounds = {}
         for entry in self.data:
@@ -49,9 +43,6 @@ class ConvergenceUtils:
         return rounds
 
     def calculate_avg_and_std(self):
-        """
-        Calculate average score and standard deviation for each round, return two lists: average scores and standard deviations.
-        """
         self.rounds = self.process_rounds()
 
         sorted_rounds = sorted(self.rounds.items(), key=lambda x: x[0])
@@ -63,10 +54,6 @@ class ConvergenceUtils:
         return avg_scores, stds
 
     def check_convergence(self, top_k=3, z=0, consecutive_rounds=5):
-        """
-        Check for convergence. z is the z-score corresponding to the confidence level.
-        consecutive_rounds is the number of consecutive rounds that must meet the stop condition.
-        """
         # Calculate average score and standard deviation for each round
         self.avg_scores, self.stds = self.calculate_avg_and_std()
         # If total rounds are not enough to calculate top_k+1 rounds, return not converged
@@ -110,9 +97,6 @@ class ConvergenceUtils:
         return False, None, None
 
     def print_results(self):
-        """
-        Print average score and standard deviation for all rounds.
-        """
         self.avg_scores, self.stds = self.calculate_avg_and_std()
         for i, (avg_score, std) in enumerate(zip(self.avg_scores, self.stds), 1):
             logger.info(f"Round {i}: Average Score = {avg_score:.4f}, Standard Deviation = {std:.4f}")

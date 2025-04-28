@@ -11,15 +11,9 @@ class Document(BaseModel):
     text: str = Field(description="[required] the text of the document.")
 
     def __str__(self):
-        """
-        return the string of a document
-        """
         return self.to_str()
     
     def to_str(self):
-        """
-        return the string of a document
-        """
         if self.title is None:
             result = self.text 
         else:
