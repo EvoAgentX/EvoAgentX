@@ -11,12 +11,7 @@ from ..workflow.workflow_graph import WorkFlowNode
 class TaskPlanningInput(ActionInput):
     """
     Input specification for the task planning action.
-    
-    This class defines the parameters required and optional for the task planning
-    process, which breaks down a high-level goal into a series of manageable
-    sub-tasks that form a complete workflow.
     """
-
     goal: str = Field(description="A clear and detailed description of the user's goal, specifying what needs to be achieved.")
     history: Optional[str] = Field(default=None, description="Optional field containing previously generated task plan.")
     suggestion: Optional[str] = Field(default=None, description="Optional suggestions or ideas to guide the planning process.")
@@ -25,26 +20,13 @@ class TaskPlanningInput(ActionInput):
 class TaskPlanningOutput(ActionOutput):
     """
     Output structure for the task planning action.
-    
-    This class defines the structure of the output produced by the task planning
-    process, which consists primarily of a list of sub-tasks that collectively
-    achieve the user's goal.
     """
-
     sub_tasks: List[WorkFlowNode] = Field(description="A list of sub-tasks that collectively achieve user's goal.")
     
 
 class TaskPlanning(Action):
     """
     Action for planning a series of tasks to achieve a goal.
-    
-    This action analyzes a user goal and decomposes it into a structured
-    series of sub-tasks that can be executed as a workflow. It uses a 
-    language model to generate the task breakdown.
-    
-    The resulting task plan can be used to construct a workflow graph
-    that represents the full sequence of operations needed to accomplish
-    the goal.
     """
 
     def __init__(self, **kwargs):

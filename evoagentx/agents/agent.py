@@ -51,14 +51,6 @@ class Agent(BaseModule):
     version: int = 0 
 
     def init_module(self):
-        """Initialize the agent's components.
-        
-        This method sets up the various components of the agent:
-        - Language model (if not a human agent)
-        - Long-term memory (if enabled)
-        - Actions list and map
-        - Context extractor for action execution
-        """
         if not self.is_human:
             self.init_llm()
         if self.use_long_term_memory:
@@ -143,17 +135,8 @@ class Agent(BaseModule):
         return message
     
     def init_llm(self):
-        """Initialize the language model for the agent.
-        
-        Sets up the language model based on the provided configuration or
-        uses the existing model if already instantiated.
-        
-        Raises:
-            AssertionError: If neither llm_config nor llm is provided for a non-human agent
-            
-        Notes:
-            - Uses the MODEL_REGISTRY to instantiate the appropriate model type
-            - Ensures the llm_config attribute is synchronized with the model
+        """
+        Initialize the language model for the agent.
         """
         assert self.llm_config or self.llm, "must provide either 'llm_config' or 'llm' when is_human=False"
         if self.llm_config and not self.llm:
@@ -163,17 +146,8 @@ class Agent(BaseModule):
             self.llm_config = self.llm.config
 
     def init_long_term_memory(self):
-        """Initialize long-term memory components.
-        
-        Sets up the long-term memory and memory manager if long-term memory
-        usage is enabled.
-        
-        Raises:
-            AssertionError: If storage_handler is not provided when use_long_term_memory is True
-            
-        Notes:
-            - Creates default instances if not provided
-            - Connects the memory to the storage handler
+        """
+        Initialize long-term memory components.
         """
         assert self.storage_handler is not None, "must provide ``storage_handler`` when use_long_term_memory=True"
         # TODO revise the initialisation of long_term_memory and long_term_memory_manager
@@ -186,32 +160,19 @@ class Agent(BaseModule):
             )
     
     def init_context_extractor(self):
-        """Initialize the context extraction action.
-        
-        Creates and adds a ContextExtraction action to the agent, which is
-        used to extract relevant context from conversation history for other actions.
-        
-        Notes:
-            - This action is a special utility action, not directly executed by users
-            - Stored with a unique name for internal reference
+        """
+        Initialize the context extraction action.
         """
         cext_action = ContextExtraction()
         self.cext_action_name = cext_action.name
         self.add_action(cext_action)
 
     def add_action(self, action: Type[Action]):
-        """Add a new action to the agent's available actions.
-        
-        Registers an action with the agent, making it available for execution.
-        Does nothing if an action with the same name already exists.
-        
+        """
+        Add a new action to the agent's available actions.
+
         Args:
             action: The action instance to add
-            
-        Notes:
-            - Actions are identified by their name attribute
-            - Duplicate actions (by name) are silently ignored
-            - Updates both the actions list and the action map
         """
         action_name  = action.name
         if action_name in self._action_map:
@@ -220,25 +181,17 @@ class Agent(BaseModule):
         self._action_map[action_name] = action
 
     def check_action_name(self, action_name: str):
-        """Check if an action name is valid for this agent.
-        
-        Verifies that the given action name exists in the agent's action map.
-        
+        """
+        Check if an action name is valid for this agent.
+                
         Args:
             action_name: Name of the action to check
-            
-        Raises:
-            KeyError: If the action name is not found in the agent's actions
-            
-        Notes:
-            - Used for validation before attempting to retrieve or execute an action
         """
         if action_name not in self._action_map:
             raise KeyError(f"'{action_name}' is an invalid action for {self.name}! Available action names: {list(self._action_map.keys())}")
     
     def get_action(self, action_name: str) -> Action:
-        """Get an action by name.
-        
+        """
         Retrieves the Action instance associated with the given name.
         
         Args:
@@ -246,19 +199,12 @@ class Agent(BaseModule):
             
         Returns:
             The Action instance with the specified name
-            
-        Raises:
-            KeyError: If the action name is not found
-            
-        Notes:
-            - Validates the action name before attempting retrieval
         """
         self.check_action_name(action_name=action_name)
         return self._action_map[action_name]
     
     def get_action_name(self, action_cls: Type[Action]) -> str:
-        """Find the name of an action by its class type.
-        
+        """
         Searches through the agent's actions to find one matching the specified type.
         
         Args:
@@ -266,13 +212,6 @@ class Agent(BaseModule):
             
         Returns:
             The name of the matching action
-            
-        Raises:
-            ValueError: If no action of the specified type is found
-            
-        Notes:
-            - Useful for finding actions by their class rather than name
-            - Returns the first matching action if multiple exist
         """
         for name, action in self._action_map.items():
             if isinstance(action, action_cls):
@@ -280,8 +219,7 @@ class Agent(BaseModule):
         raise ValueError(f"Couldn't find an action that matches Type '{action_cls.__name__}'")
     
     def get_action_inputs(self, action: Action) -> Union[dict, None]:
-        """Extract input data for an action from conversation context.
-        
+        """
         Uses the context extraction action to determine appropriate inputs
         for the specified action based on the conversation history.
         
@@ -290,10 +228,6 @@ class Agent(BaseModule):
             
         Returns:
             Dictionary of extracted input data, or None if extraction fails
-            
-        Notes:
-            - Retrieves context from short-term memory based on the agent's 'n' setting
-            - Relies on the context extraction action to process the raw context
         """
         # return the input data of an action.
         context = self.short_term_memory.get(n=self.n)
@@ -304,15 +238,8 @@ class Agent(BaseModule):
     def get_all_actions(self) -> List[Action]:
         """Get all actions except the context extraction action.
         
-        Retrieves a list of all actions available to the agent, excluding
-        the special context extraction action used internally.
-        
         Returns:
             List of Action instances available for execution
-            
-        Notes:
-            - Filters out the context extraction action which is not meant for direct use
-            - Used for generating agent documentation and interfaces
         """
         actions = [action for action in self.actions if action.name != self.cext_action_name]
         return actions
@@ -320,19 +247,12 @@ class Agent(BaseModule):
     def get_agent_profile(self, action_names: List[str] = None) -> str:
         """Generate a human-readable profile of the agent and its capabilities.
         
-        Creates a string describing the agent, including its name, description,
-        and available actions (optionally filtered by name).
-        
         Args:
             action_names: Optional list of action names to include in the profile.
                           If None, all actions are included.
             
         Returns:
             A formatted string containing the agent profile
-            
-        Notes:
-            - Useful for generating documentation or help text
-            - Describes each action with its name and description
         """
         all_actions = self.get_all_actions()
         if action_names is None:
@@ -345,52 +265,20 @@ class Agent(BaseModule):
         return profile
 
     def clear_short_term_memory(self):
-        """Remove all content from the agent's short-term memory.
-        
-        Resets the agent's conversation context by clearing its short-term memory.
-        
-        Notes:
-            - Placeholder implementation (pass) - needs implementation
-            - Useful for starting fresh conversations or resetting context
+        """
+        Remove all content from the agent's short-term memory.
         """
         pass 
         
     def __eq__(self, other: "Agent"):
-        """Compare two Agent instances for equality.
-        
-        Agents are considered equal if they have the same agent_id.
-        
-        Args:
-            other: Another Agent instance to compare with
-            
-        Returns:
-            True if the agents have the same ID, False otherwise
-            
-        Notes:
-            - Used for comparing agents in collections
-            - Equality is based solely on identity (agent_id), not capabilities
-        """
         return self.agent_id == other.agent_id
 
     def __hash__(self):
-        """Generate a hash value for the Agent instance.
-        
-        The hash is based on the agent's unique ID.
-        
-        Returns:
-            Hash value for the agent
-            
-        Notes:
-            - Allows Agent instances to be used in sets and as dictionary keys
-            - Consistent with the equality implementation
-        """
         return self.agent_id
         
     def save_module(self, path: str, ignore: List[str] = [], **kwargs)-> str:
         """Save the agent to persistent storage.
-        
-        Serializes and saves the agent's state to the specified path.
-        
+                
         Args:
             path: Path where the agent should be saved
             ignore: List of field names to exclude from serialization
@@ -398,11 +286,6 @@ class Agent(BaseModule):
             
         Returns:
             The path where the agent was saved
-            
-        Notes:
-            - Extends the parent class save_module method
-            - Automatically ignores the LLM field which may not be serializable
-            - Combines user-provided ignore list with internal _save_ignore_fields
         """
         ignore_fields = self._save_ignore_fields + ignore
         super().save_module(path=path, ignore=ignore_fields, **kwargs)

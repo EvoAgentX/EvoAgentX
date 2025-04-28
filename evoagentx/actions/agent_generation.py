@@ -11,11 +11,8 @@ from ..prompts.agent_generator import AGENT_GENERATION_ACTION
 from ..utils.utils import normalize_text
 
 class AgentGenerationInput(ActionInput):
-    """Input specification for the agent generation action.
-    
-    This class defines the required and optional parameters for generating
-    agents in the EvoAgentX framework. It provides information about the
-    workflow goal, tasks, and optional contextual information.
+    """
+    Input specification for the agent generation action.
     """
 
     goal: str = Field(description="A detailed statement of the workflow's goal, explaining the objectives the entire workflow aims to achieve")
@@ -31,11 +28,6 @@ class AgentGenerationInput(ActionInput):
 class GeneratedAgent(BaseModule):
     """
     Representation of a generated agent with validation capabilities.
-    
-    This class stores the details of an agent that has been created by the
-    agent generation process, including its properties, inputs, outputs,
-    and the prompt template it will use. It also provides validation logic
-    to ensure the prompt correctly references all inputs and outputs.
     """
 
     name: str 

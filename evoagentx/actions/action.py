@@ -146,11 +146,6 @@ class ContextExtraction(Action):
     """
 
     def __init__(self, **kwargs):
-        """Initialize the ContextExtraction action.
-        
-        Args:
-            **kwargs: Keyword arguments that can override default name and description.
-        """
         name = kwargs.pop("name") if "name" in kwargs else CONTEXT_EXTRACTION["name"]
         description = kwargs.pop("description") if "description" in kwargs else CONTEXT_EXTRACTION["description"]
         super().__init__(name=name, description=description, **kwargs)

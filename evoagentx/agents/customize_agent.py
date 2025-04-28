@@ -117,28 +117,7 @@ class CustomizeAgent(Agent):
     }
     """
     def __init__(self, **kwargs):
-        """Initialize a new CustomizeAgent with the provided configuration.
-        
-        Creates a customized agent with a primary action defined by the provided
-        parameters. The action is created dynamically based on the input and output
-        specifications.
-        
-        Args:
-            **kwargs: Agent configuration parameters including:
-            name: Name of the agent
-            description: Description of the agent
-            prompt: Prompt template for the primary action
-            inputs: List of input field specifications
-            outputs: List of output field specifications
-            system_prompt: Optional system prompt for the LLM
-            parse_mode: Mode to use for parsing LLM output (default: "title")
-            parse_func: Custom parsing function
-            output_parser: Custom output parser class
-                
-        Raises:
-            ValueError: If required parameters are missing or invalid
-            TypeError: If output_parser is not a valid type
-        """
+
         name = kwargs["name"]
         description = kwargs["description"]
         prompt = kwargs.pop("prompt", None)
@@ -174,13 +153,11 @@ class CustomizeAgent(Agent):
 
     @property
     def customize_action_name(self):
-        """Get the name of the primary custom action for this agent.
+        """
+        Get the name of the primary custom action for this agent.
         
         Returns:
             The name of the primary custom action
-            
-        Raises:
-            ValueError: If no custom action can be found
         """
         for action in self.actions:
             if action.name != self.cext_action_name:
@@ -217,11 +194,6 @@ class CustomizeAgent(Agent):
             
         Returns:
             A newly created Action instance
-            
-        Raises:
-            AssertionError: If prompt is None
-            TypeError: If output_parser is not a valid type
-            ValueError: If output_parser is incompatible with outputs
         """
         assert prompt is not None, "must provide `prompt` when creating CustomizeAgent"
 
@@ -281,22 +253,7 @@ class CustomizeAgent(Agent):
         return customize_action
     
     def _check_output_parser(self, outputs: List[dict], output_parser: Type[ActionOutput]):
-        """Validate that the output parser is compatible with the output specifications.
-        
-        Ensures that the output parser:
-        1. Is a valid class type
-        2. Is a subclass of ActionOutput
-        3. Has fields corresponding to all specified outputs
-        
-        Args:
-            outputs: List of output field specifications
-            output_parser: The output parser class to validate
-            
-        Raises:
-            TypeError: If output_parser is not a class type
-            ValueError: If output_parser is not a subclass of ActionOutput
-            ValueError: If output_parser lacks fields for any of the specified outputs
-        """
+
         if output_parser is not None:
             if not isinstance(output_parser, type):
                 raise TypeError(f"output_parser must be a class, but got {type(output_parser).__name__}")
@@ -314,15 +271,7 @@ class CustomizeAgent(Agent):
                 )
     
     def _store_inputs_outputs_info(self, inputs: List[dict], outputs: List[dict]):
-        """Store information about input and output fields for later reference.
-        
-        Saves the type and required status of each input and output field
-        to internal dictionaries for use in serialization.
-        
-        Args:
-            inputs: List of input field specifications
-            outputs: List of output field specifications
-        """
+
         self._action_input_types, self._action_input_required = {}, {} 
         for field in inputs:
             required = field.get("required", True)
@@ -350,9 +299,6 @@ class CustomizeAgent(Agent):
     def save_module(self, path: str, ignore: List[str] = [], **kwargs)-> str:
         """Save the customize agent's configuration to a JSON file.
         
-        Serializes the agent's configuration, including its name, description,
-        prompt, LLM configuration, and input/output specifications.
-        
         Args:
             path: File path where the configuration should be saved
             ignore: List of keys to exclude from the saved configuration
@@ -360,10 +306,6 @@ class CustomizeAgent(Agent):
             
         Returns:
             The path where the configuration was saved
-            
-        Notes:
-            - This creates a JSON file that can be used to recreate the agent
-            - The format matches the expected input format for CustomizeAgent initialization
         """
         customize_action = self.get_action(self.customize_action_name)
         action_input_params = customize_action.inputs_format.get_attrs()
