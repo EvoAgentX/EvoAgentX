@@ -12,9 +12,6 @@ def save_logger(path: str):
     
     Args:
         path: The path to save the logging file
-
-    Returns:
-        None
     """
     global save_logging_file
     save_logging_file = path

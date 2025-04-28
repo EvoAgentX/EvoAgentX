@@ -18,15 +18,7 @@ class Benchmark(ABC):
     """
 
     def __init__(self, name: str, path: str, mode: str = "all", **kwargs):
-        """
-        Initializes the benchmark with a name and data path.
         
-        Args:
-            name (str): The name of the benchmark.
-            path (str): The path to the dataset.
-            mode (str): which type of data to load, choices: ["all", "train", "dev", "test"]
-            **kwargs: Additional parameters for customization.
-        """
         valid_mode = ["all", "train", "dev", "test"]
         assert mode in valid_mode, f"Invalid value for model: {mode}. Available choices: {valid_mode}"
 

@@ -11,16 +11,6 @@ from typing import Union, Type, Any, List, Dict, get_origin, get_args
 from .logging import logger 
 
 def make_parent_folder(path: str):
-    """Create parent directory for a file path if it doesn't exist.
-    
-    Args:
-        path: File path whose parent directory needs to be created
-        
-    Notes:
-        - Does nothing if the directory already exists
-        - Creates all intermediate directories as needed
-        - Does nothing if the path has no directory component
-    """
     dir_folder = os.path.dirname(path)
     if len(dir_folder.strip()) == 0:
         return
@@ -28,48 +18,13 @@ def make_parent_folder(path: str):
         os.makedirs(dir_folder, exist_ok=True)
 
 def generate_id():
-    """Generate a unique hexadecimal identifier.
-    
-    Returns:
-        A unique string identifier based on UUID4
-        
-    Notes:
-        - Uses uuid4 to generate a random UUID and converts it to hex
-        - Useful for creating unique IDs for objects in the system
-    """
     return uuid4().hex
 
 def get_timestamp():
-    """Get the current timestamp in a standard format.
-    
-    Returns:
-        A string representation of the current time in YYYY-MM-DD HH:MM:SS format
-        
-    Notes:
-        - Uses the local system time
-        - Useful for logging and recording when events occur
-    """
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 def load_json(path: str, type: str="json"):
-    """Load data from a JSON or JSONL file.
-    
-    Args:
-        path: Path to the JSON or JSONL file
-        type: Format of the file, either "json" or "jsonl"
-        
-    Returns:
-        For JSON files: The parsed JSON object (dict, list, etc.)
-        For JSONL files: A list of parsed JSON objects, one per line
-        
-    Raises:
-        AssertionError: If type is not "json" or "jsonl"
-        Error logged: If the file doesn't exist or is not valid JSON
-        
-    Notes:
-        - JSON files are loaded as a single object
-        - JSONL files are loaded as a list of objects, one per line
-    """
+
     assert type in ["json", "jsonl"] # only support json or jsonl format
     if not os.path.exists(path=path):
         logger.error(f"File \"{path}\" does not exists!")
@@ -95,19 +50,6 @@ def load_json(path: str, type: str="json"):
 
 def save_json(data, path: str, type: str="json", use_indent: bool=True) -> str:
 
-    """
-    save data to a json file
-
-    Args: 
-        data: The json data to be saved. It can be a JSON str or a Serializable object when type=="json" or a list of JSON str or Serializable object when type=="jsonl".
-        path(str): The path of the saved json file. 
-        type(str): The type of the json file, chosen from ["json" or "jsonl"].
-        use_indent: Whether to use indent when saving the json file. 
-    
-    Returns:
-        path: the path where the json data is saved. 
-    """
-
     assert type in ["json", "jsonl"] # only support json or jsonl format
     make_parent_folder(path)
 
@@ -126,25 +68,11 @@ def save_json(data, path: str, type: str="json", use_indent: bool=True) -> str:
     return path
 
 def escape_json_values(string: str) -> str:
-    """Fix and escape problematic JSON strings to make them valid.
+    """
+    Fix and escape problematic JSON strings to make them valid.
     
     Attempts to repair invalid JSON by properly escaping values that might cause
     parsing errors, such as newlines, quotes, and nested JSON objects.
-    
-    Args:
-        string: The potentially invalid JSON string to fix
-        
-    Returns:
-        A valid JSON string with properly escaped values
-        
-    Notes:
-        - First tries to parse the string as JSON; returns it unchanged if valid
-        - If initial parsing fails, attempts to fix common issues:
-          1. Escapes double quotes not meant as JSON delimiters
-          2. Fixes key formatting
-          3. Escapes newlines in values
-          4. Handles nested JSON objects
-        - Returns the original string if fixing attempts fail
     """
     def escape_value(match):
         raw_value = match.group(1)
@@ -199,18 +127,6 @@ def parse_xml_from_text(text: str, label: str) -> List[str]:
     """Extract content from XML-like tags in text.
     
     Finds all content enclosed in the specified XML tags and returns them as a list.
-    
-    Args:
-        text: The text containing XML-like tags
-        label: The name of the tag to extract content from (without angle brackets)
-        
-    Returns:
-        A list of strings containing the content between the opening and closing tags,
-        with whitespace trimmed from the start and end
-        
-    Example:
-        If text = "<answer>42</answer> and <answer>hello</answer>"
-        and label = "answer", returns ["42", "hello"]
     """
     pattern = rf"<{label}>(.*?)</{label}>"
     matches: List[str] = regex.findall(pattern, text, regex.DOTALL)
@@ -220,25 +136,8 @@ def parse_xml_from_text(text: str, label: str) -> List[str]:
     return values
 
 def parse_data_from_text(text: str, datatype: str):
-    """Convert text to a specified data type.
-    
-    Parses a text string into the specified Python data type.
-    
-    Args:
-        text: The text to parse
-        datatype: The target data type, one of:
-                 'str', 'int', 'float', 'bool', 'list', 'dict'
-        
-    Returns:
-        The parsed data in the specified type
-        
-    Raises:
-        ValueError: If datatype is not one of the supported types
-        
-    Notes:
-        - For 'bool', values like "true", "yes", "1", "on", "True" return True
-        - For 'list' and 'dict', uses Python's eval() function to parse the string
-          (caution: potential security implications with untrusted input)
+    """
+    Convert text to a specified data type.
     """
     if datatype == "str":
         data = text
@@ -303,21 +202,8 @@ def extract_code_blocks(text: str, return_type: bool = False) -> Union[List[str]
         return [code.strip() for _, code in matches]
 
 def remove_repr_quotes(json_string):
-    """Remove quotes around Python representation strings in JSON.
-    
-    Identifies quoted Python object representations (e.g., "ClassName(params)")
-    in a JSON string and removes the surrounding quotes to prevent them from 
-    being interpreted as string literals.
-    
-    Args:
-        json_string: JSON string potentially containing quoted object representations
-        
-    Returns:
-        Modified JSON string with representation quotes removed
-        
-    Example:
-        Input: '{"object": "Person(name='John', age=30)"}'
-        Output: '{"object": Person(name='John', age=30)}'
+    """
+    Remove quotes around Python representation strings in JSON.
     """
     pattern = r'"([A-Za-z_]\w*\(.*\))"'
     result = regex.sub(pattern, r'\1', json_string)
@@ -334,18 +220,6 @@ def custom_serializer(obj: Any):
         
     Returns:
         A JSON-serializable representation of the object
-        
-    Raises:
-        TypeError: If the object cannot be converted to a JSON-serializable format
-        
-    Notes:
-        Handles the following object types:
-        - bytes/bytearray: Decoded to strings
-        - datetime/date: Formatted as strings
-        - sets: Converted to lists
-        - file objects: Represented as descriptive strings
-        - callables: Represented by their names
-        - other objects: Represented by their string representation or class name
     """
     if isinstance(obj, (bytes, bytearray)):
         return obj.decode()
@@ -376,23 +250,7 @@ def custom_serializer(obj: Any):
 #     return type_name
 
 def get_type_name(typ):
-    """Get a string representation of a type, including generic types.
-    
-    Creates a readable string representation of Python types, handling special
-    cases like Union types, generics (List[T], Dict[K, V]), and Type[T].
-    
-    Args:
-        typ: The type to convert to a string representation
-        
-    Returns:
-        A string representation of the type
-        
-    Examples:
-        - int -> "int"
-        - List[int] -> "list[int]"
-        - Union[int, str] -> "int | str"
-        - Dict[str, List[int]] -> "dict[str, list[int]]"
-    """
+
     origin = get_origin(typ)
     if origin is None:
         return getattr(typ, "__name__", str(typ))
@@ -415,24 +273,7 @@ def get_type_name(typ):
     return str(origin)
 
 def get_pydantic_field_types(model: Type[BaseModel]) -> Dict[str, Union[str, dict]]:
-    """Extract field types from a Pydantic model.
-    
-    Recursively analyzes a Pydantic model and returns a dictionary mapping
-    field names to their type representations.
-    
-    Args:
-        model: A Pydantic model class
-        
-    Returns:
-        A dictionary where:
-        - Keys are field names
-        - Values are either string representations of types or nested dictionaries
-          for fields that are themselves Pydantic models
-          
-    Notes:
-        - Handles nested Pydantic models by recursively extracting their field types
-        - For non-Pydantic fields, returns the string representation of the type
-    """
+
     field_types = {}
     for field_name, field_info in model.model_fields.items():
         field_type = field_info.annotation
@@ -445,23 +286,7 @@ def get_pydantic_field_types(model: Type[BaseModel]) -> Dict[str, Union[str, dic
     return field_types
 
 def get_pydantic_required_field_types(model: Type[BaseModel]) -> Dict[str, str]:
-    """Extract required field types from a Pydantic model.
-    
-    Analyzes a Pydantic model and returns a dictionary mapping required
-    field names to their type representations.
-    
-    Args:
-        model: A Pydantic model class
-        
-    Returns:
-        A dictionary where:
-        - Keys are field names of required fields
-        - Values are string representations of their types
-        
-    Notes:
-        - Only includes fields that are required (no default value)
-        - Excludes fields with default values or default factories
-    """
+
     required_field_types = {}
     for field_name, field_info in model.model_fields.items():
         if not field_info.is_required():
@@ -475,42 +300,13 @@ def get_pydantic_required_field_types(model: Type[BaseModel]) -> Dict[str, str]:
     return required_field_types
 
 def format_pydantic_field_types(field_types: Dict[str, str]) -> str:
-    """Format a dictionary of field types as a JSON-like string.
-    
-    Converts a dictionary mapping field names to type names into a string
-    formatted like a JSON object.
-    
-    Args:
-        field_types: Dictionary mapping field names to type representations
-        
-    Returns:
-        A string representation of the field types in the format:
-        {"field1": type1, "field2": type2, ...}
-        
-    Example:
-        {"name": str, "age": int, "addresses": list[str]}
-    """
+
     output = ", ".join(f"\"{field_name}\": {field_type}" for field_name, field_type in field_types.items())
     output = "{" + output + "}"
     return output
 
 def get_error_message(errors: List[Union[ValidationError, Exception]]) -> str: 
-    """Format a list of errors into a readable error message.
-    
-    Processes a list of errors, categorizing them as validation errors or exceptions,
-    and formats them into a structured error message.
-    
-    Args:
-        errors: A list of errors, can include ValidationError and other exceptions
-        
-    Returns:
-        A formatted error message string
-        
-    Notes:
-        - Groups errors by type (validation errors vs. exceptions)
-        - Provides counts of each error type
-        - Includes the full error messages with appropriate formatting
-    """
+
     if not isinstance(errors, list):
         errors = [errors]
     
@@ -533,27 +329,7 @@ def get_error_message(errors: List[Union[ValidationError, Exception]]) -> str:
     return message
 
 def get_base_module_init_error_message(cls, data: Dict[str, Any], errors: List[Union[ValidationError, Exception]]) -> str:
-    """Create a detailed error message for module initialization failures.
-    
-    Formats an error message for cases where a module class cannot be instantiated
-    from the provided data, including the input data and all encountered errors.
-    
-    Args:
-        cls: The class that failed to initialize
-        data: The data that was used to try to initialize the class
-        errors: The errors that occurred during initialization
-        
-    Returns:
-        A formatted error message string including:
-        - The class name that failed to initialize
-        - The input data (formatted as JSON)
-        - Detailed error messages
-        
-    Notes:
-        - Uses custom_serializer for proper JSON formatting of the input data
-        - Removes representation quotes from the formatted data
-        - Includes error details from get_error_message
-    """
+
     if not isinstance(errors, list):
         errors = [errors]
     

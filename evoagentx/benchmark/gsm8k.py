@@ -12,18 +12,7 @@ GSM8K_FILES_MAP = {"train": "train.jsonl", "dev": None, "test": "test.jsonl"}
 VALID_RAW_GSM8K_FILES = [file for file in list(GSM8K_FILES_MAP.values()) if file is not None]
 
 def download_raw_gsm8k_data(name: str, save_folder: str):
-    """Download raw GSM8K dataset files from the official GitHub repository.
-    
-    Fetches the specified GSM8K data file from the OpenAI grade-school-math
-    repository and saves it to the specified folder.
-    
-    Args:
-        name: Name of the file to download (must be in VALID_RAW_GSM8K_FILES)
-        save_folder: Directory path where the data should be saved
-        
-    Raises:
-        AssertionError: If the specified file name is not valid
-    """
+
     assert name in VALID_RAW_GSM8K_FILES, f"'{name}' is an invalid GSM8K file name. Available file names: {VALID_RAW_GSM8K_FILES}"
     url = f"https://raw.githubusercontent.com/openai/grade-school-math/master/grade_school_math/data/{name}"
     typ = "train" if "train" in name else "test"
@@ -32,20 +21,7 @@ def download_raw_gsm8k_data(name: str, save_folder: str):
 
 
 def load_gsm8k_data(file_path: str) -> List[dict]:
-    """Load and preprocess GSM8K data from a JSONL file.
-    
-    Loads the dataset from the specified path and adds unique identifiers
-    to each example based on the file type (train or test).
-    
-    Args:
-        file_path: Path to the GSM8K JSONL file
-        
-    Returns:
-        List of preprocessed GSM8K problem objects with added IDs
-        
-    Raises:
-        AssertionError: If the specified file name is not valid
-    """
+
     base_name = os.path.basename(file_path)
     file_type_map = {file_name: typ for typ, file_name in GSM8K_FILES_MAP.items()}
     assert base_name in file_type_map, f"'{base_name}' is an invalid gsm8k file name. Available file names: {VALID_RAW_GSM8K_FILES}"
@@ -80,27 +56,10 @@ class GSM8K(Benchmark):
     """
     
     def __init__(self, path: str = None, mode: str = "all", **kwargs):
-        """Initialize the GSM8K benchmark.
-        
-        Args:
-            path: Directory path to store/load GSM8K data. Defaults to "~/.evoagentx/data/gsm8k"
-            mode: Dataset mode to load ("train", "dev", "test", or "all"). Defaults to "all"
-            **kwargs: Additional arguments passed to the parent class
-        """
         path = os.path.expanduser(path or "~/.evoagentx/data/gsm8k")
         super().__init__(name=type(self).__name__, path=path, mode=mode, **kwargs)
 
     def _load_data_from_file(self, file_name: str):
-        """Load GSM8K data from a specific file.
-        
-        Downloads the file if not already present in the specified path.
-        
-        Args:
-            file_name: Name of the file to load
-            
-        Returns:
-            Loaded data as a list of objects, or None if file_name is None
-        """
         if file_name is None:
             return None
         file_path = os.path.join(self.path, file_name)
@@ -111,11 +70,6 @@ class GSM8K(Benchmark):
         return load_gsm8k_data(file_path=file_path)
     
     def _load_data(self):
-        """Load GSM8K dataset based on the specified mode.
-        
-        Downloads data files if not already present and loads train/test
-        data based on the specified mode.
-        """
         if self.mode == "train" or self.mode == "all":
             self._train_data = self._load_data_from_file(file_name=GSM8K_FILES_MAP["train"])
         if self.mode == "dev" or self.mode == "all":
@@ -124,39 +78,12 @@ class GSM8K(Benchmark):
             self._test_data = self._load_data_from_file(file_name=GSM8K_FILES_MAP["test"])
             
     def _get_label(self, example: Any) -> Any:
-        """Extract the answer (label) from a GSM8K example.
-        
-        Args:
-            example: A GSM8K problem object
-            
-        Returns:
-            The answer string from the example
-        """
         return example["answer"]
     
     def _get_id(self, example: Any) -> Any:
-        """Extract the unique identifier from a GSM8K example.
-        
-        Args:
-            example: A GSM8K problem object
-            
-        Returns:
-            The example ID string (e.g., "train-42")
-        """
         return example["id"]
     
     def extract_last_number(self, text: str) -> float:
-        """Extract the last numerical value from a text.
-        
-        Uses regex to find all numbers in the text (including those with
-        decimal points and commas) and returns the last one found.
-        
-        Args:
-            text: Text to extract the number from
-            
-        Returns:
-            The last number found as a float, or None if no numbers are found
-        """
         matches = regex.findall(r"[-+]?\d+(?:,\d{3})*(?:\.\d+)?|\d+\.\d+", str(text))
         if matches:
             last_number = matches[-1].replace(",", "").strip()
@@ -168,18 +95,6 @@ class GSM8K(Benchmark):
         return None
     
     def evaluate(self, prediction: Any, label: Any) -> dict:
-        """Evaluate a predicted answer against the ground truth.
-        
-        Extracts the final numerical values from both the prediction and ground truth,
-        then checks if they match within a small tolerance.
-        
-        Args:
-            prediction: The model's predicted answer
-            label: The ground truth answer
-            
-        Returns:
-            Dictionary with solve_rate (1.0 for correct, 0.0 for incorrect)
-        """
         ground_truth_answer = self.extract_last_number(label)
         predicted_answer = self.extract_last_number(prediction)
         if predicted_answer is None:
@@ -200,27 +115,10 @@ class AFlowGSM8K(GSM8K):
     """
 
     def __init__(self, path: str = None, mode: str = "all", **kwargs):
-        """Initialize the AFlow-specific GSM8K benchmark.
-        
-        Args:
-            path: Directory path to store/load data. Defaults to "~/.evoagentx/data/aflow/gsm8k"
-            mode: Dataset mode to load ("train", "dev", "test", or "all"). Defaults to "all"
-            **kwargs: Additional arguments passed to the parent class
-        """
         path = os.path.expanduser(path or "~/.evoagentx/data/aflow/gsm8k")
         super().__init__(path=path, mode=mode, **kwargs)
 
     def _load_data_from_file(self, file_name: str):
-        """Load data from a specific AFlow benchmark file.
-        
-        Downloads the file if not already present in the specified path.
-        
-        Args:
-            file_name: Name of the file to load
-            
-        Returns:
-            Loaded data as a list of objects, or None if file_name is None
-        """
         if file_name is None:
             return None
         file_path = os.path.join(self.path, file_name)
@@ -229,11 +127,6 @@ class AFlowGSM8K(GSM8K):
         return load_json(path=file_path, type="jsonl")
         
     def _load_data(self):
-        """Load AFlow-formatted GSM8K dataset based on the specified mode.
-        
-        Downloads data if not already present, and loads train/dev/test
-        data from AFlow-specific files based on the specified mode.
-        """
         if self.mode == "train" or self.mode == "all":
             logger.info(f"Loading train data from {AFLOW_DATASET_FILES_MAP['gsm8k']['train']}")
             self._train_data = self._load_data_from_file(file_name=AFLOW_DATASET_FILES_MAP["gsm8k"]["train"])
@@ -245,18 +138,6 @@ class AFlowGSM8K(GSM8K):
             self._test_data = self._load_data_from_file(file_name=AFLOW_DATASET_FILES_MAP["gsm8k"]["test"])       
     
     async def evaluate_async(self, graph: Callable, example: Any) -> float:
-        """Asynchronously evaluate a workflow graph on a GSM8K example.
-        
-        This method is specifically designed for AFlow workflows, allowing
-        asynchronous evaluation of solutions generated by workflow graphs.
-        
-        Args:
-            graph: A callable workflow graph that generates solutions
-            example: A GSM8K problem object
-            
-        Returns:
-            solve_rate score (0.0 or 1.0) indicating whether the solution is correct
-        """
         input_text = example["question"] 
         label = self._get_label(example) 
         output = await graph(input_text)
