@@ -8,9 +8,6 @@ class BaseConfig(BaseModule):
     
     A config should inherit BaseConfig and specify the attributes and their types. 
     Otherwise this will be an empty config.
-    
-    Attributes:
-            No specific attributes
     """
     def save(self, path: str, **kwargs)-> str:
 
@@ -23,7 +20,6 @@ class BaseConfig(BaseModule):
         Returns:
             str: The path where the file was saved
         """
-        super().save_module(path, **kwargs)
         return super().save_module(path, **kwargs)
 
     def get_config_params(self):

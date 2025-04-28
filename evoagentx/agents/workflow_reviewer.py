@@ -1,6 +1,6 @@
 from typing import Optional, List
 from .agent import Agent
-from ..core.message import Message, MessageType
+from ..core.message import Message # MessageType
 
 
 class WorkFlowReviewer(Agent):
