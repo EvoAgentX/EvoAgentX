@@ -14,7 +14,11 @@ from ..models.model_utils import cost_manager
 class AFlowEvaluator:
 
     """
-    AFlow-specific evaluator
+    AFlow-specific evaluator for workflow performance assessment. 
+    This evaluator measures the performance of AFlow workflow graphs against benchmarks.
+    
+    Attributes:
+        llm: The language model to use for evaluation, if needed by the graph
     """
 
     def __init__( self, llm: Optional[BaseLLM] = None):
@@ -24,6 +28,25 @@ class AFlowEvaluator:
         return graph(name=benchmark.name, llm_config=self.llm.config, benchmark=benchmark)
     
     async def graph_evaluate_async(self, benchmark: Benchmark, graph: Callable, is_test: bool = False, max_concurrent_tasks: int = 20) -> Tuple[float, float, float]:
+        """Asynchronously evaluate a workflow graph against a benchmark.
+        
+        Configures the graph with benchmark settings, processes all examples in the
+        dataset concurrently (up to max_concurrent_tasks), and calculates
+        performance metrics including average score, cost per example, and total cost.
+        
+        Args:
+            benchmark: The benchmark to evaluate against
+            graph: The workflow graph to evaluate
+            is_test: Whether to use test data (True) or validation data (False)
+            max_concurrent_tasks: Maximum number of concurrent evaluation tasks
+            
+        Returns:
+            A tuple containing:
+              - average_metrics: Mean performance score across all examples
+              - avg_cost: Average cost per example
+              - total_cost: Total cost for all examples
+              - all_failed: Boolean indicating if all evaluations failed
+        """
         
         configured_graph = self._configure_graph(graph=graph, benchmark=benchmark)
 

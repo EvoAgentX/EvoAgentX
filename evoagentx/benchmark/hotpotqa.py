@@ -22,7 +22,9 @@ def download_raw_hotpotqa_data(name: str, save_folder: str):
 
 class HotPotQA(Benchmark):
 
-    """
+    """Benchmark class for evaluating multi-hop question answering on HotPotQA dataset.
+    
+    Each HotPotQA example has the following structure:
     {
         "_id": str, 
         "question": str, 
@@ -32,6 +34,8 @@ class HotPotQA(Benchmark):
         "type": str,
         "level": str
     }
+    
+    The benchmark evaluates answers using exact match, F1 score, and accuracy metrics.
     """
 
     def __init__(self, path: str = None, mode: str = "all", **kwargs):
@@ -69,6 +73,10 @@ class HotPotQA(Benchmark):
     
 
 class AFlowHotPotQA(HotPotQA):
+
+    """
+    AFlow-specific implementation of HotPotQA benchmark.
+    """
 
     def _load_data_from_file(self, file_name: str):
         if file_name is None:

@@ -9,6 +9,18 @@ from ..utils.utils import safe_remove
 
 
 class BaseMemory(BaseModule):
+    """Base class for memory implementations in the EvoAgentX framework.
+    
+    BaseMemory provides core functionality for storing, retrieving, and 
+    filtering messages. It maintains a chronological list of messages while 
+    also providing indices for efficient retrieval by action or workflow goal.
+    
+    Attributes:
+        messages: List of stored Message objects.
+        memory_id: Unique identifier for this memory instance.
+        timestamp: Creation timestamp of this memory instance.
+        capacity: Maximum number of messages that can be stored, or None for unlimited.
+    """
 
     messages: List[Message] = []
     memory_id: str = Field(default_factory=generate_id)
@@ -16,27 +28,40 @@ class BaseMemory(BaseModule):
     capacity: Optional[PositiveInt] = Field(default=None, description="maximum of messages, None means there is no limit to the message number")
 
     def init_module(self):
+        """Initialize memory indices.
+        
+        Creates default dictionaries for indexing messages by action and workflow goal.
+        """
         self._by_action = defaultdict(list)
         self._by_wf_goal = defaultdict(list)
 
     @property
     def size(self):
+        """Returns the current number of messages in memory.
+        
+        Returns:
+            int: Number of messages currently stored.
+        """
         return len(self.messages)
     
     def clear(self):
-        """
-        clear all the messages in the memory
+        """Clear all messages from memory.
+        
+        Removes all messages and resets all indices.
         """
         self.messages.clear()
         self._by_action.clear()
         self._by_wf_goal.clear()
     
     def remove_message(self, message: Message):
-        """
-        remove a single message.
-
+        """Remove a single message from memory.
+        
+        Removes the specified message from the main message list and all indices.
+        If the message is not found in memory, no action is taken.
+        
         Args:
-            message (Message): the message to be removed. The message should be deleted from self.messages, self._by_action, self._by_wf_goal
+            message: The message to be removed. The message will be removed from 
+                   self.messages, self._by_action, and self._by_wf_goal.
         """
         if not message:
             return
@@ -49,9 +74,10 @@ class BaseMemory(BaseModule):
             safe_remove(self._by_wf_goal[message.wf_goal], message)
 
     def add_message(self, message: Message):
-        """
-        store a single message. 
-
+        """Store a single message in memory.
+        
+        Adds the message to the main list and relevant indices if it's not already stored.
+        
         Args:
             message (Message): the message to be stored. 
         """
@@ -78,11 +104,19 @@ class BaseMemory(BaseModule):
             self.add_message(message)
     
     def get(self, n: int=None, **kwargs) -> List[Message]:
-        """
-        return recent messages in the memory. 
-
+        """Retrieve recent messages from memory.
+        
+        Returns the most recent messages, up to the specified limit.
+        
         Args: 
-            k (int): the number of returned messages. If None, return all the messages in the memory. 
+            n: The maximum number of messages to return. If None, returns all messages.
+            **kwargs: Additional parameters (unused in base implementation).
+            
+        Returns:
+            A list of Message objects, ordered from oldest to newest.
+            
+        Raises:
+            AssertionError: If n is negative.
         """
         assert n is None or n>=0, "n must be None or a positive int"
         messages = self.messages if n is None else self.messages[-n:]
@@ -115,8 +149,12 @@ class BaseMemory(BaseModule):
         return messages triggered by `actions` in the memory. 
 
         Args:
-            actions (Union[str, List[str]]): the trigger actions of the messages. 
-            n (int): the number of returned messages. 
+            actions: A single action name or list of action names to filter by.
+            n: Maximum number of messages to return per action. If None, returns all matching messages.
+            **kwargs: Additional parameters (unused in base implementation).
+            
+        Returns:
+            A list of Message objects, sorted by timestamp.
         """
         if isinstance(actions, str):
             actions = [actions]
@@ -131,8 +169,12 @@ class BaseMemory(BaseModule):
         return messages related to `wf_goals` in the memory. 
 
         Args:
-            wf_goals (Union[str, List[str]]): the workflow goals of the message. 
-            n (int): the number of returned messages. 
+            wf_goals: A single workflow goal or list of workflow goals to filter by.
+            n: Maximum number of messages to return per workflow goal. If None, returns all matching messages.
+            **kwargs: Additional parameters (unused in base implementation).
+            
+        Returns:
+            A list of Message objects, sorted by timestamp.
         """
         if isinstance(wf_goals, str):
             wf_goals = [wf_goals]
@@ -144,6 +186,13 @@ class BaseMemory(BaseModule):
 
 
 class ShortTermMemory(BaseMemory):
+    """Short-term memory implementation.
+    
+    This class extends BaseMemory to represent a temporary, short-term memory
+    storage. In the current implementation, it inherits all functionality from
+    BaseMemory without modifications, but it provides a semantic distinction
+    for different memory usage patterns in the framework.
+    """
     pass
 
 

@@ -31,7 +31,14 @@ def load_humaneval_data(data_path: str):
 
 class HumanEval(CodingBenchmark):
 
-    """
+    """Benchmark class for evaluating code generation on HumanEval.
+    
+    HumanEval is a collection of Python programming problems designed to test
+    a model's ability to generate functionally correct code from natural language
+    descriptions. This class handles loading the dataset, evaluating solutions,
+    and computing metrics such as pass@k.
+    
+    Each HumanEval example has the following structure:
     {
         "task_id": "HumanEval/0", 
         "prompt": "from typing import List\n\ndef func_name(*args, **kwargs) -> return_type\n    "function description"\n\n", 
@@ -39,6 +46,9 @@ class HumanEval(CodingBenchmark):
         "canonical_solution": "canonical solution (code)",
         "test": "METADATA = {xxx}\n\n\ndef check(candidate):\n assert candidate(inputs) == output\n"
     }
+    
+    Attributes:
+        k: An integer or list of integers specifying which pass@k metrics to compute
     """
 
     def __init__(self, path: str = None, mode: str = "all", timeout: int = 60, k: Union[int, list] = 1, **kwargs):
@@ -125,7 +135,12 @@ class HumanEval(CodingBenchmark):
 
 class HumanEvaluPlus(HumanEval):
 
-    """
+    """Extended version of HumanEval with additional test cases and inputs.
+    
+    HumanEvalPlus extends the original HumanEval benchmark with additional
+    test cases, input validation contracts, and more rigorous testing.
+    
+    Each HumanEvalPlus example has the following structure:
     {
         "task_id": "HumanEvalPlus/0",
         "prompt": "function signature with docstring such as: from typing import List\n\ndef func_name(*args, **kwargs) -> return_type\n    "function description"\n\n", 
@@ -142,6 +157,10 @@ class HumanEvaluPlus(HumanEval):
 
 
 class AFlowHumanEval(HumanEval):
+
+    """
+    AFlow-specific implementation of HumanEval benchmark.
+    """
 
     def __init__(self, path: str = None, mode: str = "all", timeout: int = 60, k: Union[int, list] = 1, **kwargs):
         path = os.path.expanduser(path or "~/.evoagentx/data/aflow/humaneval")

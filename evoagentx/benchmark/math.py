@@ -39,7 +39,18 @@ def download_raw_math_data(save_folder: str):
 
 class MATH(Benchmark):
 
-    """
+    """Benchmark class for evaluating mathematical reasoning on the MATH dataset.
+    
+    MATH is a dataset of challenging competition mathematics problems,
+    spanning various difficulty levels and subject areas. This class handles
+    loading the dataset, extracting answers, evaluating solutions through
+    symbolic and numerical comparisons, and computing accuracy metrics.
+    
+    The dataset includes problems across 7 subject areas (Algebra, Geometry, etc.)
+    and 5 difficulty levels. Each problem contains LaTeX-formatted
+    questions and solutions.
+    
+    Each MATH example has the following structure:
     {
         "id": "test-1", 
         "problem": "the problem", 
@@ -47,6 +58,9 @@ class MATH(Benchmark):
         "level": "Level 1", # "Level 1", "Level 2", "Level 3", "Level 4", "Level 5", "Level ?"
         "type": "Algebra", # 'Geometry', 'Algebra', 'Intermediate Algebra', 'Counting & Probability', 'Precalculus', 'Number Theory', 'Prealgebra'
     }
+    
+    The benchmark evaluates answers using symbolic math equality checking
+    and numerical approximation to handle equivalent mathematical expressions.
     """
 
     def __init__(self, path: str = None, mode: str = "all", **kwargs):

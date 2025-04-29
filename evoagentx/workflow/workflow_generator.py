@@ -18,6 +18,22 @@ from ..workflow.workflow_graph import WorkFlowGraph, WorkFlowNode, WorkFlowEdge
 
 class WorkFlowGenerator(BaseModule):
 
+    """
+    Automated workflow generation system based on high-level goals.
+    
+    The WorkFlowGenerator is responsible for creating complete workflow graphs
+    from high-level goals or task descriptions. It breaks down the goal into
+    subtasks, creates the necessary dependency connections between tasks,
+    and assigns or generates appropriate agents for each task.
+    
+    Attributes:
+        llm: Language model used for generation and planning
+        task_planner: Component responsible for breaking down goals into subtasks
+        agent_generator: Component responsible for agent assignment or creation
+        workflow_reviewer: Component for reviewing and improving workflows
+        num_turns: Number of refinement iterations for the workflow
+    """
+
     llm: Optional[BaseLLM] = None
     task_planner: Optional[TaskPlanner] = Field(default=None, description="Responsible for breaking down the high-level task into manageable sub-tasks.")
     agent_generator: Optional[AgentGenerator] = Field(default=None, description="Assigns or generates the appropriate agent(s) to handle each sub-task.")

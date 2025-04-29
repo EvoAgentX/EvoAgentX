@@ -38,12 +38,22 @@ def load_gsm8k_data(file_path: str) -> List[dict]:
 
 class GSM8K(Benchmark):
 
-    """
+    """Benchmark class for evaluating math reasoning on GSM8K dataset.
+    
+    GSM8K (Grade School Math 8K) is a dataset of math word problems that
+    test a model's ability to solve grade school level math problems requiring
+    multi-step reasoning. This class handles loading the dataset, evaluating
+    solutions, and computing metrics based on answer accuracy.
+    
+    Each GSM8K example has the following structure:
     {
         "id": "test-1", 
         "question": "the question", 
         "answer": "the answer"
     }
+    
+    The benchmark evaluates answers by extracting the final numerical value
+    and comparing it to the ground truth answer.
     """
     
     def __init__(self, path: str = None, mode: str = "all", **kwargs):
@@ -98,6 +108,16 @@ class GSM8K(Benchmark):
 
 
 class AFlowGSM8K(GSM8K): 
+
+    """AFlow-specific implementation of GSM8K benchmark.
+    
+    This class extends the GSM8K benchmark with features specific to the
+    AFlow framework, including loading from AFlow-formatted data files and
+    supporting asynchronous evaluation for workflows.
+    
+    Attributes:
+        Same as GSM8K, with additional support for AFlow structures
+    """
 
     def __init__(self, path: str = None, mode: str = "all", **kwargs):
         path = os.path.expanduser(path or "~/.evoagentx/data/aflow/gsm8k")

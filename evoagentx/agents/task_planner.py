@@ -4,9 +4,17 @@ from ..prompts.task_planner import TASK_PLANNER
 
 
 class TaskPlanner(Agent):
-
-    """
-    An agent responsible for planning and decomposing high-level tasks into smaller sub-tasks.
+    """An agent responsible for planning and decomposing high-level tasks into smaller sub-tasks.
+    
+    The TaskPlanner agent analyzes complex goals and breaks them down into a structured
+    sequence of smaller, more manageable tasks. It serves as a critical component in the
+    workflow by creating execution plans that other specialized agents can follow.
+    
+    Attributes:
+        name (str): Name of the task planner agent, defaults to the value in TASK_PLANNER
+        description (str): Description of the agent's purpose and capabilities, defaults to the value in TASK_PLANNER
+        system_prompt (str): System prompt guiding the agent's behavior, defaults to the value in TASK_PLANNER
+        actions (List[Action]): List of actions the agent can perform, defaults to [TaskPlanning()]
     """
     def __init__(self, **kwargs):
 
@@ -18,5 +26,10 @@ class TaskPlanner(Agent):
     
     @property
     def task_planning_action_name(self):
+        """Get the name of the TaskPlanning action associated with this agent.
+        
+        Returns:
+            The name of the TaskPlanning action in this agent's action registry
+        """
         return self.get_action_name(action_cls=TaskPlanning)
     

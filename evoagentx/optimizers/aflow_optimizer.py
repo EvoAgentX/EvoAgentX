@@ -20,7 +20,7 @@ from ..utils.aflow_utils.convergence_utils import ConvergenceUtils
 
 
 class GraphOptimizeOutput(LLMOutputParser):
-    """Output for graph optimization"""
+
     modification: str = Field(default="", description="modification")
     graph: str = Field(default="", description="graph")
     prompt: str = Field(default="", description="prompt")
@@ -28,7 +28,27 @@ class GraphOptimizeOutput(LLMOutputParser):
 
 class AFlowOptimizer(BaseModule):
 
-    """AFlow Optimizer for workflow optimization"""
+    """
+    AFlow Optimizer for workflow optimization.
+    
+    This optimizer iteratively improves workflows through multiple rounds of optimization
+    using large language models. It evaluates workflow performance, identifies improvement
+    opportunities, and applies optimizations based on experience and convergence metrics.
+    
+    Attributes:
+        question_type: Type of task to optimize for (e.g., qa, match, code)
+        graph_path: Path to the workflow graph directory (must contain graph.py and prompt.py)
+        optimized_path: Path to save optimized workflows (defaults to graph_path)
+        initial_round: Starting round number for optimization
+        optimizer_llm: LLM used for generating optimizations
+        executor_llm: LLM used for executing the workflow
+        operators: List of operators available for optimization
+        sample: Number of rounds to sample from for optimization
+        max_rounds: Maximum number of optimization rounds to perform
+        validation_rounds: Number of validation runs per optimization round
+        eval_rounds: Number of evaluation runs for test mode
+        check_convergence: Whether to check for optimization convergence
+    """
     question_type: str = Field(description="The type of question to optimize the workflow for, e.g., qa, match, code, etc.")
     graph_path: str = Field(description="The folder of the workflow graph. This folder must contain a `graph.py` file that defines the workflow structure, and a `prompt.py` file that defines the prompt for the workflow.")
     optimized_path: str = Field(default=None, description="The path to save the optimized workflow. If not provided, the optimized path will be the same as the graph path.")
@@ -73,8 +93,15 @@ class AFlowOptimizer(BaseModule):
             self.executor_llm = self.optimizer_llm
 
     def optimize(self, benchmark: Benchmark):
-
-        """Run in graph optimization mode"""
+        """Run the optimization process on the workflow.
+        
+        Performs multiple rounds of optimization, evaluating each round against
+        the benchmark and checking for convergence. Continues until convergence
+        is detected or the maximum number of rounds is reached.
+        
+        Args:
+            benchmark: The benchmark to evaluate the workflow against
+        """
         self.benchmark = benchmark
         for _ in range(self.max_rounds):
             loop = asyncio.new_event_loop()
@@ -89,7 +116,15 @@ class AFlowOptimizer(BaseModule):
                 break
     
     def test(self, benchmark: Benchmark, test_rounds: List[int] = None):
-        """Run in test mode"""
+        """Run the test evaluation on optimized workflows.
+        
+        Evaluates specified rounds (or the best round if none specified) against
+        the benchmark multiple times and logs the results.
+        
+        Args:
+            benchmark: The benchmark to evaluate against
+            test_rounds: Specific round numbers to test, or None to use the best round
+        """
         self.benchmark = benchmark
         if test_rounds is None:
             best_round = self._load_best_round()
@@ -102,7 +137,6 @@ class AFlowOptimizer(BaseModule):
     
     async def _execute_with_retry(self, func: callable, max_retries: int = 3) -> Any:
 
-        """Execute a function with retry logic"""
         retry_count = 0
         while retry_count < max_retries:
             try:
@@ -118,7 +152,6 @@ class AFlowOptimizer(BaseModule):
         return None
     
     def _check_convergence(self) -> bool:
-        """Check if optimization has converged"""
         if not self.check_convergence:
             return False
 
@@ -132,7 +165,6 @@ class AFlowOptimizer(BaseModule):
         return False
 
     async def _optimize_graph(self) -> float:
-
         """Optimize the graph for one round"""
         validation_n = self.validation_rounds
         graph_path = self.root_path
@@ -150,7 +182,7 @@ class AFlowOptimizer(BaseModule):
         return await self.evaluation_utils.evaluate_graph_async(self, validation_n, data, initial=True)
 
     async def _handle_optimization_round(self, graph_path: str, validation_n: int, data: list) -> float:
-        """Handle subsequent optimization rounds"""
+
         directory = self.graph_utils.create_round_directory(graph_path, self.round + 1)
 
         while True:
@@ -182,12 +214,12 @@ class AFlowOptimizer(BaseModule):
         return avg_score
     
     def _get_optimization_sample(self) -> dict:
-        """Get sample data for optimization"""
+
         top_rounds = self.data_utils.get_top_rounds(self.sample)
         return self.data_utils.select_round(top_rounds)
 
     def _parse_optimizer_llm_output(self, content: str, orig_graph: str, orig_prompt: str) -> dict:
-        """Parse optimizer LLM output"""
+
         response = {"modification": "", "graph": "", "prompt": ""}
 
         # Extract content between <modification> tags
@@ -221,7 +253,7 @@ class AFlowOptimizer(BaseModule):
     
     async def _evaluate_and_save_optimization_results(self, directory: str, response: dict, sample: dict, data: list, validation_n: int):
 
-        """Save optimization results"""
+        # Write optimized files
         self.graph_utils.write_graph_files(directory, response)
 
         experience = self.experience_utils.create_experience_data(sample, response['modification'])
@@ -240,8 +272,8 @@ class AFlowOptimizer(BaseModule):
         return ranked_scores[0]["round"]
 
     async def _run_test(self, test_rounds: List[int]):
-        
         """Run test evaluation"""
+
         logger.info("Running test evaluation...")
 
         graph_path = self.root_path

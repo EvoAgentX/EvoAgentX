@@ -1,6 +1,6 @@
 import json
 from pydantic_core import PydanticUndefined
-from typing import Optional, Type, Union, List
+from typing import Optional, Type, Tuple, Union, List
 
 from ..core.module import BaseModule
 from ..core.module_utils import get_type_name
@@ -13,13 +13,34 @@ from ..prompts.context_extraction import CONTEXT_EXTRACTION
 
 
 class ActionInput(LLMOutputParser):
-
-    # parameters in ActionInput should be defined in Pydantic Field format
-    # for optional variable, use var: Optional[int] = Field(default=None, description="xxx") to define. Remember to add `default=None`
+    """Input specification and parsing for actions.
+    
+    This class defines the input requirements for actions and provides methods
+    to generate structured input specifications. It inherits from LLMOutputParser 
+    to allow parsing of LLM outputs into structured inputs for actions.
+    
+    Notes:
+        Parameters in ActionInput should be defined in Pydantic Field format.
+        For optional variables, use format: 
+        var: Optional[int] = Field(default=None, description="xxx")
+        Remember to add `default=None` for optional parameters.
+    """
 
     @classmethod
     def get_input_specification(cls, ignore_fields: List[str] = []) -> str:
-
+        """Generate a JSON specification of the input requirements.
+        
+        Examines the class fields and produces a structured specification of
+        the input parameters, including their types, descriptions, and whether
+        they are required.
+        
+        Args:
+            ignore_fields (List[str]): List of field names to exclude from the specification.
+            
+        Returns:
+            A JSON string containing the input specification, or an empty string
+            if no fields are defined or all are ignored.
+        """
         fields_info = {}
         attrs = cls.get_attrs()
         for field_name, field_info in cls.model_fields.items():
@@ -47,12 +68,37 @@ class ActionInput(LLMOutputParser):
 
 
 class ActionOutput(LLMOutputParser):
+    """Output representation for actions.
+    
+    This class handles the structured output of actions, providing methods
+    to convert the output to structured data. It inherits from LLMOutputParser
+    to support parsing of LLM outputs into structured action results.
+    """
     
     def to_str(self) -> str:
+        """Convert the output to a formatted JSON string.
+        
+        Returns:
+            A pretty-printed JSON string representation of the structured data.
+        """
         return json.dumps(self.get_structured_data(), indent=4)
     
 
 class Action(BaseModule):
+    """Base class for all actions in the EvoAgentX framework.
+    
+    Actions represent discrete operations that can be performed by agents.
+    They define inputs, outputs, and execution behavior, and can optionally
+    use tools to accomplish their tasks.
+    
+    Attributes:
+        name (str): Unique identifier for the action.
+        description (str): Human-readable description of what the action does.
+        prompt (Optional[str]): Optional prompt template for this action.
+        tools (Optional[List[Tool]]): Optional list of tools that can be used by this action.
+        inputs_format (Optional[Type[ActionInput]]): Optional class defining the expected input structure.
+        outputs_format (Optional[Type[Parser]]): Optional class defining the expected output structure.
+    """
 
     name: str
     description: str
@@ -62,24 +108,42 @@ class Action(BaseModule):
     outputs_format: Optional[Type[Parser]] = None  # specify the possible structured output format
 
     def init_module(self):
+        """Initialize the action module.
+        
+        This method is called after the action is instantiated.
+        Subclasses can override this to perform custom initialization.
+        """
         pass 
 
-    def execute(self, llm: Optional[BaseLLM] = None, inputs: Optional[dict] = None, sys_msg: Optional[str]=None, return_prompt: bool = False, **kwargs) -> Optional[Parser]:
-        """
-        The main entrance for executing an action. 
+    def execute(self, llm: Optional[BaseLLM] = None, inputs: Optional[dict] = None, sys_msg: Optional[str]=None, return_prompt: bool = False, **kwargs) -> Optional[Union[Parser, Tuple[Parser, str]]]:
+        """Execute the action to produce a result.
+        
+        This is the main entry point for executing an action. Subclasses must
+        implement this method to define the action's behavior.
 
         Args:
-            llm (BaseLLM, optional): the LLM used to execute the action.
-            msgs (List[Message], optional): the context for executing the action.
-            sys_msg (str, optional): The system message for the llm.
+            llm (Optional[BaseLLM]): The LLM used to execute the action.
+            inputs (Optional[dict]): Input data for the action execution. The input data should be a dictionary that matches the input format of the provided prompt. 
+                For example, if the prompt contains a variable `{input_var}`, the `inputs` dictionary should have a key `input_var`, otherwise the variable will be set to empty string. 
+            sys_msg (Optional[str]): Optional system message for the LLM.
+            return_prompt (bool): Whether to return the complete prompt passed to the LLM.
+            **kwargs: Additional keyword arguments for the execution.
         
         Returns:
-            Parser: returns a Parser object (a structured output of LLM's generated text  or other structured object).
+            If `return_prompt` is False, the method returns a Parser object containing the structured result of the action.
+            If `return_prompt` is True, the method returns a tuple containing the Parser object and the complete prompt passed to the LLM.
         """
         pass
 
 
 class ContextExtraction(Action):
+    """Action for extracting structured inputs from context.
+    
+    This action analyzes a conversation context to extract relevant information
+    that can be used as inputs for other actions. It uses the LLM to interpret
+    unstructured contextual information and format it according to the target
+    action's input requirements.
+    """
 
     def __init__(self, **kwargs):
         name = kwargs.pop("name") if "name" in kwargs else CONTEXT_EXTRACTION["name"]
@@ -91,7 +155,22 @@ class ContextExtraction(Action):
         return str_context 
     
     def execute(self, llm: Optional[BaseLLM] = None, action: Action = None, context: List[Message] = None, **kwargs) -> Union[dict, None]:
-
+        """Extract structured inputs for an action from conversation context.
+        
+        This method uses the LLM to analyze the conversation context and extract
+        information that matches the input requirements of the target action.
+        
+        Args:
+            llm: The language model to use for extraction.
+            action: The target action whose input requirements (`inputs_format`) define what to extract.
+            context: List of messages providing the conversation context.
+            **kwargs: Additional keyword arguments.
+            
+        Returns:
+            A dictionary containing the extracted inputs for the target action,
+            or None if extraction is not possible (e.g., if the action doesn't
+            require inputs or if context is missing).
+        """
         if action is None or context is None:
             return None
         

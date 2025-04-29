@@ -18,25 +18,69 @@ from .registry import register_module, MODULE_REGISTRY
 
 
 class MetaModule(ModelMetaclass):
+    """
+    MetaModule is a metaclass that automatically registers all subclasses of BaseModule.
+
+    
+    Attributes:
+        No public attributes
+    """
     def __new__(mcs, name, bases, namespace, **kwargs):
+        """
+        Creates a new class and registers it in MODULE_REGISTRY.
+        
+        Args:
+            mcs: The metaclass itself
+            name: The name of the class being created
+            bases: Tuple of base classes
+            namespace: Dictionary containing the class attributes and methods
+            **kwargs: Additional keyword arguments
+        
+        Returns:
+            The created class object
+        """
         cls = super().__new__(mcs, name, bases, namespace)
         register_module(name, cls)
         return cls 
 
 
 class BaseModule(BaseModel, metaclass=MetaModule):
+    """
+    Base module class that serves as the foundation for all modules in the EvoAgentX framework.
+    
+    This class provides serialization/deserialization capabilities, supports creating instances from
+    dictionaries, JSON, or files, and exporting instances to these formats.
+    
+    Attributes:
+        class_name: The class name, defaults to None but is automatically set during subclass initialization
+        model_config: Pydantic model configuration that controls type matching and behavior
+    """
 
-    """
-    model_config是用于控制类型匹配的参数, 子类的model_config会覆盖父类的model_config
-    """
     class_name: str = None 
     model_config = {"arbitrary_types_allowed": True, "extra": "allow", "protected_namespaces": ()}
 
     def __init_subclass__(cls, **kwargs):
+        """
+        Subclass initialization method that automatically sets the class_name attribute.
+        
+        Args:
+            cls: The subclass being initialized
+            **kwargs: Additional keyword arguments
+        """
         super().__init_subclass__(**kwargs)
         cls.class_name = cls.__name__
     
     def __init__(self, **kwargs):
+        """
+        Initializes a BaseModule instance.
+        
+        Args:
+            **kwargs: Keyword arguments used to initialize the instance
+        
+        Raises:
+            ValidationError: When parameter validation fails
+            Exception: When other errors occur during initialization
+        """
 
         try:
             for field_name, _ in type(self).model_fields.items():
@@ -63,23 +107,56 @@ class BaseModule(BaseModel, metaclass=MetaModule):
                 exception_handler.add(e)
     
     def init_module(self):
+        """
+        Module initialization method that subclasses can override to provide additional initialization logic.
+        """
         pass
 
     def __str__(self):
+        """
+        Returns a string representation of the object.
+        
+        Returns:
+            str: String representation of the object
+        """
         return self.to_str()
     
     @property
     def kwargs(self):
+        """
+        Returns the extra fields of the model.
+        
+        Returns:
+            dict: Dictionary containing all extra keyword arguments
+        """
         return self.model_extra
     
     @classmethod
     def _create_instance(cls, data: Dict[str, Any]) -> "BaseModule":
+        """
+        Internal method for creating an instance from a dictionary.
+        
+        Args:
+            data: Dictionary containing instance data
+        
+        Returns:
+            BaseModule: The created instance
+        """
         processed_data = {k: cls._process_data(v) for k, v in data.items()}
         # print(processed_data)
         return cls.model_validate(processed_data)
 
     @classmethod
     def _process_data(cls, data: Any) -> Any:
+        """
+        Recursive method for processing data, with special handling for dictionaries containing class_name.
+        
+        Args:
+            data: Data to be processed
+        
+        Returns:
+            Processed data
+        """
         if isinstance(data, dict):
             if "class_name" in data:
                 sub_class = MODULE_REGISTRY.get_module(data.get("class_name"))
@@ -94,7 +171,17 @@ class BaseModule(BaseModel, metaclass=MetaModule):
     @classmethod
     def from_dict(cls, data: Dict[str, Any], **kwargs):
         """
-        Instantiate the BaseModule from a dict.
+        Instantiate the BaseModule from a dictionary.
+        
+        Args:
+            data: Dictionary containing instance data
+            **kwargs: Additional keyword arguments, can include log to control logging output
+        
+        Returns:
+            BaseModule: The created module instance
+        
+        Raises:
+            Exception: When errors occur during initialization
         """
         use_logger = kwargs.get("log", True)
         with exception_buffer() as buffer:
@@ -116,7 +203,22 @@ class BaseModule(BaseModel, metaclass=MetaModule):
     @classmethod
     def from_json(cls, content: str, **kwargs):
         """
-        construct the BaseModule from a JSON str. 
+        Construct the BaseModule from a JSON string.
+        
+        This method uses yaml.safe_load to parse the JSON string into a Python object,
+        which supports more flexible parsing than standard json.loads (including handling
+        single quotes, trailing commas, etc). The parsed data is then passed to from_dict
+        to create the instance.
+        
+        Args:
+            content: JSON string
+            **kwargs: Additional keyword arguments, can include `log` to control logging output
+        
+        Returns:
+            BaseModule: The created module instance
+        
+        Raises:
+            ValueError: When the input is not a valid JSON string
         """
         use_logger = kwargs.get("log", True)
         try:
@@ -138,10 +240,22 @@ class BaseModule(BaseModel, metaclass=MetaModule):
     @classmethod
     def from_str(cls, content: str, **kwargs):
         """
-        construct the BaseModule from a str. The input content should contain valid JSON str. 
-
+        Construct the BaseModule from a string that may contain JSON.
+        
+        This method is more forgiving than `from_json` as it can extract valid JSON
+        objects embedded within larger text. It uses `parse_json_from_text` to extract 
+        all potential JSON strings from the input text, then tries to create an instance 
+        from each extracted JSON string until successful.
+        
         Args:
-            content (str): the text that contain the JSON str. 
+            content: Text that may contain JSON strings
+            **kwargs: Additional keyword arguments, can include `log` to control logging output
+        
+        Returns:
+            BaseModule: The created module instance
+        
+        Raises:
+            ValueError: When the input does not contain valid JSON strings or the JSON is incompatible with the class
         """
         use_logger = kwargs.get("log", True)
         
@@ -172,13 +286,17 @@ class BaseModule(BaseModel, metaclass=MetaModule):
     @classmethod 
     def load_module(cls, path: str, **kwargs) -> dict:
         """
-        load the values for a module from a file. 
-
+        Load the values for a module from a file.
+        
+        By default, it opens the specified file and uses `yaml.safe_load` to parse its contents 
+        into a Python object (typically a dictionary).
+        
         Args:
-            path (str): the path of the file. 
+            path: The path of the file
+            **kwargs: Additional keyword arguments
         
         Returns:
-            dict: the JSON object instantiated from the file.
+            dict: The JSON object instantiated from the file
         """
         with open(path, mode="r", encoding="utf-8") as file:
             content = yaml.safe_load(file.read())
@@ -187,11 +305,24 @@ class BaseModule(BaseModel, metaclass=MetaModule):
     @classmethod
     def from_file(cls, path: str, load_function: Callable=None, **kwargs):
         """
-        construct the BaseModule from a file. It will load the file and then use .from_str to instantiate the BaseModule by default. 
-
+        Construct the BaseModule from a file.
+        
+        This method reads and parses a file into a data structure, then creates
+        a module instance from that data. It first verifies that the file exists,
+        then uses either the provided `load_function` or the default `load_module`
+        method to read and parse the file content, and finally calls `from_dict`
+        to create the instance.
+        
         Args:
-            path (str): the path of the file. 
-            load_function: (Callable): the function used to load the data. It takes a file path as input and a JSON object 
+            path: The path of the file
+            load_function: The function used to load the data, takes a file path as input and returns a JSON object
+            **kwargs: Additional keyword arguments, can include `log` to control logging output
+        
+        Returns:
+            BaseModule: The created module instance
+        
+        Raises:
+            ValueError: When the file does not exist
         """
         use_logger = kwargs.get("log", True)
         if not os.path.exists(path):
@@ -214,7 +345,15 @@ class BaseModule(BaseModel, metaclass=MetaModule):
 
     def to_dict(self, exclude_none: bool = True, ignore: List[str] = [], **kwargs) -> dict:
         """
-        convert the BaseModule to a dict. 
+        Convert the BaseModule to a dictionary.
+        
+        Args:
+            exclude_none: Whether to exclude fields with None values
+            ignore: List of field names to ignore
+            **kwargs: Additional keyword arguments
+        
+        Returns:
+            dict: Dictionary containing the object data
         """
         data = {}
         for field_name, _ in type(self).model_fields.items():
@@ -242,7 +381,15 @@ class BaseModule(BaseModel, metaclass=MetaModule):
     
     def to_json(self, use_indent: bool=False, ignore: List[str] = [], **kwargs) -> str:
         """
-        convert the BaseModule to JSON str format
+        Convert the BaseModule to a JSON string.
+        
+        Args:
+            use_indent: Whether to use indentation
+            ignore: List of field names to ignore
+            **kwargs: Additional keyword arguments
+        
+        Returns:
+            str: The JSON string
         """
         if use_indent:
             kwargs["indent"] = kwargs.get("indent", 4)
@@ -257,20 +404,32 @@ class BaseModule(BaseModel, metaclass=MetaModule):
     
     def to_str(self, **kwargs) -> str:
         """
-        convert the BaseModule to a str. Use .to_json to output JSON str by default. 
+        Convert the BaseModule to a string. Use .to_json to output JSON string by default.
+        
+        Args:
+            **kwargs: Additional keyword arguments
+        
+        Returns:
+            str: The string
         """
         return self.to_json(use_indent=False)
     
     def save_module(self, path: str, ignore: List[str] = [], **kwargs)-> str:
         """
-        Save the BaseModule to a file. This function will set the non-serilizable object to None by default. 
-        If you want to save the non-serilizable objects, override this function. Remember to override ``load_module'' function to make sure the loaded object can be correctly parsed by ``cls.from_dict''
-
+        Save the BaseModule to a file.
+        
+        This method will set non-serializable objects to None by default.
+        If you want to save non-serializable objects, override this method.
+        Remember to also override the `load_module` function to ensure the loaded
+        object can be correctly parsed by `cls.from_dict`.
+        
         Args:
-            path (str): the path to save the file. 
+            path: The path to save the file
+            ignore: List of field names to ignore
+            **kwargs: Additional keyword arguments
         
         Returns:
-            str: the path where the file is saved. It is the same as the input ``path''.
+            str: The path where the file is saved, same as the input path
         """
         logger.info("Saving {} to {}", self.__class__.__name__, path)
         return save_json(self.to_json(use_indent=True, default=lambda x: None, ignore=ignore), path=path)

@@ -11,6 +11,9 @@ from ..prompts.agent_generator import AGENT_GENERATION_ACTION
 from ..utils.utils import normalize_text
 
 class AgentGenerationInput(ActionInput):
+    """
+    Input specification for the agent generation action.
+    """
 
     goal: str = Field(description="A detailed statement of the workflow's goal, explaining the objectives the entire workflow aims to achieve")
     workflow: str = Field(description="An overview of the entire workflow, detailing all sub-tasks with their respective names, descriptions, inputs, and outputs")
@@ -23,6 +26,9 @@ class AgentGenerationInput(ActionInput):
 
 
 class GeneratedAgent(BaseModule):
+    """
+    Representation of a generated agent with validation capabilities.
+    """
 
     name: str 
     description: str 
@@ -33,7 +39,6 @@ class GeneratedAgent(BaseModule):
 
     @classmethod
     def find_output_name(cls, text: str, outputs: List[str]):
-
         def sim(t1: str, t2: str):
             t1_words = normalize_text(t1).split()
             t2_words = normalize_text(t2).split()
@@ -46,7 +51,25 @@ class GeneratedAgent(BaseModule):
     @model_validator(mode="after")
     @classmethod
     def validate_prompt(cls, agent: 'GeneratedAgent'):
-
+        """Validate and fix the agent's prompt template.
+        
+        This validator ensures that:
+        1. All input parameters are properly referenced in the prompt
+        2. Input references use the correct format with braces
+        3. All output sections match the defined output parameters
+        
+        If there are mismatches in the output sections, it attempts to
+        fix them by finding the most similar output name.
+        
+        Args:
+            agent: The GeneratedAgent instance to validate.
+            
+        Returns:
+            The validated and potentially modified GeneratedAgent.
+            
+        Raises:
+            ValueError: If inputs are missing from the prompt or output sections don't match the defined outputs.
+        """
         # check whether all the inputs are present in the prompt 
         input_names = [inp.name for inp in agent.inputs]
         prompt_has_inputs = [name in agent.prompt for name in input_names]
@@ -100,9 +123,15 @@ class AgentGenerationOutput(ActionOutput):
     
 
 class AgentGeneration(Action):
+    """
+    Action for generating agent specifications for workflow tasks.
+    
+    This action analyzes task requirements and generates appropriate agent
+    specifications, including their prompts, inputs, and outputs. It can either
+    select from existing agents or create new ones tailored to the task.
+    """
 
     def __init__(self, **kwargs):
-
         name = kwargs.pop("name") if "name" in kwargs else AGENT_GENERATION_ACTION["name"]
         description = kwargs.pop("description") if "description" in kwargs else AGENT_GENERATION_ACTION["description"]
         prompt = kwargs.pop("prompt") if "prompt" in kwargs else AGENT_GENERATION_ACTION["prompt"]
@@ -113,7 +142,25 @@ class AgentGeneration(Action):
         super().__init__(name=name, description=description, prompt=prompt, inputs_format=inputs_format, outputs_format=outputs_format, **kwargs)
     
     def execute(self, llm: Optional[BaseLLM] = None, inputs: Optional[dict] = None, sys_msg: Optional[str]=None, return_prompt: bool = False, **kwargs) -> AgentGenerationOutput:
+        """Execute the agent generation process.
         
+        This method uses the provided language model to generate agent specifications
+        based on the workflow context and task requirements.
+        
+        Args:
+            llm: The language model to use for generation.
+            inputs: Input data containing workflow and task information.
+            sys_msg: Optional system message for the language model.
+            return_prompt: Whether to return both the generated agents and the prompt used.
+            **kwargs: Additional keyword arguments.
+            
+        Returns:
+            If return_prompt is False (default): The generated agents output.
+            If return_prompt is True: A tuple of (generated agents, prompt used).
+            
+        Raises:
+            ValueError: If the inputs are None or empty.
+        """
         if not inputs:
             logger.error("AgentGeneration action received invalid `inputs`: None or empty.")
             raise ValueError('The `inputs` to AgentGeneration action is None or empty.')

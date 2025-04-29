@@ -40,6 +40,13 @@ class AgentManager(BaseModule):
             self.check_agents()
     
     def check_agents(self):
+        """Validate agent list integrity and state consistency.
+        
+        Performs thorough validation of the agent manager's internal state:
+        1. Checks for duplicate agent names
+        2. Verifies that agent states exist for all agents
+        3. Ensures agent list and state dictionary sizes match
+        """
         # check that the names of self.agents should be unique
         duplicate_agent_names = self.find_duplicate_agents(self.agents)
         if duplicate_agent_names:
@@ -67,29 +74,38 @@ class AgentManager(BaseModule):
         return missing_agents
 
     def list_agents(self) -> List[str]:
-        """
-        return all the agent names in self.agents. 
-        """
         return [agent.name for agent in self.agents]
     
     def has_agent(self, agent_name: str) -> bool:
+        """Check if an agent with the given name exists in the manager.
+        
+        Args:
+            agent_name: The name of the agent to check
+            
+        Returns:
+            True if an agent with the given name exists, False otherwise
+        """
         all_agent_names = self.list_agents()
         return agent_name in all_agent_names
     
     @property
     def size(self):
+        """
+        Get the total number of agents managed by this manager.
+        """
         return len(self.agents)
     
     def load_agent(self, agent_name: str, **kwargs) -> Agent:
-
-        """
-        load an agent from local storage through self.storage_handler
-
+        """Load an agent from local storage through storage_handler.
+        
+        Retrieves agent data from storage and creates an Agent instance.
+        
         Args:
-            agent (str): the name of the agent.
+            agent_name: The name of the agent to load
+            **kwargs: Additional parameters for agent creation
         
         Returns:
-            Agent: the agent instance with the data loaded from local storage. 
+            Agent instance with data loaded from storage
         """
         if not self.storage_handler:
             raise ValueError("must provide ``self.storage_handler`` to use ``load_agent``")
@@ -98,8 +114,13 @@ class AgentManager(BaseModule):
         return agent
 
     def load_all_agents(self, **kwargs):
-        """
-        load all agents from storage and add them to self.agents. 
+        """Load all agents from storage and add them to the manager.
+        
+        Retrieves all available agents from storage and adds them to the
+        managed agents collection.
+        
+        Args:
+            **kwargs: Additional parameters passed to storage handler
         """
         pass 
     
@@ -108,13 +129,12 @@ class AgentManager(BaseModule):
         create a customized agent from the provided `agent_data`. 
 
         Args:
-            agent_data (dict): the data used to create an Agent instance, must contain the `name` and `description` keys.
+            agent_data: The data used to create an Agent instance, must contain 'name' and 'description' keys
+            llm_config (Optional[LLMConfig]): The LLM configuration to be used for the agent. If not provided, the `agent_data` should contain a `llm_config` key.  
+            **kwargs: Additional parameters for agent creation
         
         Returns:
             Agent: the instantiated agent instance.
-        
-        Notes: 
-            - use CustomizeAgent.from_dict() to create the agent instance.
         """
         if llm_config:
             if isinstance(llm_config, dict):
@@ -126,7 +146,18 @@ class AgentManager(BaseModule):
         return CustomizeAgent.from_dict(data=agent_data)
     
     def get_agent_name(self, agent: Union[str, dict, Agent]):
-
+        """Extract agent name from different agent representations.
+        
+        Handles different ways to specify an agent (string name, dictionary, or
+        Agent instance) and extracts the agent name.
+        
+        Args:
+            agent: Agent specified as a string name, dictionary with 'name' key,
+                  or Agent instance
+                  
+        Returns:
+            The extracted agent name as a string
+        """
         if isinstance(agent, str):
             agent_name = agent
         elif isinstance(agent, dict):
@@ -164,14 +195,12 @@ class AgentManager(BaseModule):
         add a single agent, ignore if the agent already exists (judged by the name of an agent).
 
         Args:
-            agent (Union[str, dict, Agent]): The agent to be added.
-                - Determine whether this agent should be added:
-                    - If the agent's name is different from existing agents, add the agent. 
-                    - If the agent's name already exists:
-                        - check whether the data of this agent (if provided) is the same with existing one. If they are the same, ignore 
-                - If a string is provided, it is treated as the agent's name. The agent will be loaded from storage using self.storage_handler.
-                - If a dictionary is provided, CustomizeAgent.from_dict() will be used to create an Agent instance.
-                - If an Agent instance is provided, it will be directly added to self.agents.
+            agent: The agent to be added, specified as:
+                - String: Agent name to load from storage
+                - Dictionary: Agent specification to create a CustomizeAgent
+                - Agent: Existing Agent instance to add directly
+            llm_config (Optional[LLMConfig]): The LLM configuration to be used for the agent. Only used when the `agent` is a dictionary, used to create a CustomizeAgent. 
+            **kwargs: Additional parameters for agent creation
         """
         agent_name = self.get_agent_name(agent=agent)
         if self.has_agent(agent_name=agent_name):
@@ -197,9 +226,7 @@ class AgentManager(BaseModule):
         Args:
             workflow_graph (WorkFlowGraph): The workflow graph containing nodes with agents information.
             llm_config (Optional[LLMConfig]): The LLM configuration to be used for the agents.
-        
-        Notes:
-            - The agent information is in workflow_graph.nodes: List[WorkFlowNode].
+            **kwargs: Additional parameters passed to add_agent
         """
         from ..workflow.workflow_graph import WorkFlowGraph
         if not isinstance(workflow_graph, WorkFlowGraph):
@@ -210,8 +237,16 @@ class AgentManager(BaseModule):
                     self.add_agent(agent=agent, llm_config=llm_config, **kwargs)
 
     def get_agent(self, agent_name: str, **kwargs) -> Agent:
-        """
-        Retrieve an agent by its name from self.agents. 
+        """Retrieve an agent by its name from managed agents.
+        
+        Searches the list of managed agents for an agent with the specified name.
+        
+        Args:
+            agent_name: The name of the agent to retrieve
+            **kwargs: Additional parameters (unused)
+            
+        Returns:
+            The Agent instance with the specified name
         """
         for agent in self.agents:
             if agent.name == agent_name:
@@ -221,11 +256,12 @@ class AgentManager(BaseModule):
     @atomic_method
     def remove_agent(self, agent_name: str, remove_from_storage: bool=False, **kwargs):
         """
-        remove an agent from self.agents (and storage). 
-
+        Remove an agent from the manager and optionally from storage.
+        
         Args:
-            agent_name (str): the name of the agent to be removed. 
-            remove_from_storage (boo): if True, remove the agent from storage if the agent is already in the storage.
+            agent_name: The name of the agent to remove
+            remove_from_storage: If True, also remove the agent from storage
+            **kwargs: Additional parameters passed to storage_handler.remove_agent
         """
         self.agents = [agent for agent in self.agents if agent.name != agent_name]
         self.agent_states.pop(agent_name, None)
@@ -239,25 +275,27 @@ class AgentManager(BaseModule):
         Get the state of a specific agent by its name.
 
         Args:
-            agent_name (str): The name of the agent.
+            agent_name: The name of the agent.
 
         Returns:
-            AgentState: The current state of the agent, or None if not found.
+            AgentState: The current state of the agent.
         """
         return self.agent_states[agent_name]
     
     @atomic_method
     def set_agent_state(self, agent_name: str, new_state: AgentState) -> bool:
         """
-        Update the state of a specific agent by its name.
-
+        Changes an agent's state and notifies any threads waiting on that agent's state.
+        Thread-safe operation for coordinating multi-threaded agent execution.
+        
         Args:
-            agent_name (str): The name of the agent.
-            new_state (AgentState): The new state to set.
+            agent_name: The name of the agent
+            new_state: The new state to set
         
         Returns:
-            bool: True if the state was updated successfully, False otherwise.
+            True if the state was updated successfully, False otherwise
         """
+        
         # if agent_name in self.agent_states and isinstance(new_state, AgentState):
         #     # self.agent_states[agent_name] = new_state
         #     with self._state_conditions[agent_name]:
@@ -277,8 +315,7 @@ class AgentManager(BaseModule):
         return False
 
     def get_all_agent_states(self) -> Dict[str, AgentState]:
-        """
-        Get the states of all managed agents.
+        """Get the states of all managed agents.
 
         Returns:
             Dict[str, AgentState]: A dictionary mapping agent names to their states.
@@ -287,8 +324,10 @@ class AgentManager(BaseModule):
     
     @atomic_method
     def save_all_agents(self, **kwargs):
-        """
-        Save all agents to storage.
+        """Save all managed agents to persistent storage.
+                
+        Args:
+            **kwargs: Additional parameters passed to the storage handler
         """
         pass 
     
@@ -303,15 +342,14 @@ class AgentManager(BaseModule):
         self.check_agents()
 
     def wait_for_agent_available(self, agent_name: str, timeout: Optional[float] = None) -> bool:
-        """
-        Wait for an agent to be available.
-
+        """Wait for an agent to be available.
+        
         Args:
-            agent_name (str): The name of the agent.
-            timeout (Optional[float]): The maximum time to wait for the agent to be available.
-
+            agent_name: The name of the agent to wait for
+            timeout: Maximum time to wait in seconds, or None to wait indefinitely
+            
         Returns:
-            bool: True if the agent is available, False otherwise.
+            True if the agent became available, False if timed out
         """
         if agent_name not in self._state_conditions:
             self._state_conditions[agent_name] = threading.Condition()

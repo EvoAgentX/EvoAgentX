@@ -37,12 +37,21 @@ def load_tsv_data(file_path: str) -> List[dict]:
 
 class NQ(Benchmark):
 
-    """
+    """Benchmark class for evaluating question answering on Natural Questions dataset.
+    
+    Natural Questions (NQ) is a dataset for open-domain question answering,
+    containing real questions from Google Search and answers from Wikipedia.
+    This class handles loading the dataset, evaluating answers, and computing
+    metrics like exact match and F1 score.
+    
+    Each NQ example has the following structure:
     {
         "id": str, 
         "question": str, 
         "answers": List[str]
     }
+    
+    The benchmark evaluates answers using exact match, F1 score, and accuracy metrics.
     """
 
     def __init__(self, path: str = None, mode: str = "all", **kwargs):

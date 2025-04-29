@@ -34,7 +34,7 @@ class Evaluator:
 
         Args:
             llm (BaseLLM): The LLM to use for evaluation.
-            num_workers (int): The number of parallel workers to use for evaluation.
+            num_workers (int): The number of parallel workers to use for evaluation. Default is 1. 
             agent_manager (AgentManager, optional): The agent manager used to construct the workflow. Only used when the workflow graph is a WorkFlowGraph.
             collate_func (Callable, optional): A function to collate the benchmark data. 
                 It receives a single example from the benchmark and the output (which should be a dictionary) will serve as inputs  
@@ -59,9 +59,7 @@ class Evaluator:
         self.kwargs = kwargs
 
     def _get_eval_data(self, benchmark: Benchmark, eval_mode: str = "test", indices: Optional[List[int]] = None, sample_k: Optional[int] = None, seed: Optional[int] = None) -> List[dict]:
-        """
-        Get the evaluation data from the benchmark.
-        """
+
         assert eval_mode in ["test", "dev", "train"], f"Invalid eval_mode: {eval_mode}. Choices: ['test', 'dev', 'train']"
         if eval_mode == "test":
             data = benchmark.get_test_data(indices=indices, sample_k=sample_k, seed=seed)

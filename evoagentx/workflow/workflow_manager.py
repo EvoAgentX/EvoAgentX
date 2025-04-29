@@ -22,13 +22,19 @@ from ..prompts.workflow.workflow_manager import (
 
 class Scheduler(Action):
     """
-    An interface for the workflow schedulers
+    Base interface for workflow schedulers.
+    
+    Provides a common interface for all scheduler types within the workflow
+    system. Schedulers are responsible for making decisions about what to 
+    execute next in a workflow, whether at the task or action level.
+    
+    Inherits from Action to leverage the common action interface and functionality.
     """
     pass
 
 
 class TaskSchedulerOutput(LLMOutputParser):
-
+    
     decision: str = Field(description="The decision made by the scheduler, whether to re-execute, iterate or forward a certain task.")
     task_name: str = Field(description="The name of the scheduled task.")
     reason: str = Field(description="The rationale behind the scheduling decision, explaining why the task was scheduled.")
@@ -40,7 +46,7 @@ class TaskSchedulerOutput(LLMOutputParser):
 class TaskScheduler(Action):
 
     """
-    Determines the next task to execute based on the workflow graph and node statuses.
+    Determines the next task to execute in a workflow.
     """
     def __init__(self, **kwargs):
         name = kwargs.pop("name", None) if "name" in kwargs else DEFAULT_TASK_SCHEDULER["name"]

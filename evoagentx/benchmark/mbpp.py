@@ -80,7 +80,17 @@ def load_mbpp_data(data_path: str):
 
 class MBPP(CodingBenchmark):
 
-    """
+    """Benchmark class for evaluating code generation on the MBPP dataset.
+    
+    MBPP (Mostly Basic Python Programming) is a collection of Python programming 
+    problems designed to test a model's ability to generate functionally correct 
+    code from natural language descriptions. This class handles loading the dataset, 
+    evaluating solutions, and computing metrics such as pass@k.
+    
+    The original MBPP format is transformed to be compatible with the HumanEval
+    benchmark format, allowing for consistent evaluation infrastructure.
+    
+    Each MBPP example has the following structure:
     {
         "task_id" (int): 2, 
         "prompt" (str): "Write a function to find the shared elements from the given two lists.",
@@ -88,6 +98,9 @@ class MBPP(CodingBenchmark):
         "test_imports": [] 
         "test_list" (List[str]): ['assert set(similar_elements((3, 4, 5, 6),(5, 7, 4, 10))) == set((4, 5))', 'assert set(similar_elements((1, 2, 3, 4),(5, 4, 3, 7))) == set((3, 4))', 'assert set(similar_elements((11, 12, 14, 13),(17, 15, 14, 13))) == set((13, 14))']
     }
+    
+    Attributes:
+        k: An integer or list of integers specifying which pass@k metrics to compute
     """
 
     def __init__(self, path: str = None, mode: str = "all", timeout: int = 60, k: Union[int, list] = 1,**kwargs):
@@ -161,6 +174,10 @@ class MBPP(CodingBenchmark):
 
 
 class AFlowMBPP(MBPP):
+
+    """
+    AFlow-specific implementation of MBPP benchmark.
+    """
 
     def __init__(self, path: str = None, mode: str = "all", timeout: int = 60, k: Union[int, list] = 1,**kwargs):
         path = os.path.expanduser(path or "~/.evoagentx/data/aflow/mbpp")

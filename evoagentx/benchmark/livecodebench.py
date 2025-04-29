@@ -28,6 +28,27 @@ VALID_SCENARIO = ["code_generation", "test_output_prediction", "code_execution"]
 
 class LiveCodeBench(CodingBenchmark):
 
+    """Benchmark class for evaluating LLM capabilities on real-world programming tasks.
+    
+    LiveCodeBench provides a framework for evaluating different scenarios of code-related tasks:
+    1. Code Generation: generating code from problem descriptions
+    2. Test Output Prediction: predicting test outputs given test code
+    3. Code Execution: generating code that executes correctly
+    
+    The benchmark supports different evaluation modes, metrics, and can be customized
+    with various parameters like timeouts, sample dates, and processing options.
+    
+    Attributes:
+        k: An integer or list of integers specifying which pass@k metrics to compute
+        version: Release version of the dataset to use
+        num_process: Number of processes to use for evaluation
+        start_date: Filter problems to those after this date
+        end_date: Filter problems to those before this date
+        scenario: Type of programming task to evaluate ("code_generation", 
+                  "test_output_prediction", or "code_execution")
+        use_cot_for_execution: Whether to use chain-of-thought processing for code execution
+    """
+
     def __init__(
         self, 
         path: str = None, 

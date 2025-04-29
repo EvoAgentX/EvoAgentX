@@ -601,9 +601,7 @@ class SEWWorkFlowScheme:
 
 
 class SimplePromptBreeder:
-    """
-    The simple prompt breeder for SEW optimizer.
-    """
+
     def __init__(self, llm: BaseLLM, **kwargs):
         self.llm = llm
         self.kwargs = kwargs
@@ -675,9 +673,7 @@ class SEWOptimizer(Optimizer):
                 )
 
     def optimize(self, dataset: Benchmark, **kwargs):
-        """
-        Optimize the workflow.
-        """
+
         if isinstance(self.graph, SequentialWorkFlowGraph):
             logger.info(f"Optimizing the {type(self.graph).__name__} workflow with {self.repr_scheme} representation.")
         elif isinstance(self.graph, ActionGraph):
@@ -776,9 +772,7 @@ class SEWOptimizer(Optimizer):
         return avg_metrics
     
     def log_snapshot(self, graph: Union[SequentialWorkFlowGraph, ActionGraph], metrics: dict):
-        """
-        Log the snapshot of the workflow.
-        """
+        
         if isinstance(graph, SequentialWorkFlowGraph):
             graph_info = graph.get_graph_info()
         elif isinstance(graph, ActionGraph):
@@ -796,9 +790,7 @@ class SEWOptimizer(Optimizer):
         )
 
     def _select_graph_with_highest_score(self, return_metrics: bool = False) -> Union[SequentialWorkFlowGraph, ActionGraph]:
-        """
-        Select the graph in `self._snapshot` with the highest score.
-        """
+
         if len(self._snapshot) == 0:
             return self.graph
         snapshot_scores = [np.mean(list(snapshot["metrics"].values())) for snapshot in self._snapshot]
@@ -817,9 +809,7 @@ class SEWOptimizer(Optimizer):
         return graph
     
     def restore_best_graph(self):
-        """
-        Restore the best graph from the snapshot and set it to `self.graph`.
-        """
+
         best_graph, best_metrics = self._select_graph_with_highest_score(return_metrics=True)
         logger.info(f"Restore the best graph from snapshot with metrics {best_metrics} ...")
         self.graph = best_graph
@@ -853,9 +843,7 @@ class SEWOptimizer(Optimizer):
         return new_graph
     
     def _wfg_prompt_optimization_step(self, graph: SequentialWorkFlowGraph) -> SequentialWorkFlowGraph:
-        """
-        optinize the prompt of the workflow graph and return the optimized graph.
-        """
+
         task_description = graph.goal
         graph_scheme = SEWWorkFlowScheme(graph=graph)
         graph_repr = graph_scheme.convert_to_scheme(scheme=self.repr_scheme)
@@ -872,9 +860,7 @@ class SEWOptimizer(Optimizer):
         return new_graph
         
     def _workflow_graph_step(self, graph: SequentialWorkFlowGraph) -> SequentialWorkFlowGraph:
-        """
-        Take a step of optimization on the workflow graph and return the optimized graph.
-        """
+
         if self.optimize_mode == "structure" or self.optimize_mode == "all":
             # optimize the structure of the graph    
             graph = self._wfg_structure_optimization_step(graph)
@@ -885,9 +871,7 @@ class SEWOptimizer(Optimizer):
         return graph
     
     def _action_graph_prompt_optimization_step(self, graph: ActionGraph) -> ActionGraph:
-        """
-        Optimize the prompts of the action graph. 
-        """
+
         task_description = graph.description
         graph_info = graph.get_graph_info()
         graph_steps = inspect.getsource(getattr(graph, "execute"))
@@ -906,9 +890,7 @@ class SEWOptimizer(Optimizer):
         return new_graph
 
     def _action_graph_step(self, graph: ActionGraph) -> ActionGraph:
-        """
-        Take a step of optimization on the action graph and return the optimized graph.
-        """
+        
         if self.optimize_mode == "prompt":
             graph = self._action_graph_prompt_optimization_step(graph)
         else:
@@ -917,9 +899,7 @@ class SEWOptimizer(Optimizer):
         return graph
 
     def convergence_check(self, **kwargs) -> bool:
-        """
-        Check if the optimization has converged.
-        """
+        
         if not self._snapshot:
             logger.warning("No snapshots available for convergence check")
             return False
