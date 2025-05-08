@@ -43,30 +43,29 @@
 - [快速开始 & 演示视频](#quickstart--demo-video)
 - [教程和使用案例](#tutorial-and-use-cases)
 
-### Installation
+### 安装
 
-Refer to the [Installation Guide for EvoAgentX](./docs/installation.md) for detailed instructions on how to install EvoAgentX.
+请参阅 [EvoAgentX 安装指南](./docs/installation.md) 以获取详细的安装步骤。
 
-Create environment: 
-1. Clone this repository and navigate to EvoAgentX folder
+创建环境：
+1. 克隆此代码库并进入 EvoAgentX 文件夹
 ```bash
 git clone https://github.com/EvoAgentX/EvoAgentX.git
 cd EvoAgentX
-```
 
-2. Install Package
+2. 安装依赖包
 ```Shell
 conda create -n evoagentx python=3.10 
 conda activate evoagentx
 pip install -r requirements.txt 
 ```
 
-### Configuration
+### 配置
 Todos:
 1. How to set up keys
 2. others
 
-### Examples: Automatic WorkFlow Generation 
+### 示例：自动工作流生成
 ```python
 from evoagentx.models import OpenAILLMConfig, OpenAILLM
 from evoagentx.agents import AgentManager
