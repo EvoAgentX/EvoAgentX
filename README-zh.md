@@ -33,15 +33,15 @@
 
 <hr>
 
-## 🔥 Latest News
-- **[May 2025]** 🎉 **EvoAgentX** has been officially released!
+## 🔥 最新动态
+- **[2025年5月]** 🎉 **EvoAgentX** 正式发布！
 
-## ⚡Get Started
-- [Installation](#installation)
-- [Configuration](#configuration)
-- [Examples: Automatic WorkFlow Generation](#examples-automatic-workflow-generation)
-- [QuickStart & Demo Video](#quickstart--demo-video)
-- [Tutorial and Use Cases](#tutorial-and-use-cases)
+## ⚡开始使用
+- [安装指南](#installation)
+- [配置指南](#configuration)
+- [示例：自动工作流生成](#examples-automatic-workflow-generation)
+- [快速开始 & 演示视频](#quickstart--demo-video)
+- [教程和使用案例](#tutorial-and-use-cases)
 
 ### Installation
 
