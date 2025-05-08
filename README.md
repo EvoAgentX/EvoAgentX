@@ -132,7 +132,7 @@ Explore how to effectively use EvoAgentX with the following resources:
 
 If you have any questions or feedback about this project, please feel free to contact us. We highly appreciate your suggestions!
 
-- **Email:** clayx.ai.co@gmail.com
+- **Email:** evoagentx.ai@gmail.com
 
 We will respond to all questions within 2-3 business days.
 
