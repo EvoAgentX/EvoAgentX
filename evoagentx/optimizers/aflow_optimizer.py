@@ -63,6 +63,7 @@ class AFlowOptimizer(BaseModule):
     eval_rounds: int = Field(default=3, description="Run the workflow for `eval_rounds` times to evaluate the performance on the test set.")
     check_convergence: bool = Field(default=True, description="Whether to check for convergence.")
 
+    
     def init_module(self, **kwargs):
 
         self.root_path = self.optimized_path or self.graph_path

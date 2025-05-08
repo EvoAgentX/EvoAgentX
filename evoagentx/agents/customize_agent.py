@@ -221,7 +221,7 @@ class CustomizeAgent(Agent):
         system_prompt = system_prompt or DEFAULT_SYSTEM_PROMPT
         inputs = inputs or [] 
         outputs = outputs or [] 
-
+    
         if isinstance(parse_func, str):
             if not PARSE_FUNCTION_REGISTRY.has_function(parse_func):
                 raise ValueError(f"parse function `{parse_func}` is not registered! To instantiate a CustomizeAgent from a file, you should use decorator `@register_parse_function` to register the parse function.")

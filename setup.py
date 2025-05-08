@@ -24,7 +24,7 @@ setup(
     author='Jinyuan Fang',
     author_email='fangjy6@gmail.com',
     description="EvoAgentX: An Evolutionary Agent Framework",
-    long_description=open('README.md', 'r').read(),
+    long_description=open('README.md', 'r', encoding='utf-8').read(),
     long_description_content_type="text/markdown",
     url='https://github.com/EvoAgentX/EvoAgentX',
     packages=find_packages(),
