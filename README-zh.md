@@ -109,46 +109,45 @@ Todos
 
 | Cookbook | Description |
 |:---|:---|
-| **[Build Your First Agent](./docs/tutorial/first_agent.md)** | A comprehensive guide to creating your first agent step-by-step. |
-| **[Building Workflows Manually](./docs/tutorial/first_workflow.md)** | Learn how to design and implement collaborative agent workflows. |
-| **[Benchmark and Evaluation Tutorial](./docs/tutorial/benchmark_and_evaluation.md)** | Guidelines for evaluating and benchmarking agent performance. |
-| **[SEW Optimizer Tutorial](./docs/tutorial/sew_optimizer.md)** | Learn optimization techniques for enhancing agent workflows. |
+| **[构建你的第一个智能体](./docs/tutorial/first_agent.md)** | 逐步创建第一个智能体的完全指南. |
+| **[手动构建工作流](./docs/tutorial/first_workflow.md)** | 学习如何设计和实现写作智能体工作流. |
+| **[基准和评估教程](./docs/tutorial/benchmark_and_evaluation.md)** | 智能体性能评估和准则测试指南. |
+| **[SEW优化器教程](./docs/tutorial/sew_optimizer.md)** | 学习优化技术，提升智能体工作效率. |
 
-🛠️ Follow the tutorials to build and optimize your EvoAgentX workflows.
+🛠️ 按照教程构建和优化你的 EvoAgentX 工作流。
 
-💡 Discover real-world applications and unleash the potential of EvoAgentX in your projects!
+💡 通过这些实际案例，发掘 EvoAgentX 在你的项目中的潜力！
 
-## 🙋 Support
+## 🙋 支持
 
-### Join the Community
+### 加入社区
 
-📢 Stay connected and be part of the **EvoAgentX** journey!  
-🚩 Join our community to get the latest updates, share your ideas, and collaborate with AI enthusiasts worldwide.
+📢 参与并跟随  **EvoAgentX** 的发展历程！
+🚩 加入我们的社区，获取最新动态，分享你的想法，并与全球的AI爱好者合作。
 
-- [Discord](https://discord.com/invite/EvoAgentX) — Chat, discuss, and collaborate in real-time.
-- [X (formerly Twitter)](https://x.com/EvoAgentX) — Follow us for news, updates, and insights.
-- [WeChat]() — Connect with our Chinese community.
+- [Discord](https://discord.com/invite/EvoAgentX) — 实时聊天，讨论和协作。
+- [X (formerly Twitter)](https://x.com/EvoAgentX) — 获取新闻、更新和洞察。
+- [WeChat]() — 与中国社区连接。
 
-### Contact Information
+### 联系信息
 
-If you have any questions or feedback about this project, please feel free to contact us. We highly appreciate your suggestions!
+如果你有任何问题或反馈，请随时联系我们。我们非常欢迎您的建议！
 
-- **Email:** evoagentx.ai@gmail.com
+- **邮箱:** evoagentx.ai@gmail.com
 
-We will respond to all questions within 2-3 business days.
+我们将在2-3个工作日内回复所有问题。
 
-## 🙌 Contributing to EvoAgentX
-Thanks go to these awesome contributors
+## 🙌 为EvoAgentX做贡献
+感谢以下优秀的贡献者
 
 <a href="https://github.com/EvoAgentX/EvoAgentX/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=EvoAgentX/EvoAgentX" />
 </a>
 
-We appreciate your interest in contributing to our open-source initiative. We provide a document of [contributing guidelines](https://github.com/clayxai/EvoAgentX/blob/main/CONTRIBUTING.md) which outlines the steps for contributing to EvoAgentX. Please refer to this guide to ensure smooth collaboration and successful contributions. 🤝🚀
+我们感谢你对我们开源项目的兴趣。我们提供了 [贡献指南文档](https://github.com/clayxai/EvoAgentX/blob/main/CONTRIBUTING.md) 其中列出了为EvoAgentX做贡献的步骤。请参考此指南，确保顺利合作并取得成功。 🤝🚀
 
 [![Star History Chart](https://api.star-history.com/svg?repos=EvoAgentX/EvoAgentX&type=Date)](https://www.star-history.com/#EvoAgentX/EvoAgentX&Date)
 
 
-## 📄 License
-
-Source code in this repository is made available under the [MIT License](./LICENSE).
+## 📄 许可证
+本仓库中的源代码根据 [MIT 许可证](./LICENSE) 提供。
