@@ -132,6 +132,7 @@ class HumanEval(CodingBenchmark):
         
         return pass_at_k
     
+
 class HumanEvaluPlus(HumanEval):
 
     """Extended version of HumanEval with additional test cases and inputs.

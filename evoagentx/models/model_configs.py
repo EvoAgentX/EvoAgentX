@@ -10,8 +10,9 @@ from ..core.base_config import BaseConfig
 class LLMConfig(BaseConfig):
 
     llm_type: str
-    model: str = Field(default="gpt-4o-mini", description="The model to use for the LLM")
+    model: str 
     output_response: bool = Field(default=False, description="Whether to output LLM response.")
+
 
 class OpenAILLMConfig(LLMConfig):
 

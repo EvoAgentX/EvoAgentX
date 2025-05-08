@@ -72,7 +72,6 @@ class HotPotQA(Benchmark):
         return {"f1": f1, "em": em, "acc": acc}
     
 
-
 class AFlowHotPotQA(HotPotQA):
 
     """
