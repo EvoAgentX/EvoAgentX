@@ -9,6 +9,7 @@ from collections import defaultdict
 from pydantic import Field, field_validator, model_validator
 from typing import Union, Optional, Tuple, Callable, Dict, List
 from functools import wraps
+
 from ..core.logging import logger
 from ..core.module import BaseModule
 from ..core.base_config import Parameter
@@ -287,14 +288,13 @@ class WorkFlowGraph(BaseModule):
         nodes: List of WorkFlowNode instances representing tasks
         edges: List of WorkFlowEdge instances representing dependencies
         graph: Internal NetworkX MultiDiGraph or another WorkFlowGraph
-        graph_path: Path to the graph file
     """
 
     goal: str
     nodes: Optional[List[WorkFlowNode]] = []
     edges: Optional[List[WorkFlowEdge]] = []
     graph: Optional[Union[MultiDiGraph, "WorkFlowGraph"]] = Field(default=None, exclude=True)
-    graph_path: Optional[str] = Field(default=None, description="Path to the graph file")
+
     def init_module(self):
         self._lock = threading.Lock()
         if not self.graph:
@@ -307,27 +307,6 @@ class WorkFlowGraph(BaseModule):
             raise TypeError(f"{type(self.graph)} is an unknown type for graph. Supported types: [MultiDiGraph, WorkFlowGraph]")
         self._validate_workflow_structure()
         self.update_graph()
-    
-
-    def agents(self):
-        agent_lst = []
-        for node in self.nodes:
-            for agent in node.agents:
-                agent_lst.append(agent)
-        return agent_lst
-
-    def reset_agents(self):
-        agent_lst = self.agents()
-        for agent in agent_lst:
-            agent['traces'] = []
-            agent['train'] = []
-            agent['demos'] = []
-    
-    def reset_copy(self):
-        graph = self.to_dict()
-        new_instance = type(self).from_dict(graph)
-        
-        return new_instance.reset_agents()
     
     def update_graph(self):
         # call this function when modifying nodes or edges!
@@ -1162,16 +1141,11 @@ class SequentialWorkFlowGraph(WorkFlowGraph):
                     "prompt": node.agents[0].get("prompt", None),
                     "system_prompt": node.agents[0].get("system_prompt", None),
                     "parse_mode": node.agents[0].get("parse_mode", "str"), 
-                    "parse_func": getattr(node.agents[0].get("parse_func", None), '__name__', node.agents[0].get("parse_func", None)),
-                    "parse_title": node.agents[0].get("parse_title", None),
-                    "demos": node.agents[0].get("demos", []),
-                    "traces": node.agents[0].get("traces", []),
-                    "train": node.agents[0].get("train", [])
-                    
-                } 
+                    "parse_func": node.agents[0].get("parse_func", None).__name__ if node.agents[0].get("parse_func", None) else None,
+                    "parse_title": node.agents[0].get("parse_title", None)
+                }
                 for node in self.nodes
-            ],
-            "graph_path": self.graph_path
+            ]
         }
         return config
     
@@ -1180,29 +1154,15 @@ class SequentialWorkFlowGraph(WorkFlowGraph):
         Save the workflow graph to a module file.
         """
         logger.info("Saving {} to {}", self.__class__.__name__, path)
-        self.graph_path = path
         config = self.get_graph_info()
         for ignore_key in ignore:
             config.pop(ignore_key, None)
         make_parent_folder(path)
-        
         with open(path, "w", encoding="utf-8") as f:
             json.dump(config, f, indent=4)
-        
         return path
     
-    
-    def deep_copy(self):
-        graph = self.get_graph_info()
-        new_instance = type(self).from_dict(graph)
-        return new_instance
-    
-    def reset_copy(self):
-        new_instance = self.deep_copy()
-        new_instance.reset_agents()
-        return new_instance
-    
-    
+
 class SEWWorkFlowGraph(SequentialWorkFlowGraph):
 
     def __init__(self, **kwargs):

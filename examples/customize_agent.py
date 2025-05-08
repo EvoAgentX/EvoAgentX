@@ -12,32 +12,21 @@ def build_customize_agent():
     # Configure LLM
     openai_config = OpenAILLMConfig(model="gpt-4o-mini", openai_key=OPENAI_API_KEY, stream=True)
 
-    describe_module = CustomizeAgent(
-        name="DescribeModule",
-        description="An agent that describes a module's functionality in a program",
-        prompt="""
-        Below is some pseudo-code for a pipeline that solves tasks with calls to language models. Please describe the purpose of one of the specified module in this pipeline.
-        {program_code}
-        {program_example}
-        {program_description}
-        {module}
-        """,
-        inputs = [
-            {"name": "program_code", "type": "str", "description": "Pseudocode for a language model program designed to solve a particular task"},
-            {"name": "program_example", "type": "str", "description": "An example of the program in use"},
-            {"name": "program_description", "type": "str", "description": "Summary of the task the program is designed to solve, and how it goes about solving it"},
-            {"name": "module", "type": "str", "description": "The module in the program that we want to describe"}
-        ],
-        outputs = [
-            {"name": "module_description", "type": "str", "description": "Description of the module's role in the broader program"}
-        ],
-        llm_config=openai_config,
-        parse_mode="str",
-    )
-    
-    # 获取 action 的输入和输出字段
-    
-    message = describe_module(inputs = {"program_code": "hello", "program_example": "world", "program_description": "world", "module": "hello"})
-    print(message.content.module_description)
+    # Create an agent from a dictionary
+    agent_data = {
+        "name": "FirstAgent",
+        "description": "A simple agent that prints hello world",
+        "prompt": "Print 'hello world'",
+        "llm_config": openai_config
+    }
+    agent = CustomizeAgent.from_dict(agent_data)
+
+    # Execute the agent
+    message: Message = agent() # the output of an agent is a Message object 
+
+    print(f"Response from {agent.name}:")
+    print(message.content.content) # the content of a Message object is a LLMOutputParser object
+
+
 if __name__ == "__main__":
     build_customize_agent()
