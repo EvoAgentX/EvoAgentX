@@ -52,6 +52,7 @@
 ```bash
 git clone https://github.com/EvoAgentX/EvoAgentX.git
 cd EvoAgentX
+```
 
 2. 安装依赖包
 ```Shell
