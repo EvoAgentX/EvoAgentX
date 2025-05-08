@@ -6,7 +6,7 @@
 </div>
 
 <h1 align="center">
-    EvoAgentX:  Building a Self-Evolving Ecosystem of AI Agents
+    EvoAgentX:  构建自进化的 AI 智能体生态系统
 </h1>
 
 <div align="center">
