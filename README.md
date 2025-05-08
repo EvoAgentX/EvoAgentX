@@ -25,7 +25,7 @@
 
 <h3 align="center">
 
-English | [简体中文](./README-zh.md) 
+[English](./README.md)  | [简体中文](./README-zh.md) 
 
 </h3>
 
