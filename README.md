@@ -6,7 +6,7 @@
 </div>
 
 <h1 align="center">
-    EvoAgentX: Automate and Evolve Your Workflows
+    EvoAgentX:  Building a Self-Evolving Ecosystem of AI Agents
 </h1>
 
 <div align="center">
