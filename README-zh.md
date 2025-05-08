@@ -80,31 +80,32 @@ model = OpenAILLM(config=openai_config)
 agent_manager = AgentManager()
 wf_generator = WorkFlowGenerator(llm=model)
 
-# generate workflow & agents
-workflow_graph: WorkFlowGraph = wf_generator.generate_workflow(goal="Generate a python code for greedy snake game")
+# 生成工作流和智能体
+workflow_graph: WorkFlowGraph = wf_generator.generate_workflow(goal="生成一个贪吃蛇游戏的python代码")
 
-# [optional] display workflow
+# [可选] 显示工作流
 workflow_graph.display()
-# [optional] save workflow 
+# [可选] 保存工作流 
 workflow_graph.save_module("debug/workflow_demo.json")
-#[optional] load saved workflow 
+#[可选] 加载已保存的工作流 
 workflow_graph: WorkFlowGraph = WorkFlowGraph.from_file("debug/workflow_demo.json")
 
 agent_manager.add_agents_from_workflow(workflow_graph)
-# execute workflow
+# 执行工作流
 workflow = WorkFlow(graph=workflow_graph, agent_manager=agent_manager, llm=model)
 output = workflow.execute()
 print(output)
 ```
 
-### QuickStart & Demo Video
+### 快速开始 & 演示视频
 Todos
 
-Refer to the [Quickstart Guide](./docs/quickstart.md) for a step-by-step guide to get started with EvoAgentX.
+请参阅[快速开始指南](./docs/quickstart.md) 以获得一步步的指导，帮助你快速上手 EvoAgentX。
 
-### Tutorial and Use Cases
 
-Explore how to effectively use EvoAgentX with the following resources:
+### 教程和使用案例
+
+探索如何有效地使用 EvoAgentX:
 
 | Cookbook | Description |
 |:---|:---|
