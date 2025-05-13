@@ -1,5 +1,5 @@
 
-from pydantic import Field
+# from pydantic import Field
 
 from .memory import BaseMemory
 from ..storages.base import StorageHandler
