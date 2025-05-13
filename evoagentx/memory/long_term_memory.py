@@ -11,7 +11,7 @@ class LongTermMemory(BaseMemory):
     Responsible for the management of raw data for long-term storage.
     """
     storage: StorageHandler
-    rag_engine = Field(..., description="")
+    # rag_engine = Field(..., description="")
     pass 
 
 
