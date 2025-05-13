@@ -66,8 +66,8 @@ class BaseModule(BaseModel, metaclass=MetaModule):
         Subclass initialization method that automatically sets the class_name attribute.
         
         Args:
-            cls: The subclass being initialized
-            **kwargs: Additional keyword arguments
+            cls (Type): The subclass being initialized
+            **kwargs (Any): Additional keyword arguments
         """
         super().__init_subclass__(**kwargs)
         cls.class_name = cls.__name__
@@ -77,7 +77,7 @@ class BaseModule(BaseModel, metaclass=MetaModule):
         Initializes a BaseModule instance.
         
         Args:
-            **kwargs: Keyword arguments used to initialize the instance
+            **kwargs (Any): Keyword arguments used to initialize the instance
         
         Raises:
             ValidationError: When parameter validation fails
@@ -114,7 +114,7 @@ class BaseModule(BaseModel, metaclass=MetaModule):
         """
         pass
 
-    def __str__(self):
+    def __str__(self) -> str:
         """
         Returns a string representation of the object.
         
@@ -124,7 +124,7 @@ class BaseModule(BaseModel, metaclass=MetaModule):
         return self.to_str()
     
     @property
-    def kwargs(self):
+    def kwargs(self) -> dict:
         """
         Returns the extra fields of the model.
         
@@ -171,13 +171,13 @@ class BaseModule(BaseModel, metaclass=MetaModule):
             return data 
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any], **kwargs):
+    def from_dict(cls, data: Dict[str, Any], **kwargs) -> "BaseModule":
         """
         Instantiate the BaseModule from a dictionary.
         
         Args:
             data: Dictionary containing instance data
-            **kwargs: Additional keyword arguments, can include log to control logging output
+            **kwargs (Any): Additional keyword arguments, can include log to control logging output
         
         Returns:
             BaseModule: The created module instance
@@ -203,7 +203,7 @@ class BaseModule(BaseModel, metaclass=MetaModule):
         return module
     
     @classmethod
-    def from_json(cls, content: str, **kwargs):
+    def from_json(cls, content: str, **kwargs) -> "BaseModule":
         """
         Construct the BaseModule from a JSON string.
         
@@ -214,7 +214,7 @@ class BaseModule(BaseModel, metaclass=MetaModule):
         
         Args:
             content: JSON string
-            **kwargs: Additional keyword arguments, can include `log` to control logging output
+            **kwargs (Any): Additional keyword arguments, can include `log` to control logging output
         
         Returns:
             BaseModule: The created module instance
@@ -240,7 +240,7 @@ class BaseModule(BaseModel, metaclass=MetaModule):
         return cls.from_dict(data, log=use_logger)
     
     @classmethod
-    def from_str(cls, content: str, **kwargs):
+    def from_str(cls, content: str, **kwargs) -> "BaseModule":
         """
         Construct the BaseModule from a string that may contain JSON.
         
@@ -251,7 +251,7 @@ class BaseModule(BaseModel, metaclass=MetaModule):
         
         Args:
             content: Text that may contain JSON strings
-            **kwargs: Additional keyword arguments, can include `log` to control logging output
+            **kwargs (Any): Additional keyword arguments, can include `log` to control logging output
         
         Returns:
             BaseModule: The created module instance
@@ -295,7 +295,7 @@ class BaseModule(BaseModel, metaclass=MetaModule):
         
         Args:
             path: The path of the file
-            **kwargs: Additional keyword arguments
+            **kwargs (Any): Additional keyword arguments
         
         Returns:
             dict: The JSON object instantiated from the file
@@ -305,7 +305,7 @@ class BaseModule(BaseModel, metaclass=MetaModule):
         return content
 
     @classmethod
-    def from_file(cls, path: str, load_function: Callable=None, **kwargs):
+    def from_file(cls, path: str, load_function: Callable=None, **kwargs) -> "BaseModule":
         """
         Construct the BaseModule from a file.
         
@@ -318,7 +318,7 @@ class BaseModule(BaseModel, metaclass=MetaModule):
         Args:
             path: The path of the file
             load_function: The function used to load the data, takes a file path as input and returns a JSON object
-            **kwargs: Additional keyword arguments, can include `log` to control logging output
+            **kwargs (Any): Additional keyword arguments, can include `log` to control logging output
         
         Returns:
             BaseModule: The created module instance
@@ -352,7 +352,7 @@ class BaseModule(BaseModel, metaclass=MetaModule):
         Args:
             exclude_none: Whether to exclude fields with None values
             ignore: List of field names to ignore
-            **kwargs: Additional keyword arguments
+            **kwargs (Any): Additional keyword arguments
         
         Returns:
             dict: Dictionary containing the object data
@@ -388,7 +388,7 @@ class BaseModule(BaseModel, metaclass=MetaModule):
         Args:
             use_indent: Whether to use indentation
             ignore: List of field names to ignore
-            **kwargs: Additional keyword arguments
+            **kwargs (Any): Additional keyword arguments
         
         Returns:
             str: The JSON string
@@ -409,7 +409,7 @@ class BaseModule(BaseModel, metaclass=MetaModule):
         Convert the BaseModule to a string. Use .to_json to output JSON string by default.
         
         Args:
-            **kwargs: Additional keyword arguments
+            **kwargs (Any): Additional keyword arguments
         
         Returns:
             str: The string
@@ -428,7 +428,7 @@ class BaseModule(BaseModel, metaclass=MetaModule):
         Args:
             path: The path to save the file
             ignore: List of field names to ignore
-            **kwargs: Additional keyword arguments
+            **kwargs (Any): Additional keyword arguments
         
         Returns:
             str: The path where the file is saved, same as the input path

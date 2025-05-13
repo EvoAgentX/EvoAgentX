@@ -271,7 +271,7 @@ class CustomizeAgent(Agent):
         self.title_format = title_format
 
     @property
-    def customize_action_name(self):
+    def customize_action_name(self) -> str:
         """
         Get the name of the primary custom action for this agent.
         
@@ -284,7 +284,7 @@ class CustomizeAgent(Agent):
         raise ValueError("Couldn't find the customize action name!")
 
     @property
-    def action(self):
+    def action(self) -> Action:
         """
         Get the primary custom action for this agent.
         
@@ -294,7 +294,7 @@ class CustomizeAgent(Agent):
         return self.get_action(self.customize_action_name) 
     
     @property
-    def prompt(self):
+    def prompt(self) -> str:
         """
         Get the prompt for the primary custom action.
         
@@ -490,7 +490,7 @@ class CustomizeAgent(Agent):
 
         Args:
             inputs (dict): The inputs to the customize action.
-            **kwargs: Additional keyword arguments.
+            **kwargs (Any): Additional keyword arguments.
 
         Returns:
             ActionOutput: The output of the customize action.
@@ -545,7 +545,7 @@ class CustomizeAgent(Agent):
         Args:
             path: File path where the configuration should be saved
             ignore: List of keys to exclude from the saved configuration
-            **kwargs: Additional parameters for the save operation
+            **kwargs (Any): Additional parameters for the save operation
             
         Returns:
             The path where the configuration was saved

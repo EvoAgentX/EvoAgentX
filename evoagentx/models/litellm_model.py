@@ -54,7 +54,7 @@ class LiteLLM(OpenAILLM):
 
         Args: 
             messages (List[dict]): A list of dictionaries representing the conversation history.
-            **kwargs: Additional parameters to be passed to the `completion` function.
+            **kwargs (Any): Additional parameters to be passed to the `completion` function.
         
         Returns: 
             str: A string containing the model's response.
@@ -83,7 +83,7 @@ class LiteLLM(OpenAILLM):
 
         Args: 
             batch_messages (List[List[dict]]): A list of message lists, where each sublist represents a conversation.
-            **kwargs: Additional parameters to be passed to the `completion` function.
+            **kwargs (Any): Additional parameters to be passed to the `completion` function.
         
         Returns: 
             List[str]: A list of responses for each conversation.
@@ -100,7 +100,7 @@ class LiteLLM(OpenAILLM):
 
         Args: 
             messages (List[dict]): A list of dictionaries representing the conversation history.
-            **kwargs: Additional parameters to be passed to the `completion` function.
+            **kwargs (Any): Additional parameters to be passed to the `completion` function.
         
         Returns: 
             str: A string containing the model's response.

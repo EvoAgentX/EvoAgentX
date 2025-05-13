@@ -155,10 +155,13 @@ def parse_data_from_text(text: str, datatype: str):
     elif datatype == "dict":
         data = eval(text)
     else:
-        raise ValueError(
-            f"Invalid value '{datatype}' is detected for `datatype`. "
-            "Available choices: ['str', 'int', 'float', 'bool', 'list', 'dict']"
-        )
+        # raise ValueError(
+        #     f"Invalid value '{datatype}' is detected for `datatype`. "
+        #     "Available choices: ['str', 'int', 'float', 'bool', 'list', 'dict']"
+        # )
+        # logger.warning(f"Unknown datatype '{datatype}' is detected for `datatype`. Return the raw text instead.")
+        # failed to parse the data, return the raw text
+        return text 
     return data
 
 def parse_json_from_llm_output(text: str) -> dict:

@@ -184,7 +184,7 @@ class Agent(BaseModule):
             msgs: Optional list of messages providing context for the action
             action_input_data: Optional pre-extracted input data for the action
             return_msg_type: Message type for the return message
-            **kwargs: Additional parameters, may include workflow information
+            **kwargs (Any): Additional parameters, may include workflow information
         
         Returns:
             Message: A message containing the execution results
@@ -247,7 +247,7 @@ class Agent(BaseModule):
             msgs: Optional list of messages providing context for the action
             action_input_data: Optional pre-extracted input data for the action
             return_msg_type: Message type for the return message
-            **kwargs: Additional parameters, may include workflow information
+            **kwargs (Any): Additional parameters, may include workflow information
         
         Returns:
             Message: A message containing the execution results
@@ -490,7 +490,7 @@ class Agent(BaseModule):
         Args:
             path: Path where the agent should be saved
             ignore: List of field names to exclude from serialization
-            **kwargs: Additional parameters for the save operation
+            **kwargs (Any): Additional parameters for the save operation
             
         Returns:
             The path where the agent was saved
@@ -499,7 +499,7 @@ class Agent(BaseModule):
         super().save_module(path=path, ignore=ignore_fields, **kwargs)
 
     @classmethod
-    def load_module(cls, path: str, llm_config: LLMConfig = None, **kwargs):
+    def load_module(cls, path: str, llm_config: LLMConfig = None, **kwargs) -> "Agent":
         """
         load the agent from local storage. Must provide `llm_config` when loading the agent from local storage. 
 

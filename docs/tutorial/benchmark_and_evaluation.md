@@ -182,4 +182,4 @@ To define a custom benchmark, you need to extend the `Benchmark` class and imple
     Compute the evaluation metrics for a single example, based on its prediction and ground-truth label (obtained from `_get_label`).
     This method should return a dictionary of metric name(s) and value(s).
 
-For a complete example of a benchmark implementation, please refer to the [HotPotQA](../../evoagentx/benchmark/hotpotqa.py#L23) class.
+For a complete example of a benchmark implementation, please refer to the [HotPotQA](https://github.com/EvoAgentX/EvoAgentX/blob/main/evoagentx/benchmark/hotpotqa.py#L23) class.

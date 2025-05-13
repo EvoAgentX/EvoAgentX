@@ -124,4 +124,4 @@ print("Evaluation metrics: ", metrics)
 optimizer.save("debug/optimized_sew_workflow.json")
 ```
 
-For a complete working example, please refer to [sew_optimizer.py](../../examples/sew_optimizer.py).
+For a complete working example, please refer to [sew_optimizer.py](https://github.com/EvoAgentX/EvoAgentX/blob/main/examples/sew_optimizer.py).

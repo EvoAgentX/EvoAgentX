@@ -87,8 +87,9 @@ class OpenAILLM(BaseLLM):
         Process async stream response and return the complete output.
         
         Args:
-            response: The async stream response from OpenAI
-            output_response: Whether to print the response in real-time
+            response (AsyncIterator[ChatCompletionChunk]): The async stream response from OpenAI
+            output_response (bool): Whether to print the response in real-time
+            
             
         Returns:
             str: The complete output text

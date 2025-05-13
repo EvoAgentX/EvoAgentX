@@ -42,7 +42,7 @@ pip install -e .
 
 If you prefer to use Conda for managing your Python environments, follow these steps:
 
-```bash
+```bash hl_lines="4-5"
 # Create a new conda environment
 conda create -n evoagentx python=3.10
 

@@ -16,14 +16,14 @@ class BaseConfig(BaseModule):
         
         Args:
             path: The file path to save the configuration
-            **kwargs: Additional keyword arguments passed to save_module method
+            **kwargs (Any): Additional keyword arguments passed to save_module method
         
         Returns:
             str: The path where the file was saved
         """
         return super().save_module(path, **kwargs)
 
-    def get_config_params(self):
+    def get_config_params(self) -> List[str]:
         """Get a list of configuration parameters.
         
         Returns:

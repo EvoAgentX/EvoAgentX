@@ -780,16 +780,19 @@ class WorkFlowGraph(BaseModule):
     
     def get_candidate_children_nodes(self, completed_nodes: List[Union[str, WorkFlowNode]]) -> List[str]:
         """
-        return the next set of possible tasks to execute. If there are no loops in the graph, consider only the uncompleted children. 
+        Return the next set of possible tasks to execute. If there are no loops in the graph, consider only the uncompleted children. 
         If there exists loops, also consider the previous completed tasks.
 
         Args:
-            nodes (List[Union[str, WorkFlowNode]]): a list of completed nodes. 
+            completed_nodes (List[Union[str, WorkFlowNode]]): A list of completed nodes.
+            
+        Returns:
+            List[str]: List of node names that are candidates for execution.
         """
         node_names = [node if isinstance(node, str) else node.name for node in completed_nodes]
         has_loop = (len(self._loops) > 0)
         if has_loop:
-            # 存在环的时候需要额外判断
+            # if there exists loops, we need to check the completed nodes and their children nodes
             uncompleted_children_nodes = []
             for node_name in node_names:
                 children_nodes = self.get_all_children_nodes(nodes=[node_name])
@@ -819,8 +822,7 @@ class WorkFlowGraph(BaseModule):
         Check if all predecessors for a node are complete.
 
         Args:
-            graph (WorkFlowGraph): The workflow graph.
-            task_name (str): the name of a task.
+            node_name (str): The name of the task/node to check.
         
         Returns:
             bool: True if all predecessors are complete, False otherwise.

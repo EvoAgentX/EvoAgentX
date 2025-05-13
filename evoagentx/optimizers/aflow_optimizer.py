@@ -4,6 +4,7 @@ import os
 import re 
 import shutil
 import asyncio
+import numpy as np
 from tqdm import tqdm
 from typing import List, Any
 from pydantic import Field
@@ -279,12 +280,17 @@ class AFlowOptimizer(BaseModule):
         graph_path = self.root_path
         data = self.data_utils.load_results(graph_path)
         json_file_path = self.data_utils.get_results_file_path(graph_path)
+        scores = [] 
 
-        for round in tqdm(test_rounds, desc="Testing"):
+        # for round in tqdm(test_rounds, desc="Testing"):
+        for round in test_rounds:
+
+            logger.info(f"Running test for round {round}...")
 
             self.graph = self.graph_utils.load_graph(round, graph_path)
 
             score, avg_cost, total_cost = await self.evaluation_utils.evaluate_graph_test_async(self)
+            scores.append(score)
 
             new_data = self.data_utils.create_result_data(round, score, avg_cost, total_cost)
             data.append(new_data)
@@ -292,3 +298,6 @@ class AFlowOptimizer(BaseModule):
             logger.info(f"Test round {round} score: {score}, avg_cost: {avg_cost}, total_cost: {total_cost}")
 
             self.data_utils.save_results(json_file_path, data)
+
+        logger.info(f"Test round {round} avg_score: {np.mean(scores)}")
+        return np.mean(scores)

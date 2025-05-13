@@ -116,7 +116,11 @@ class AFlowGSM8K(GSM8K):
     supporting asynchronous evaluation for workflows.
     
     Attributes:
-        Same as GSM8K, with additional support for AFlow structures
+        path: Path to the directory containing AFlow-formatted GSM8K files.
+        mode: Data loading mode ("train", "dev", "test", or "all").
+        _train_data: Training dataset loaded from AFlow format.
+        _dev_data: Development dataset loaded from AFlow format.
+        _test_data: Test dataset loaded from AFlow format.
     """
 
     def __init__(self, path: str = None, mode: str = "all", **kwargs):

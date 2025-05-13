@@ -50,7 +50,11 @@ class CodeExtraction(Action):
     also identify which file is likely the main entry point based on heuristics.
     
     Attributes:
-        Inherits all attributes from the Action base class
+        name: The name of the action.
+        description: A description of what the action does.
+        prompt: The prompt template used by the action.
+        inputs_format: The expected format of inputs to this action.
+        outputs_format: The format of the action's output.
     """
 
     def __init__(self, **kwargs):
@@ -207,7 +211,7 @@ class CodeExtraction(Action):
                 - project_name: Optional project folder name
             sys_msg: Optional system message override for the LLM
             return_prompt: Whether to return the prompt along with the result
-            **kwargs: Additional keyword arguments
+            **kwargs (Any): Additional keyword arguments
             
         Returns:
             CodeExtractionOutput with extracted file information

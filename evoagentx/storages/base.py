@@ -181,19 +181,12 @@ class StorageHandler(BaseModule):
         """
         Remove an agent from storage if the agent exists.
 
-        Attributes:
-            agent_name (str): The name of the agent to be deleted.
-            table (Optional[str]): The table name; defaults to 'agent' if None.
-
-        Raises:
-            ValueError: If the agent does not exist in the specified table.
+        Args:
+            agent_name (str) the name of the agent to be deleted.
         """
-        table = table or TableType.store_agent.value
-        success = self.storageDB.delete(agent_name, store_type="agent", table=table)
-        if not success:
-            raise ValueError(f"Agent with name {agent_name} not found in table {table}")
+        pass
 
-    def save_agent(self, agent_data: Dict[str, Any], table: Optional[str]=None, *args, **kwargs):
+    def save_agent(self, agent_data: Dict[str, Any], **kwargs):
         """
         Save or update a single agent's data.
 

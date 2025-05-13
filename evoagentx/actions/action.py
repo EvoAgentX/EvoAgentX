@@ -171,7 +171,7 @@ class Action(BaseModule):
                 For example, if the prompt contains a variable `{input_var}`, the `inputs` dictionary should have a key `input_var`, otherwise the variable will be set to empty string. 
             sys_msg (Optional[str]): Optional system message for the LLM.
             return_prompt (bool): Whether to return the complete prompt passed to the LLM.
-            **kwargs: Additional keyword arguments for the execution.
+            **kwargs (Any): Additional keyword arguments for the execution.
         
         Returns:
             If `return_prompt` is False, the method returns a Parser object containing the structured result of the action.

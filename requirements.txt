@@ -8,6 +8,7 @@ ruff
 
 sympy
 stopit
+scipy
 setuptools
 tree_sitter
 tree_sitter_python

@@ -36,7 +36,7 @@ class BaseMemory(BaseModule):
         self._by_wf_goal = defaultdict(list)
 
     @property
-    def size(self):
+    def size(self) -> int:
         """Returns the current number of messages in memory.
         
         Returns:
@@ -110,7 +110,7 @@ class BaseMemory(BaseModule):
         
         Args: 
             n: The maximum number of messages to return. If None, returns all messages.
-            **kwargs: Additional parameters (unused in base implementation).
+            **kwargs (Any): Additional parameters (unused in base implementation).
             
         Returns:
             A list of Message objects, ordered from oldest to newest.
@@ -133,7 +133,7 @@ class BaseMemory(BaseModule):
             data (Dict[str, list]): A dictionary where keys are type strings and values are lists of messages.
             key (str): The key in `data` identifying the specific list of messages to retrieve.
             n (int, optional): The maximum number of messages to return. If not provided, all messages under the given `key` may be returned.
-            **kwargs: Additional parameters for filtering or processing the messages.
+            **kwargs (Any): Additional parameters for filtering or processing the messages.
 
         Returns:
             List[Message]: A list of messages corresponding to the given `key`, possibly filtered or truncated according to `n` and other provided keyword arguments.
@@ -151,7 +151,7 @@ class BaseMemory(BaseModule):
         Args:
             actions: A single action name or list of action names to filter by.
             n: Maximum number of messages to return per action. If None, returns all matching messages.
-            **kwargs: Additional parameters (unused in base implementation).
+            **kwargs (Any): Additional parameters (unused in base implementation).
             
         Returns:
             A list of Message objects, sorted by timestamp.
@@ -171,7 +171,7 @@ class BaseMemory(BaseModule):
         Args:
             wf_goals: A single workflow goal or list of workflow goals to filter by.
             n: Maximum number of messages to return per workflow goal. If None, returns all matching messages.
-            **kwargs: Additional parameters (unused in base implementation).
+            **kwargs (Any): Additional parameters (unused in base implementation).
             
         Returns:
             A list of Message objects, sorted by timestamp.

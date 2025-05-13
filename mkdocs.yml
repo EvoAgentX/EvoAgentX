@@ -1,20 +1,66 @@
 site_name: EvoAgentX
 theme:
   name: material
+  custom_dir: docs/overrides
+  font:
+    text: Exo 2
+    code: Fira Code
+  icon:
+    repo: fontawesome/brands/git-alt 
+  logo: assets/logo.svg
+  favicon: assets/logo.svg
   features:
+    # - header.autohide
     - navigation.sections 
     - navigation.expand 
+    - navigation.footer
+    - navigation.path
+    - content.code.select
     - content.code.copy 
+    - navigation.indexes
+    - navigation.expand
+    - navigation.tabs
+    - content.tabs.link
+    - navigation.top
+    - navigation.tracking
+    - navigation.search.highlight
+    - navigation.search.share
+    - navigation.search.suggest
     - navigation.instant
-    - content.heading.auto-number  
+    - navigation.instant.prefetch
+    - navigation.instant.progress
+    - content.code.annotate
+    - content.heading.auto-number 
+    # - navigation.tabs.sticky
+    - toc.follow
+    - announce.dismiss 
   palette:
-    - scheme: default 
-  icon:
-    repo: fontawesome/brands/github
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/link
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: teal
+      toggle:
+        icon: material/toggle-switch
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: teal
+      toggle:
+        icon: material/toggle-switch-off
+        name: Switch to system preference
 
+  # icon:
+  #   repo: fontawesome/brands/github
+
+# Repository
 repo_url: https://github.com/EvoAgentX/EvoAgentX
 repo_name: EvoAgentX
-repo_type: github
+# repo_type: github
 
 extra_css:
   - stylesheets/extra.css
@@ -23,8 +69,28 @@ extra:
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/EvoAgentX/EvoAgentX
+    - icon: fontawesome/brands/x-twitter
+      link: https://x.com/EvoAgentX
+    - icon: fontawesome/brands/discord
+      link: https://discord.gg/EvoAgentX
+    - icon: fontawesome/solid/envelope
+      link: mailto:evoagentx.ai@gmail.com
+  generator: false
+
+copyright: Copyright © 2025 EvoAgentX Team.
 
 markdown_extensions:
+  - toc:
+      title: On this page
+      permalink: true
+      toc_depth: 4
+      slugify: !!python/name:pymdownx.slugs.uslugify
+      anchorlink: true
+  - attr_list
+  - md_in_html
+  - pymdownx.emoji:
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
   - pymdownx.highlight:
       anchor_linenums: true
       line_spans: __span
@@ -33,16 +99,22 @@ markdown_extensions:
   - pymdownx.snippets
   - pymdownx.superfences
   - admonition
+  - pymdownx.mark
+  - pymdownx.details
+  - pymdownx.caret
+
 
 nav:
+  # - Home: index.md
   - Getting Started:
-    - About: index.md
+    - Home: index.md
     - Install: installation.md 
     - Quickstart: quickstart.md
   - Tutorials:
     - Build Your First Agent: tutorial/first_agent.md
     - Build Your First Workflow: tutorial/first_workflow.md
     - Benchmark and Evaluation: tutorial/benchmark_and_evaluation.md
+    - AFlow Optimizer: tutorial/aflow_optimizer.md
     - SEW Optimizer: tutorial/sew_optimizer.md
   - Key Modules:
     - LLM: modules/llm.md 
@@ -65,10 +137,6 @@ nav:
     - Evaluators: api/evaluators.md
     - Optimizers: api/optimizers.md
 
-# plugins:
-#   - search
-#   - mkdocstrings:
-#       default_handler: python
 
 plugins:
   - search
@@ -76,11 +144,14 @@ plugins:
       handlers:
         python:
           options:
-            heading_level: 3
+            heading_level: 2
+            show_root_toc_entry: true
             show_root_heading: true
-            show_source: false
+            show_source: true
             merge_init_into_class: true
             show_signature: true
             show_docstring: true
             separate_signature: true
             members_order: source
+            signature_crossrefs: true
+            show_signature_annotations: true

@@ -21,7 +21,7 @@ class Message(BaseModule):
     """
     the base class for message. 
 
-    Args: 
+    Attributes: 
         content (Any): the content of the message, need to implement str() function. 
         agent (str): the sender of the message, normally set as the agent name.
         action (str): the trigger of the message, normally set as the action name.

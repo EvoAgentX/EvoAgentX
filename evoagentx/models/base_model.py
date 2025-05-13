@@ -85,7 +85,7 @@ class LLMOutputParser(Parser):
                 - 'title': Parses content with Markdown-style headings.
                 - 'custom': Uses custom parsing logic. Requires providing `parse_func` parameter as a custom parsing function.
             parse_func: The function to parse the content, only valid when parse_mode is 'custom'.
-            **kwargs: Additional arguments passed to the parsing function.
+            **kwargs (Any): Additional arguments passed to the parsing function.
         
         Returns:
             The parsed content as a dictionary.
@@ -251,17 +251,22 @@ class LLMOutputParser(Parser):
         output_titles = [title_format.format(title=attr) for attr in attrs]
 
         def is_output_title(text: str):
-            return any(text.strip().startswith(title) for title in output_titles)
+            for title in output_titles:
+                if text.strip().lower().startswith(title.lower()):
+                    return True, title
+            return False, None
 
         data = {}
         current_output_name: str = None
         current_output_content: list = None
         for line in content.split("\n"):
-            if is_output_title(line):
+            is_title, title = is_output_title(line)
+            if is_title:
                 if current_output_name is not None and current_output_content is not None:
                     data[current_output_name] = "\n".join(current_output_content)
                 current_output_content = []
-                current_output_name = line.replace("#", "").strip()
+                current_output_name = title.replace("#", "").strip()
+                output_titles.remove(title)
             else: 
                 if current_output_content is not None:
                     current_output_content.append(line)
@@ -284,7 +289,7 @@ class LLMOutputParser(Parser):
                 - 'title': Parses content with Markdown-style headings. Uses the Markdown-style headings to create an instance of LLMOutputParser. The default title format is "## {title}", you can change it by providing `title_format` parameter, which should be a string that contains `{title}` placeholder. 
                 - 'custom': Uses custom parsing logic. Requires providing `parse_func` parameter as a custom parsing function. The `parse_func` must have a parameter named `content` and return a dictionary where the keys are the attribute names and the values are the parsed data. 
             parse_func: The function to parse the content, only valid when `parse_mode` is 'custom'.
-            **kwargs: Additional arguments passed to parsing functions, such as:
+            **kwargs (Any): Additional arguments passed to parsing functions, such as:
                 - `title_format` for `parse_mode="title"`.
             
         Returns:
@@ -346,7 +351,7 @@ class BaseLLM(ABC):
         
         Args:
             config: Configuration object for the LLM.
-            **kwargs: Additional keyword arguments.
+            **kwargs (Any): Additional keyword arguments.
         """
         self.config = config
         self.kwargs = kwargs
@@ -360,14 +365,14 @@ class BaseLLM(ABC):
         """
         pass
 
-    def __deepcopy__(self, memo):
+    def __deepcopy__(self, memo) -> "BaseLLM":
         """Handles deep copying of the LLM instance.
         
         Returns the same instance when deepcopy is called, as LLM instances
         often cannot be meaningfully deep-copied.
         
         Args:
-            memo: Memo dictionary used by the deepcopy process.
+            memo (Dict[int, Any]): Memo dictionary used by the deepcopy process.
             
         Returns:
             The same LLM instance.
@@ -395,7 +400,7 @@ class BaseLLM(ABC):
 
         Args:
             messages: The input messages to the LLM in chat format.
-            **kwargs: Additional keyword arguments for generation settings.
+            **kwargs (Any): Additional keyword arguments for generation settings.
         
         Returns:
             The generated output text from the LLM.
@@ -408,7 +413,7 @@ class BaseLLM(ABC):
 
         Args: 
             batch_messages: A list of message lists, where each inner list contains messages for a single generation.
-            **kwargs: Additional keyword arguments for generation settings.
+            **kwargs (Any): Additional keyword arguments for generation settings.
         
         Returns:
             A list of generated outputs from the LLM, one for each input message set.
@@ -423,7 +428,7 @@ class BaseLLM(ABC):
         
         Args:
             messages: The input messages to the LLM in chat format.
-            **kwargs: Additional keyword arguments for generation settings.
+            **kwargs (Any): Additional keyword arguments for generation settings.
         
         Returns:
             The generated output text from the LLM.
@@ -441,7 +446,7 @@ class BaseLLM(ABC):
         
         Args: 
             batch_messages: A list of message lists, where each inner list contains messages for a single generation.
-            **kwargs: Additional keyword arguments for generation settings.
+            **kwargs (Any): Additional keyword arguments for generation settings.
         
         Returns:
             A list of generated outputs from the LLM, one for each input message set.
@@ -457,7 +462,7 @@ class BaseLLM(ABC):
             text: The text generated by the LLM.
             parser: An LLMOutputParser class to use for parsing. If None, the default LLMOutputParser is used.
             parse_mode: The mode to use for parsing, must be the `parse_mode` supported by the `parser`. 
-            **kwargs: Additional arguments passed to the parser.
+            **kwargs (Any): Additional arguments passed to the parser.
         
         Returns:
             An LLMOutputParser instance containing the parsed data.
@@ -473,7 +478,7 @@ class BaseLLM(ABC):
             texts: A list of texts generated by the LLM.
             parser: An LLMOutputParser class to use for parsing.
             parse_mode: The mode to use for parsing, must be the `parse_mode` supported by the `parser`. 
-            **kwargs: Additional arguments passed to the parser.
+            **kwargs (Any): Additional arguments passed to the parser.
             
         Returns:
             A list of LLMOutputParser instances containing the parsed data.
@@ -561,7 +566,7 @@ class BaseLLM(ABC):
             messages: Chat message(s) for the LLM, already in the required format (either `prompt` or `messages` must be provided).
             parser: Parser class to use for processing the output.
             parse_mode: The mode to use for parsing, must be the `parse_mode` supported by the `parser`. 
-            **kwargs: Additional generation configuration parameters.
+            **kwargs (Any): Additional generation configuration parameters.
         
         Returns:
             For single generation: An LLMOutputParser instance.

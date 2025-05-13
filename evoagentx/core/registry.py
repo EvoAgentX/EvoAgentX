@@ -81,7 +81,7 @@ class ParseFunctionRegistry:
         
         Args:
             func_name: The name to register the function under
-            func: The function to register
+            func (Callable): The function to register
             
         Raises:
             ValueError: If a function with the same name is already registered
@@ -90,14 +90,14 @@ class ParseFunctionRegistry:
             raise ValueError(f"Function name '{func_name}' is already registered!")
         self.functions[func_name] = func
     
-    def get_function(self, func_name: str):
+    def get_function(self, func_name: str) -> callable:
         """Get a registered function by name.
         
         Args:
             func_name: The name of the function to retrieve
             
         Returns:
-            The registered function
+            Callable: The registered function
             
         Raises:
             KeyError: If no function with the given name is registered

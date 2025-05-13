@@ -1,37 +1,45 @@
 <!-- Add logo here -->
 <div align="center">
   <a href="https://github.com/EvoAgentX/EvoAgentX">
-    <img src="./assets/evologo.png" alt="EvoAgentX" width="300" height="300">
+    <img src="./assets/EAXLoGo.svg" alt="EvoAgentX" width="50%">
   </a>
 </div>
 
-<h1 align="center">
-    EvoAgentX:  Building a Self-Evolving Ecosystem of AI Agents
-</h1>
+<h2 align="center">
+    Building a Self-Evolving Ecosystem of AI Agents
+</h2>
 
 <div align="center">
 
-[![EvoAgentX Homepage](https://img.shields.io/badge/EvoAgentX-Homepage-blue?logo=homebridge)](https://EvoAgentX.github.io/EvoAgentX/)
+[![Docs](https://img.shields.io/badge/-Documentation-0A66C2?logo=readthedocs&logoColor=white&color=7289DA&labelColor=grey)](https://EvoAgentX.github.io/EvoAgentX/)
 [![Discord](https://img.shields.io/badge/Chat-Discord-5865F2?&logo=discord&logoColor=white)](https://discord.gg/EvoAgentX)
 [![Twitter](https://img.shields.io/badge/Follow-@EvoAgentX-e3dee5?&logo=x&logoColor=white)](https://x.com/EvoAgentX)
 [![Wechat](https://img.shields.io/badge/WeChat-EvoAgentX-brightgreen?logo=wechat&logoColor=white)]()
-[![hf_space](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-EvoAgentX-ffc107?color=ffc107&logoColor=white)](https://huggingface.co/EvoAgentX)
 [![GitHub star chart](https://img.shields.io/github/stars/EvoAgentX/EvoAgentX?style=social)](https://star-history.com/#EvoAgentX/EvoAgentX)
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg?)](https://github.com/EvoAgentX/EvoAgentX/blob/main/LICENSE)
-
+[![GitHub fork](https://img.shields.io/github/forks/EvoAgentX/EvoAgentX?style=social)](https://github.com/EvoAgentX/EvoAgentX/fork)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg?)](https://github.com/EvoAgentX/EvoAgentX/blob/main/LICENSE)
+<!-- [![EvoAgentX Homepage](https://img.shields.io/badge/EvoAgentX-Homepage-blue?logo=homebridge)](https://EvoAgentX.github.io/EvoAgentX/) -->
+<!-- [![hf_space](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-EvoAgentX-ffc107?color=ffc107&logoColor=white)](https://huggingface.co/EvoAgentX) -->
 </div>
 
 <div align="center">
 
 <h3 align="center">
 
-[English](./README.md)  | [简体中文](./README-zh.md) 
+<a href="./README.md" style="text-decoration: underline;">English</a> | <a href="./README-zh.md">简体中文</a>
 
 </h3>
 
 </div>
 
-<hr>
+<h4 align="center">
+  <i>An automated framework for evaluating and evolving agentic workflows.</i>
+</h4>
+
+<p align="center">
+  <img src="./assets/framework_en.png">
+</p>
+
 
 ## 🔥 Latest News
 - **[May 2025]** 🎉 **EvoAgentX** has been officially released!
@@ -40,69 +48,147 @@
 - [Installation](#installation)
 - [Configuration](#configuration)
 - [Examples: Automatic WorkFlow Generation](#examples-automatic-workflow-generation)
-- [QuickStart & Demo Video](#quickstart--demo-video)
+- [Demo Video](#demo-video)
 - [Tutorial and Use Cases](#tutorial-and-use-cases)
 
-### Installation
+## Installation
 
-Refer to the [Installation Guide for EvoAgentX](./docs/installation.md) for detailed instructions on how to install EvoAgentX.
+We recommend installing EvoAgentX using `pip`:
 
-Create environment: 
-1. Clone this repository and navigate to EvoAgentX folder
+```bash
+pip install evoagentx
+```
+
+For local development or detailed setup (e.g., using conda), refer to the [Installation Guide for EvoAgentX](./docs/installation.md).
+
+<details>
+<summary>Example (optional, for local development):</summary>
+
 ```bash
 git clone https://github.com/EvoAgentX/EvoAgentX.git
 cd EvoAgentX
-```
+# Create a new conda environment
+conda create -n evoagentx python=3.10
 
-2. Install Package
-```Shell
-conda create -n evoagentx python=3.10 
+# Activate the environment
 conda activate evoagentx
-pip install -r requirements.txt 
+
+# Install the package
+pip install -r requirements.txt
+# OR install in development mode
+pip install -e .
+```
+</details>
+
+## Configuration
+
+To use LLMs with EvoAgentX (e.g., OpenAI), you must set up your API key.
+
+#### Option 1: Set API Key via Environment Variable
+
+- Linux/macOS: 
+```bash
+export OPENAI_API_KEY=<your-openai-api-key>
 ```
 
-### Configuration
-Todos:
-1. How to set up keys
-2. others
+- Windows Command Prompt: 
+```cmd 
+set OPENAI_API_KEY=<your-openai-api-key>
+```
 
-### Examples: Automatic WorkFlow Generation 
+-  Windows PowerShell:
+```powershell
+$env:OPENAI_API_KEY="<your-openai-api-key>" # " is required 
+```
+
+Once set, you can access the key in your Python code with:
+```python
+import os
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+```
+
+#### Option 2: Use .env File
+
+- Create a .env file in your project root:
+```bash
+OPENAI_API_KEY=<your-openai-api-key>
+```
+
+Then load it in Python:
+```python
+from dotenv import load_dotenv 
+import os 
+
+load_dotenv() # Loads environment variables from .env file
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+```
+
+> 🔐 Tip: Don’t forget to add `.env` to your `.gitignore` to avoid committing secrets.
+
+### Configure and Use the LLM
+Once the API key is set, initialise the LLM with:
+
 ```python
 from evoagentx.models import OpenAILLMConfig, OpenAILLM
-from evoagentx.agents import AgentManager
-from evoagentx.workflow import WorkFlowGenerator, WorkFlowGraph, WorkFlow
 
-OPENAI_API_KEY = "OPENAI_API_KEY" 
-# set output_response=True to see LLM outputs 
-openai_config = OpenAILLMConfig(model="gpt-4o-mini", openai_key=OPENAI_API_KEY, stream=True, output_response=False)
-model = OpenAILLM(config=openai_config)
+# Load the API key from environment
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+# Define LLM configuration
+openai_config = OpenAILLMConfig(
+    model="gpt-4o-mini",       # Specify the model name
+    openai_key=OPENAI_API_KEY, # Pass the key directly
+    stream=True,               # Enable streaming response
+    output_response=True       # Print response to stdout
+)
+
+# Initialize the language model
+llm = OpenAILLM(config=openai_config)
+
+# Generate a response from the LLM
+response = llm.generate(prompt="What is Agentic Workflow?")
+```
+> 📖 More details on supported models and config options: [LLM module guide](./docs/modules/llm.md).
+
+
+## Examples: Automatic WorkFlow Generation 
+Once your API key and language model are configured, you can automatically generate and execute multi-agent workflows in EvoAgentX.
+
+🧩 Core Steps:
+1. Define a natural language goal
+2. Generate the workflow with WorkFlowGenerator
+3. Instantiate agents using AgentManager
+4. Execute the workflow via WorkFlow
+
+💡 Minimal Example:
+```python
+from evoagentx.workflow import WorkFlowGenerator, WorkFlowGraph, WorkFlow
+from evoagentx.agents import AgentManager
+
+goal = "Generate html code for the Tetris game"
+workflow_graph = WorkFlowGenerator(llm=llm).generate_workflow(goal)
 
 agent_manager = AgentManager()
-wf_generator = WorkFlowGenerator(llm=model)
+agent_manager.add_agents_from_workflow(workflow_graph, llm_config=openai_config)
 
-# generate workflow & agents
-workflow_graph: WorkFlowGraph = wf_generator.generate_workflow(goal="Generate a python code for greedy snake game")
-
-# [optional] display workflow
-workflow_graph.display()
-# [optional] save workflow 
-workflow_graph.save_module("debug/workflow_demo.json")
-#[optional] load saved workflow 
-workflow_graph: WorkFlowGraph = WorkFlowGraph.from_file("debug/workflow_demo.json")
-
-agent_manager.add_agents_from_workflow(workflow_graph)
-# execute workflow
-workflow = WorkFlow(graph=workflow_graph, agent_manager=agent_manager, llm=model)
+workflow = WorkFlow(graph=workflow_graph, agent_manager=agent_manager, llm=llm)
 output = workflow.execute()
 print(output)
 ```
 
-### QuickStart & Demo Video
-Todos
+You can also:
+- 📊 Visualise the workflow: `workflow_graph.display()`
+- 💾 Save/load workflows: `save_module()` / `from_file()`
 
-Refer to the [Quickstart Guide](./docs/quickstart.md) for a step-by-step guide to get started with EvoAgentX.
+> 📂 For a complete working example, check out the [`workflow_demo.py`](./examples/workflow_demo.py)
 
-### Tutorial and Use Cases
+
+## Demo Video
+🎥 Demo video coming soon – stay tuned!
+
+> In the meantime, check out the [EvoAgentX Quickstart Guide](./docs/quickstart.md) for a step-by-step guide to get started with EvoAgentX.
+
+## Tutorial and Use Cases
 
 Explore how to effectively use EvoAgentX with the following resources:
 

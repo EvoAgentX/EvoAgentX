@@ -285,11 +285,11 @@ class Test(Operator):
     
     def exec_code(self, solution: str, entry_point: str, benchmark: Benchmark):
 
-        if isinstance(benchmark, TEST_SUPPORTED_BENCHMARKS):
+        if any(isinstance(benchmark, benchmark_type) for benchmark_type in TEST_SUPPORTED_BENCHMARKS):
             test_cases = benchmark.extract_test_cases_with_entry_point(entry_point)
         else:
-            supported_benchmarsk = [typ.__name__ for typ in TEST_SUPPORTED_BENCHMARKS]
-            raise ValueError(f"Benchmark {type(benchmark)} is not supported! Available benchmarks: {supported_benchmarsk}")
+            supported_benchmarks = [typ.__name__ for typ in TEST_SUPPORTED_BENCHMARKS]
+            raise ValueError(f"Benchmark {type(benchmark)} is not supported! Available benchmarks: {supported_benchmarks} and their subclasses")
         
         fail_cases = []
         for test_case in test_cases:

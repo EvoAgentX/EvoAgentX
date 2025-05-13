@@ -41,7 +41,7 @@ class WorkFlow(BaseModule):
         
         Args:
             inputs: Dictionary of inputs for workflow execution
-            **kwargs: Additional keyword arguments
+            **kwargs (Any): Additional keyword arguments
             
         Returns:
             str: The output of the workflow execution
@@ -59,7 +59,7 @@ class WorkFlow(BaseModule):
         
         Args:
             inputs: Dictionary of inputs for workflow execution
-            **kwargs: Additional keyword arguments
+            **kwargs (Any): Additional keyword arguments
             
         Returns:
             str: The output of the workflow execution
