@@ -89,8 +89,8 @@ class GraphStoreFactory:
     Maps provider names to specific graph store classes.
     """
     provider_to_class = {
-        "": "mem0.graph_stores",  # Note: Incomplete mapping, likely a placeholder
-        "": "mem0.graph_stores",  # Note: Incomplete mapping, likely a placeholder
+        "neo4j": "mem0.graph_stores",  # Note: Incomplete mapping, likely a placeholder
+        "memgraph": "mem0.graph_stores",  # Note: Incomplete mapping, likely a placeholder
     }
 
     @classmethod

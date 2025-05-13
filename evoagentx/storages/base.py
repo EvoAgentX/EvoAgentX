@@ -186,7 +186,7 @@ class StorageHandler(BaseModule):
         """
         pass
 
-    def save_agent(self, agent_data: Dict[str, Any], **kwargs):
+    def save_agent(self, agent_data: Dict[str, Any], table: Optional[str]=None, *args, **kwargs):
         """
         Save or update a single agent's data.
 
