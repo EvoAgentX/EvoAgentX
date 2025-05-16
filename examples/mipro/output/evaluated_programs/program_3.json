@@ -1,0 +1,102 @@
+{
+    "class_name": "SequentialWorkFlowGraph",
+    "goal": "Generate a functional and correct Python code for the given problem.",
+    "tasks": [
+        {
+            "name": "code_generate",
+            "description": "Code generation for MBPP.",
+            "inputs": [
+                {
+                    "name": "problem",
+                    "type": "str",
+                    "description": "The problem to solve.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "code",
+                    "type": "str",
+                    "description": "The generated code.",
+                    "required": true
+                }
+            ],
+            "prompt": "To enhance the effectiveness and clarity of the instruction for the language model, the prompt can be improved by providing more contextual details and specifying the expected quality of the generated code. Here\u2019s a refined instruction:\n\n---\n\n**Improved Instruction:**\n\n\"Please write a complete and correct Python function that solves the following problem. Ensure that the code is clear, well-structured, and thoroughly comments where necessary to enhance understanding. Additionally, consider edge cases and provide proper error handling. \n\nProblem: {problem}\"\n\n---\n\nThis revision emphasizes clarity, structure, comments, and considerations for edge cases, which can lead to better code generation outcomes.",
+            "system_prompt": null,
+            "parse_mode": "str",
+            "parse_func": null,
+            "parse_title": null,
+            "demos": [
+                {
+                    "source_file": "Benchmark Questions Verification V2.ipynb",
+                    "task_id": 283,
+                    "prompt": "Write a python function takes in an integer and check whether the frequency of each digit in the integer is less than or equal to the digit itself.\n\ndef validate(n):\n",
+                    "code": "def validate(n): \n    for i in range(10): \n        temp = n;  \n        count = 0; \n        while (temp): \n            if (temp % 10 == i): \n                count+=1;  \n            if (count > i): \n                return False\n            temp //= 10; \n    return True",
+                    "test_imports": [],
+                    "test_list": [
+                        "assert validate(1234) == True",
+                        "assert validate(51241) == False",
+                        "assert validate(321) == True"
+                    ],
+                    "entry_point": "validate",
+                    "canonical_solution": "def validate(n): \n    for i in range(10): \n        temp = n;  \n        count = 0; \n        while (temp): \n            if (temp % 10 == i): \n                count+=1;  \n            if (count > i): \n                return False\n            temp //= 10; \n    return True",
+                    "test": "def check(candidate):\n    assert validate(1234) == True\n    assert validate(51241) == False\n    assert validate(321) == True\n",
+                    "original_prompt": "Write a python function takes in an integer and check whether the frequency of each digit in the integer is less than or equal to the digit itself."
+                },
+                {
+                    "source_file": "Ellen's Copy of Benchmark Questions Verification V2.ipynb",
+                    "task_id": 308,
+                    "prompt": "Write a function to find the specified number of largest products from two given lists, selecting one factor from each list.\n\ndef large_product(nums1, nums2, N):\n",
+                    "code": "def large_product(nums1, nums2, N):\n    result = sorted([x*y for x in nums1 for y in nums2], reverse=True)[:N]\n    return result",
+                    "test_imports": [],
+                    "test_list": [
+                        "assert large_product([1, 2, 3, 4, 5, 6],[3, 6, 8, 9, 10, 6],3)==[60, 54, 50]",
+                        "assert large_product([1, 2, 3, 4, 5, 6],[3, 6, 8, 9, 10, 6],4)==[60, 54, 50, 48]",
+                        "assert large_product([1, 2, 3, 4, 5, 6],[3, 6, 8, 9, 10, 6],5)==[60, 54, 50, 48, 45]"
+                    ],
+                    "entry_point": "large_product",
+                    "canonical_solution": "def large_product(nums1, nums2, N):\n    result = sorted([x*y for x in nums1 for y in nums2], reverse=True)[:N]\n    return result",
+                    "test": "def check(candidate):\n    assert large_product([1, 2, 3, 4, 5, 6],[3, 6, 8, 9, 10, 6],3)==[60, 54, 50]\n    assert large_product([1, 2, 3, 4, 5, 6],[3, 6, 8, 9, 10, 6],4)==[60, 54, 50, 48]\n    assert large_product([1, 2, 3, 4, 5, 6],[3, 6, 8, 9, 10, 6],5)==[60, 54, 50, 48, 45]\n",
+                    "original_prompt": "Write a function to find the specified number of largest products from two given lists, selecting one factor from each list."
+                },
+                {
+                    "source_file": "Benchmark Questions Verification V2.ipynb",
+                    "task_id": 802,
+                    "prompt": "Write a python function to count the number of rotations required to generate a sorted array. https://www.geeksforgeeks.org/count-of-rotations-required-to-generate-a-sorted-array/\n\ndef count_rotation(arr):\n",
+                    "code": "def count_rotation(arr):   \n    for i in range (1,len(arr)): \n        if (arr[i] < arr[i - 1]): \n            return i  \n    return 0",
+                    "test_imports": [],
+                    "test_list": [
+                        "assert count_rotation([3,2,1]) == 1",
+                        "assert count_rotation([4,5,1,2,3]) == 2",
+                        "assert count_rotation([7,8,9,1,2,3]) == 3",
+                        "assert count_rotation([1,2,3]) == 0",
+                        "assert count_rotation([1,3,2]) == 2"
+                    ],
+                    "entry_point": "count_rotation",
+                    "canonical_solution": "def count_rotation(arr):   \n    for i in range (1,len(arr)): \n        if (arr[i] < arr[i - 1]): \n            return i  \n    return 0",
+                    "test": "def check(candidate):\n    assert count_rotation([3,2,1]) == 1\n    assert count_rotation([4,5,1,2,3]) == 2\n    assert count_rotation([7,8,9,1,2,3]) == 3\n    assert count_rotation([1,2,3]) == 0\n    assert count_rotation([1,3,2]) == 2\n",
+                    "original_prompt": "Write a python function to count the number of rotations required to generate a sorted array. https://www.geeksforgeeks.org/count-of-rotations-required-to-generate-a-sorted-array/"
+                },
+                {
+                    "source_file": "Ellen's Copy of Benchmark Questions Verification V2.ipynb",
+                    "task_id": 310,
+                    "prompt": "Write a function to convert a given string to a tuple of characters.\n\ndef string_to_tuple(str1):\n",
+                    "code": "def string_to_tuple(str1):\n    result = tuple(x for x in str1 if not x.isspace()) \n    return result",
+                    "test_imports": [],
+                    "test_list": [
+                        "assert string_to_tuple(\"python 3.0\")==('p', 'y', 't', 'h', 'o', 'n', '3', '.', '0')",
+                        "assert string_to_tuple(\"item1\")==('i', 't', 'e', 'm', '1')",
+                        "assert string_to_tuple(\"15.10\")==('1', '5', '.', '1', '0')"
+                    ],
+                    "entry_point": "string_to_tuple",
+                    "canonical_solution": "def string_to_tuple(str1):\n    result = tuple(x for x in str1 if not x.isspace()) \n    return result",
+                    "test": "def check(candidate):\n    assert string_to_tuple(\"python 3.0\")==('p', 'y', 't', 'h', 'o', 'n', '3', '.', '0')\n    assert string_to_tuple(\"item1\")==('i', 't', 'e', 'm', '1')\n    assert string_to_tuple(\"15.10\")==('1', '5', '.', '1', '0')\n",
+                    "original_prompt": "Write a function to convert a given string to a tuple of characters."
+                }
+            ],
+            "traces": [],
+            "train": []
+        }
+    ],
+    "graph_path": "examples/mipro/output\\evaluated_programs\\program_3.json"
+}

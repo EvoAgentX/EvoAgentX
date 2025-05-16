@@ -1,0 +1,100 @@
+{
+    "class_name": "SequentialWorkFlowGraph",
+    "goal": "Generate a functional and correct Python code for the given problem.",
+    "tasks": [
+        {
+            "name": "code_generate",
+            "description": "Code generation for MBPP.",
+            "inputs": [
+                {
+                    "name": "problem",
+                    "type": "str",
+                    "description": "The problem to solve.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "code",
+                    "type": "str",
+                    "description": "The generated code.",
+                    "required": true
+                }
+            ],
+            "prompt": "Generate a functional and correct Python code for the given problem.\n\nProblem: {problem}",
+            "system_prompt": null,
+            "parse_mode": "str",
+            "parse_func": null,
+            "parse_title": null,
+            "demos": [
+                {
+                    "source_file": "Ellen's Copy of Benchmark Questions Verification V2.ipynb",
+                    "task_id": 310,
+                    "prompt": "Write a function to convert a given string to a tuple of characters.\n\ndef string_to_tuple(str1):\n",
+                    "code": "def string_to_tuple(str1):\n    result = tuple(x for x in str1 if not x.isspace()) \n    return result",
+                    "test_imports": [],
+                    "test_list": [
+                        "assert string_to_tuple(\"python 3.0\")==('p', 'y', 't', 'h', 'o', 'n', '3', '.', '0')",
+                        "assert string_to_tuple(\"item1\")==('i', 't', 'e', 'm', '1')",
+                        "assert string_to_tuple(\"15.10\")==('1', '5', '.', '1', '0')"
+                    ],
+                    "entry_point": "string_to_tuple",
+                    "canonical_solution": "def string_to_tuple(str1):\n    result = tuple(x for x in str1 if not x.isspace()) \n    return result",
+                    "test": "def check(candidate):\n    assert string_to_tuple(\"python 3.0\")==('p', 'y', 't', 'h', 'o', 'n', '3', '.', '0')\n    assert string_to_tuple(\"item1\")==('i', 't', 'e', 'm', '1')\n    assert string_to_tuple(\"15.10\")==('1', '5', '.', '1', '0')\n",
+                    "original_prompt": "Write a function to convert a given string to a tuple of characters."
+                },
+                {
+                    "source_file": "Benchmark Questions Verification V2.ipynb",
+                    "task_id": 283,
+                    "prompt": "Write a python function takes in an integer and check whether the frequency of each digit in the integer is less than or equal to the digit itself.\n\ndef validate(n):\n",
+                    "code": "def validate(n): \n    for i in range(10): \n        temp = n;  \n        count = 0; \n        while (temp): \n            if (temp % 10 == i): \n                count+=1;  \n            if (count > i): \n                return False\n            temp //= 10; \n    return True",
+                    "test_imports": [],
+                    "test_list": [
+                        "assert validate(1234) == True",
+                        "assert validate(51241) == False",
+                        "assert validate(321) == True"
+                    ],
+                    "entry_point": "validate",
+                    "canonical_solution": "def validate(n): \n    for i in range(10): \n        temp = n;  \n        count = 0; \n        while (temp): \n            if (temp % 10 == i): \n                count+=1;  \n            if (count > i): \n                return False\n            temp //= 10; \n    return True",
+                    "test": "def check(candidate):\n    assert validate(1234) == True\n    assert validate(51241) == False\n    assert validate(321) == True\n",
+                    "original_prompt": "Write a python function takes in an integer and check whether the frequency of each digit in the integer is less than or equal to the digit itself."
+                },
+                {
+                    "source_file": "Benchmark Questions Verification V2.ipynb",
+                    "task_id": 280,
+                    "prompt": "Write a function that takes in an array and element and returns a tuple containing a boolean that indicates if the element is in the array and the index position of the element (or -1 if the element is not found).\n\ndef sequential_search(dlist, item):\n",
+                    "code": "def sequential_search(dlist, item):\n    pos = 0\n    found = False\n    while pos < len(dlist) and not found:\n        if dlist[pos] == item:\n            found = True\n        else:\n            pos = pos + 1\n    return found, pos",
+                    "test_imports": [],
+                    "test_list": [
+                        "assert sequential_search([11,23,58,31,56,77,43,12,65,19],31) == (True, 3)",
+                        "assert sequential_search([12, 32, 45, 62, 35, 47, 44, 61],61) == (True, 7)",
+                        "assert sequential_search([9, 10, 17, 19, 22, 39, 48, 56],48) == (True, 6)"
+                    ],
+                    "entry_point": "sequential_search",
+                    "canonical_solution": "def sequential_search(dlist, item):\n    pos = 0\n    found = False\n    while pos < len(dlist) and not found:\n        if dlist[pos] == item:\n            found = True\n        else:\n            pos = pos + 1\n    return found, pos",
+                    "test": "def check(candidate):\n    assert sequential_search([11,23,58,31,56,77,43,12,65,19],31) == (True, 3)\n    assert sequential_search([12, 32, 45, 62, 35, 47, 44, 61],61) == (True, 7)\n    assert sequential_search([9, 10, 17, 19, 22, 39, 48, 56],48) == (True, 6)\n",
+                    "original_prompt": "Write a function that takes in an array and element and returns a tuple containing a boolean that indicates if the element is in the array and the index position of the element (or -1 if the element is not found)."
+                },
+                {
+                    "source_file": "Mike's Copy of Benchmark Questions Verification V2.ipynb",
+                    "task_id": 127,
+                    "prompt": "Write a function to multiply two integers.\n\ndef multiply_int(x, y):\n",
+                    "code": "def multiply_int(x, y):\n    if y < 0:\n        return -multiply_int(x, -y)\n    elif y == 0:\n        return 0\n    elif y == 1:\n        return x\n    else:\n        return x + multiply_int(x, y - 1)",
+                    "test_imports": [],
+                    "test_list": [
+                        "assert multiply_int(10,20)==200",
+                        "assert multiply_int(5,10)==50",
+                        "assert multiply_int(4,8)==32"
+                    ],
+                    "entry_point": "multiply_int",
+                    "canonical_solution": "def multiply_int(x, y):\n    if y < 0:\n        return -multiply_int(x, -y)\n    elif y == 0:\n        return 0\n    elif y == 1:\n        return x\n    else:\n        return x + multiply_int(x, y - 1)",
+                    "test": "def check(candidate):\n    assert multiply_int(10,20)==200\n    assert multiply_int(5,10)==50\n    assert multiply_int(4,8)==32\n",
+                    "original_prompt": "Write a function to multiply two integers."
+                }
+            ],
+            "traces": [],
+            "train": []
+        }
+    ],
+    "graph_path": "examples/mipro/output\\evaluated_programs\\program_11.json"
+}

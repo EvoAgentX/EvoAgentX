@@ -1,0 +1,494 @@
+{
+    "class_name": "SequentialWorkFlowGraph",
+    "goal": "Answer the question based on the context. The answer should be a direct response to the question, without including explanations or reasoning.",
+    "tasks": [
+        {
+            "name": "answer_generate",
+            "description": "Answer the question based on the context.",
+            "inputs": [
+                {
+                    "name": "problem",
+                    "type": "str",
+                    "description": "The problem to solve.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "answer",
+                    "type": "str",
+                    "description": "The answer to the problem.",
+                    "required": true
+                }
+            ],
+            "prompt": "Here\u2019s a revised and improved instruction for the language model, focused on enhancing clarity and ensuring adherence to the task of providing direct answers: \n\n---\n\n**Instruction:**\n\nYour task is to generate a direct answer to the question based on the provided context. Please follow these steps:\n\n1. **Read the Question:** Begin by understanding the question fully. The question is provided as `Problem: {problem}`.\n   \n2. **Process the Information:** Utilize the context given with the question to derive the answer. Ensure your answer is specific and directly addresses the question posed without any additional explanation or reasoning.\n\n3. **Format Your Output:** You should output your response in XML format. Use the following structure:\n   - For your thought process (if any reasoning is needed), you can include it in the `<thought>` tag, but remember that the focus is on the final answer.\n   - Place the final answer in the `<answer>` tag.\n\nFor example:\n```xml\n<thought>Your reasoning here (if applicable).</thought>\n<answer>Your concise answer here.</answer>\n```\n\n4. **Output Directive:** The answer must be a clear and straightforward response based solely on the question without elaborating on the reasoning behind it.\n\n---\n\nThis revised instruction clearly outlines the task, emphasizes the importance of directness in the answer, and reinforces the required XML formatting. It provides the language model with a structured approach to answering while allowing for minimal reasoning, which might be beneficial in complex scenarios.",
+            "system_prompt": null,
+            "parse_mode": "xml",
+            "parse_func": null,
+            "parse_title": null,
+            "demos": [
+                {
+                    "_id": "5a845d735542996488c2e52e",
+                    "answer": "Virginia",
+                    "question": "Stronger Together was used for the campaign comprised of the Vice Presidential candidate who was a Senator from what state?",
+                    "supporting_facts": [
+                        [
+                            "Stronger Together (book)",
+                            0
+                        ],
+                        [
+                            "Tim Kaine",
+                            0
+                        ]
+                    ],
+                    "context": [
+                        [
+                            "Aquino\u2013Binay Campaign, 2010",
+                            [
+                                "The Noynoy-Binay campaign or NoyBi began when Senator Francis Escudero endorsed the candidates Benigno \"Noynoy\" Aquino III and Jejomar Binay as President and Vice President respectively.",
+                                " This was done without the consent of the two candidates, especially since Escudero, Binay, and Aquino all come from different political parties.",
+                                " Aquino had Manuel \"Mar\" Roxas II as his running mate for Vice President, while Binay was the Vice Presidential candidate of Joseph Estrada, who was aiming to be elected president for a second time.",
+                                " The campaign was nonetheless successful as Aquino and Binay were elected as President and Vice President of the Philippines."
+                            ]
+                        ],
+                        [
+                            "Matilde Zimmermann",
+                            [
+                                "Matilde Zimmermann (born September 6, 1943) is an American author and professor who ran as the Socialist Workers Party candidate for United States Vice President in 1980.",
+                                " The party had three different Presidential candidates that year, Andrew Pulley, Richard H. Congress and Clifton DeBerry depending on the state.",
+                                " She was at the time a writer for the party newspaper \"The Militant\".",
+                                " Zimmermann also ran as an alternate vice presidential candidate for Andrea Gonzales in some states in 1984; Melvin T. Mason was the presidential candidate."
+                            ]
+                        ],
+                        [
+                            "Tim Kaine",
+                            [
+                                "Timothy Michael Kaine ( , born February 26, 1958) is an American attorney and politician who is the junior United States Senator from Virginia.",
+                                " A Democrat, Kaine was elected to the Senate in 2012 and was the nominee of his party for Vice President of the United States in the 2016 election."
+                            ]
+                        ],
+                        [
+                            "Mahamudu Bawumia",
+                            [
+                                "Mahamudu Bawumia (born 7 October 1963) is a Ghanaian economist and banker and the current Vice President of Ghana.",
+                                " He assumed office on 7 January 2017.",
+                                " He was a Deputy Governor of the Bank of Ghana until his nomination as the vice presidential candidate of the New Patriotic Party (NPP) in 2008, standing alongside presidential candidate Nana Akufo-Addo.",
+                                " He also ran as the NPP vice-presidential candidate in the 2012 general elections and was the lead witness for the petitioners in the 2012/2013 Presidential Election Petition which challenged the declaration of John Mahama as winner of the election.",
+                                " He is married to Samira Ramadan and has four children."
+                            ]
+                        ],
+                        [
+                            "Running mate",
+                            [
+                                "A running mate is a person running together with another person on a joint ticket during an election.",
+                                " The term is most often used in reference to the person in the subordinate position (such as the vice presidential candidate running with a presidential candidate) but can also properly be used when referring to both candidates, such as by saying Joko Widodo and Jusuf Kalla, and Uhuru Kenyatta and William Ruto, were running mates in relation to the most recent presidential elections held in Indonesia and Kenya respectively."
+                            ]
+                        ],
+                        [
+                            "Willie Mae Reid",
+                            [
+                                "Willie Mae Reid is an African-American politician who ran as the Socialist Workers Party candidate for Mayor of Chicago in 1975, winning 16,693 votes but coming in third place against Richard J. Daley.",
+                                " The number had fallen from the number of signatures she'd acquired to get on the ballot, 66,000.",
+                                " She also ran as their vice presidential candidate in 1976 (Presidential candidate: Peter Camejo) and 1992 (Presidential candidate: James \"Mac\" Warren), winning 91,314 votes."
+                            ]
+                        ],
+                        [
+                            "Stronger Together (book)",
+                            [
+                                "Stronger Together: A Blueprint for America's Future is a 2016 book by Hillary Clinton and her vice-presidential running mate Tim Kaine, released during the 2016 U.S. presidential election.",
+                                " It outlines their vision for the nation were they to win the election.",
+                                " The book was published by Simon & Schuster in September 2016."
+                            ]
+                        ],
+                        [
+                            "Game Change",
+                            [
+                                "Game Change: Obama and the Clintons, McCain and Palin, and the Race of a Lifetime is a book by political journalists John Heilemann and Mark Halperin about the 2008 United States presidential election.",
+                                " Released on January 11, 2010, it was also published in the United Kingdom under the title Race of a Lifetime: How Obama Won the White House.",
+                                " The book is based on interviews with more than 300 people involved in the campaign.",
+                                " It discusses factors including Democratic Party presidential candidate John Edwards' extramarital affair, the relationship between Democratic presidential nominee Barack Obama and his vice presidential running mate Joe Biden, the failure of Republican Party candidate Rudy Giuliani's presidential campaign and Sarah Palin's vice presidential candidacy."
+                            ]
+                        ],
+                        [
+                            "Samuel Sam-Sumana",
+                            [
+                                "Alhaji Samuel Sidique Sam-Sumana (born April 7, 1962) was a Sierra Leonean politician who was the Vice President of Sierra Leone from September 17, 2007 to March 17, 2015.",
+                                " Sam-Sumana stood as the vice-presidential candidate of the All People's Congress (APC) in the 2007 presidential election, alongside presidential candidate Ernest Bai Koroma.",
+                                " The APC ticket defeated the Sierra Leone People's Party (SLPP) presidential candidate Solomon Berewa and vice presidential candidate Momodou Koroma.",
+                                " Sam-Sumana took office as Vice President on September 17, 2007."
+                            ]
+                        ],
+                        [
+                            "Unpledged elector",
+                            [
+                                "In United States presidential elections, an unpledged elector is a person nominated to stand as an elector but who has not pledged to support any particular presidential or vice presidential candidate, and is free to vote for any candidate when elected a member of the Electoral College.",
+                                " Presidential elections are indirect, with voters in each state choosing electors on Election Day in November, and these electors choosing the President of the United States and Vice President of the United States in December.",
+                                " Electors today are elected in every state by popular vote, and in practice have since the 19th century almost always agreed in advance to vote for a particular candidate \u2014 that is, they are said to have been \"pledged\" to that candidate.",
+                                " In the 20th century, however, several elections were contested by unpledged electors, who made no pledge to any candidate before the election.",
+                                " These anomalies largely arose over fissures within the Democratic Party over the issues of civil rights and segregation.",
+                                " No serious general election campaign has been mounted to elect unpledged electors in any state since 1964."
+                            ]
+                        ]
+                    ],
+                    "type": "bridge",
+                    "level": "hard"
+                },
+                {
+                    "_id": "5ac562985542993e66e823ca",
+                    "answer": "London",
+                    "question": "Otterington railway station was on a 393 mi major railway that linked Edinburgh to what city?",
+                    "supporting_facts": [
+                        [
+                            "Otterington railway station",
+                            0
+                        ],
+                        [
+                            "East Coast Main Line",
+                            0
+                        ]
+                    ],
+                    "context": [
+                        [
+                            "Otterington railway station",
+                            [
+                                "Otterington railway station was located in the village of South Otterington, North Yorkshire, on the East Coast Main Line.",
+                                " It opened in 1841 and closed in 1958.",
+                                " The station is now a private residence, though the platform can still be seen.",
+                                " The buildings date from the 1930s when the East Coast Main Line was widened."
+                            ]
+                        ],
+                        [
+                            "Ochira railway station",
+                            [
+                                "Ochira railway station (Code:OCR) is an 'E-Class' railway station, situated near the city of Kollam in Kollam district of Kerala.",
+                                " Ochira railway station is situated at the borders of Kollam district.",
+                                " It falls under the Thiruvananthapuram railway division of the Southern Railway Zone, Indian Railways.",
+                                " The railway station is situated between Karunagappalli and Kayamkulam.",
+                                " The nearest important major rail head is Kollam Junction railway station.",
+                                " The other major railway stations near oachira are Kayamkulam Junction railway station and Karunagappalli railway station."
+                            ]
+                        ],
+                        [
+                            "Habra railway station",
+                            [
+                                "Habra railway station is a station of Eastern Railway.",
+                                " It is 45\u00a0km away from Sealdah railway station and 23\u00a0km from Barasat on the Sealdah-Bangaon branch line of Eastern Railway.",
+                                " It is part of the Kolkata Suburban Railway system.",
+                                " Habra, Gobordanga,Thakurnagar and Bangaon local connects this city to Sealdah Station and other stations of the Sealdah-Bangaon branch line.",
+                                " Habra Station Road is directly connected on NH 35 (Jessore Road).",
+                                "It is a major railway station between bangaon and barasat railway station"
+                            ]
+                        ],
+                        [
+                            "Edinburgh Waverley railway station",
+                            [
+                                "Edinburgh Waverley railway station (also known simply as Edinburgh or as Waverley) is the principal station serving Edinburgh, the capital city of Scotland.",
+                                " It is the northern terminus of the East Coast Main Line, 393 mi from , although some trains operated by Virgin Trains East Coast continue to other Scottish destinations beyond Edinburgh."
+                            ]
+                        ],
+                        [
+                            "East Coast Main Line",
+                            [
+                                "The East Coast Main Line (ECML) is a 393 mi major railway link between London and Edinburgh via Peterborough, Doncaster, Wakefield, Leeds, York, Darlington and Newcastle, electrified along the whole route.",
+                                " Services north of Edinburgh to Aberdeen and Inverness use diesel trains.",
+                                " The main franchise on the line is operated by Virgin Trains East Coast."
+                            ]
+                        ],
+                        [
+                            "Shapingba Railway Station",
+                            [
+                                "The Shapingba Railway Station is a railway station of Chengyu Passenger Railway that is located in Shapingba District of Chongqing, People's Republic of China.",
+                                " Currently it is closed.",
+                                " After having been demolished, construction started in 2013 to rebuild it as an underground train station.",
+                                " According to current plans the underground complex will be opened in 2015 and also include stations for two subway lines.",
+                                " It will be part of the Chengdu-Chongqing Intercity Railway due to open in 2015, allowing for journeys to Chengdu in around an hours travel time.",
+                                " Once completed it was anticipated that the name would change to Chongqing West Railway Station but this has now been given to a new fourth major railway station for Chongqing in nearby Shangqiao area of Shapingba District."
+                            ]
+                        ],
+                        [
+                            "Jiayuguan South Railway Station",
+                            [
+                                "Jiayuguan South Railway Station () is a railway station located in China's Gansu Province, Jiayuguan City.",
+                                " It was put into operation on December 26, 2014.",
+                                " It serves the Lanzhou\u2013Xinjiang High-Speed Railway with High Speed services between Lanzhou and Urumqi and conventional services connecting Urumqi to various cities in Eastern and South Western China.",
+                                " It is the second major railway station serving Jiayuguan, with Jiayuguan Railway Station, which serves the conventional LanXin Railway."
+                            ]
+                        ],
+                        [
+                            "Krishna railway station",
+                            [
+                                "Krishna Railway Station is located in Telangana, Mahbubnagar, Maganoor.",
+                                " It belongs to South Central Railway zone, Guntakal railway division of Indian Railways.",
+                                " Neighbourhood stations are Chegunta, Saidapur, Yadlapur.",
+                                " Nearby major railway station is Secunderabad Junction another nearby major railway station is Raichur and airport is Rajiv Gandhi International Airport.",
+                                " A total of 16 express trains stop at this station.",
+                                " It is an important station for people in rural areas of neighbouring small villages such as Chegunta, Yadlapur.",
+                                " A lot of native Telugu people of this area are migrated to neighbouring Maharashtra they visit their native villages occasionally."
+                            ]
+                        ],
+                        [
+                            "Praha-Sm\u00edchov railway station",
+                            [
+                                "Praha-Sm\u00edchov railway station (Czech: \"N\u00e1dra\u017e\u00ed Praha-Sm\u00edchov\" , ] ) is a major railway station in Prague, Czech Republic, located in Sm\u00edchov, in the south-west of the city.",
+                                " It serves as a major railway station on the Czech national rail network, and is connected to the rest of Prague by its metro station of the same name and numerous tram routes which stop on N\u00e1dra\u017en\u00ed street outside the station.",
+                                " It is also a major bus terminus for lines going to the south and southwest of Prague and beyond.",
+                                " In 2009 the station served almost 4 million people."
+                            ]
+                        ],
+                        [
+                            "Varkala Sivagiri railway station",
+                            [
+                                "Varkala railway station also known as \"Varkala Sivagiri railway station\", station code VAK, is a major railway station serving the district of Thiruvananthapuram of Kerala.",
+                                " It is situated in the municipality of Varkala in Thiruvananthapuram district.",
+                                " It falls in the Thiruvananthapuram railway division of the Southern Railway zone of the Indian Railways.",
+                                " It is on Kollam-Thiruvananthapuram railway line and is an important railway station in Thiruvananthapuram district, after the Thiruvananthapuram Central station.",
+                                " In close proximity to the station is Varkala Bus Station."
+                            ]
+                        ]
+                    ],
+                    "type": "bridge",
+                    "level": "hard"
+                },
+                {
+                    "_id": "5ab915ad55429919ba4e239c",
+                    "answer": "Jimmy Ellis",
+                    "question": "Who did Muhummad Ali fight next, in Houston, after the so-called Fight of the Century with Joe Frazier?",
+                    "supporting_facts": [
+                        [
+                            "Muhammad Ali vs. Jimmy Ellis",
+                            0
+                        ],
+                        [
+                            "Muhammad Ali vs. Jimmy Ellis",
+                            2
+                        ],
+                        [
+                            "Fight of the Century",
+                            0
+                        ]
+                    ],
+                    "context": [
+                        [
+                            "Muhammad Ali vs. Jimmy Ellis",
+                            [
+                                "Muhammad Ali and Jimmy Ellis fought each other in a boxing match at the Astrodome in Houston on July 26, 1971.",
+                                " Ali won the bout through a technical knockout when the referee stopped the fight in the twelfth round.",
+                                " This was Ali's first boxing match after Fight of the Century."
+                            ]
+                        ],
+                        [
+                            "Cassius Clay vs. Don Warner",
+                            [
+                                "Cassius Clay (soon Muhammad Ali) fought a ten-round boxing match with Don Warner in Miami on February 28, 1962.",
+                                " Clay won the fight through a technical knockout after the referee stopped the fight in the fourth round.Warner would later serve as a sparring partner for Joe Frazier."
+                            ]
+                        ],
+                        [
+                            "Fight of the Century",
+                            [
+                                "The Fight of the Century (also known as The Fight) is the title boxing writers and historians have given to the boxing match between WBC/WBA heavyweight champion Joe Frazier (26\u20130, 23 KOs) and Ring magazine/lineal heavyweight champion"
+                            ]
+                        ],
+                        [
+                            "George Chuvalo",
+                            [
+                                "George Louis Chuvalo, CM (born September 12, 1937) is a retired Canadian professional boxer who was a five-time Canadian heavyweight champion, and two-time world heavyweight title challenger.",
+                                " Chuvalo, who is considered by many to have one of the best chins in boxing history, was never knocked down in his amateur career or his 93-fight professional career and was ranked #4 on ESPN's greatest chin in boxing history list.",
+                                " Chuvalo lost to Hall of Fame heavyweights such as Floyd Patterson, Muhammad Ali, Joe Frazier and George Foreman, but was credited for his spirited performances.",
+                                " He did defeat top contenders such as Yvon Durelle, Doug Jones, Jerry Quarry and Cleveland Williams.",
+                                " He fought for the world title twice, losing a controversial decision to Ernie Terrell and another decision in his first fight with Ali."
+                            ]
+                        ],
+                        [
+                            "Thrilla in Manila",
+                            [
+                                "The Thrilla in Manila was the third and final boxing match between Muhammad Ali and Joe Frazier.",
+                                " It was contested in 1975 for the heavyweight championship of the world at the Philippine Coliseum in Cubao, Quezon City, Philippines, on Wednesday, October 1.",
+                                " The venue was renamed from Araneta Coliseum, specifically for the match.",
+                                " Ali won by technical knockout (TKO) after Frazier's chief second, Eddie Futch, conceded the fight prior to the 15th round.",
+                                " The contest's name is derived from the frequent rhyming boast made by Ali that the fight would be a \"killa and a thrilla and a chilla, when I get that gorilla in Manila.\""
+                            ]
+                        ],
+                        [
+                            "Ali (film)",
+                            [
+                                "Ali is a 2001 American biographical sports drama film written, produced and directed by Michael Mann.",
+                                " The film focuses on ten years in the life of the boxer Muhammad Ali, played by Will Smith, from 1964 to 1974, featuring his capture of the heavyweight title from Sonny Liston, his conversion to Islam, criticism of the Vietnam War, and banishment from boxing, his return to fight Joe Frazier in 1971, and, finally, his reclaiming the title from George Foreman in the Rumble in the Jungle fight of 1974.",
+                                " It also touches on the great social and political upheaval in the United States following the assassinations of Malcolm X and Martin Luther King, Jr."
+                            ]
+                        ],
+                        [
+                            "Joe Frazier's Gym",
+                            [
+                                "Joe Frazier's Gym was a training facility owned by American professional boxer, Joe Frazier.",
+                                " Frazier trained at the gym while preparing for his 1971 Fight of the Century against Muhammed Ali.",
+                                ""
+                            ]
+                        ],
+                        [
+                            "Fight of the Century (disambiguation)",
+                            [
+                                "Fight of the Century usually refers to the 1971 boxing match between Muhammad Ali and Joe Frazier."
+                            ]
+                        ],
+                        [
+                            "Bob Foster (boxer)",
+                            [
+                                "Robert Lloyd \"Bob\" Foster (December 15, 1938 \u2013 November 21, 2015) was an American professional boxer who fought as a light heavyweight and heavyweight.",
+                                " Known as \"The Deputy Sheriff\", Foster was one of the greatest light heavyweight champions in boxing history.",
+                                " He won the world light heavyweight title from Dick Tiger in 1968 via fourth-round knockout, and went on to defend his crown fourteen times in total from 1968 to 1974.",
+                                " Foster challenged heavyweight kings Joe Frazier and Muhammad Ali during his career, but was knocked out by both fighters (the fight with Ali was not for a world heavyweight title, but for the regional NABF version)."
+                            ]
+                        ],
+                        [
+                            "Muhammad Ali vs. Joe Frazier II",
+                            [
+                                "Super Fight II was a non-title boxing match between Muhammad Ali and Joe Frazier.",
+                                " The second of the three Ali\u2013Frazier bouts, it took place at Madison Square Garden in New York City on January 28, 1974.",
+                                " Ali was a slight favorite to win, and did by a unanimous decision."
+                            ]
+                        ]
+                    ],
+                    "type": "bridge",
+                    "level": "hard"
+                },
+                {
+                    "_id": "5ae67def5542991bbc9760f3",
+                    "answer": "Dubai International Airport",
+                    "question": "Kenneth L. Gile is the Chief Operating Officer of an airline with its head office in what airport?",
+                    "supporting_facts": [
+                        [
+                            "Kenneth L. Gile",
+                            0
+                        ],
+                        [
+                            "Flydubai",
+                            0
+                        ]
+                    ],
+                    "context": [
+                        [
+                            "Jim Lentz",
+                            [
+                                "Jim Lentz is the chief executive officer for Toyota North America; president and chief operating officer of Toyota Motor North America, Inc. (TMA); and a senior managing officer of the parent company Toyota Motor Corporation (TMC) which is located in Japan.",
+                                " In that role Lentz manages all of Toyota\u2019s North American affiliate companies which include TMA, Toyota Motor Sales, U.S.A., Inc. (TMS), and Toyota Motor Engineering & Manufacturing, North America, Inc. (TEMA), which includes responsibilities for Toyota Motor Manufacturing Canada Inc. (TMMC), and oversight for Toyota Canada, Inc. (TCI).",
+                                " Lentz also serves as the chairman of the North American Executive Committee.",
+                                " This is composed of the top leaders from the affiliate companies.",
+                                " Most recently Lentz was the president and chief executive officer of TMS and senior vice president of TMA and served in a global advisory capacity as the managing officer for TMC.",
+                                " Before that he served as president and chief operating officer and executive vice president of TMS.",
+                                " Lentz previously held several executive positions including Toyota division group vice president and general manager where he oversaw all sales, logistics and marketing activities for Toyota and Scion regional sales offices and distributors.",
+                                " He also served as the group vice president of marketing for the Toyota division and vice president of Scion, and was responsible for the initial launch of a new line of vehicles.",
+                                " Lentz spent several years in the field as vice president and general manager of the Los Angeles region and before that general manager of the San Francisco region.",
+                                " Prior to his role as general manager Lentz was vice president of marketing services for CAT in Maryland.",
+                                " He has also held several other TMS positions, including field training manager, sales administration manager and truck sales team member.",
+                                " Lentz joined Toyota in 1982 as the merchandising manager for its Portland, Oregon region where he later became the distribution manager and field operations manager.",
+                                " He serves as chairman on the board of directors of The Global Automakers and is also a member of the executive advisory board for Daniels College of Business at the University of Denver (DU), his alma mater.",
+                                " He was named \u201cMarketer of the Year\u201d by Advertising Age in 2006, an Automotive News \u201cAll Star\u201d in 2007 and honored at Industry Leader of the year."
+                            ]
+                        ],
+                        [
+                            "Michael J. Lotz",
+                            [
+                                "Michael J. Lotz is President and Chief Operating Officer of Mesa Air Group, joining the Company in July 1998.",
+                                " In January 1999, Mr. Lotz became Chief Operating Officer.",
+                                " In August 1999, Mr. Lotz became the Company\u2019s Chief Financial Officer and in January 2000 returned to the position of Chief Operating Officer.",
+                                " On June 22, 2000, Mr. Lotz was appointed President of the Company.",
+                                " Prior to joining the Company, Mr. Lotz served as Chief Operating Officer of Virgin Express, a position he held from October 1996 to June 1998.",
+                                " Previously, Mr. Lotz was employed by Continental Airlines, most recently as Vice President of Airport Operations, Properties and Facilities at Continental Express.",
+                                "."
+                            ]
+                        ],
+                        [
+                            "Carole Post",
+                            [
+                                "Carole Post is the Deputy Chief Operating Officer of USF Health at the University of South Florida.",
+                                " She was formerly the Executive Vice President at New York Law School and serves as the school's Chief Operating Officer and first Chief Strategy Officer.",
+                                " Before her tenure at New York Law School, she served as the Commissioner of the New York City Department of Information Technology and Telecommunications (DoITT) and New York City's Chief Information Officer (CIO).",
+                                " She was appointed by Mayor Michael R. Bloomberg on December 30, 2009 and assumed the official position on January 19, 2010.",
+                                " She is the first woman to have held this office at the City of New York.",
+                                " Post modernized New York City government practices and infrastructure to advance open government and improve services to the public."
+                            ]
+                        ],
+                        [
+                            "Glen Post",
+                            [
+                                "Glen F. Post III (born October 4, 1952) is the chief executive officer and president of CenturyLink, an S&P 500 integrated communications service provider based out of Monroe, Louisiana.",
+                                " He earned a bachelor's degree in accounting in 1974 at Louisiana Tech University and an MBA in 1976 at Louisiana Tech.",
+                                " Post joined CenturyTel in 1976.",
+                                " He was named vice president in 1982 and was promoted to senior vice president and treasurer in 1984.",
+                                " He was appointed to the CenturyTel board of directors in 1985, and the following year he was promoted to senior vice president and chief financial officer.",
+                                " In 1988 Post was named executive vice president and chief operating officer.",
+                                " He became the president and chief operating officer of CenturyTel in 1990.",
+                                " In 1992 Post was named vice chairman of the board, president, and chief executive officer.",
+                                " In 2002 he was appointed chairman of the board and chief executive officer.",
+                                " Since 2009 Post has served as chief executive officer and president of CenturyLink.",
+                                " His honors include: Louisiana Tech College of Administration and Business Distinguished Alumni in 1991, Louisiana Tech University Tower Medallion Award in 1997 and DeGree Enterprises Lifetime Achievement Award in Business 2003."
+                            ]
+                        ],
+                        [
+                            "Flydubai",
+                            [
+                                "flydubai (Arabic: \u0641\u0644\u0627\u064a \u062f\u0628\u064a\u200e \u200e ), legally Dubai Aviation Corporation (Arabic: \u0645\u0624\u0633\u0633\u0629 \u062f\u0628\u064a \u0644\u0644\u0637\u064a\u0631\u0627\u0646\u200e \u200e ), is a government-owned low-cost airline with its head office and flight operations in Terminal 2 of Dubai International Airport.",
+                                " The airline operates between a total of 95 destinations, serving the Middle East, Africa, Asia and Europe from Dubai."
+                            ]
+                        ],
+                        [
+                            "Kenneth L. Gile",
+                            [
+                                "Kenneth \"Ken\" Gile (born 1947) is the Chief Operating Officer of Flydubai, the low-cost carrier owned by the Dubai government.",
+                                " Prior to joining Flydubai, Ken was the President and COO of now defunct Skybus Airlines and a former pilot and Director of Operations for Southwest Airlines.",
+                                " Ken was also a pilot in the US Air Force, as well as for Saudi Arabian Airlines prior to his career with Southwest."
+                            ]
+                        ],
+                        [
+                            "President (corporate title)",
+                            [
+                                "The President is a leader of an organization, company, community, club, trade union, university or other group.",
+                                " In many organizations, it is the legally recognized highest \"titled\" corporate officer, ranking above the various Vice Presidents (e.g. Senior Vice President and Executive Vice President).",
+                                " The president may also be the chairperson.",
+                                " The relationship between the president and the Chief Executive Officer varies, depending on the structure of the specific organization.",
+                                " In a similar vein to the Chief Operating Officer, the title of corporate President as a separate position (as opposed to being combined with a \"C-Suite\" designation, such as \"President and Chief Executive Officer\" or \"President and Chief Operating Officer\") is also loosely defined.",
+                                " The powers of the president vary widely across organizations and such powers come from specific authorization in the bylaws (e.g. the president can make an \"executive decision\" only if the bylaws allow for it)."
+                            ]
+                        ],
+                        [
+                            "David O'Sullivan (civil servant)",
+                            [
+                                "David O'Sullivan (born 1953) is an Irish civil servant who serves as the Ambassador of the European Union to the United States and the Head of the Delegation of the European Union to the United States.",
+                                " Prior to his post in the United States, he was the chief operating officer of the European Union's diplomatic corps, the European External Action Service (EEAS).",
+                                " He has held a number of high level positions including Head of Cabinet to Romano Prodi and Secretary-General of the European Commission between June 2000 and November 2005.",
+                                " In 2010 he was appointed as Director General for Relex with the responsibility of setting up the EEAS and was appointed the Chief Operating Officer on 1 January 2011."
+                            ]
+                        ],
+                        [
+                            "Ronald Logue",
+                            [
+                                "Ronald (Ron) E. Logue is the former Chairman of the Board of State Street Corporation (), formerly Chief Executive Officer as Jay Hooley assumed that title March 1, 2010 in addition to his role as President.",
+                                " Logue was appointed Chairman and Chief Executive Officer in 2004.",
+                                " Prior to that he held a number of leadership positions at State Street.",
+                                " Logue joined the company in 1990 as Senior Vice President and head of the investment servicing for US mutual funds.",
+                                " He was named Chief Operating Officer in 2000 and President in 2001.",
+                                " As President and Chief Operating Officer, Logue was responsible for overseeing State Street's investment servicing, securities and investment research and trading activities, as well as information technology.",
+                                " During his presidency, he led the highly successful integration of the Deutsche Bank's Global Securities Services business, acquired in January 2003."
+                            ]
+                        ],
+                        [
+                            "Hlaudi Motsoeneng",
+                            [
+                                "Hlaudi Motsoeneng served as the acting Chief operating officer of the South African Broadcasting Corporation (SABC) from 2011 to 2013.",
+                                " Motsoeneng was removed from his position as Chief operating officer after it had been found that he lied about his qualifications.",
+                                " After being removed as acting Chief operating officer it was announced that Motsoeneng would move back to his previous position as Group Executive Editor of Provinces and Corporate Affairs of the SABC.",
+                                " In December 2016, the Western Cape High Court ruled that Motsoeneng\u2019s appointment as Group Executive was illegal and that he was \u201cnot entitled to occupy any position at the SABC\u201d."
+                            ]
+                        ]
+                    ],
+                    "type": "bridge",
+                    "level": "hard"
+                }
+            ],
+            "traces": [],
+            "train": []
+        }
+    ],
+    "graph_path": "examples/mipro/output\\evaluated_programs\\program_11_mb.json"
+}

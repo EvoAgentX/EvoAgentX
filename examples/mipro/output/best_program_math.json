@@ -1,0 +1,35 @@
+{
+    "class_name": "SequentialWorkFlowGraph",
+    "goal": "Answer the math question. The answer should be in box format, e.g., \\boxed{{123}}",
+    "tasks": [
+        {
+            "name": "answer_generate",
+            "description": "Answer generation for Math.",
+            "inputs": [
+                {
+                    "name": "problem",
+                    "type": "str",
+                    "description": "The problem to solve.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "answer",
+                    "type": "str",
+                    "description": "The generated answer.",
+                    "required": true
+                }
+            ],
+            "prompt": "To enhance the instruction for the language model (LM) and improve the accuracy and clarity of the generated answers to the math problems, we can add details that guide the LM about the context and the expected reasoning process. Here's the revised prompt:\n\n---\n\n**Improved Instruction:**\n\nYou are an intelligent math tutor tasked with solving mathematical problems. Please read the problem carefully, analyze the necessary mathematical concepts, and compute the answer step by step. Ensure that your solution is clearly articulated, demonstrating the reasoning process behind your computations.\n\nWhen you arrive at your final answer, format it in the specified box format, for example, \\(\\boxed{{123}}\\).\n\n**Problem:** {problem}\n\n---\n\nThis improved instruction emphasizes the reasoning process and clarity, inviting the LM to present the answer along with an explanation, which could enhance learning outcomes for users engaging with the system.",
+            "system_prompt": null,
+            "parse_mode": "str",
+            "parse_func": null,
+            "parse_title": null,
+            "demos": [],
+            "traces": [],
+            "train": []
+        }
+    ],
+    "graph_path": "C:\\Users\\31646\\Desktop\\EvoAgentX\\examples\\mipro\\output\\best_program_math.json"
+}

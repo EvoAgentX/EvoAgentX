@@ -1,0 +1,569 @@
+{
+    "class_name": "SequentialWorkFlowGraph",
+    "goal": "Answer the question based on the context. The answer should be a direct response to the question, without including explanations or reasoning.",
+    "tasks": [
+        {
+            "name": "answer_generate",
+            "description": "Answer the question based on the context.",
+            "inputs": [
+                {
+                    "name": "problem",
+                    "type": "str",
+                    "description": "The problem to solve.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "answer",
+                    "type": "str",
+                    "description": "The answer to the problem.",
+                    "required": true
+                }
+            ],
+            "prompt": "**\n\nYou are a knowledgeable history expert tasked with answering questions about historical events, cultural references, and notable figures. For each question, provide a concise and direct answer without any explanations or reasoning. Include the answer in the specified XML format with the `<answer>` tag only.\n\n**Format your output as follows:**\n```\n<answer>{{your concise answer}}</answer>\n```\n\n**Problem:** {problem}\n\nBy following these guidelines, ensure that your answers are clear and straightforward for educational and trivia purposes.",
+            "system_prompt": null,
+            "parse_mode": "xml",
+            "parse_func": null,
+            "parse_title": null,
+            "demos": [
+                {
+                    "_id": "5ab28a87554299449642c8ec",
+                    "answer": "Pulitzer Prize",
+                    "question": "This expansion of the 2008 magazine article \"Is Google Making Us Stoopid?\" was a finalist for what award?",
+                    "supporting_facts": [
+                        [
+                            "The Shallows (book)",
+                            4
+                        ],
+                        [
+                            "Is Google Making Us Stupid?",
+                            2
+                        ]
+                    ],
+                    "context": [
+                        [
+                            "Gabriel Arana",
+                            [
+                                "Gabriel Arana (born April 10, 1983) is an American journalist.",
+                                " He is currently senior editor at Mic.",
+                                " He was previously a contributing writer at \"Salon\" and a senior editor at \"The Huffington Post\" and \"The American Prospect.\"",
+                                " His articles have appeared in numerous publications, including \"The New York Times\", \"The Atlantic\", \"The New Republic\", \"The Nation\", \"The Advocate\", and \"The Daily Beast\".",
+                                " He is also known for writing a 2012 profile of the ex-gay movement in which psychiatrist Robert Spitzer repudiated his work supporting sexual orientation change efforts.",
+                                " After the article was published, Spitzer released a letter apologizing to the gay community, citing his interaction with Arana.",
+                                " In 2010, Arana was nominated for a GLAAD Media Award for Outstanding Magazine Article for a feature story on the legal challenge to California's Proposition 8.",
+                                " In 2014, he was awarded the National Lesbian and Gay Journalists Association's Excellence in Feature Writing Award for his profile of activist Dan Choi.",
+                                " He has been a guest on television and radio talk shows including \"The Dr. Oz Show\", \"Rachel Maddow\", \"Starting Point\", and \"Talk of the Nation\"."
+                            ]
+                        ],
+                        [
+                            "Is Google Making Us Stupid?",
+                            [
+                                "\"Is Google Making Us Stupid?",
+                                " What the Internet is doing to our brains\" (alternatively \"Is Google Making Us Stoopid?\")",
+                                " is a magazine article by technology writer Nicholas G. Carr, and is highly critical of the Internet's effect on cognition.",
+                                " It was published in the July/August 2008 edition of \"The Atlantic\" magazine as a six-page cover story.",
+                                " Carr's main argument is that the Internet might have detrimental effects on cognition that diminish the capacity for concentration and contemplation.",
+                                " Despite the title, the article is not specifically targeted at Google, but more at the cognitive impact of the Internet and World Wide Web.",
+                                " Carr expanded his argument in \"\", a book published by W. W. Norton in June 2010."
+                            ]
+                        ],
+                        [
+                            "Byline",
+                            [
+                                "The byline on a newspaper or magazine article gives the date, as well as the name of the writer of the article.",
+                                " Bylines are commonly placed between the headline and the text of the article, although some magazines (notably \"Reader's Digest\") place bylines at the bottom of the page to leave more room for graphical elements around the headline."
+                            ]
+                        ],
+                        [
+                            "Isabel dos Santos",
+                            [
+                                "Isabel dos Santos (born 20 April 1973) is an Angolan businesswoman.",
+                                " In 2013, according to research by \"Forbes\", her net worth had reached more than three billion US dollars, making her Africa\u2019s first billionaire woman.",
+                                " She is the daughter of Angola's President Jos\u00e9 Eduardo dos Santos, who has ruled the country since 1979.",
+                                " A \"Forbes\" magazine article described in 2013 how Isabel dos Santos acquired her wealth by taking stakes in companies doing business in Angola, suggesting that her wealth comes almost entirely from her family's power and connections.",
+                                " In November 2015, the BBC named Isabel dos Santos as one of the 100 most influential women in the world."
+                            ]
+                        ],
+                        [
+                            "The Shallows (book)",
+                            [
+                                "The Shallows: What the Internet Is Doing to Our Brains, published in the United Kingdom as The Shallows: How the Internet Is Changing the Way We Think, Read and Remember, is a 2010 book by the American journalist Nicholas G. Carr.",
+                                " The book expands on the themes first raised in \"Is Google Making Us Stupid?",
+                                "\", Carr's 2008 essay in \"The Atlantic\", and explores the effects of the Internet on the brain.",
+                                " The book claims research shows \"online reading\" yields lower comprehension than reading a printed page.",
+                                " \"The Shallows\" was a finalist for the 2011 Pulitzer Prize in General Nonfiction."
+                            ]
+                        ],
+                        [
+                            "Sara Naomi Lewkowicz",
+                            [
+                                "Sara Naomi Lewkowicz is an American photographer best known for her 2013 \"Time\" magazine article \"Photographer as Witness: A Portrait of Domestic Violence\".",
+                                " Her work with the article and Lewkowicz's overall work covering domestic violence won her the Ville de Perpignan R\u00e9mi Ochlik Award in 2013.",
+                                " Lewkowicz has attended Ohio University, where she completed a master's degree in Visual Communication."
+                            ]
+                        ],
+                        [
+                            "The Uninhabitable Earth",
+                            [
+                                "\"The Uninhabitable Earth\" is a \"New York\" magazine article by American journalist David Wallace-Wells published on July 9, 2017.",
+                                " The long-form article depicts a pessimistic worst-case scenario of what might happen in the near-future due to global warming.",
+                                " The article starts with the statement \"[i]f your anxiety about global warming is dominated by fears of sea-level rise, you are barely scratching the surface of what terrors are possible.\"",
+                                " Robinson Meyer of \"The Atlantic\" said it is an \"unusually specific and severe depiction of what global warming will do to the planet.\"",
+                                " Susan Matthews writing in \"Slate\" said \"The instantly viral piece might be the \"Silent Spring\" of our time\"."
+                            ]
+                        ],
+                        [
+                            "The Simple Art of Murder",
+                            [
+                                "The Simple Art of Murder is hard-boiled detective fiction author Raymond Chandler's critical essay, a magazine article, and his collection of short stories.",
+                                " The essay was first published in \"The Atlantic Monthly\" in December 1944.",
+                                " The magazine article appeared in the \"Saturday Review of Literature\", April 15, 1950.",
+                                " The article, somewhat rewritten, served to introduce the collection \"The Simple Art of Murder\", 1950 (Houghton Mifflin Co.), which contained eight of Chandler's early stories pre-dating his first novel, \"The Big Sleep\"."
+                            ]
+                        ],
+                        [
+                            "AdSense",
+                            [
+                                "Google AdSense is a program run by Google that allows publishers in the Google Network of content sites to serve automatic text, image, video, or interactive media advertisements, that are targeted to site content and audience.",
+                                " These advertisements are administered, sorted, and maintained by Google.",
+                                " They can generate revenue on either a per-click or per-impression basis.",
+                                " Google beta-tested a cost-per-action service, but discontinued it in October 2008 in favor of a DoubleClick offering (also owned by Google).",
+                                " In Q1 2014, Google earned US $3.4 billion ($13.6 billion annualized), or 22% of total revenue, through Google AdSense.",
+                                " AdSense is a participant in the AdChoices program, so AdSense ads typically include the triangle-shaped AdChoices icon.",
+                                " This program also operates on HTTP cookies.",
+                                " Over 14 million websites use AdSense."
+                            ]
+                        ],
+                        [
+                            "Fanny's",
+                            [
+                                "Fanny's Restaurant was a notable eatery located at 1601 Simpson Street Evanston, IL 60201 USA (the first suburb north of the Chicago City Limits) between 1946 and 1987.",
+                                " It was an anomaly in that it was located in a working-class neighborhood and yet known the world over.",
+                                " Patrons included the Marshall Field Family, of department store fame.",
+                                " Both the salad dressing and meat sauce won the International Epicurian Award of France.",
+                                " It was cited by Chicago Magazine as one of the top 40 Chicago restaurants ever.",
+                                " According to that same Chicago Magazine article Kraft Foods offered $75,000 in 1948 to buy Fanny's salad dressing recipe.",
+                                " This offer was refused.",
+                                " The restaurant was closed due to the deteriorating health of the founder, Fanny Lazar n\u00e9e Bianucci.",
+                                " According to the May 11, 1991 Chicago Sun Times and Chicago Tribune obituaries, Fanny Lazar died at Saint Francis Hospital of Evanston.",
+                                " At some point, possibly in the 1960s, Fanny's products became available on grocery shelves and the business continues on today through mail order.",
+                                " For several years the restaurant building at Simpson Street and Ashland Avenue was shuttered, then later occupied by rental tenants.",
+                                " However, during the condominium boom which occurred in the United States during the first ten years of the 21st Century it was heavily altered and converted into loft spaces.",
+                                " According to a July 5, 1998 Chicago Sun Times article a second version of the restaurant was opened in Union Pier, MI.",
+                                " It appears to remain in business as of 2011, as it can be found through searching local tourism web sites.",
+                                " Fanny's in Union Pier Michigan was located in the Gordon Beach Inn, It's no longer in business.",
+                                " Fanny's meat sauce and salad dressing can still be purchased through World Wide Food Products in Evanston, IL"
+                            ]
+                        ]
+                    ],
+                    "type": "bridge",
+                    "level": "hard"
+                },
+                {
+                    "_id": "5a7dc3275542997cc2c4749c",
+                    "answer": "Sam Boyd Stadium",
+                    "question": "What stadium does the team who has Kent Baer as the defensive coordinator play its home games?",
+                    "supporting_facts": [
+                        [
+                            "Kent Baer",
+                            1
+                        ],
+                        [
+                            "UNLV Rebels football",
+                            3
+                        ]
+                    ],
+                    "context": [
+                        [
+                            "Trenton Lightning",
+                            [
+                                "The Trenton Lightning were an indoor professional football team founded in 2000 by owner/general manager, Phillip J. Subhan and local businessman, Kenneth Samu.",
+                                " The team started the 2001 season in the Indoor Professional Football League (IPFL) and were led by head coach (ex-NFL RB) Vaughn Hebron (played for the Philadelphia Eagles, Denver Broncos and Indianapolis Colts) and the team played its home games at the Sovereign Bank Arena, capacity 7,605 in Trenton, NJ.",
+                                " The team was originally scheduled for a 16-game season (eight home and eight away games), But, the team was to fold after only 6 games.",
+                                " The team's Director of Football operations was Marty Yukichak and the team had a front office staff of seven others in addition to a coaching staff of eight, including Hebron.",
+                                " The team's defensive coordinator was Chuck Murphy and offensive coordinator was Tom Cocuzza."
+                            ]
+                        ],
+                        [
+                            "2013 Weber State Wildcats football team",
+                            [
+                                "The 2013 Weber State Wildcats football team represented Weber State University in the 2013 NCAA Division I FCS football season.",
+                                " Jody Sears returned as the head coach for the 2013 season, after being the interim head coach during 2012, and will be working with a new offensive coordinator and defensive coordinator in Robin Pflugrad and Eric Lewis.",
+                                " Weber State played their home games at Stewart Stadium.",
+                                " They were a member of the Big Sky Conference.",
+                                " They finished the season 2\u201310, 1\u20137 in Big Sky play to finish in a tie for 11th place."
+                            ]
+                        ],
+                        [
+                            "UNLV Rebels football",
+                            [
+                                "The UNLV Rebels football program is a college football team that represents the University of Nevada, Las Vegas (UNLV).",
+                                " The team is currently a member of the Mountain West Conference, which is a Division I Bowl Subdivision (formerly Division I-A) conference of the National Collegiate Athletics Association (NCAA).",
+                                " The program which began on September 14, 1968, is coached by former Bishop Gorman High School head coach, Tony Sanchez.",
+                                " The team's home games are played at Sam Boyd Stadium in Whitney, Nevada."
+                            ]
+                        ],
+                        [
+                            "Kent Baer",
+                            [
+                                "Kent Lex Baer (born May 2, 1951) is an American college football coach.",
+                                " He is the defensive coordinator for UNLV Rebels."
+                            ]
+                        ],
+                        [
+                            "2015 Wisconsin Badgers football team",
+                            [
+                                "The 2015 Wisconsin Badgers football team represented the University of Wisconsin\u2013Madison in the 2015 NCAA Division I FBS football season.",
+                                " The Badgers, led by first-year head coach Paul Chryst, were members of the West Division of the Big Ten Conference and played their home games at Camp Randall Stadium.",
+                                " On January 13, 2015, the Badgers hired offensive coordinator Joe Rudolph.",
+                                " The Badgers were the media preseason favorites to win the Big Ten West division.",
+                                " During fall camp prior to the start of the season Chryst announced the Badgers would return to a pro-style punt scheme instead of the shield punt scheme, also known as the spread punt scheme.",
+                                " Two days after Wisconsin played in the Holiday Bowl defensive coordinator Dave Aranda was hired by LSU as their new defensive coordinator.",
+                                " At the end of the season, Wisconsin featured the #1 defense in college football, with opponents averaging just 13.1 points per game against the Badgers."
+                            ]
+                        ],
+                        [
+                            "2016 South Carolina Gamecocks football team",
+                            [
+                                "The 2016 South Carolina Gamecocks football team represented the University of South Carolina in the 2016 NCAA Division I FBS football season.",
+                                " The Gamecocks played their home games at Williams-Brice Stadium in Columbia, South Carolina and competed in the Eastern Division of the Southeastern Conference (SEC).",
+                                " The Gamecocks first-year head coach was Will Muschamp, with Kurt Roper as offensive coordinator and Travaris Robinson as defensive coordinator.",
+                                " They finished the season 6\u20137, 3\u20135 in SEC play to finish in a tie for fifth place in the Eastern Division.",
+                                " They were invited to the Birmingham Bowl where they lost to South Florida in overtime."
+                            ]
+                        ],
+                        [
+                            "2016 Texas Longhorns football team",
+                            [
+                                "The 2016 Texas Longhorns football team, known variously as \"Texas\", \"UT\", the \"Longhorns\", or the \"Horns\", was a collegiate American football team representing the University of Texas at Austin as a member of the Big 12 Conference in the 2016 NCAA Division I FBS football season; the 2016\u00a0team was the 124th to represent the university in college football.",
+                                " The Longhorns were led by third-year head coach Charlie Strong with Sterlin Gilbert as the team's offensive coordinator and Vance Bedford as the team's defensive coordinator.",
+                                " The team played its home games at Darrell K Royal\u2013Texas Memorial Stadium in Austin, Texas, where the team is based."
+                            ]
+                        ],
+                        [
+                            "2012 Arkansas State Red Wolves football team",
+                            [
+                                "The 2012 Arkansas State Red Wolves football team represents Arkansas State University in the 2012 NCAA Division I FBS football season.",
+                                " They were led by first year head coach Gus Malzahn and played their home games at Liberty Bank Stadium as members of the Sun Belt Conference.",
+                                " Arkansas State recorded a Sun Belt conference championship on the way to a 10-3 season.",
+                                " Malzahn vacated the position prior to the team's bowl game to assume the head coach position at Auburn University.",
+                                " Defensive coordinator John Thompson led the team as interim head coach to victory over the Kent State Golden Flashes in the 2013 GoDaddy.com Bowl."
+                            ]
+                        ],
+                        [
+                            "2017 Wyoming Cowboys football team",
+                            [
+                                "The 2017 Wyoming Cowboys football team represents the University of Wyoming during the 2017 NCAA Division I FBS football season.",
+                                " The Cowboys are coached by fourth-year head coach Craig Bohl and play their home games at War Memorial Stadium.",
+                                " They participate in the Mountain Division of the Mountain West Conference.",
+                                " This is their first year with new defensive coordinator Scottie Hazelton, who was previously an NFL linebackers coach with Jacksonville Jaguars for three seasons and was also Bohl's defensive coordinator for two seasons at North Dakota State."
+                            ]
+                        ],
+                        [
+                            "2013 Texas Longhorns football team",
+                            [
+                                "The 2013 Texas Longhorns football team (variously \"Texas,\" \"UT,\" the \"Longhorns,\" or the \"Horns\") represented the University of Texas at Austin in the 2013 NCAA Division I FBS football season, as a member of the Big 12 Conference.",
+                                " The Longhorns were led by 16th-year head coach Mack Brown and played their home games at Darrell K Royal\u2013Texas Memorial Stadium\u00a0(DKR).",
+                                " The team was also coached by offensive coordinators Major Applewhite and Darrell Wyatt, as well as defensive coordinator Greg Robinson; Manny Diaz was defensive coordinator to begin the season but was fired following the team's second game against Brigham Young\u00a0(BYU)."
+                            ]
+                        ]
+                    ],
+                    "type": "bridge",
+                    "level": "hard"
+                },
+                {
+                    "_id": "5ac4db1d554299076e296e1a",
+                    "answer": "Frederick Alexander",
+                    "question": "who is a British physicist  and also a  British government's chief scientific adviser",
+                    "supporting_facts": [
+                        [
+                            "Dehousing",
+                            0
+                        ],
+                        [
+                            "Frederick Lindemann, 1st Viscount Cherwell",
+                            0
+                        ]
+                    ],
+                    "context": [
+                        [
+                            "Mark J. Lewis",
+                            [
+                                "Dr. Mark J. Lewis was the Chief Scientist of the U.S. Air Force, Washington, D.C. from 2004 to 2008 and was the longest-serving Chief Scientist in Air Force history.",
+                                " He served as chief scientific adviser to the Chief of Staff and Secretary of the Air Force, and provided assessments on a wide range of scientific and technical issues affecting the Air Force mission.",
+                                " In this role he identified and analyzed technical issues and brought them to attention of Air Force leaders, and interacted with other Air Staff principals, operational commanders, combatant commands, acquisition, and science & technology communities to address cross-organizational technical issues and solutions.",
+                                " His primary areas of focus included energy, sustainment, long-range strike technologies, advanced propulsion systems, and workforce development."
+                            ]
+                        ],
+                        [
+                            "Mark T. Maybury",
+                            [
+                                "Mark Thomas Maybury, PhD (born December 13, 1964) is an American computer scientist and Chief Scientist of the United States Air Force, Washington, D.C. He serves as chief scientific adviser to the Chief of Staff of the Air Force and Secretary of the U.S. Air Force, and provides assessments on a wide range of scientific and technical issues affecting the Air Force mission."
+                            ]
+                        ],
+                        [
+                            "Michael Kelly (physicist)",
+                            [
+                                "Michael Joseph Kelly FRS FREng (born 14 May 1949) is a New Zealand-British physicist.",
+                                " He is Professor of Solid State Electronics and Nanoscale Science in the Division of Electrical Engineering, University of Cambridge.",
+                                " He was elected a Fellow of the Royal Society in 1993 and won its Hughes Medal in 2006.",
+                                " He was formerly the Chief Scientific Adviser to the Department for Communities and Local Government.",
+                                " He was elected in 1998 as a Fellow of the Royal Academy of Engineering"
+                            ]
+                        ],
+                        [
+                            "Frederick Lindemann, 1st Viscount Cherwell",
+                            [
+                                "Frederick Alexander Lindemann, 1st Viscount Cherwell, (5 April 18863 July 1957), pronounced , was a British physicist and an influential scientific adviser to the British government from the early 1940s to the early 1950s, particularly to Winston Churchill.",
+                                " He advocated the \"area\" bombing or \"strategic bombing\" of German cities and civilian homes during the Second World War by falsely stating data to Winston Churchill from a study on psychological impact of Germany's Birmingham Blitz and Hull Blitz on the local population.",
+                                " He also doubted the sophistication of Nazi Germany's radar technology and the existence of its \"V\" weapons programme."
+                            ]
+                        ],
+                        [
+                            "Nick Jennings (computer scientist)",
+                            [
+                                "Nicholas Robert Jennings, CB, FREng, FIEEE, FIET, FBCS, CEng, CITP is the Vice-Provost for Research at Imperial College, where he also holds a Chair in Artificial Intelligence.",
+                                " He was previously the Regius Professor of Computer Science at the University of Southampton and Chief Scientific Adviser to the UK Government on National Security.",
+                                " He is an internationally recognised authority in the areas of artificial intelligence, autonomous systems, agent-based computing and cybersecurity.",
+                                " He has been involved in founding and advising a number of start ups including Aerogility , Contact Engine , Crossword Cyber Security , Mentat and Reliance Cyber Science ."
+                            ]
+                        ],
+                        [
+                            "Government Office for Science",
+                            [
+                                "The Government Office for Science is part of the British government.",
+                                " This organisation advises the UK Government on policy and decision-making based on robust scientific evidence and long-term thinking.",
+                                " It is led by the Government Chief Scientific Adviser (GCSA), Sir Mark Walport who reports to the Prime Minister and Cabinet."
+                            ]
+                        ],
+                        [
+                            "Dehousing",
+                            [
+                                "On 30 March 1942 Professor Frederick Lindemann, Baron Cherwell, the British government's chief scientific adviser, sent to the British Prime Minister Winston Churchill a memorandum which after it had become accepted by the Cabinet became known as the dehousing paper."
+                            ]
+                        ],
+                        [
+                            "John Beddington",
+                            [
+                                "Sir John Rex Beddington, HonFREng, CMG, FRS (born 13 October 1945) is Senior Adviser at the Oxford Martin School, and was previously Professor of Applied Population Biology at Imperial College London, and the UK Government Chief Scientific Adviser from 2008 until 2013."
+                            ]
+                        ],
+                        [
+                            "David J. C. MacKay",
+                            [
+                                "Sir David John Cameron MacKay {'1': \", '2': \", '3': \", '4': \"} (22 April 1967 \u2013 14 April 2016) was a British physicist, mathematician, and academic.",
+                                " He was the Regius Professor of Engineering in the Department of Engineering at the University of Cambridge and from 2009 to 2014 was Chief Scientific Adviser to the UK Department of Energy and Climate Change (DECC).",
+                                " MacKay was well known as author of the book \"Sustainable Energy \u2013 Without the Hot Air\"."
+                            ]
+                        ],
+                        [
+                            "Anthony Finkelstein",
+                            [
+                                "Anthony Charles Wiener Finkelstein, CBE, FREng (born 28 July 1959) is a British software engineer.",
+                                " He is Chief Scientific Adviser for National Security to HM Government.",
+                                " His research is based at the Alan Turing Institute and he holds a Chair in Software Systems Engineering at University College London (UCL)."
+                            ]
+                        ]
+                    ],
+                    "type": "bridge",
+                    "level": "hard"
+                },
+                {
+                    "_id": "5ab7f97a5542991d322237ef",
+                    "answer": "super-regional shopping mall",
+                    "question": "What is Opry Mills in Nashville, Tennessee?",
+                    "supporting_facts": [
+                        [
+                            "Music City Queen",
+                            1
+                        ],
+                        [
+                            "Opry Mills",
+                            0
+                        ]
+                    ],
+                    "context": [
+                        [
+                            "Opry Mills",
+                            [
+                                "Opry Mills is a super-regional shopping mall owned by Simon Property Group, formerly by its initial owners Mills Corporation and Gaylord Entertainment.",
+                                " It opened in Nashville, Tennessee in 2000 on the former site of the Opryland USA theme park."
+                            ]
+                        ],
+                        [
+                            "Grand Ole Opry",
+                            [
+                                "The Grand Ole Opry is a weekly country-music stage concert in Nashville, Tennessee, which was founded on November 28, 1925, by George D. Hay as a one-hour radio \"barn dance\" on WSM.",
+                                " Currently owned and operated by Opry Entertainment (a division of Ryman Hospitality Properties, Inc.), it is the longest-running radio broadcast in US history, albeit not the longest-running one on a radio network.",
+                                " Dedicated to honoring country music and its history, the Opry showcases a mix of famous singers and contemporary chart-toppers performing country, bluegrass, Americana, folk, gospel, and comedic performances and skits.",
+                                " It attracts hundreds of thousands of visitors from around the world and millions of radio and Internet listeners."
+                            ]
+                        ],
+                        [
+                            "Keith Bilbrey",
+                            [
+                                "Keith Bilbrey (born August 14, 1952) is an American country music disc jockey and television host in Nashville, Tennessee.",
+                                " He served as a disc jockey at Nashville's WSM, as an announcer on the Grand Ole Opry, and as the host of TNN\u2019s Grand Ole Opry Live."
+                            ]
+                        ],
+                        [
+                            "Nashville Terminal Subdivision",
+                            [
+                                "The Nashville Terminal Subdivision is a railroad line owned by CSX Transportation in the U.S. State of Tennessee.",
+                                " The Subdivision is broken up into 5 sections all in Nashville, Tennessee.",
+                                " The northern part of the Terminal is in Madison, Tennessee at milepost 000/0BA 174 on the southern end of the Ex-L&N Mainline Subdivision at Monfort.",
+                                " Disptach for the Mainline Sub is known as \"LD\" which is part of the Cincinnati Division.",
+                                " From here in Madison begins the double track that stays for another 22 miles south to Brentwood, Tennessee.",
+                                " At milepost 000/0BA/00H 176.6, the famous Johnny Cash \"Amqui\" location where the Ex-L&N Evansville, Indiana line, the Henderson Subdivision meets with the Terminal.",
+                                " Dispatch for the Henderson Sub is known as \"SA\" and operates on AAR58.",
+                                " There are two crossings near each other, Williams Ave and Nesbitt Lane at Amqui.",
+                                " From here the Terminal goes south about 2 miles to the Nashville National Cemetery to the first major location, known as Ekin, 000179, where there is a cross over track from number 1 to number 2 track (left to right track).",
+                                " There is also the first EDD (Defect Detector) at 000179.1.",
+                                " Few more miles southward, the next major location appears.",
+                                " At 000181.0, Maplewood is a major location for the Terminal.",
+                                " From here the regular Terminal goes south to swap crews at Kayne Ave, and the right side, Radnor Cutoff, detours the city and gives yard departures and arrivals direct access to and from Radnor yard to cities like Louisville and Chicago.",
+                                " The Cutoff runs from Maplewood to Shelby Park double track.",
+                                " From Shebly the track converges into one to pass the historic Shelby bridge, then it opens back to double track.",
+                                " From there, the cutoff hits the Intermediates at 0BA187.0 known as Chicken Pike.",
+                                " The Radnor Cutoff carries the L&N mainline classification of \"0BA\" but meets the main at the same milepost from the Terminal.",
+                                " At Chicken Pike, trains are staged to await arrival to Radnor yard.",
+                                " Once they get clearance, speed is decreased to 15, and at 0BA188.1 the EDD (Defect Detector) sounds for departures and arrivals.",
+                                " This location is known as North Radnor.",
+                                " The right track diverging from the #2 is known as A-1, it is for departure trains to Chattanooga and Atlanta.",
+                                " The left track which goes west from the #1 is known as A-2, and serves as a departure track to Memphis, and if the cutoff is out of service, all northbound departures.",
+                                " The interesting piece of Maplewood is the crossovers that are there to move trains from the Cutoff to the Main.",
+                                " Both lines remain double track for a while.",
+                                " The main runs south for 2 more miles until the Intermediate signals at 000183.0.",
+                                " Commonly trains will stop before Delmas Ave when Kayne Ave is at capacity and await dispatch permission before moving south.",
+                                " From here, the main continues south until the CR Cumberland River Swingbridge, where the main converges into a single track shortly to cross the bridge.",
+                                " At this point, trains had been running at track speed of around 40.",
+                                " From the drawbridge into town, speed is reduced to around 10.",
+                                " After the bridge is passed, the main returns to double track in downtown.",
+                                " On the #1 track about a half a mile south, another connecting track is present.",
+                                " This is the Wye track that connects the main with the Bruceton side, while rarely used for mainline trains, locals and river jobs use it.",
+                                " The location is known as 8th Avenue or 8th Avenue Wye.",
+                                " The main then runs down to Kayne Ave, the central hotbed of all Nashville thru traffic.",
+                                " The Memphis, Tennessee Ex-L&N Bruceton Subdivision meets with the Terminal.",
+                                " The Bruceton Sub begins at Church Street at 00N0.0.",
+                                " The line then runs single track until 00N0.7 \"11th Avenue\" where it turns into double track and also meets the aforementioned, Wye track.",
+                                " The Bruceton line then goes southwest a while to the next signals, at \"Shops\".",
+                                " Now speed has been increased.",
+                                " The line is still double track until \"Sellars\", where speed is increased to 40 and jurisdiction transferred to the SD Dispatcher.",
+                                " For a short time, 4 main tracks are present and an additional fifth track for switchers and yard movements.",
+                                " The tracks from left to right in Kayne Ave are as follows: 100, 99, 98, 12, 3.",
+                                " The Kayne Ave yard is also here in this area, which houses some frieght and some switcher engines.",
+                                " The tracks to the old shed are covered and removed.",
+                                " The Union Station is not an active station, but a historic hotel.",
+                                " Crew change usually occurs at the \"walkway\" which is under the Demombreun St bridge by the Kayne Ave Tower.",
+                                " This is also where the Ex-NC&StL Chattanooga Subdivision begins.",
+                                " Then tracks run south to Fogg St/South End where things get complicated.",
+                                " At milepost 000/0BA/00J187 the 98 track merges into the 12 track, making for 3 tracks now.",
+                                " There is a crossover from 99 to 12, also a crossover from 12 to 3.",
+                                " About 2/10ths of a mile down the 99 merges into the 12 track reducing the tracks back to the regular double.",
+                                " About 4/10ths of a mile down the line from Fogg St, 000187.4, Oak St, is a crossover track from #2 to #1 (the track names are no longer 3 and 12, but are back to regular names).",
+                                " When trains use this crossover northbound, such as Memphis bound trains from the A-2 line, they refer to it as \"Long Lead\".",
+                                " And now, the Terminal splits into two parts.",
+                                " The right side turns into a single track shortly, and will become the Chattanooga Subdivision, and the left side runs south to Brentwood.",
+                                " The right track runs single shortly until double track for a while.",
+                                " This begins part of the Chattanooga Sub or J-Line.",
+                                " The #2 meets with the A-2 connection track at 00J2.2 known as A-2.",
+                                " Speed is now increased to 40.",
+                                " Commonly northbounds will stage at 4th Ave on the #1 to await clearance.",
+                                " Now about a mile down the #1 meets the A-1 connection line.",
+                                " At 00J3.6 known as A-1.",
+                                " Further down the double track ends at Glencliff (00J4.9).",
+                                " Now it runs single for three miles until it hits Danley, which has the D Line connection track, which is an arrival track for incoming Radnor trains from the J Line.",
+                                " At Danley, the Terminal ends but the same dispatcher handles traffic, \"SC\".",
+                                " At Oak Street, our main terminal line goes south two miles to 000189.0 known as Criaghead or Vine Hill.",
+                                " There is a crossover here from #1 to #2 track.",
+                                " And there is also a connection/delivery track to the Nashville and Eastern Railroad which connects the Tennessee Central Railroad Museum to a major railroad.",
+                                " Trains sometimes stop on the #2 before Craighead if they are waiting to enter Radnor yard.",
+                                " Sometimes trains wait on the #1 at the Berry Road crossing if they await arrival to Kayne Ave. At this point, speed has been increased to 30 from 10.",
+                                " Moving south, the line hits Radnor Yard at 000192.",
+                                " The #2 track meets the E-Line arrival track which most Memphis trains and locals use.",
+                                " The B-Line which meets the #1 track is used for departures out of the C yard and local jobs.",
+                                " At Mayton, 000192.3, the B line meets the #1 track, and there is a crossover track from #2 to #1.",
+                                " Speed is now at 40.",
+                                " 2 miles south, at 000194.0, South Radnor, the next intersection is present.",
+                                " This is where the Radnor A yard meets the main.",
+                                " There is a single departure/arrival track that meets the #2 track along with a crossover from #1 to #2 track.",
+                                " Commonly, the #2 track south of the signals is used to halt trains.",
+                                " This location is known as TVA, because of the power station that is adjacent.",
+                                " From here the Terminal runs about 2.5 miles south until we hit the southern tip.",
+                                " The tracks converge onto one single main, at 000/0BA196.6 known as Brentwood.",
+                                " Speed is increased to 50 and jurisdiction to the S.E. dispatcher.",
+                                " The right track is the main, S&NA North, while the left track is the Nashville Subdivision which runs to Columbia and exchanges freight with the TSRR.",
+                                " The Nashville Terminal Subdivision is one of the busiest locations on the CSX network, and one of the most important."
+                            ]
+                        ],
+                        [
+                            "Ryman Auditorium",
+                            [
+                                "Ryman Auditorium (formerly Grand Ole Opry House and Union Gospel Tabernacle) is a 2,362-seat live performance venue, located at 116 5th Avenue North, in Nashville, Tennessee and is best known as the home of the \"Grand Ole Opry\" from 1943 to 1974.",
+                                " It is owned and operated by Ryman Hospitality Properties, Inc."
+                            ]
+                        ],
+                        [
+                            "The Bailey Brothers and the Happy Valley Boys",
+                            [
+                                "The Bailey Brothers and the Happy Valley Boys were an American bluegrass act widely considered to be among the first to cultivate the duo harmony vocal technique widely used in modern bluegrass music today.",
+                                " Charlie Bailey (February 11, 1916 in Happy Valley, Tennessee, near Rogersville \u2013 March 12, 2004 in Bear, Delaware) began his musical career in 1936.",
+                                " His brother, Danny Bailey (December 1, 1919, Happy Valley, Tennessee \u2013 March 22, 2004, Knoxville, Tennessee), teamed up with him in 1940, and the brothers began making frequent appearances on Tennessee radio stations in the Knoxville area.",
+                                " Danny formed the Happy Valley Boys after Charlie joined the military in 1941.",
+                                " In 1944 the Happy Valley Boys relocated to Nashville, where they became members of the Grand Ole Opry, and also made regular appearances on WSM radio in Nashville.",
+                                " At that time, Danny was the youngest person to ever perform on the Grand Ole Opry.",
+                                " When Charlie returned from his military service in 1946 the brothers were reunited as a duo but only stayed in Nashville briefly before returning to radio work in Knoxville."
+                            ]
+                        ],
+                        [
+                            "Infinity Cat Recordings",
+                            [
+                                "Infinity Cat Recordings is an independent record label founded in 2002 and based in Nashville, Tennessee.",
+                                " The label has released recordings from artists including JEFF the Brotherhood, Diarrhea Planet, Be Your Own Pet, Ed Schrader's Music Beat, and Daddy Issues.",
+                                " In 2011, the label was highlighted by British publication The Guardian, which wrote \"forget the Grand Ole Opry; there are more thrilling new bands in East Nashville than anywhere else on earth [and] so many of their records have been released on the same label, Infinity Cat.\""
+                            ]
+                        ],
+                        [
+                            "Bradley Gaskin",
+                            [
+                                "Bradley Gaskin (born in Gadsden, Alabama) is an American country music singer-songwriter.",
+                                " He signed with Columbia Nashville in 2011 and has released his debut single, \"Mr. Bartender\" after being discovered through a talent contest sponsored by John Rich.",
+                                " At the time, Gaskin had been working for his father hanging sheetrock.",
+                                " The song entered the Hot Country Songs charts at number 51 on the chart dated for the week ending April 2, 2011.",
+                                " He made his Grand Ole Opry debut on August 20th, 2011.",
+                                " After a corporate restructuring, Gaskin moved to Columbia Records to release his second single, \"Diamonds Make Babies\".",
+                                " On June 4, 2012, it was announced that Sony Nashville was retiring the BNA label and moving its roster to Columbia Nashville.",
+                                " Gaskin was dropped from the label following this move.",
+                                " Gaskin spent much of 2012 touring with Big & Rich, typically performing \"Mr. Bartender\" as well as a cover of Keith Whitley's \"Don't Close Your Eyes\".",
+                                " Gaskin had plans for releasing a version of the Keith Whitley song prior to the problems that arose with his label.",
+                                " Gaskin wrote a Tate Stevens \"Power of a Love Song\" in 2013.",
+                                " Bradley performed \"Don't Close Your Eyes\" during a Grand Ole Opry performance on October 30, 2015."
+                            ]
+                        ],
+                        [
+                            "John England &amp; the Western Swingers",
+                            [
+                                "John England & the Western Swingers is a six piece Nashville, Tennessee band that plays Western swing.",
+                                " The group has played at Nashville's Robert's Western World every Monday since July 2001.",
+                                " The Swingers have also performed at New York's Lincoln Center, the Grand Ole Opry, the Legends of Western Swing Festival, the Ernest Tubb Record Shop's \"Midnight Jamboree\", and has been profiled by Downbeat magazine, the Nashville Tennessean, and other print media."
+                            ]
+                        ],
+                        [
+                            "Music City Queen",
+                            [
+                                "Music City Queen was a replica showboat formerly operating for entertainment purposes on the Cumberland River in the southern United States.",
+                                " It was the smaller of two stern-wheel paddle steamers based at Opry Mills in Nashville, Tennessee; the other is the \"General Jackson\"."
+                            ]
+                        ]
+                    ],
+                    "type": "bridge",
+                    "level": "hard"
+                }
+            ],
+            "traces": [],
+            "train": []
+        }
+    ],
+    "graph_path": "examples/mipro/output\\evaluated_programs\\program_6_mb.json"
+}

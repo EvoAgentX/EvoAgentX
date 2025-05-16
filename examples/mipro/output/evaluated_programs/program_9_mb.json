@@ -1,0 +1,465 @@
+{
+    "class_name": "SequentialWorkFlowGraph",
+    "goal": "Answer the question based on the context. The answer should be a direct response to the question, without including explanations or reasoning.",
+    "tasks": [
+        {
+            "name": "answer_generate",
+            "description": "Answer the question based on the context.",
+            "inputs": [
+                {
+                    "name": "problem",
+                    "type": "str",
+                    "description": "The problem to solve.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "answer",
+                    "type": "str",
+                    "description": "The answer to the problem.",
+                    "required": true
+                }
+            ],
+            "prompt": "**\n\nYou are a knowledgeable history expert tasked with answering questions about historical events, cultural references, and notable figures. For each question, provide a concise and direct answer without any explanations or reasoning. Include the answer in the specified XML format with the `<answer>` tag only.\n\n**Format your output as follows:**\n```\n<answer>{{your concise answer}}</answer>\n```\n\n**Problem:** {problem}\n\nBy following these guidelines, ensure that your answers are clear and straightforward for educational and trivia purposes.",
+            "system_prompt": null,
+            "parse_mode": "xml",
+            "parse_func": null,
+            "parse_title": null,
+            "demos": [
+                {
+                    "_id": "5a8e60ca5542995a26add4d9",
+                    "answer": "\"Read It and Weep\" (2006)",
+                    "question": "In which movie the Stephanie Kay Panabaker was alongside with her elder sister Danielle Nicole Panabaker?",
+                    "supporting_facts": [
+                        [
+                            "Danielle Panabaker",
+                            0
+                        ],
+                        [
+                            "Danielle Panabaker",
+                            1
+                        ],
+                        [
+                            "Kay Panabaker",
+                            0
+                        ]
+                    ],
+                    "context": [
+                        [
+                            "Danielle Nicole",
+                            [
+                                "Danielle Nicole was previously in the band Trampled Under Foot with her brothers Kris and Nick Schnebelen.",
+                                " At the 2014 Blues Music Awards, Trampled Under Foot's album, \"Badlands\", won the 'Contemporary Blues Album of the Year' category.",
+                                " At the same ceremony, Danielle Nicole, under the name of Danielle Schnebelen, triumphed in the 'Best Instrumentalist \u2013 Bass' category.",
+                                " The band was also nominated in the 'Band of the Year' category."
+                            ]
+                        ],
+                        [
+                            "Danielle Panabaker",
+                            [
+                                "Danielle Nicole Panabaker (born September 19, 1987) is an American actress.",
+                                " She began acting as a teenager and first came to prominence for her roles in the Disney films \"Stuck in the Suburbs\" (2004), \"Sky High\" (2005) and \"Read It and Weep\" (2006), the latter alongside her younger sister Kay Panabaker, and in the HBO miniseries \"Empire Falls\" (2005)."
+                            ]
+                        ],
+                        [
+                            "Custody (2007 film)",
+                            [
+                                "Custody is a 2007 Lifetime television movie, starring Rob Morrow, James Denton, and Kay Panabaker about a widower's fight for custody of the daughter he raised and legally adopted, when her birth father who abandoned her returns.",
+                                " Aired on September 8, 2007.",
+                                " It was filmed in and around Ottawa on locations such as the University of Ottawa, Rideau Canal, and Le Chateau Montebello.",
+                                " It was based on the book \"Figures of Echo\", by Mary S. Herczog."
+                            ]
+                        ],
+                        [
+                            "Nancy Drew (2007 film)",
+                            [
+                                "Nancy Drew is a 2007 American mystery comedy film loosely based on the popular series of mystery novels about the titular teen detective.",
+                                " It stars Emma Roberts as Nancy Drew, Max Thieriot as Ned, Kay Panabaker as George, and Amy Bruckner as Bess Marvin.",
+                                " Set in Los Angeles, it was directed by Andrew Fleming."
+                            ]
+                        ],
+                        [
+                            "Beverly Hills Chihuahua 3: Viva la Fiesta!",
+                            [
+                                "Beverly Hills Chihuahua 3: Viva la Fiesta!",
+                                " is a 2012 American direct-to-DVD comedy film directed by Lev L. Spiro.",
+                                " It is the third and final installment of the \"Beverly Hills Chihuahua\" series, and stars George Lopez, Odette Annable and Logan Grove.",
+                                " The film focuses on Papi, Chloe and the puppies moving to a hotel.",
+                                " Pedro finds love when he falls head over heels for Charlotte.",
+                                " The film was released by Walt Disney Studios Home Entertainment on September 18, 2012 in a two-disc Blu-ray/DVD combo pack.",
+                                " Zachary Gordon and Chantily Spalan did not reprise their roles as Papi, Jr. and Rosa.",
+                                " This was Kay Panabaker's final film before she retired to become a zoologist."
+                            ]
+                        ],
+                        [
+                            "Little Birds (film)",
+                            [
+                                "Little Birds is a 2011 American film written and directed by Elgin James, and starring Juno Temple and Kay Panabaker.",
+                                " The film follows two girls that leave home to follow two skateboarders to Los Angeles and is loosely based on the life of director Elgin James.",
+                                " The film premiered at the Sundance Film Festival, with Millennium Entertainment acquiring the North American rights to the film."
+                            ]
+                        ],
+                        [
+                            "Kay Panabaker",
+                            [
+                                "Stephanie Kay Panabaker (born May 2, 1990) is an American actress, voice actress, and zookeeper.",
+                                " She is best known for her roles as Jenny Garison in the 2009 reboot of \"Fame\", Debbie Berwick on \"Phil of the Future\" and Nikki Westerly on \"Summerland\".",
+                                " She is the younger sister of Danielle Panabaker."
+                            ]
+                        ],
+                        [
+                            "Read It and Weep",
+                            [
+                                "Read It and Weep is a 2006 Disney Channel Original Movie which premiered on July 21, 2006.",
+                                " It is based on the novel \"How My Private, Personal Journal Became A Bestseller\" by Julia DeVillers.",
+                                " Sisters Kay and Danielle Panabaker star as Jamie Bartlett and her alter ego Isabella (Iz or Is), respectively.",
+                                " Both sisters have starred in previous Disney Channel films: Kay in \"Life Is Ruff\" (2005), and Danielle in \"Stuck in the Suburbs\" (2004), like \"Read It and Weep\", those films also premiered in July in their respective years."
+                            ]
+                        ],
+                        [
+                            "Moondance Alexander",
+                            [
+                                "Moondance Alexander is a comedy-drama film directed by Michael Damian and written by Janeen Damian.",
+                                " The film was released in North America in October, 2007.",
+                                " The story is shot on location in Okotoks, High River and Calgary, Alberta, Canada and is based on actual events from the life of Janeen Damian.",
+                                " It stars former Summerland (TV series) co-stars Kay Panabaker as Moondance Alexander and Lori Loughlin as Gelsey Alexander.",
+                                " The movie co-stars Don Johnson and Olympic-skating silver medalist Sasha Cohen."
+                            ]
+                        ],
+                        [
+                            "Life Is Ruff",
+                            [
+                                "Life Is Ruff is a 2005 Disney Channel Original Movie starring Kyle Massey, Mitchel Musso, and Kay Panabaker."
+                            ]
+                        ]
+                    ],
+                    "type": "bridge",
+                    "level": "hard"
+                },
+                {
+                    "_id": "5a7c49dc55429935c91b514f",
+                    "answer": "Engineering",
+                    "question": "The head of the Foreign Relations Department of the Rastriya Janashakti Party holds a degree that can be abbreviated MS, M.S., or ScM, in what field?",
+                    "supporting_facts": [
+                        [
+                            "Hari Bahadur Basnet",
+                            1
+                        ],
+                        [
+                            "Hari Bahadur Basnet",
+                            3
+                        ],
+                        [
+                            "Master of Science",
+                            0
+                        ]
+                    ],
+                    "context": [
+                        [
+                            "Sikkim Janashakti Party",
+                            [
+                                "Sikkim Janashakti Party (translation: Sikkim People's Power Party), was a political party in the Indian state of Sikkim.",
+                                " SJP was founded in 1997, when Tara Man Rai broke away from Sikkim Ekta Manch.",
+                                " Rai was the president of SJP.",
+                                " In January 1999 SJP merged with Indian National Congress."
+                            ]
+                        ],
+                        [
+                            "Master of Science",
+                            [
+                                "A Master of Science (Latin: \"Magister Scientiae\" ; abbreviated MS, M.S., MSc, M.Sc., MSci, M.Sci., ScM, Sc.M., SciM or Sci.M.)",
+                                " is a master's degree in the field of science awarded by universities in many countries, or a person holding such a degree.",
+                                " In contrast to the Master of Arts degree, the Master of Science degree is typically granted for studies in sciences, engineering, and medicine, and is usually for programs that are more focused on scientific and mathematical subjects; however, different universities have different conventions and may also offer the degree for fields typically considered within the humanities and social sciences.",
+                                " While it ultimately depends upon the specific program, earning a Master of Science degree typically includes writing a thesis."
+                            ]
+                        ],
+                        [
+                            "Hari Bahadur Basnet",
+                            [
+                                "Hari Bahadur Basnet is a Nepalese politician.",
+                                " He is the head of the Foreign Relations Department of the Rastriya Janashakti Party.",
+                                " Basnet holds a M.Sc.",
+                                " in Engineering."
+                            ]
+                        ],
+                        [
+                            "Gregory Weeks",
+                            [
+                                "Gregory Weeks (born 1970) is a lecturer at the International Relations Department at Webster University in Vienna, Austria.",
+                                " He was the Head of the International Relations Department from 2005 until 2011.",
+                                " Weeks teaches and researches civil-military relations, genocide prevention, and twentieth century Austrian and German diplomatic and military history."
+                            ]
+                        ],
+                        [
+                            "Rastriya Janashakti Mahila Sangh",
+                            [
+                                "Rastriya Janashakti Mahila Sangh (Nepali: \u0930\u093e\u0937\u094d\u091f\u094d\u0930\u093f\u092f \u091c\u0928\u0936\u0915\u094d\u0924\u093f \u092e\u0939\u093f\u0932\u093e \u0938\u0902\u0918 ) is a women's organisation in Nepal, politically aligned with the Rastriya Janashakti Party."
+                            ]
+                        ],
+                        [
+                            "Rastriya Janashakti Student Union",
+                            [
+                                "Rastriya Janashakti Student Union is a students organisation in Nepal.",
+                                " It is the students wing of the Royalist Rashtriya Janashakti Party."
+                            ]
+                        ],
+                        [
+                            "Rastriya Janashakti Party",
+                            [
+                                "Rastriya Janashakti Party is a liberal political party in Nepal, led by former Prime Minister Surya Bahadur Thapa.",
+                                " Thapa had split away from the Rastriya Prajatantra Party in November 2004.",
+                                " The party is registered with the Election Commission of Nepal in March 2005."
+                            ]
+                        ],
+                        [
+                            "Politics in the San Francisco Bay Area",
+                            [
+                                "Politics in the San Francisco Bay Area is widely regarded as one of the most liberal in the country.",
+                                " According to the California Secretary of State, the Democratic Party holds a voter registration advantage in every congressional district, state senate district, state assembly district, State Board of Equalization districts, all nine counties, and all but three of the 101 incorporated municipalities in the Bay Area.",
+                                " The Republican Party holds a voter registration advantage in one state assembly subdistrict (the portion of California's 4th State Assembly district in Solano county) and three cities, Atherton, Hillsborough, and Danville."
+                            ]
+                        ],
+                        [
+                            "Foreign relations of Finland",
+                            [
+                                "The foreign relations of Finland are the responsibility of the President of Finland, who leads foreign policy in cooperation with the government.",
+                                " Implicitly the government is responsible for internal policy and decision making in the European Union.",
+                                " Within the government, preparative discussions are conducted in the government committee of foreign and security policy (\"ulko- ja turvallisuuspoliittinen ministerivaliokunta\"), which includes the Prime Minister and at least the Minister of Foreign Affairs and the Minister of Defence, and at most four other ministers as necessary.",
+                                " The committee meets with the President as necessary.",
+                                " Laws concerning foreign relations are discussed in the parliamentary committee of foreign relations (\"ulkoasiainvaliokunta, utrikesutskottet\").",
+                                " The Ministry of Foreign Affairs implements the foreign policy."
+                            ]
+                        ],
+                        [
+                            "ITV (Thailand)",
+                            [
+                                "iTV was a television station in Thailand owned by ITV Public Company Limited, a unit of Shin Corporation.",
+                                " Thailand's first UHF channel, the station was started in 1995 when the company was granted a 30-year concession by the Office of the Permanent Secretary to the Prime Minister's Office to operate a free-to-air television station in the Ultra High Frequency (UHF) spectrum at 510-790 MHz (from Channel 26 to 60).",
+                                " After a lengthy dispute over unpaid concession fees to the Prime Minister's Office, iTV was taken in 2007 over by the government's Public Relations Department and its name was changed to Thai Independent Television (TITV).",
+                                " Following a previously unannounced order of Thailand's Public Relations Department delivered the same day, the station closed down operations at the crack of dawn on January 15th, 2008.",
+                                " In accordance with the Public Broadcasting Service Act, the channel's frequency was assigned to the Thai Public Broadcasting Service, or Thai PBS."
+                            ]
+                        ]
+                    ],
+                    "type": "bridge",
+                    "level": "hard"
+                },
+                {
+                    "_id": "5a7b537555429927d897bf90",
+                    "answer": "German",
+                    "question": "The trophy given to the winner of the college football game between University of Idaho Vandals and University of Montana Grizzlies is derived from which European culture?",
+                    "supporting_facts": [
+                        [
+                            "Little Brown Stein",
+                            0
+                        ],
+                        [
+                            "Little Brown Stein",
+                            1
+                        ],
+                        [
+                            "Beer stein",
+                            1
+                        ]
+                    ],
+                    "context": [
+                        [
+                            "2006 Idaho Vandals football team",
+                            [
+                                "The 2006 Idaho Vandals football team represented the University of Idaho during the 2006 NCAA Division I FBS football season.",
+                                " Idaho competed as a member of the Western Athletic Conference (WAC), and played their home games in the Kibbie Dome, an indoor facility on campus in Moscow, Idaho.",
+                                " The Vandals were led by Dennis Erickson, hired following the departure of Nick Holt for an assistant's position at USC in February 2006.",
+                                " Erickson was previously the head coach of the Vandals from 1982-85, his first collegiate head coaching position."
+                            ]
+                        ],
+                        [
+                            "Little Brown Stein",
+                            [
+                                "The Little Brown Stein is a rivalry trophy awarded to the winner of the college football game between the University of Idaho Vandals and University of Montana Grizzlies.",
+                                " The trophy is, as the name implies, a large stein mug with the results of all the games between the two painted on."
+                            ]
+                        ],
+                        [
+                            "1957 Idaho Vandals football team",
+                            [
+                                "The 1957 Idaho Vandals football team represented the University of Idaho in the 1957 college football season.",
+                                " The Vandals were led by fourth-year head coach Skip Stahley and were members of the Pacific Coast Conference.",
+                                " Home games were played on campus at Neale Stadium in Moscow, with one home game in Boise at old Bronco Stadium at Boise Junior College."
+                            ]
+                        ],
+                        [
+                            "Beer stein",
+                            [
+                                "Beer stein ( ), or simply stein, is an English neologism for either traditional beer mugs made out of stoneware, or specifically ornamental beer mugs that are usually sold as souvenirs or collectibles.",
+                                " In German, the word \"stein \" means stone and is not used to refer to a beverage container."
+                            ]
+                        ],
+                        [
+                            "1972 Idaho Vandals football team",
+                            [
+                                "The 1972 Idaho Vandals football team represented the University of Idaho in the 1972 college football season.",
+                                " The Vandals were led by third-year head coach Don Robbins and were members of the Big Sky Conference, then in the college division of the NCAA.",
+                                " They played their home games at new Idaho Stadium, an unlit outdoor facility on campus in Moscow, Idaho."
+                            ]
+                        ],
+                        [
+                            "1964 Idaho Vandals football team",
+                            [
+                                "The 1964 Idaho Vandals football team represented the University of Idaho in the 1964 college football season.",
+                                " The Vandals were led by third-year head coach Dee Andros and were an independent in the NCAA's University Division.",
+                                " Home games were played on campus at Neale Stadium in Moscow, with one home game in Boise at old Bronco Stadium at Boise Junior College."
+                            ]
+                        ],
+                        [
+                            "1947 Idaho Vandals football team",
+                            [
+                                "The 1947 Idaho Vandals football team represented the University of Idaho in the 1947 college football season.",
+                                " The Vandals were led by first-year head coach Dixie Howell, and were members of the Pacific Coast Conference.",
+                                " Home games were played on campus in Moscow at Neale Stadium, with one game in Boise at Public School Field.",
+                                " The Vandals were 4\u20134 overall and 1\u20134 in conference play."
+                            ]
+                        ],
+                        [
+                            "1971 Idaho Vandals football team",
+                            [
+                                "The 1971 Idaho Vandals football team represented the University of Idaho in the 1971 college football season.",
+                                " The Vandals, led by second-year head coach Don Robbins, were members of the Big Sky Conference and played the final three of their five home games at the new Idaho Stadium, an outdoor facility on campus in Moscow, Idaho."
+                            ]
+                        ],
+                        [
+                            "1963 Idaho Vandals football team",
+                            [
+                                "The 1963 Idaho Vandals football team represented the University of Idaho in the 1963 college football season.",
+                                " The Vandals were led by second-year head coach Dee Andros and were an independent in the NCAA's University Division.",
+                                " Home games were played on campus at Neale Stadium in Moscow, with one home game in Boise at old Bronco Stadium at Boise Junior College."
+                            ]
+                        ],
+                        [
+                            "1952 Idaho Vandals football team",
+                            [
+                                "The 1952 Idaho Vandals football team represented the University of Idaho in the 1952 college football season.",
+                                " The Vandals were led by second-year head coach Raymond \"Babe\" Curfman and were members of the Pacific Coast Conference.",
+                                " Home games were played on campus at Neale Stadium in Moscow, with one home game in Boise at old Bronco Stadium at Boise Junior College."
+                            ]
+                        ]
+                    ],
+                    "type": "bridge",
+                    "level": "hard"
+                },
+                {
+                    "_id": "5abbd3ac55429931dba1458b",
+                    "answer": "no",
+                    "question": "Are both Duke Energy and Affiliated Managers Group based in Massachusetts?",
+                    "supporting_facts": [
+                        [
+                            "Duke Energy",
+                            0
+                        ],
+                        [
+                            "Affiliated Managers Group",
+                            0
+                        ]
+                    ],
+                    "context": [
+                        [
+                            "Duke Energy Florida",
+                            [
+                                "Duke Energy Florida, formerly Florida Power, was the generation, transmission, and distribution sector of Florida Progress Corporation.",
+                                " The company distributed power over much of central and north Florida.",
+                                " Florida Progress merged with Carolina Power & Light in 2000 to form Progress Energy.",
+                                " Progress Energy merged with Duke Energy in 2012.",
+                                " Today the Florida operations operate as Duke Energy Florida."
+                            ]
+                        ],
+                        [
+                            "Crystal River Energy Complex",
+                            [
+                                "The Crystal River Energy Complex consists of five power-generating plants on a 4,700 acre (1,900 hectare) site near the mouth of the Crystal River in Citrus County, Florida.",
+                                " Crystal River 1, 2, 4, and 5 are fossil fuel power plants, while Crystal River 3 is the sole nuclear power plant on the site.",
+                                " The complex was developed in the early 1960s by the Florida Power Corporation and sold to Progress Energy Inc in 2000.",
+                                " Following Progress Energy's merger with Duke Energy in 2012, the facility is owned and operated by Duke Energy."
+                            ]
+                        ],
+                        [
+                            "Sean Healey",
+                            [
+                                "Sean Michael Healey (born 1961) is the chairman and chief executive officer of Affiliated Managers Group, Inc. (NYSE: AMG), a global asset management firm whose affiliates in aggregate managed approximately $638 billion as of March 31, 2015."
+                            ]
+                        ],
+                        [
+                            "Darrell Crate",
+                            [
+                                "Darrell W. Crate (born 1967) is an American investor, private equity manager, and philanthropist.",
+                                " He served as the chief financial officer of Affiliated Managers Group.",
+                                " He is currently a managing principal of Easterly Capital, a private equity firm in Beverly, Massachusetts he founded in 2009."
+                            ]
+                        ],
+                        [
+                            "Sabal Trail Transmission Pipeline",
+                            [
+                                "Sabal Trail Transmission Pipeline is a proposed natural gas pipeline to run from central Alabama through southwest Georgia to Orange County.",
+                                " A minority stake in the venture is owned by NextEra Energy and Duke Energy.",
+                                " The pipeline has been being planned since before 2011.",
+                                " In July 2013 it was announced that Florida Power & Light Company (FPL) jointly awarded its parent corporation, NextEra Energy and Spectra Energy the bid to build the pipeline.",
+                                " In May 2015, Duke Energy bought an interest in the venture.",
+                                " Construction began in September 2016.",
+                                " The pipeline is currently scheduled to be in service by June 2017."
+                            ]
+                        ],
+                        [
+                            "Duke Energy",
+                            [
+                                "Duke Energy, headquartered in Charlotte, North Carolina, is an electric power holding company in the United States, with assets also in Canada and Latin America."
+                            ]
+                        ],
+                        [
+                            "Crescent Communities",
+                            [
+                                "In 1939, Duke Power (now Duke Energy) established a forestry department to manage company land not used for power generation.",
+                                " In 1963 this department became the company South Carolina Land and Timber.",
+                                " As the holdings expanded to include land in North Carolina, the organization was renamed Crescent Land and Timber in 1969.",
+                                " Some of the original land was sold to Crescent Land and Timber by the Singer Corporation.",
+                                " In the mid-1980s the company was renamed Crescent Resources as it began to actively develop residential communities.",
+                                " Crescent Resources began work on its first commercial development, Coliseum Centre, in 1990.",
+                                " As of 1991, Crescent Resources managed 270,000 acres of land.",
+                                " Holdings included part of what became Lake James State Park, which it later sold to the state of North Carolina.",
+                                "Crescent Resources became a separate entity from Duke Energy in 2006 with Duke Energy selling its 49% stake to Morgan Stanley.",
+                                " Crescent Resources filed for bankruptcy in 2009 and has emerged from it separated from the utility company.",
+                                " The company aimed to rebrand itself, renaming itself \"Crescent Communities\" in 2013."
+                            ]
+                        ],
+                        [
+                            "Progress Energy Inc",
+                            [
+                                "Progress Energy, headquartered in Raleigh, North Carolina, is a subsidiary of Duke Energy and prior to its merger with Duke Energy was a Fortune 500 energy company with more than 21,000 megawatts of generation capacity and $9 billion in annual revenues.",
+                                " Progress Energy includes two major electric utilities that serve approximately 3.1 million customers in the Carolinas and Florida.",
+                                " As an independent company, the last chairman and CEO of Progress Energy was William D. Johnson; his predecessor was Robert McGehee, who died on October 9, 2007 at the age of 64 of a stroke while on a business trip to London."
+                            ]
+                        ],
+                        [
+                            "Affiliated Managers Group",
+                            [
+                                "Affiliated Managers Group Inc. is an American international investment management company headquartered in Massachusetts that owns stakes in a number of boutique asset management, hedge fund, and specialized private equity firms."
+                            ]
+                        ],
+                        [
+                            "Gulfstream Natural Gas Pipeline",
+                            [
+                                "Gulfstream Natural Gas Pipeline is a natural gas pipeline that brings gas from Mississippi and Alabama, underwater across the Gulf of Mexico, to Florida.",
+                                " It was owned by Duke Energy, but is now owned by Duke Energy's spin-off company Spectra Energy.",
+                                " Its FERC code is 183.",
+                                ""
+                            ]
+                        ]
+                    ],
+                    "type": "comparison",
+                    "level": "hard"
+                }
+            ],
+            "traces": [],
+            "train": []
+        }
+    ],
+    "graph_path": "examples/mipro/output\\evaluated_programs\\program_9_mb.json"
+}

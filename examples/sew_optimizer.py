@@ -38,7 +38,7 @@ def main():
     agent_manager.add_agents_from_workflow(sew_graph)
 
     # obtain HumanEval benchmark
-    humaneval = HumanEvalSplits()
+    humaneval = ()
     def collate_func(example: dict) -> dict:
         # convert raw example to the expected input for the SEW workflow
         return {"question": example["prompt"]}

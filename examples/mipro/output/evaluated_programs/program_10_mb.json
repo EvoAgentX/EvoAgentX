@@ -1,0 +1,35 @@
+{
+    "class_name": "SequentialWorkFlowGraph",
+    "goal": "Answer the question based on the context. The answer should be a direct response to the question, without including explanations or reasoning.",
+    "tasks": [
+        {
+            "name": "answer_generate",
+            "description": "Answer the question based on the context.",
+            "inputs": [
+                {
+                    "name": "problem",
+                    "type": "str",
+                    "description": "The problem to solve.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "answer",
+                    "type": "str",
+                    "description": "The answer to the problem.",
+                    "required": true
+                }
+            ],
+            "prompt": "Think step by step to answer the question. You should explain your thinking process in the 'thought' field, and provide the final answer in the 'answer' field.\nFormat your output in xml format, such as <thought>xxx</thought> and <answer>xxx</answer>.\n\nProblem: {problem}",
+            "system_prompt": null,
+            "parse_mode": "xml",
+            "parse_func": null,
+            "parse_title": null,
+            "demos": [],
+            "traces": [],
+            "train": []
+        }
+    ],
+    "graph_path": "examples/mipro/output\\evaluated_programs\\program_10_mb.json"
+}

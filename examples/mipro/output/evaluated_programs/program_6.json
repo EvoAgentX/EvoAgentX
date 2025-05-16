@@ -1,0 +1,100 @@
+{
+    "class_name": "SequentialWorkFlowGraph",
+    "goal": "Generate a functional and correct Python code for the given problem.",
+    "tasks": [
+        {
+            "name": "code_generate",
+            "description": "Code generation for MBPP.",
+            "inputs": [
+                {
+                    "name": "problem",
+                    "type": "str",
+                    "description": "The problem to solve.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "code",
+                    "type": "str",
+                    "description": "The generated code.",
+                    "required": true
+                }
+            ],
+            "prompt": "**\n\n\"Transform the following problem description into a valid and efficient Python function. Your solution should not only be correct but also adhere to best practices in coding style, utilize Python's standard libraries where applicable, and include inline comments for clarity. \n\n### Problem Statement:\n{problem}\n\n### Example of Expected Output:\n- The output should be a complete Python function ready to be executed.\n- Ensure proper naming conventions and include necessary input validation if the problem requires it.",
+            "system_prompt": null,
+            "parse_mode": "str",
+            "parse_func": null,
+            "parse_title": null,
+            "demos": [
+                {
+                    "source_file": "Ellen's Copy of Benchmark Questions Verification V2.ipynb",
+                    "task_id": 295,
+                    "prompt": "Write a function to return the sum of all divisors of a number.\n\ndef sum_div(number):\n",
+                    "code": "def sum_div(number):\n    divisors = [1]\n    for i in range(2, number):\n        if (number % i)==0:\n            divisors.append(i)\n    return sum(divisors)",
+                    "test_imports": [],
+                    "test_list": [
+                        "assert sum_div(8)==7",
+                        "assert sum_div(12)==16",
+                        "assert sum_div(7)==1"
+                    ],
+                    "entry_point": "sum_div",
+                    "canonical_solution": "def sum_div(number):\n    divisors = [1]\n    for i in range(2, number):\n        if (number % i)==0:\n            divisors.append(i)\n    return sum(divisors)",
+                    "test": "def check(candidate):\n    assert sum_div(8)==7\n    assert sum_div(12)==16\n    assert sum_div(7)==1\n",
+                    "original_prompt": "Write a function to return the sum of all divisors of a number."
+                },
+                {
+                    "source_file": "Ellen's Copy of Benchmark Questions Verification V2.ipynb",
+                    "task_id": 308,
+                    "prompt": "Write a function to find the specified number of largest products from two given lists, selecting one factor from each list.\n\ndef large_product(nums1, nums2, N):\n",
+                    "code": "def large_product(nums1, nums2, N):\n    result = sorted([x*y for x in nums1 for y in nums2], reverse=True)[:N]\n    return result",
+                    "test_imports": [],
+                    "test_list": [
+                        "assert large_product([1, 2, 3, 4, 5, 6],[3, 6, 8, 9, 10, 6],3)==[60, 54, 50]",
+                        "assert large_product([1, 2, 3, 4, 5, 6],[3, 6, 8, 9, 10, 6],4)==[60, 54, 50, 48]",
+                        "assert large_product([1, 2, 3, 4, 5, 6],[3, 6, 8, 9, 10, 6],5)==[60, 54, 50, 48, 45]"
+                    ],
+                    "entry_point": "large_product",
+                    "canonical_solution": "def large_product(nums1, nums2, N):\n    result = sorted([x*y for x in nums1 for y in nums2], reverse=True)[:N]\n    return result",
+                    "test": "def check(candidate):\n    assert large_product([1, 2, 3, 4, 5, 6],[3, 6, 8, 9, 10, 6],3)==[60, 54, 50]\n    assert large_product([1, 2, 3, 4, 5, 6],[3, 6, 8, 9, 10, 6],4)==[60, 54, 50, 48]\n    assert large_product([1, 2, 3, 4, 5, 6],[3, 6, 8, 9, 10, 6],5)==[60, 54, 50, 48, 45]\n",
+                    "original_prompt": "Write a function to find the specified number of largest products from two given lists, selecting one factor from each list."
+                },
+                {
+                    "source_file": "Benchmark Questions Verification V2.ipynb",
+                    "task_id": 562,
+                    "prompt": "Write a python function to find the length of the longest sublists.\n\ndef Find_Max_Length(lst):\n",
+                    "code": "def Find_Max_Length(lst):  \n    maxLength = max(len(x) for x in lst )\n    return maxLength ",
+                    "test_imports": [],
+                    "test_list": [
+                        "assert Find_Max_Length([[1],[1,4],[5,6,7,8]]) == 4",
+                        "assert Find_Max_Length([[0,1],[2,2,],[3,2,1]]) == 3",
+                        "assert Find_Max_Length([[7],[22,23],[13,14,15],[10,20,30,40,50]]) == 5"
+                    ],
+                    "entry_point": "Find_Max_Length",
+                    "canonical_solution": "def Find_Max_Length(lst):  \n    maxLength = max(len(x) for x in lst )\n    return maxLength ",
+                    "test": "def check(candidate):\n    assert Find_Max_Length([[1],[1,4],[5,6,7,8]]) == 4\n    assert Find_Max_Length([[0,1],[2,2,],[3,2,1]]) == 3\n    assert Find_Max_Length([[7],[22,23],[13,14,15],[10,20,30,40,50]]) == 5\n",
+                    "original_prompt": "Write a python function to find the length of the longest sublists."
+                },
+                {
+                    "source_file": "Mike's Copy of Benchmark Questions Verification V2.ipynb",
+                    "task_id": 72,
+                    "prompt": "Write a python function to check whether the given number can be represented as the difference of two squares or not.\n\ndef dif_Square(n):\n",
+                    "code": "def dif_Square(n): \n    if (n % 4 != 2): \n        return True\n    return False",
+                    "test_imports": [],
+                    "test_list": [
+                        "assert dif_Square(5) == True",
+                        "assert dif_Square(10) == False",
+                        "assert dif_Square(15) == True"
+                    ],
+                    "entry_point": "dif_Square",
+                    "canonical_solution": "def dif_Square(n): \n    if (n % 4 != 2): \n        return True\n    return False",
+                    "test": "def check(candidate):\n    assert dif_Square(5) == True\n    assert dif_Square(10) == False\n    assert dif_Square(15) == True\n",
+                    "original_prompt": "Write a python function to check whether the given number can be represented as the difference of two squares or not."
+                }
+            ],
+            "traces": [],
+            "train": []
+        }
+    ],
+    "graph_path": "examples/mipro/output\\evaluated_programs\\program_6.json"
+}

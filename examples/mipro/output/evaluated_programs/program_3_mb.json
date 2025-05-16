@@ -1,0 +1,520 @@
+{
+    "class_name": "SequentialWorkFlowGraph",
+    "goal": "Answer the question based on the context. The answer should be a direct response to the question, without including explanations or reasoning.",
+    "tasks": [
+        {
+            "name": "answer_generate",
+            "description": "Answer the question based on the context.",
+            "inputs": [
+                {
+                    "name": "problem",
+                    "type": "str",
+                    "description": "The problem to solve.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "answer",
+                    "type": "str",
+                    "description": "The answer to the problem.",
+                    "required": true
+                }
+            ],
+            "prompt": "**\n\nProvide a direct answer to the following question based solely on the given context. No elaboration or reasoning should be included in the answer. \n\nPlease follow this format:\n- Place your thought process in the `<thought>` field, but keep it concise and relevant to your final answer.\n- Write the final answer in the `<answer>` field.\n\nFormat your output in XML, similar to this example:\n```xml\n<thought>Your concise thought process here.</thought>\n<answer>Your final answer here.</answer>\n```\n\nQuestion: {problem}",
+            "system_prompt": null,
+            "parse_mode": "xml",
+            "parse_func": null,
+            "parse_title": null,
+            "demos": [
+                {
+                    "_id": "5ab6f7415542991d322236f4",
+                    "answer": "1978",
+                    "question": "Sadok Sassi played for a national team that made its first World Cup in what year?",
+                    "supporting_facts": [
+                        [
+                            "Sadok Sassi",
+                            1
+                        ],
+                        [
+                            "Tunisia national football team",
+                            1
+                        ]
+                    ],
+                    "context": [
+                        [
+                            "2002 FIFA World Cup",
+                            [
+                                "The 2002 FIFA World Cup was the 17th staging of the FIFA World Cup which took place from 31 May to 30 June 2002 in South Korea and Japan.",
+                                " It was the first World Cup to be held in Asia, the first to be held on a continent other than Europe or the Americas, the last World Cup during which the golden goal rule was in force and the only World Cup to be jointly hosted by more than one nation.",
+                                " Brazil won the tournament for a record fifth time, winning the final against Germany 2\u20130.",
+                                " The victory meant Brazil qualified for the 2005 FIFA Confederations Cup for the fifth time, representing the World.",
+                                " In the third place play-off match against South Korea, Turkey won 3\u20132 taking third place in only their second ever FIFA World Cup finals.",
+                                " China PR, Ecuador, Senegal and Slovenia made their first appearances at the finals with Turkey making its first appearance since 1954.",
+                                " Republic of Ireland, Russia and Sweden returned after missing the 1998 tournament."
+                            ]
+                        ],
+                        [
+                            "Kenya at the Cricket World Cup",
+                            [
+                                "The Kenya national cricket team is the team that represents the country of Kenya in international cricket matches.",
+                                " Kenya was part of the East Africa cricket team which became an associate member of the ICC in 1966, and competed in the first World Cup.",
+                                " Kenya first competed as an independent nation at the 1996 Cricket World Cup, after which they were given full ODI status, which they held until 2014, when they finished fifth in the 2014 Cricket World Cup Qualifier.",
+                                " Kenya's best performance at the Cricket World Cup was in 2003, where they reached the semi-finals."
+                            ]
+                        ],
+                        [
+                            "Aung Thu (footballer)",
+                            [
+                                "Aung Thu (Burmese: \u1021\u1031\u102c\u1004\u103a\u101e\u1030 ; born 22 May 1996) is a footballer from Myanmar, and a striker for the Myanmar U-19 national football team and Yadanarbon FC.",
+                                " He was born in Pyinmana, Mandalay.",
+                                " In 2009, he joined the Myanmar Football Academy in Mandalay.",
+                                " He had played for U-16 and has begun playing for the Myanmar national football team.",
+                                " Aung Thu first appeared in national under 16 team that took part in 2011 AFF U-16 Youth Championship.",
+                                " He scored a goal against Qatar in 2014 AFC U-19 Championship in Myanmar which the team eventually lost in the extra time.",
+                                " He is fond of Messi.",
+                                " His performance helped the U-19 Myanmar National Team advance to the FIFA U-20 World Cup for the first time in Myanmar football history.",
+                                " This was the first time that a Myanmar football team taking part in a world level tournament after Myanmar had qualified for the football tournament in the 1972 Summer Olympics in Munich, Germany.",
+                                " He also won the most valuable player award of the year in early 2015 January.",
+                                " He scored a leading goal for Myanmar against New Zealand in the 2015 FIFA U-20 World Cup.",
+                                " He scored his first international goal for Myanmar National Football team against Laos 3-1 in 2018 World Cup qualification(AFC)."
+                            ]
+                        ],
+                        [
+                            "World Cup 98 (video game)",
+                            [
+                                "World Cup 98 (known in Europe as FIFA World Cup 98) is the first official FIFA World Cup game developed by EA Sports after obtaining the rights from FIFA in 1997.",
+                                " Unlike the previous World Cup games, which were in 2D and showed a bird's-eye view, \"World Cup 98\" was the first in the franchise to use a 3D engine, utilising DirectX for the PC version.",
+                                " Accurate national team kits (except for the goalkeepers who were issued a generic kit) were introduced complete with kit manufacturer logos and official merchandise.",
+                                " The game engine is based on that of \"\", though it features some minor gameplay improvements to areas such as ingame strategy changing and player positioning.",
+                                " The playable teams in the friendly mode also included several nations that did not qualify for the finals.",
+                                " \"World Cup 98\" was released for Microsoft Windows, PlayStation, Nintendo 64 and Game Boy."
+                            ]
+                        ],
+                        [
+                            "Tunisia national football team",
+                            [
+                                "The Tunisia national football team (Arabic: \u0645\u0646\u062a\u062e\u0628 \u062a\u0648\u0646\u0633 \u0644\u0643\u0631\u0629 \u0627\u0644\u0642\u062f\u0645\u200e \u200e ), nicknamed \"Les Aigles de Carthage (The Eagles of Carthage or The Carthage Eagles)\", is the national team of Tunisia and is controlled by the Tunisian Football Federation.",
+                                " They have qualified for four FIFA World Cups, the first one in 1978, but have yet to make it out of the first round.",
+                                " Nevertheless, they created history in that 1978 tournament in Argentina by becoming the first African side to win a World Cup match, beating Mexico 3\u20131.",
+                                " They also held defending champions West Germany to a goalless draw before bowing out.",
+                                " They have since qualified for the three tournaments in succession, in 1998, 2002 and 2006: they were the only African team to appear at both the 2002 and 2006 tournaments."
+                            ]
+                        ],
+                        [
+                            "Markus Vogel",
+                            [
+                                "Markus Vogel (born January 12, 1984) is a World Cup alpine ski racer from the Canton of Nidwalden in Switzerland, who specializes in the Slalom discipline.",
+                                " He made his World Cup debut in January 2008 in his home race at Adelboden where he skied out of the first run.",
+                                " A week later in the slalom in Wengen, Vogel managed to qualify for the second run in 29th place from a start number of 62 but was unable to finish the second run.",
+                                " He did not finish the first run of his other four races in 2008.",
+                                " In fact it was over a year until Vogel picked up his first World Cup points with a 19th-place finish in Kitzb\u00fchel.",
+                                " The 2010 season was another disappointing one, with Vogel spending most of his time in FIS Races and European Cup level.",
+                                " After this period, Vogel came back strongly at the end of the next season and earned himself a place in the Swiss World Championship team in 2011.",
+                                " In 2012, he was Switzerland's top slalom skier with the injury to Marc Gini.",
+                                " Vogel was also selected to the World Championship team in 2013, where he finished 17th in the Slalom."
+                            ]
+                        ],
+                        [
+                            "Sadok Sassi",
+                            [
+                                "Sadok Sassi (Arabic: \u0627\u0644\u0635\u0627\u062f\u0642 \u0633\u0627\u0633\u064a\u200e \u200e ), nicknamed \"Attouga\" (born 15 November 1945 in Tunis) is a former Tunisian footballer.",
+                                " He was a goalkeeper and played for Club Africain and the Tunisian national team."
+                            ]
+                        ],
+                        [
+                            "Rugby League World Cup",
+                            [
+                                "The Rugby League World Cup is an international rugby league tournament, contested by national teams of the Rugby League International Federation, which was first held in France in 1954, the first World Cup in either rugby code.",
+                                " The idea of a rugby league world cup tournament was first mooted in the 1930s with the French proposing holding a tournament in 1931, and again in 1951.",
+                                " The fourteen tournaments held to date have been at intervals ranging from two to eight years, and have featured a number of different formats.",
+                                " So far three nations have won the competition (Australia ten times, Great Britain three times and New Zealand once).",
+                                " Australia, France and New Zealand are the only teams to have played in all tournaments (Great Britain has been split into England, Wales, Scotland and Ireland since 1995, while England and Wales had previously competed as separate teams in the 1975 World Cup).",
+                                " Since 2000, the RLIF has also organised World Cups for women, students and other categories.",
+                                " The 2013 Rugby League World Cup was held in England and Wales and won by Australia."
+                            ]
+                        ],
+                        [
+                            "Australia at the Cricket World Cup",
+                            [
+                                "The Australian cricket team is the most successful team in the Cricket World Cup winning the 1987, 1999, 2003, 2007 and 2015 editions.",
+                                " This also makes them the only team to have won the world cup in all the regions (group of countries) that have hosted the world cup till now.",
+                                " Besides, Australia had reached the finals of the 1975 and 1996 World cups losing to West Indies and Sri Lanka respectively.",
+                                " They also reached quarterfinals of 2011 Cricket World Cup, and were knocked out in first round three times : 1979, 1983 and 1992.",
+                                " Though they have won world cup record five times, they are also the only team considered as tournament favorites for every world cup, right from 1975 to present.",
+                                " The team has played total 85 world cup matches, the highest of any team.",
+                                " Its overall win-loss record is 61-21 (which gives it the highest win percentage among all teams playing the world cup), with one tied match and two being abandoned due to rain."
+                            ]
+                        ],
+                        [
+                            "Olle Nordin",
+                            [
+                                "Olle Nordin (born 23 November 1949 in Delary, Sm\u00e5land) is a Swedish football coach and former player.",
+                                " He was capped 19 times for the national team and played at the 1978 FIFA World Cup, but he is best remembered for his coaching merits.",
+                                " As national team coach, he led Sweden to the 1990 FIFA World Cup \u2014 its first World Cup since Nordin participated as a player.",
+                                " The tournament was a failure, however, as Sweden lost all three matches with 1-2.",
+                                " Nordin was fired shortly thereafter.",
+                                " He managed Norwegian clubs (V\u00e5lerenga, Lyn) as well as Swedish V\u00e4stra Fr\u00f6lunda IF, IFK Norrk\u00f6ping and AIK."
+                            ]
+                        ]
+                    ],
+                    "type": "bridge",
+                    "level": "hard"
+                },
+                {
+                    "_id": "5a72dcb45542992359bc31af",
+                    "answer": "Aloe Vera of America",
+                    "question": "What company did Rex Maughan aquire?",
+                    "supporting_facts": [
+                        [
+                            "Rex Maughan",
+                            0
+                        ],
+                        [
+                            "Forever Living Products",
+                            2
+                        ]
+                    ],
+                    "context": [
+                        [
+                            "REX American Resources",
+                            [
+                                "REX American Resources Corp. (REX; ) is an American producer and retailer of ethanol, distillers grains and natural gas as well as a holding company in energy entities.",
+                                " It was founded in 1980 and is headquartered in Dayton, Ohio.",
+                                " The company has the entire ownership of three affiliated corporations including Rex Radio and Television, Inc., Stereo Town, Inc. and Kelly & Cohen Appliances, Inc.",
+                                " As of 2012, the company has the ownership of 22 national retail stores and invested in five ethanol production entities nationwide.",
+                                " One of the plants the company invested in, One Earth Energy, LLC, has an annual capacity of 100\u00a0million gallons of ethanol and 320,000\u00a0tons of dried distillers grains.",
+                                " The company exited the retail industry and transferred to energy investment in 2009 with changing the name from Rex Stores Corporation to its current name in the following year."
+                            ]
+                        ],
+                        [
+                            "World Publishing Company",
+                            [
+                                "The World Publishing Company was an American publishing company founded by Alfred H. Cahen.",
+                                " Originally headquartered in Cleveland, the company later added an office in New York City.",
+                                " The company published genre fiction, trade paperbacks, children's literature, nonfiction books, textbooks, Bibles, and dictionaries, primarily from 1940 to 1980.",
+                                " Authors published by World Publishing Company include Ruth Nanda Anshen, Michael Crichton, Simone de Beauvoir, Robert Ludlum, Sam Moskowitz, Ayn Rand, Rex Stout, Gay Talese, and Lin Yutang.",
+                                " The company's Cleveland headquarters were located in the Caxton Building."
+                            ]
+                        ],
+                        [
+                            "Rex-Acme",
+                            [
+                                "Rex, Rex Motorcycles, Rex-Acme, was a motorcycle company which began in Birmingham, England in 1900.",
+                                " Rex soon merged with a Coventry bicycle maker named Allard and then later in 1922 the company merged with Coventry's 'Acme' motorcycle company forming 'Rex Acme'.",
+                                " The company existed until 1933, and, in its heyday, was considered one of the greatest names in the British motorcycle industry."
+                            ]
+                        ],
+                        [
+                            "Forever Living Products",
+                            [
+                                "Forever Living Products International, Inc. (FLPI) is a privately held multi-level marketing (MLM) company based in Scottsdale, Arizona, which manufactures and sells aloe vera-based drinks and bee-derived cosmetics, nutritional supplements, and personal care products.",
+                                " The company was founded in 1978 by CEO Rex Maughan.",
+                                " After acquiring the company Aloe Vera of America by the 1990s, In 2010, the company reported having over 4,000 employees, a network of 9.3 million distributors, and revenue of $1.7 billion."
+                            ]
+                        ],
+                        [
+                            "Xircom",
+                            [
+                                "Xircom, Inc. was based in Thousand Oaks, California, with manufacturing facilities located in Penang & Malaysia and international offices throughout Europe and Asia Pacific.",
+                                " They were one of the first companies to develop network computing products for notebook computers.",
+                                " Products included computer memory cards, LAN adapters, modems, and remote access server products.",
+                                " The company's products enabled notebook users to share information over a network connection.",
+                                " During fiscal 1999, the company introduced 56K modems in the MiniPCI form factor.",
+                                " In September 1999, the company acquired Rex PC Card Organizer product line.",
+                                " During fiscal 2000, the company acquired Omnipoint Technologies, Inc. and Entrega Technologies Inc.",
+                                " Branded products accounted for 65% of fiscal 2000 revenues and OEM products, 35%.",
+                                " In 2001, Intel acquired Xircom and in early 2003 laid off most of Xircom's Thousand Oaks employees."
+                            ]
+                        ],
+                        [
+                            "Rex Maughan",
+                            [
+                                "Rex G. Maughan is the founder, president, and CEO of Forever Living Products, a multi-level marketing program that sells aloe-vera based cosmetics and other personal products.",
+                                " He is also a real-estate investor."
+                            ]
+                        ],
+                        [
+                            "Graco (baby products)",
+                            [
+                                "Graco (pronounced gray-co) is an American baby products company, owned and operated by Newell Brands, now based in Atlanta, Georgia.",
+                                " It was founded in 1942 in Philadelphia, Pennsylvania, by Russell Gray and Robert Cone (hence the name) as Graco Metal Products, a company that fabricated machine and car parts.",
+                                " Rex Thomas (one of two engineers hired to come up with a sustainable product) watched his wife sitting on the porch, rocking their baby in a swing with a string tied to it, while she read a book.",
+                                " Rex went into work the next day and said \u201cwhy don\u2019t we make an automatic baby swing.\u201d",
+                                " After 18 months of research and development, the Swyngnomatic - the world\u2019s first wind-up, automatic baby swing\u2014was born in 1955, designed by company engineer Dave Saint.",
+                                " In 1987 the company pioneered the invention of the Pack N' Play Portable Playard, the world\u2019s first portable playard (designed by Nate Saint, Dave Saint\u2019s son)."
+                            ]
+                        ],
+                        [
+                            "Rex Records (1912)",
+                            [
+                                "Rex Records was a United States based record label owned by the Rex Talking Machine Corporation of Wilmington, Delaware.",
+                                " The company was in business from 1912 through 1919.",
+                                " They issued vertical cut double-sided ten- and 12-inch diameter disc records compatible with the Path\u00e9 Records system.",
+                                " They were bought out by Okeh Records.",
+                                " For further details and references see <nowiki>mainspringress.com</nowiki>.",
+                                " That article cites \"1918 issues of 'Talking Machine World' as a specific source for remarks about Rex Records."
+                            ]
+                        ],
+                        [
+                            "Rexist Party",
+                            [
+                                "The Rexist Party (French: \"Parti Rexiste\" ), or simply Rex, was a far-right Catholic, nationalist, authoritarian and corporatist political party active in Belgium from 1935 until 1945.",
+                                " The party was founded by a journalist, L\u00e9on Degrelle, and, unlike other fascist parties in the Belgium of the time, advocated Belgian unitarism and royalism.",
+                                " Initially the party ran in both Flanders and Wallonia but never achieved much success outside Wallonia and Brussels.",
+                                " Its name was derived from the Roman Catholic journal and publishing company \"Christus Rex\" (Latin for Christ the King)."
+                            ]
+                        ],
+                        [
+                            "Rex Records (1933)",
+                            [
+                                "Rex Records was a United Kingdom-based record label founded in 1933 by the Crystalate Gramophone Record Manufacturing Company, also the parent of British Imperial Records.",
+                                " Rex released their first discs in September 1933, with the initial release bearing a catalogue number of 8000 or 8001.",
+                                " The company was taken over by Decca Records in March 1937.",
+                                " Rex Records were sold at Marks & Spencer's chain stores."
+                            ]
+                        ]
+                    ],
+                    "type": "bridge",
+                    "level": "hard"
+                },
+                {
+                    "_id": "5a87bd4e5542994846c1cde0",
+                    "answer": "no",
+                    "question": "Are both Coldplay and Pierre Bouvier from the same country?",
+                    "supporting_facts": [
+                        [
+                            "Coldplay",
+                            0
+                        ],
+                        [
+                            "Pierre Bouvier",
+                            0
+                        ]
+                    ],
+                    "context": [
+                        [
+                            "St Pierre, Monmouthshire",
+                            [
+                                "St Pierre is a former parish and hamlet in Monmouthshire, south east Wales, 3 mi south west of Chepstow and adjacent to the Severn estuary.",
+                                " It is now the site of a large golf and country club, the Marriott St Pierre Hotel & Country Club, which was previously a large manor house and deer park belonging to the Lewis family."
+                            ]
+                        ],
+                        [
+                            "Damage Control (TV series)",
+                            [
+                                "Damage Control is a reality TV series produced by MTV.",
+                                " Hosted by lead vocalist of Canadian music group Simple Plan Pierre Bouvier, and directed by Sebastian Doggart, the show was a real-life version of the movie \"Risky Business.\"",
+                                " It first aired on MTV on March 6, 2005.",
+                                " The last episode was broadcast on April 24, 2005."
+                            ]
+                        ],
+                        [
+                            "Coldplay",
+                            [
+                                "Coldplay are a British rock band formed in 1996 by lead vocalist and keyboardist Chris Martin and lead guitarist Jonny Buckland at University College London (UCL).",
+                                " After they formed under the name Pectoralz, Guy Berryman joined the group as bassist and they changed their name to Starfish.",
+                                " Will Champion joined as drummer and backing vocalist, completing the lineup.",
+                                " Creative director Phil Harvey is often referred to as the fifth member by the band.",
+                                " The band renamed themselves \"Coldplay\" in 1998, before recording and releasing three EPs: \"Safety\" in 1998 and \"Brothers & Sisters\" and \"The Blue Room\" in 1999.",
+                                " \"The Blue Room\" was their first release on a major label, after signing to Parlophone."
+                            ]
+                        ],
+                        [
+                            "I'm Just a Kid",
+                            [
+                                "\"I'm Just a Kid\" is the debut single by the band Simple Plan, written by Pierre Bouvier.",
+                                " It appeared on their debut album \"No Pads, No Helmets... Just Balls\".",
+                                " It was featured in the films \"Grind\", \"The New Guy\", and \"Cheaper by the Dozen\"."
+                            ]
+                        ],
+                        [
+                            "Pierre Belleque",
+                            [
+                                "Pierre Belleque or Pierre Billique (1793\u20131849) was a French Canadian fur trader in the British-claimed Columbia District, which was also known as the Oregon Country and also claimed by the United States.",
+                                " He settled on the French Prairie in what is now the state of Oregon where in 1843 he participated in the Champoeg Meetings.",
+                                " Pierre was elected one of three Constables.",
+                                " He voted affirmative for the measure to form a provisional government at the May 2, 1843 meeting.",
+                                " That measure passed and led to the creation of the Provisional Government of Oregon."
+                            ]
+                        ],
+                        [
+                            "Pierre Bouvier",
+                            [
+                                "Pierre Charles Bouvier {'1': \", '2': \", '3': \", '4': \"} (born 9 May 1979) is a Canadian singer, songwriter, musician, composer and actor who is best known as the lead singer and guitarist of the rock band Simple Plan."
+                            ]
+                        ],
+                        [
+                            "Pierre Lorillard III",
+                            [
+                                "Pierre Lorillard III (October 20, 1796 \u2013 December 23, 1867) was the grandson of Pierre Abraham Lorillard, the founder of the P. Lorillard and Company.",
+                                " Pierre also developed Tuxedo Park, New York, one of the nation's early country clubs."
+                            ]
+                        ],
+                        [
+                            "History (Story Untold song)",
+                            [
+                                "\"History\" is the first single from Canadian band Story Untold.",
+                                " The members of Story Untold are from Quebec, Canada, which is also home to Simple Plan.",
+                                " Simple Plan has known the five-piece for a while, and the French Canadians teamed up to write Story Untold's newest single \"History\".",
+                                " The song is about how the band is going to make it big, even if it seems like a crazy idea: \"You can call me crazy/But when I close my eyes/I can see it clearly/I can see the shining lights.\"",
+                                " The song was co-penned with Simple Plan's vocalist Pierre Bouvier and drummer Chuck Comeau.",
+                                " The song is just one of seven songs on the band's self-titled EP.",
+                                " History also has a music video where the band is a part of an underground fight club.",
+                                " It features each boy taking on a different fighter, and it subtly introduces each band member for those who have never heard of Story Untold before.",
+                                " An acoustic version of the song does appear on YouTube but is not featured on the Story Untold EP."
+                            ]
+                        ],
+                        [
+                            "Chuck Comeau",
+                            [
+                                "Charles-Andr\u00e9 \"Chuck\" Comeau {'1': \", '2': \", '3': \", '4': \"} (born 17 September 1979) is a Canadian musician and drummer, best known for being the drummer of the rock band Simple Plan.",
+                                " He also founded the apparel company Role Model Clothing along with his bandmate Pierre Bouvier and the band's best friend, Patrick Langlois.",
+                                " He is also former drummer for the punk rock band Reset from 1993 to 1999, which he quit to form Simple Plan with his Reset bandmate who also left Reset, Pierre Bouvier."
+                            ]
+                        ],
+                        [
+                            "Billy Boyle",
+                            [
+                                "Billy Boyle is an Irish actor on British film, television and stage.",
+                                " He is a veteran of the West End stage having played leading roles in over 15 hit shows.",
+                                " In his first West End musical \"Maggie May\" he was nominated as best newcomer.",
+                                " Gower Champion then chose him to play Barnaby in \"Hello Dolly\" at The Theatre Royal Drury Lane.",
+                                " He appeared in \"Canterbury Tales\" at the Phoenix Theatre as The Clerk of Oxford.",
+                                " Harold Hobson, The Times critic said, \"He was a breath of fresh air in the West-End\".",
+                                " He then went on to play leading roles in \"No Sex Please, We're British\", \"Billy\", \"What's a Nice Country\", \"The Rivals\", \"Love, Lust, & Marriage\", \"Some Like it Hot\", Disney's \"Beauty and the Beast\", and in the original cast of \"Dirty Dancing.",
+                                " Lately he has appeared as Grandpa George\" and Grandpa Joe in Charlie and The Chocolate Factory at Drury Lane.",
+                                " In 2016 he was Major Bouvier and Norman Vincent Peale in the smash hit Grey Gardens.",
+                                " He followed this playing Arvide in Guys and Dolls at the Phoenix Theatre in the West End.He has had his own very successful television series in Ireland \"It's Billy Boyle\" as well as leading roles in \"Trail of Guilt\", the award-winning \"The Grass Arena\", \"The Bretts\", as well as many guest appearances in EastEnders, The Professionals, Coronation Street, Father Ted etc.",
+                                " In the late 1970s, Boyle was cast as 'Ronald McDonald' in the European TV commercials and in all print media for the fast food chain McDonald's.",
+                                " He was the last 'straight man' to Basil Brush on BBC1's \"The Basil Brush Show\" and later presented a programme, Dance Crazy for ITV, on the history of dance with Lesley Judd.",
+                                " Lately he has been seen in Dirk Gently, for BBC Four and Lead Balloon.",
+                                " His many films include Stanley Kubrick's \"Barry Lyndon\", \"Groupie Girl\", \"Side by Side\", \"Shergar\", \"Wild Geese II\", \"The Scarlet and the Black\", \"Round Ireland with a Fridge\" and A United Kingdom."
+                            ]
+                        ]
+                    ],
+                    "type": "comparison",
+                    "level": "hard"
+                },
+                {
+                    "_id": "5adfdef9554299025d62a36b",
+                    "answer": "Bath, Maine",
+                    "question": "Where was the first governor after the The Missouri Compromise from?",
+                    "supporting_facts": [
+                        [
+                            "Maine gubernatorial election, 1820",
+                            1
+                        ],
+                        [
+                            "Maine gubernatorial election, 1820",
+                            2
+                        ],
+                        [
+                            "Maine gubernatorial election, 1820",
+                            3
+                        ],
+                        [
+                            "William King (governor)",
+                            0
+                        ]
+                    ],
+                    "context": [
+                        [
+                            "Compromise of 1790",
+                            [
+                                "The Compromise of 1790 was a compromise between Alexander Hamilton on the one hand and Thomas Jefferson and James Madison whereby Hamilton won the decision for the national government to take over and pay the state debts, while Jefferson and Madison obtained the national capital (District of Columbia) for the South.",
+                                " The compromise resolved the deadlock in Congress.",
+                                " Southerners were blocking the assumption of state debts by the treasury, thereby destroying the Hamiltonian program for building a fiscally strong nation state.",
+                                " Northerners rejected the proposal, much desired by Virginians, to locate the permanent national capital on the Virginia-Maryland border.",
+                                " The compromise made possible the passage of the Residence and Funding (Assumption) Acts in July and August 1790.",
+                                " Historian Jacob Cooke says it is, \"generally regarded as one of the most important bargains in American history, ranking just below the better known Missouri Compromise and the Compromise of 1850.\""
+                            ]
+                        ],
+                        [
+                            "Anti-Nebraska movement",
+                            [
+                                "The Anti-Nebraska movement was a political alignment in the United States formed in opposition to the Kansas-Nebraska Act of 1854 and to its repeal of the Missouri Compromise provision forbidding slavery in U.S. territories north of latitude 36\u00b0 30' N.",
+                                " (At the time, the name \"Nebraska\" could loosely refer to areas west of the Missouri River.)"
+                            ]
+                        ],
+                        [
+                            "History of the United States Republican Party",
+                            [
+                                "The Republican Party, also commonly called the GOP (for \"Grand Old Party\"), is one of the world's oldest extant political parties.",
+                                " It is the second oldest existing political party in the United States after its primary rival, the Democratic Party.",
+                                " It emerged in 1854 to combat the Kansas\u2013Nebraska Act, an act that dissolved the terms of the Missouri Compromise and allowed slave or free status to be decided in the territories by popular sovereignty.",
+                                " The Party had almost no presence in the Southern United States, but by 1858 in the North it had enlisted former Whigs and former Free Soil Democrats to form majorities in nearly every Northern state."
+                            ]
+                        ],
+                        [
+                            "William King (governor)",
+                            [
+                                "William King (February 9, 1768June 17, 1852) was an American merchant, shipbuilder, army officer, and statesman from Bath, Maine.",
+                                " A proponent of statehood for Maine, he became its first governor when it separated from Massachusetts in 1820."
+                            ]
+                        ],
+                        [
+                            "Henry Smith Lane",
+                            [
+                                "Henry Smith Lane (February 24, 1811 \u2013 June 19, 1881) was a United States Representative, Senator, and the 13th Governor of Indiana; he was by design the shortest-serving Governor of Indiana, having made plans to resign the office should his party take control of the Indiana General Assembly and elect him to the United States Senate.",
+                                " He held that office for only two days, and was known for his opposition to slavery.",
+                                " A Whig until the party collapsed, he supported compromise with the south.",
+                                " He became an early leader in the Republican Party starting in 1856 serving as the president of the first party convention, delivering its keynote address, and was influential in the nomination of Abraham Lincoln.",
+                                " With the repeal of the Missouri Compromise, he became a full-fledged"
+                            ]
+                        ],
+                        [
+                            "Parallel 36\u00b030\u2032 north",
+                            [
+                                "The parallel 36\u00b030\u2032 north is a circle of latitude that is 36 and one-half degrees north of the equator of the Earth.",
+                                " This parallel of latitude is particularly significant in the history of the United States as the line of the Missouri Compromise, which was used to divide the prospective slave and free states west of the Mississippi River, with the exception of Missouri, which is mostly north of this parallel."
+                            ]
+                        ],
+                        [
+                            "Maine gubernatorial election, 1820",
+                            [
+                                "The 1820 Maine gubernatorial election took place on April 3, 1820.",
+                                " It was the first election for Governor of Maine, taking place after Maine separated from Massachusetts and was recognized as a state on March 15, 1820.",
+                                " Maine's separation from Massachusetts came as a result of The Missouri Compromise.",
+                                " This election saw the virtually unanimous election of William King, the man most chiefly responsible for the push for Maine statehood.",
+                                " He had no opponents."
+                            ]
+                        ],
+                        [
+                            "Pottawatomie massacre",
+                            [
+                                "The Pottawatomie massacre occurred during the night of May 24 and the morning of May 25, 1856.",
+                                " In reaction to the sacking of Lawrence, Kansas by pro-slavery forces, John Brown and a band of abolitionist settlers\u2014some of them members of the Pottawatomie Rifles\u2014killed five settlers north of Pottawatomie Creek in Franklin County, Kansas.",
+                                " This was one of the many bloody episodes in Kansas preceding the American Civil War, which came to be known collectively as Bleeding Kansas.",
+                                " Bleeding Kansas was largely brought about by the Missouri Compromise and the Kansas\u2013Nebraska Act."
+                            ]
+                        ],
+                        [
+                            "Missouri Compromise",
+                            [
+                                "The Missouri Compromise is the title generally attached to the legislation passed by the 16th United States Congress on May 8, 1820.",
+                                " The measures provided for the admission of Maine as a state along with Missouri as a slave state, thus maintaining the balance of power between North and South.",
+                                " As part of the compromise, slavery was prohibited North of the 36\u00b030\u2032 parallel, excluding Missouri.",
+                                " President James Monroe signed the legislation on April 6, 1820."
+                            ]
+                        ],
+                        [
+                            "Dred Scott",
+                            [
+                                "Dred Scott (c. 1799 \u2013 September 17, 1858) was an enslaved African American man in the United States who unsuccessfully sued for his freedom and that of his wife and their two daughters in the \"Dred Scott v. Sandford\" case of 1857, popularly known as the \"Dred Scott Decision\".",
+                                " Scott claimed that he and his wife should be granted their freedom because they had lived in Illinois and the Wisconsin Territory for four years, where slavery was illegal.",
+                                " The United States Supreme Court decided 7\u20132 against Scott, finding that neither he nor any other person of African ancestry could claim citizenship in the United States, and therefore Scott could not bring suit in federal court under diversity of citizenship rules.",
+                                " Moreover, Scott's temporary residence outside Missouri did not bring about his emancipation under the Missouri Compromise, which the court ruled unconstitutional as it would \"improperly deprive Scott's owner of his legal property\"."
+                            ]
+                        ]
+                    ],
+                    "type": "bridge",
+                    "level": "hard"
+                }
+            ],
+            "traces": [],
+            "train": []
+        }
+    ],
+    "graph_path": "examples/mipro/output\\evaluated_programs\\program_3_mb.json"
+}

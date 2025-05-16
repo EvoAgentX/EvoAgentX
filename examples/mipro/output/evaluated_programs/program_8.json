@@ -1,0 +1,102 @@
+{
+    "class_name": "SequentialWorkFlowGraph",
+    "goal": "Generate a functional and correct Python code for the given problem.",
+    "tasks": [
+        {
+            "name": "code_generate",
+            "description": "Code generation for MBPP.",
+            "inputs": [
+                {
+                    "name": "problem",
+                    "type": "str",
+                    "description": "The problem to solve.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "code",
+                    "type": "str",
+                    "description": "The generated code.",
+                    "required": true
+                }
+            ],
+            "prompt": "**\n\n\"Transform the following problem description into a valid and efficient Python function. Your solution should not only be correct but also adhere to best practices in coding style, utilize Python's standard libraries where applicable, and include inline comments for clarity. \n\n### Problem Statement:\n{problem}\n\n### Example of Expected Output:\n- The output should be a complete Python function ready to be executed.\n- Ensure proper naming conventions and include necessary input validation if the problem requires it.",
+            "system_prompt": null,
+            "parse_mode": "str",
+            "parse_func": null,
+            "parse_title": null,
+            "demos": [
+                {
+                    "source_file": "Ellen's Copy of Benchmark Questions Verification V2.ipynb",
+                    "task_id": 295,
+                    "prompt": "Write a function to return the sum of all divisors of a number.\n\ndef sum_div(number):\n",
+                    "code": "def sum_div(number):\n    divisors = [1]\n    for i in range(2, number):\n        if (number % i)==0:\n            divisors.append(i)\n    return sum(divisors)",
+                    "test_imports": [],
+                    "test_list": [
+                        "assert sum_div(8)==7",
+                        "assert sum_div(12)==16",
+                        "assert sum_div(7)==1"
+                    ],
+                    "entry_point": "sum_div",
+                    "canonical_solution": "def sum_div(number):\n    divisors = [1]\n    for i in range(2, number):\n        if (number % i)==0:\n            divisors.append(i)\n    return sum(divisors)",
+                    "test": "def check(candidate):\n    assert sum_div(8)==7\n    assert sum_div(12)==16\n    assert sum_div(7)==1\n",
+                    "original_prompt": "Write a function to return the sum of all divisors of a number."
+                },
+                {
+                    "source_file": "Benchmark Questions Verification V2.ipynb",
+                    "task_id": 802,
+                    "prompt": "Write a python function to count the number of rotations required to generate a sorted array. https://www.geeksforgeeks.org/count-of-rotations-required-to-generate-a-sorted-array/\n\ndef count_rotation(arr):\n",
+                    "code": "def count_rotation(arr):   \n    for i in range (1,len(arr)): \n        if (arr[i] < arr[i - 1]): \n            return i  \n    return 0",
+                    "test_imports": [],
+                    "test_list": [
+                        "assert count_rotation([3,2,1]) == 1",
+                        "assert count_rotation([4,5,1,2,3]) == 2",
+                        "assert count_rotation([7,8,9,1,2,3]) == 3",
+                        "assert count_rotation([1,2,3]) == 0",
+                        "assert count_rotation([1,3,2]) == 2"
+                    ],
+                    "entry_point": "count_rotation",
+                    "canonical_solution": "def count_rotation(arr):   \n    for i in range (1,len(arr)): \n        if (arr[i] < arr[i - 1]): \n            return i  \n    return 0",
+                    "test": "def check(candidate):\n    assert count_rotation([3,2,1]) == 1\n    assert count_rotation([4,5,1,2,3]) == 2\n    assert count_rotation([7,8,9,1,2,3]) == 3\n    assert count_rotation([1,2,3]) == 0\n    assert count_rotation([1,3,2]) == 2\n",
+                    "original_prompt": "Write a python function to count the number of rotations required to generate a sorted array. https://www.geeksforgeeks.org/count-of-rotations-required-to-generate-a-sorted-array/"
+                },
+                {
+                    "source_file": "Ellen's Copy of Benchmark Questions Verification V2.ipynb",
+                    "task_id": 310,
+                    "prompt": "Write a function to convert a given string to a tuple of characters.\n\ndef string_to_tuple(str1):\n",
+                    "code": "def string_to_tuple(str1):\n    result = tuple(x for x in str1 if not x.isspace()) \n    return result",
+                    "test_imports": [],
+                    "test_list": [
+                        "assert string_to_tuple(\"python 3.0\")==('p', 'y', 't', 'h', 'o', 'n', '3', '.', '0')",
+                        "assert string_to_tuple(\"item1\")==('i', 't', 'e', 'm', '1')",
+                        "assert string_to_tuple(\"15.10\")==('1', '5', '.', '1', '0')"
+                    ],
+                    "entry_point": "string_to_tuple",
+                    "canonical_solution": "def string_to_tuple(str1):\n    result = tuple(x for x in str1 if not x.isspace()) \n    return result",
+                    "test": "def check(candidate):\n    assert string_to_tuple(\"python 3.0\")==('p', 'y', 't', 'h', 'o', 'n', '3', '.', '0')\n    assert string_to_tuple(\"item1\")==('i', 't', 'e', 'm', '1')\n    assert string_to_tuple(\"15.10\")==('1', '5', '.', '1', '0')\n",
+                    "original_prompt": "Write a function to convert a given string to a tuple of characters."
+                },
+                {
+                    "source_file": "Benchmark Questions Verification V2.ipynb",
+                    "task_id": 562,
+                    "prompt": "Write a python function to find the length of the longest sublists.\n\ndef Find_Max_Length(lst):\n",
+                    "code": "def Find_Max_Length(lst):  \n    maxLength = max(len(x) for x in lst )\n    return maxLength ",
+                    "test_imports": [],
+                    "test_list": [
+                        "assert Find_Max_Length([[1],[1,4],[5,6,7,8]]) == 4",
+                        "assert Find_Max_Length([[0,1],[2,2,],[3,2,1]]) == 3",
+                        "assert Find_Max_Length([[7],[22,23],[13,14,15],[10,20,30,40,50]]) == 5"
+                    ],
+                    "entry_point": "Find_Max_Length",
+                    "canonical_solution": "def Find_Max_Length(lst):  \n    maxLength = max(len(x) for x in lst )\n    return maxLength ",
+                    "test": "def check(candidate):\n    assert Find_Max_Length([[1],[1,4],[5,6,7,8]]) == 4\n    assert Find_Max_Length([[0,1],[2,2,],[3,2,1]]) == 3\n    assert Find_Max_Length([[7],[22,23],[13,14,15],[10,20,30,40,50]]) == 5\n",
+                    "original_prompt": "Write a python function to find the length of the longest sublists."
+                }
+            ],
+            "traces": [],
+            "train": []
+        }
+    ],
+    "graph_path": "examples/mipro/output\\evaluated_programs\\program_8.json"
+}

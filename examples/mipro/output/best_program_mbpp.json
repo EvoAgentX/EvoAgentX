@@ -1,0 +1,35 @@
+{
+    "class_name": "SequentialWorkFlowGraph",
+    "goal": "Generate a functional and correct Python code for the given problem.",
+    "tasks": [
+        {
+            "name": "code_generate",
+            "description": "Code generation for MBPP.",
+            "inputs": [
+                {
+                    "name": "problem",
+                    "type": "str",
+                    "description": "The problem to solve.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "code",
+                    "type": "str",
+                    "description": "The generated code.",
+                    "required": true
+                }
+            ],
+            "prompt": "Generate a functional and correct Python code for the given problem.\n\nProblem: {problem}",
+            "system_prompt": null,
+            "parse_mode": "str",
+            "parse_func": null,
+            "parse_title": null,
+            "demos": [],
+            "traces": [],
+            "train": []
+        }
+    ],
+    "graph_path": "C:\\Users\\31646\\Desktop\\EvoAgentX\\examples\\mipro\\output\\best_program_mbpp.json"
+}
