@@ -1,113 +1,300 @@
-from abc import ABC, abstractmethod
-from typing import Dict, Any
+import json
+from typing import List, Dict, Any, Optional, Union
+
+from pydantic import Field
 
 from ..core.module import BaseModule
+from ..utils.factory import DBStoreFactory, VectorStoreFactory, GraphStoreFactory
+from .storages_config import StoreConfig
+from .db_stores.base import DBStoreBase
+from .graph_stores.base import GraphStoreBase
+from .vectore_stores.base import VectorStoreBase
+from .schema import TableType, AgentStore, WorkflowStore, MemoryStore, HistoryStore
 
 
-class StorageHandler(BaseModule, ABC):
-
+class StorageHandler(BaseModule):
     """
-    An interface for all the storage handlers. 
+    Implementation of a storage handler for managing various storage backends.
     
-    StorageHandler defines an abstraction of storage used for reading and writing data (such as memory, agents, workflow, ect.). 
-    It can be implemented in various ways such as file storage, database storage, cloud storage, etc.
+    StorageHandler provides an abstraction for reading and writing data (e.g., memory, agents, workflows).
+    It supports multiple storage types, including database, vector, and graph storage, initialized via factories.
     """
+    storageConfig: StoreConfig = Field(..., description="Configuration for all storage backends")
+    storageDB: Optional[DBStoreBase] = Field(None, description="Database storage backend")
+    storageVector: Optional[VectorStoreBase] = Field(None, description="Optional vector storage backend")
+    storageGraph: Optional[GraphStoreBase] = Field(None, description="Optional graph storage backend")
 
-    @abstractmethod
-    def load(self, *args, **kwargs):
+    def init_module(self):
         """
-        Load all data from the underlying storage (file, database, etc.)
+        Initialize all storage backends based on the provided configuration.
+        Calls individual initialization methods for database, vector, and graph stores.
         """
-        pass 
+        self._init_db_store()
+        self._init_vector_store()
+        self._init_graph_store()
 
-    @abstractmethod
-    def save(self, *args, **kwargs):
+    def _init_db_store(self):
         """
-        Save all data to the underlying storage at once.
+        Initialize the database storage backend using the DBStoreFactory.
+        Sets the storageDB attribute with the created instance.
         """
-        pass 
+        db_config = self.storageConfig.dbConfig
+        self.storageDB = DBStoreFactory.create(db_config.db_name, db_config)
+    
+    def _init_vector_store(self):
+        """
+        Initialize the vector storage backend using the VectorStoreFactory.
+        Sets the storageVector attribute if the configuration is provided.
+        """
+        vector_config = self.storageConfig.vectorConfig
+        if vector_config is not None:
+            self.storageVector = VectorStoreFactory.create(vector_config)
+    
+    def _init_graph_store(self):
+        """
+        Initialize the graph storage backend using the GraphStoreFactory.
+        Sets the storageGraph attribute if the configuration is provided.
+        """
+        graph_config = self.storageConfig.graphConfig
+        if graph_config is not None:
+            self.storageGraph = GraphStoreFactory.create(graph_config)
 
-    @abstractmethod
-    def load_memory(self, memory_id: str, **kwargs) -> Dict[str, Any]:
+    def load(self, tables: Optional[List[str]] = None, *args, **kwargs) -> Dict[str, Any]:
         """
-        Load a single long term memory data. 
+        Load all data from the database storage.
 
-        Args:
-            memory_id (str): the id of the long term memory. 
-        
+        Attributes:
+            tables (Optional[List[str]]): List of table names to load; if None, loads all tables.
+
         Returns:
-            Dict[str, Any]: the data that can be used to create an LongTermMemory instance. 
+            Dict[str, Dict[str, str]]: A dictionary with table names as keys and lists of records as values. You should parse the values by yourself.
+        """
+        result = {}
+        table_info = self.storageDB.col_info()
+        
+        if tables is None:
+            tables_to_load = [t.value for t in TableType]
+        else:
+            tables_to_load = tables
+
+        # Load data for each table
+        for table_name in tables_to_load:
+            table_data = []
+            # Check if the table exists
+            if any(t["table_name"] == table_name for t in table_info):
+                cursor = self.storageDB.connection.cursor()
+                cursor.execute(f"SELECT * FROM {table_name}")
+                # Get column names from the columns dictionary
+                columns = next(t["columns"].keys() for t in table_info if t["table_name"] == table_name)
+                rows = cursor.fetchall()
+                table_data = [dict(zip(columns, row)) for row in rows]
+            result[table_name] = table_data
+        
+        return result
+
+    def save(self, data: Dict[str, Any], *args, **kwargs):
+        """
+        Save all provided data to the database storage.
+
+        Attributes:
+            data (Dict[str, Any]): Dictionary with table names as keys and lists of records to save.
+
+        Raises:
+            ValueError: If an unknown table name is provided.
+        """
+        for table_name, records in data.items():
+            store_type = None
+            # Map table name to store_type
+            for st in TableType:
+                if st.value == table_name:
+                    store_type = st
+                    break
+            if store_type is None:
+                raise ValueError(f"Unknown table: {table_name}")
+            # Insert each record
+            for record in records:
+                self.storageDB.insert(metadata=record, store_type=store_type, table=table_name)
+
+    def parse_result(self, results: Dict[str, str], 
+                     store: Union[AgentStore, WorkflowStore, MemoryStore, HistoryStore]) -> Dict[str, Any]:
+        """
+        Parse database results, converting JSON strings to Python objects where applicable.
+
+        Attributes:
+            results (Dict[str, str]): Raw database results with column names as keys.
+            store (Union[AgentStore, WorkflowStore, MemoryStore, HistoryStore]): Pydantic model for validation.
+
+        Returns:
+            Dict[str, Any]: Parsed results with JSON strings deserialized to Python objects.
+        """
+        for k, v in store.model_fields.items():
+            if v.annotation not in [Optional[str], str]:
+                try:
+                    results[k] = json.loads(results[k])
+                except (json.JSONDecodeError, KeyError, TypeError):
+                    results[k] = results.get(k)
+        return results
+
+    def load_memory(self, memory_id: str, table: Optional[str]=None, **kwargs) -> Dict[str, Any]:
+        """
+        Load a single long-term memory data.
+
+        Attributes:
+            memory_id (str): The ID of the long-term memory.
+            table (Optional[str]): The table name; defaults to 'memory' if None.
+
+        Returns:
+            Dict[str, Any]: The data that can be used to create a LongTermMemory instance.
         """
         pass
 
-    @abstractmethod
-    def save_memory(self, memory_data: Dict[str, Any], **kwargs):
+    def save_memory(self, memory_data: Dict[str, Any], table: Optional[str]=None, **kwargs):
         """
-        Save or update a single memory. 
+        Save or update a single memory.
 
-        Args:
-            memory_data (Dict[str, Any]): the long term memory's data. 
+        Attributes:
+            memory_data (Dict[str, Any]): The long-term memory's data.
+            table (Optional[str]): The table name; defaults to 'memory' if None.
+
         """
-        pass 
+        pass
 
-    @abstractmethod
-    def load_agent(self, agent_name: str, **kwargs) -> Dict[str, Any]:
-        # TODO
+    def load_agent(self, agent_name: str, table: Optional[str]=None, *args, **kwargs) -> Dict[str, Any]:
         """
         Load a single agent's data.
 
-        Args: 
-            agent_name (str): use agent name (unique identifier) to retrieve the data. 
-        
+        Attributes:
+            agent_name (str): The unique name of the agent to retrieve.
+            table (Optional[str]): The table name; defaults to 'agent' if None.
+
         Returns:
-            Dict[str, Any]: the data that can be used to create an Agent instance. 
+            Dict[str, Any]: The data that can be used to create an Agent instance, or None if not found.
         """
-        pass 
+        table = table or TableType.store_agent.value
+        result = self.storageDB.get_by_id(agent_name, store_type="agent", table=table)
+        # Parse the result to convert JSON strings to Python objects
+        if result is not None:
+            result = self.parse_result(result, AgentStore)
+        return result
 
-    @abstractmethod
-    def remove_agent(self, agent_name: str, **kwargs):
-        # TODO 
+    def remove_agent(self, agent_name: str, table: Optional[str]=None, *args, **kwargs):
         """
-        Remove an agent from storage if the agent exists. 
+        Remove an agent from storage if the agent exists.
 
-        Args:
-            agent_name: The name of the agent to be deleted.
-            **kwargs (Any): Additional keyword arguments for the operation.
+        Attributes:
+            agent_name (str): The name of the agent to be deleted.
+            table (Optional[str]): The table name; defaults to 'agent' if None.
+
+        Raises:
+            ValueError: If the agent does not exist in the specified table.
         """
-        pass
+        table = table or TableType.store_agent.value
+        success = self.storageDB.delete(agent_name, store_type="agent", table=table)
+        if not success:
+            raise ValueError(f"Agent with name {agent_name} not found in table {table}")
 
-    @abstractmethod
-    def save_agent(self, agent_data: Dict[str, Any], **kwargs):
+    def save_agent(self, agent_data: Dict[str, Any], table: Optional[str]=None, *args, **kwargs):
         """
         Save or update a single agent's data.
 
-        Args:
-            agent_data (Dict[str, Any]): the agent's data. 
-        """
-        pass 
+        Attributes:
+            agent_data (Dict[str, Any]): The agent's data, must include 'name' and 'content' keys.
+            table (Optional[str]): The table name; defaults to 'agent' if None.
 
-    
-    @abstractmethod
-    def load_workflow(self, workflow_id: str, **kwargs) -> Dict[str, Any]:
+        Raises:
+            ValueError: If 'name' field is missing or if Pydantic validation fails.
         """
-        Load a single workflow's data. 
-
-        Args: 
-            workflow_id (str): the id of the workflow. 
+        table = table or TableType.store_agent.value
+        agent_name = agent_data.get("name")
+        if not agent_name:
+            raise ValueError("Agent data must include a 'name' field")
         
-        Returns:
-            Dict[str, Any]: the data that can be used to create a WorkFlow instance.
-        """
-        pass 
+        existing = self.storageDB.get_by_id(agent_name, store_type="agent", table=table)
+        if existing:
+            self.storageDB.update(agent_name, new_metadata=agent_data, store_type="agent", table=table)
+        else:
+            self.storageDB.insert(metadata=agent_data, store_type="agent", table=table)
 
-    @abstractmethod
-    def save_workflow(self, workflow_data: Dict[str, Any], **kwargs):
+    def load_workflow(self, workflow_id: str, table: Optional[str] = None, *args, **kwargs) -> Dict[str, Any]:
+        """
+        Load a single workflow's data.
+
+        Attributes:
+            workflow_id (str): The ID of the workflow.
+            table (Optional[str]): The table name; defaults to 'workflow' if None.
+
+        Returns:
+            Dict[str, Any]: The data that can be used to create a WorkFlow instance, or None if not found.
+        """
+        table = table or TableType.store_workflow.value
+        result = self.storageDB.get_by_id(workflow_id, store_type="workflow", table=table)
+        # Parse the result to convert JSON strings to Python objects
+        if result is not None:
+            result = self.parse_result(result, WorkflowStore)
+        return result
+
+    def save_workflow(self, workflow_data: Dict[str, Any], table: Optional[str] = None, *args, **kwargs):
         """
         Save or update a workflow's data.
 
-        Args:
-            workflow_data (Dict[str, Any]): the workflow's data.
+        Attributes:
+            workflow_data (Dict[str, Any]): The workflow's data, must include 'name' field.
+            table (Optional[str]): The table name; defaults to 'workflow' if None.
+
+        Raises:
+            ValueError: If 'name' field is missing or if Pydantic validation fails.
         """
-        pass 
+        table = table or TableType.store_workflow.value
+        workflow_id = workflow_data.get("name")
+        if not workflow_id:
+            raise ValueError("Workflow data must include a 'name' field")
+        # Check if workflow exists to decide between insert or update
+        existing = self.storageDB.get_by_id(workflow_id, store_type="workflow", table=table)
+        if existing:
 
+            self.storageDB.update(workflow_id, new_metadata=workflow_data, store_type="workflow", table=table)
+        else:
+            self.storageDB.insert(metadata=workflow_data, store_type="workflow", table=table)
 
+    def load_history(self, memory_id: str, table: Optional[str] = None, *args, **kwargs) -> Dict[str, Any]:
+        """
+        Load a single history entry.
+
+        Attributes:
+            memory_id (str): The ID of the memory associated with the history entry.
+            table (Optional[str]): The table name; defaults to 'history' if None.
+
+        Returns:
+            Dict[str, Any]: The history data, or None if not found.
+        """
+        table = table or TableType.store_history.value
+        result = self.storageDB.get_by_id(memory_id, store_type="history", table=table)
+        # Parse the result to convert JSON strings to Python objects (if any)
+        if result is not None:
+            result = self.parse_result(result, HistoryStore)
+        return result
+
+    def save_history(self, history_data: Dict[str, Any], table: Optional[str] = None, *args, **kwargs):
+        """
+        Save or update a single history entry.
+
+        Attributes:
+            history_data (Dict[str, Any]): The history data, must include 'memory_id' field.
+            table (Optional[str]): The table name; defaults to 'history' if None.
+
+        Raises:
+            ValueError: If 'memory_id' field is missing or if Pydantic validation fails.
+        """
+        table = table or TableType.store_history.value
+        memory_id = history_data.get("memory_id")
+        if not memory_id:
+            raise ValueError("History data must include a 'memory_id' field")
+        # Check if history entry exists to decide between insert or update
+        existing = self.storageDB.get_by_id(memory_id, store_type="history", table=table)
+        if existing:
+            # parse the history, then change the old_hisotry
+            result = HistoryStore.model_validate(self.parse_result(existing, HistoryStore))
+            history_data["old_memory"] = result.old_memory
+            self.storageDB.update(memory_id, new_metadata=history_data, store_type="history", table=table)
+        else:
+            self.storageDB.insert(metadata=history_data, store_type="history", table=table)
