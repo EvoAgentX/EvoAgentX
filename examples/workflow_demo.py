@@ -77,9 +77,9 @@ def main():
         print(f"\nMain file: {results.main_file}")
         file_type = os.path.splitext(results.main_file)[1].lower()
         if file_type == '.html':
-            print(f"You can open this HTML file in a browser to play the Tetris game")
+            print("You can open this HTML file in a browser to play the Tetris game")
         else:
-            print(f"This is the main entry point for your application")
+            print("This is the main entry point for your application")
     
 
 if __name__ == "__main__":

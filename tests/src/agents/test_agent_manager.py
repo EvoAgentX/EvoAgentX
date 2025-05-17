@@ -21,7 +21,13 @@ class TestModule(unittest.TestCase):
                 {
                     "name": "WriteFileToDisk",
                     "description": "save several files to local storage.", 
-                    "tools": [{"class_name": "Tool"}]
+                    "tools": [{
+                        "class_name": "Tool",
+                        "name": "WriteFileTool",
+                        "descriptions": ["A tool to write files to disk"],
+                        "schemas": [{"type": "object"}],
+                        "tools": []
+                    }]
                 }
             ]
         )

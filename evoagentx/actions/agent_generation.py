@@ -139,7 +139,9 @@ class AgentGeneration(Action):
         # outputs_format = kwargs.pop("outputs_format") if "outputs_format" in kwargs else AgentGenerationOutput
         inputs_format = kwargs.pop("inputs_format", None) or AgentGenerationInput
         outputs_format = kwargs.pop("outputs_format", None) or AgentGenerationOutput 
+        tool_info = kwargs.pop("tool_info", None)
         super().__init__(name=name, description=description, prompt=prompt, inputs_format=inputs_format, outputs_format=outputs_format, **kwargs)
+        self.tool_info = tool_info
     
     def execute(self, llm: Optional[BaseLLM] = None, inputs: Optional[dict] = None, sys_msg: Optional[str]=None, return_prompt: bool = False, **kwargs) -> AgentGenerationOutput:
         """Execute the agent generation process.
@@ -170,6 +172,8 @@ class AgentGeneration(Action):
 
         prompt_params_names = inputs_format.get_attrs()
         prompt_params_values = {param: inputs.get(param, "") for param in prompt_params_names}
+        if self.tool_info:
+            prompt_params_values["tools"] = self.tool_info
         prompt = self.prompt.format(**prompt_params_values)
         agents = llm.generate(
             prompt = prompt, 
@@ -177,6 +181,8 @@ class AgentGeneration(Action):
             parser=outputs_format,
             parse_mode="json"
         )
+        
+        print(f"Generated agents: {agents}")
         
         if return_prompt:
             return agents, prompt

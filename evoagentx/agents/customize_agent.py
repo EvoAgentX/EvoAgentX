@@ -18,22 +18,24 @@ OUTPUT_EXTRACTION_PROMPT = """
 You are given the following text:
 {text}
 
-Within this text, there are specific outputs we want to extract. Please locate and extract the content for each of the following outputs:
+We need you to process this text and generate high-quality outputs for each of the following fields:
 {output_description}
 
 **Instructions:**
 1. Read through the provided text carefully.
-2. For each of the listed output names, extract the corresponding content from the text. 
-3. Return your findings in a single JSON object, where the JSON keys **exactly match** the output names given above.
-4. If you cannot find content for an output, set its value to an empty string ("") or `null`.
-5. Do not include any additional keys in the JSON. 
-6. Your final output should be valid JSON and should not include any explanatory text.
+2. For each of the listed output fields, analyze the relevant information from the text and generate a well-formulated response.
+3. You may summarize, process, restructure, or enhance the information as needed to provide the best possible answer.
+4. Your analysis should be faithful to the content but can go beyond simple extraction - provide meaningful insights where appropriate.
+5. Return your processed outputs in a single JSON object, where the JSON keys **exactly match** the output names given above.
+6. If there is insufficient information for an output, provide your best reasonable inference or set its value to an empty string ("") or `null`.
+7. Do not include any additional keys in the JSON.
+8. Your final output should be valid JSON and should not include any explanatory text.
 
 **Example JSON format:**
 {{
-  "<OUTPUT_NAME_1>": "Extracted content here",
-  "<OUTPUT_NAME_2>": "Extracted content here",
-  "<OUTPUT_NAME_3>": "Extracted content here"
+  "<OUTPUT_NAME_1>": "Processed content here",
+  "<OUTPUT_NAME_2>": "Processed content here",
+  "<OUTPUT_NAME_3>": "Processed content here"
 }}
 
 Now, based on the text and the instructions above, provide your final JSON output.

@@ -138,6 +138,9 @@ class WorkFlow(BaseModule):
             agent_manager=self.agent_manager, 
             env=self.environment
         )
+        
+        print(f"Next action: {next_action}")
+        
         if next_action.action_graph is not None:
             await self._async_execute_task_by_action_graph(task=task, next_action=next_action)
         else:

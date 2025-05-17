@@ -14,7 +14,7 @@ from ..agents.workflow_reviewer import WorkFlowReviewer
 from ..actions.task_planning import TaskPlanningOutput
 from ..actions.agent_generation import AgentGenerationOutput
 from ..workflow.workflow_graph import WorkFlowGraph, WorkFlowNode, WorkFlowEdge
-
+from ..tools.tool import Tool
 
 class WorkFlowGenerator(BaseModule):
 
@@ -39,9 +39,13 @@ class WorkFlowGenerator(BaseModule):
     agent_generator: Optional[AgentGenerator] = Field(default=None, description="Assigns or generates the appropriate agent(s) to handle each sub-task.")
     workflow_reviewer: Optional[WorkFlowReviewer] = Field(default=None, description="Provides feedback and reflections to improve the generated workflow.")
     num_turns: Optional[PositiveInt] = Field(default=0, description="Specifies the number of refinement iterations for the generated workflow.")
+    tools: Optional[List[Tool]] = Field(default=None, description="A list of tools that can be used in the workflow.")
 
     def init_module(self):
 
+        if self.tools is not None:
+            self.get_tool_info()
+        
         if self.task_planner is None:
             if self.llm is None:
                 raise ValueError("Must provide `llm` when `task_planner` is None")
@@ -50,13 +54,24 @@ class WorkFlowGenerator(BaseModule):
         if self.agent_generator is None:
             if self.llm is None:
                 raise ValueError("Must provide `llm` when `agent_generator` is None")
-            self.agent_generator = AgentGenerator(llm=self.llm)
+            self.agent_generator = AgentGenerator(llm=self.llm, tool_info=self.tool_info)
         
         # TODO add WorkFlowReviewer
         # if self.workflow_reviewer is None:
         #     if self.llm is None:
         #         raise ValueError(f"Must provide `llm` when `workflow_reviewer` is None")
         #     self.workflow_reviewer = WorkFlowReviewer(llm=self.llm)
+
+    def get_tool_info(self):
+        tools_schemas = [tool.get_tool_schemas() for tool in self.tools]
+        tools_schemas = [j for i in tools_schemas for j in i]
+        tools_names = [i["function"]["name"] for i in tools_schemas]
+        tools_descriptions = [i["function"]["description"] for i in tools_schemas]
+        
+        tool_info = {}
+        for tool_name, tool_description in zip(tools_names, tools_descriptions):
+            tool_info[tool_name] = tool_description
+        self.tool_info = tool_info
 
     def generate_workflow(self, goal: str, existing_agents: Optional[List[Agent]] = None, **kwargs) -> WorkFlowGraph:
 

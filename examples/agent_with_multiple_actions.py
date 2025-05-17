@@ -5,7 +5,6 @@ from dotenv import load_dotenv
 from typing import Optional
 from evoagentx.models import BaseLLM, OpenAILLMConfig
 from evoagentx.agents import Agent
-from evoagentx.core.module_utils import extract_code_blocks
 from evoagentx.actions import Action, ActionInput, ActionOutput
 
 load_dotenv()
