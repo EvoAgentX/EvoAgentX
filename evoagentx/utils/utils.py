@@ -98,3 +98,26 @@ def download_file(url: str, save_file: str, max_retries=3, timeout=10):
         error_message = "Exceeded maximum retries. Download failed."
         logger.error(error_message)
         raise RuntimeError(error_message)
+    
+def _convert_single_braces(text: str, preserve_vars: set[str]) -> str:
+    pattern = r'(?<!{){([^{}]+)}(?!})'
+    
+    def replace_func(match):
+        var = match.group(1)
+        if var in preserve_vars:
+            return match.group(0)  # 保持原样
+        return f"{{{{{var}}}}}"
+    
+    return regex.sub(pattern, replace_func, text)
+
+def append_inputs_to_prompt(prompt: str, inputs: list[str]) -> str:
+    # 首先处理prompt中可能存在的单个大括号，但保留inputs中的变量
+    prompt = _convert_single_braces(prompt, set(inputs))
+    
+    for name in inputs:
+        placeholder = "{" + name + "}"
+        line = f"{name} : {placeholder}"
+        if placeholder not in prompt:
+            prompt += f"\n{line}"
+            
+    return prompt

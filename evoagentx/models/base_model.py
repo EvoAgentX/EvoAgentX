@@ -380,6 +380,18 @@ class BaseLLM(ABC):
         # return the same instance when deepcopy
         memo[id(self)] = self
         return self
+    
+    def copy(self) -> "BaseLLM":
+        """Returns the same instance when copy is called.
+        
+        This is consistent with the __deepcopy__ implementation which also
+        returns the same instance since LLM instances often cannot be
+        meaningfully copied.
+        
+        Returns:
+            The same LLM instance.
+        """
+        return self
 
     @abstractmethod
     def formulate_messages(self, prompts: List[str], system_messages: Optional[List[str]] = None) -> List[List[dict]]:

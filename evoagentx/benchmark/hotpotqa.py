@@ -70,7 +70,7 @@ class HotPotQA(Benchmark):
         f1 = f1_score(prediction=prediction, ground_truth=label)
         acc = acc_score(prediction=prediction, ground_truths=[label])
         return {"f1": f1, "em": em, "acc": acc}
-    
+
 
 class AFlowHotPotQA(HotPotQA):
 

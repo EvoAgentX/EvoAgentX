@@ -1,8 +1,6 @@
 """
 Main application entry point for EvoAgentX.
 """
-import logging
-# import asyncio
 from contextlib import asynccontextmanager
 
 import uvicorn
@@ -21,13 +19,7 @@ from evoagentx.app.api import (
     executions_router,
     system_router
 )
-
-# Configure logging
-logging.basicConfig(
-    level=getattr(logging, settings.LOG_LEVEL.upper()),
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+from evoagentx.core.logging import logger
 
 # Lifespan context manager for startup and shutdown events
 @asynccontextmanager

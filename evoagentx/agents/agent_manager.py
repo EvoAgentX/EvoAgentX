@@ -245,6 +245,9 @@ class AgentManager(BaseModule):
         for node in workflow_graph.nodes:
             if node.agents:
                 for agent in node.agents:
+                    if isinstance(agent, str) and self.storage_handler is None:
+                        if not self.has_agent(agent_name=agent):
+                            raise ValueError(f"Cannot find agent ``{agent}`` specified in the WorkflowGraph! You should either use `.add_agent` to add the agent or provide a dictionary with the agent information.")
                     self.add_agent(agent=agent, llm_config=llm_config, **kwargs)
     
     def update_agents_from_workflow(self, workflow_graph, llm_config: Optional[LLMConfig]=None, **kwargs):

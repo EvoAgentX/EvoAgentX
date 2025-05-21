@@ -39,6 +39,8 @@ dependencies = [
     "transformers>=4.47.1",
     "datasets>=3.4.0",
     "faiss-cpu==1.8.0.post1",
+    "textgrad>=0.1.8",
+    "optuna>=3.4.0",
     "fastapi>=0.115.11",
     "motor>=3.7.0",
     "uvicorn>=0.34.0",
@@ -63,7 +65,8 @@ dev = [
     "pytest-asyncio",
     "pytest-subtests",
     "pytest-json-report",
-    "ruff"
+    "ruff",
+    "ipython>=8.0.0"
 ]
 
 [project.urls]
