@@ -17,6 +17,8 @@ from evoagentx.tools.search_wiki import SearchWiki
 from evoagentx.tools.search_google import SearchGoogle
 from evoagentx.tools.search_google_f import SearchGoogleFree
 from evoagentx.tools.mcp import MCPToolkit
+from evoagentx.tools.file_tool import FileTool
+from evoagentx.tools.browser_tool import BrowserTool
 
 
 def run_simple_hello_world(interpreter):
@@ -372,9 +374,177 @@ def run_mcp_example():
             toolkit.disconnect()
 
 
+def run_file_tool_example():
+    """
+    Run an example using the FileTool to read and write PDF files.
+    """
+    print("\n===== FILE TOOL EXAMPLE =====\n")
+    
+    try:
+        # Initialize the file tool
+        file_tool = FileTool()
+        
+        # Create sample content for a PDF
+        sample_content = """This is a sample PDF document created using the FileTool.
+This tool provides special handling for different file types.
+For PDF files, it uses PyPDF2 library for reading and writing operations."""
+        
+        # Example PDF file path
+        pdf_path = os.path.join(os.getcwd(), "examples", "output", "sample_document.pdf")
+        
+        # Make sure the output directory exists
+        os.makedirs(os.path.dirname(pdf_path), exist_ok=True)
+        
+        print(f"Writing content to PDF file: {pdf_path}")
+        
+        # Write content to PDF file
+        write_result = file_tool.write_file(pdf_path, sample_content)
+        print("Write Result:")
+        print("-" * 30)
+        print(write_result)
+        print("-" * 30)
+        
+        # Read content from PDF file
+        print(f"\nReading content from PDF file: {pdf_path}")
+        read_result = file_tool.read_file(pdf_path)
+        print("Read Result:")
+        print("-" * 30)
+        print(read_result)
+        print("-" * 30)
+        
+        # Also demonstrate with a regular text file
+        text_path = os.path.join(os.getcwd(), "examples", "output", "sample_text.txt")
+        
+        print(f"\nWriting content to text file: {text_path}")
+        text_write_result = file_tool.write_file(text_path, "This is a sample text file.")
+        print("Text Write Result:")
+        print("-" * 30)
+        print(text_write_result)
+        print("-" * 30)
+        
+        print(f"\nReading content from text file: {text_path}")
+        text_read_result = file_tool.read_file(text_path)
+        print("Text Read Result:")
+        print("-" * 30)
+        print(text_read_result)
+        print("-" * 30)
+        
+    except Exception as e:
+        print(f"Error running file tool example: {str(e)}")
+
+
+def run_browser_tool_example():
+    """
+    Run an example using the BrowserTool to initialize browser, 
+    go to Google, search for "test", and then close the browser.
+    """
+    print("\n===== BROWSER TOOL EXAMPLE =====\n")
+    
+    try:
+        # Initialize the browser tool (with visible browser window if headless is False)
+        # browser_tool = BrowserTool(headless=False, timeout=10)
+        browser_tool = BrowserTool(headless=True, timeout=10)
+        
+        print("Step 1: Initializing browser...")
+        init_result = browser_tool.initialize_browser()
+        print("Browser Initialization Result:")
+        print("-" * 30)
+        print(init_result)
+        print("-" * 30)
+        
+        if init_result.get("status") == "success":
+            print("\nStep 2: Navigating to Google...")
+            nav_result = browser_tool.navigate_to_url("https://www.google.com")
+            print("Navigation Result:")
+            print("-" * 30)
+            print(f"Status: {nav_result.get('status')}")
+            print(f"URL: {nav_result.get('current_url')}")
+            print(f"Title: {nav_result.get('title')}")
+            
+            # Show available interactive elements
+            if nav_result.get("snapshot") and nav_result["snapshot"].get("interactive_elements"):
+                elements = nav_result["snapshot"]["interactive_elements"]
+                print(f"Found {len(elements)} interactive elements:")
+                for elem in elements[:5]:  # Show first 5 elements
+                    print(f"  - {elem['id']}: {elem.get('description', 'No description')}")
+            print("-" * 30)
+            
+            if nav_result.get("status") == "success":
+                # Find the search input box and search button
+                elements = nav_result.get("snapshot", {}).get("interactive_elements", [])
+                search_input_ref = None
+                search_button_ref = None
+                
+                for elem in elements:
+                    desc = elem.get("description", "").lower()
+                    if "search" in desc and ("input" in desc or "textbox" in desc):
+                        search_input_ref = elem["id"]
+                    elif "search" in desc and ("button" in desc or "submit" in desc):
+                        search_button_ref = elem["id"]
+                
+                if search_input_ref:
+                    print(f"\nStep 3: Typing 'test' in search box (element {search_input_ref})...")
+                    input_result = browser_tool.input_text(
+                        element="Search box", 
+                        ref=search_input_ref, 
+                        text="test", 
+                        submit=False
+                    )
+                    print("Input Result:")
+                    print("-" * 30)
+                    print(input_result)
+                    print("-" * 30)
+                    
+                    if search_button_ref:
+                        print(f"\nStep 4: Clicking search button (element {search_button_ref})...")
+                        click_result = browser_tool.browser_click(
+                            element="Search button", 
+                            ref=search_button_ref
+                        )
+                        print("Click Result:")
+                        print("-" * 30)
+                        print(click_result)
+                        print("-" * 30)
+                    else:
+                        print("\nStep 4: Search button not found, submitting with Enter key...")
+                        submit_result = browser_tool.input_text(
+                            element="Search box", 
+                            ref=search_input_ref, 
+                            text="", 
+                            submit=True
+                        )
+                        print("Submit Result:")
+                        print("-" * 30)
+                        print(submit_result)
+                        print("-" * 30)
+        
+        print("Closing browser...")
+        close_result = browser_tool.close_browser()
+        print("Browser Close Result:")
+        print("-" * 30)
+        print(close_result)
+        print("-" * 30)
+        
+    except Exception as e:
+        print(f"Error running browser tool example: {str(e)}")
+        # Make sure to close browser even if there's an error
+        try:
+            if 'browser_tool' in locals():
+                browser_tool.close_browser()
+        except Exception as e:
+            print(f"Error closing browser: {str(e)}")
+
+
 def main():
     """Main function to run all examples"""
     print("===== INTERPRETER TOOL EXAMPLES =====")
+    
+    # Run file tool example
+    run_file_tool_example()
+    
+    # Run browser tool example
+    run_browser_tool_example()
+    
     
     # Run MCP toolkit example
     run_mcp_example()
@@ -387,8 +557,6 @@ def main():
     
     # # Run search tools examples
     run_search_examples()
-    
-
     
     print("\n===== ALL EXAMPLES COMPLETED =====")
 

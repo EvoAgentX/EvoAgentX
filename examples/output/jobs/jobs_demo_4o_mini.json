@@ -1,0 +1,306 @@
+{
+    "class_name": "WorkFlowGraph",
+    "goal": "\n    \n                Read and analyze the pdf resume at examples/output/jobs/test_pdf.pdf, then find 5 real job opportunities to this client by search the website.\n                You should visit the first website in browser and fill out the application information but not submit it.\n                \n    \n    It would be better to include a short summary on the resume at the beginning of the output.\n    You should use the tool_calling action to find real job opportunities.\n    I already give you the path in this goal. You should take \"goal\" as the only input at beginning.\n    Apart from operating the browser, you should also provide a output report to the user at the end of your execution.\n    While operating the browser, you should not search for new jobs, you should use jobs you found in previous steps.\n    You should actaully operate the browser to fill out the application information but not submit it.\n    The output should be well-formatted.\n    You should return every detailed information you collected from the website, inclduing job title, company name, location, detailed job description, detailed job requirements, salary, job posting link, etc.\n    \n    ",
+    "nodes": [
+        {
+            "class_name": "WorkFlowNode",
+            "name": "resume_analysis",
+            "description": "Analyze the client's resume and create a summary for better understanding of qualifications.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "goal",
+                    "type": "string",
+                    "description": "The user's goal in textual format.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "resume_summary",
+                    "type": "string",
+                    "description": "A concise summary of the client's qualifications derived from the resume.",
+                    "required": true
+                }
+            ],
+            "reason": "This step ensures that we have a clear understanding of the client's skills and experience to find suitable job opportunities.",
+            "agents": [
+                {
+                    "name": "resume_analysis_agent",
+                    "description": "This agent analyzes the client's resume based on the provided goal, generating a concise summary of the client's qualifications.",
+                    "inputs": [
+                        {
+                            "name": "goal",
+                            "type": "string",
+                            "description": "The user's goal in textual format.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "resume_summary",
+                            "type": "string",
+                            "description": "A concise summary of the client's qualifications derived from the resume.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Objective\nAnalyze the client's resume to create a concise summary of their qualifications based on the provided goal.\n\n### Instructions\n1. Understand the user's goal provided in the input: <input>{goal}</input>.\n2. Read and analyze the content of the resume to identify key qualifications, skills, and experiences.\n3. Summarize the findings into a coherent, concise summary that clearly reflects the client's qualifications.\n4. Ensure the summary is relevant to the user's goal, highlighting aspects that would be appealing for job searches.\n\n### Output Format\nYour final output should ALWAYS in the following format:\n\n## Thought\nBriefly explain the reasoning process for creating the resume summary.\n\n## resume_summary\nA concise summary of the client's qualifications derived from the resume."
+                }
+            ],
+            "status": "pending"
+        },
+        {
+            "class_name": "WorkFlowNode",
+            "name": "job_search",
+            "description": "Use the resume summary to search for 5 relevant job opportunities on job listing websites.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "goal",
+                    "type": "string",
+                    "description": "The user's goal in textual format.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "resume_summary",
+                    "type": "string",
+                    "description": "A concise summary of the client's qualifications for targeted job searching.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "job_opportunities",
+                    "type": "array",
+                    "description": "A list of 5 job opportunities including title, company, location, and relevant details.",
+                    "required": true
+                }
+            ],
+            "reason": "This step helps in systematically finding job opportunities that match the client's qualifications.",
+            "agents": [
+                {
+                    "name": "job_search_agent",
+                    "description": "This agent searches for relevant job opportunities based on the user's goal and resume summary, retrieving detailed job information.",
+                    "inputs": [
+                        {
+                            "name": "goal",
+                            "type": "string",
+                            "description": "The user's goal in textual format.",
+                            "required": true
+                        },
+                        {
+                            "name": "resume_summary",
+                            "type": "string",
+                            "description": "A concise summary of the client's qualifications for targeted job searching.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "job_opportunities",
+                            "type": "array",
+                            "description": "A list of 5 job opportunities including title, company, location, and relevant details.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Objective\nSearch for 5 relevant job opportunities based on the provided user's goal and resume summary.\n\n### Instructions\n1. Retrieve the user's goal: <input>{goal}</input> to understand the purpose of the job search.\n2. Read and analyze the resume summary: <input>{resume_summary}</input> to identify qualifications and skills for targeted job searching.\n3. Utilize the 'search_jobs' tool to search for job opportunities that match the qualifications and user's goal. Ensure the search is relevant and targeted.\n4. Collect detailed information for each job found, including job title, company name, location, job description, requirements, salary, and application link.\n5. Compile the information into a structured array containing 5 job opportunities.\n\n### Output Format\nYour final output should ALWAYS in the following format:\n\n## Thought\nBriefly explain the reasoning process for achieving the objective.\n\n## job_opportunities\nProvide a structured list of 5 job opportunities including title, company, location, and relevant details.",
+                    "tools": [
+                        "search_jobs"
+                    ]
+                }
+            ],
+            "status": "pending"
+        },
+        {
+            "class_name": "WorkFlowNode",
+            "name": "application_details_completion",
+            "description": "Visit the first job listing website and fill out the application details without submitting.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "goal",
+                    "type": "string",
+                    "description": "The user's goal in textual format.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "job_opportunities",
+                    "type": "array",
+                    "description": "The list of 5 job opportunities found in the previous step.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "application_form_details",
+                    "type": "object",
+                    "description": "The filled out application details ready for submission.",
+                    "required": true
+                }
+            ],
+            "reason": "This action is necessary to comply with the user's request to process application information specifically for the first job found.",
+            "agents": [
+                {
+                    "name": "job_application_agent",
+                    "description": "This agent visits the first job listing website and fills out the application details based on the provided job opportunity information.",
+                    "inputs": [
+                        {
+                            "name": "goal",
+                            "type": "string",
+                            "description": "The user's goal in textual format.",
+                            "required": true
+                        },
+                        {
+                            "name": "job_opportunities",
+                            "type": "array",
+                            "description": "The list of 5 job opportunities found in the previous step.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "application_form_details",
+                            "type": "object",
+                            "description": "The filled out application details ready for submission.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Objective\nVisit the first job listing website and fill out the application details based on the details from the job opportunities list.\n\n### Instructions\n1. Read the user's goal: <input>{goal}</input> to understand the context of the application.\n2. Access the job opportunities list: <input>{job_opportunities}</input> and select the first job opportunity.\n3. Initialize the browser session using the appropriate tools.\n4. Navigate to the URL of the first job listing from the provided job opportunities.\n5. Fill out the application form with the relevant details gathered from the job opportunity (such as title, company, etc.) without submitting it.\n6. Capture the filled application form details as the output.\n\n### Output Format\nYour final output should ALWAYS in the following format:\n\n## Thought\nBriefly explain the reasoning process for visiting the job listing website and filling out the application details.\n\n## application_form_details\nThe filled out application details ready for submission.",
+                    "tools": [
+                        "initialize_browser",
+                        "navigate_to_url",
+                        "input_text",
+                        "browser_click",
+                        "browser_snapshot"
+                    ]
+                }
+            ],
+            "status": "pending"
+        },
+        {
+            "class_name": "WorkFlowNode",
+            "name": "output_report",
+            "description": "Compile a well-formatted report including all relevant information from the resume analysis and job opportunities.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "goal",
+                    "type": "string",
+                    "description": "The user's goal in textual format.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "resume_summary",
+                    "type": "string",
+                    "description": "A concise summary of the client's qualifications.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "job_opportunities",
+                    "type": "array",
+                    "description": "The list of 5 job opportunities found.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "application_form_details",
+                    "type": "object",
+                    "description": "The filled application details for inclusion in the report.",
+                    "required": false
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "final_report",
+                    "type": "string",
+                    "description": "A well-formatted report summarizing the resume analysis and job opportunities.",
+                    "required": true
+                }
+            ],
+            "reason": "This final step will provide the user with a comprehensive summary and details of the job opportunities found.",
+            "agents": [
+                {
+                    "name": "report_compilation_agent",
+                    "description": "This agent compiles a well-formatted report summarizing the client's resume analysis and the job opportunities discovered, including optional application details.",
+                    "inputs": [
+                        {
+                            "name": "goal",
+                            "type": "string",
+                            "description": "The user's goal in textual format.",
+                            "required": true
+                        },
+                        {
+                            "name": "resume_summary",
+                            "type": "string",
+                            "description": "A concise summary of the client's qualifications.",
+                            "required": true
+                        },
+                        {
+                            "name": "job_opportunities",
+                            "type": "array",
+                            "description": "The list of 5 job opportunities found.",
+                            "required": true
+                        },
+                        {
+                            "name": "application_form_details",
+                            "type": "object",
+                            "description": "The filled application details for inclusion in the report.",
+                            "required": false
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "final_report",
+                            "type": "string",
+                            "description": "A well-formatted report summarizing the resume analysis and job opportunities.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Objective\nCompile a well-structured report that summarizes the client's resume analysis and job opportunities found, including optional application details.\n\n### Instructions\n1. Begin with the user's goal: <input>{goal}</input>.\n2. Present the resume summary: <input>{resume_summary}</input>.\n3. List the job opportunities: <input>{job_opportunities}</input> in a clear format, detailing each position's title, company, and relevant information.\n4. If provided, include the filled application details: <input>{application_form_details}</input> in a distinct section of the report.\n5. Ensure the report flows logically and is formatted neatly for readability.\n\n### Output Format\nYour final output should ALWAYS in the following format:\n\n## Thought\nBriefly explain the reasoning process for compiling the report.\n\n## final_report\nThe comprehensive report summarizing the resume analysis, job opportunities, and application details."
+                }
+            ],
+            "status": "pending"
+        }
+    ],
+    "edges": [
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "resume_analysis",
+            "target": "job_search",
+            "priority": 0
+        },
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "resume_analysis",
+            "target": "output_report",
+            "priority": 0
+        },
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "job_search",
+            "target": "application_details_completion",
+            "priority": 0
+        },
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "job_search",
+            "target": "output_report",
+            "priority": 0
+        },
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "application_details_completion",
+            "target": "output_report",
+            "priority": 0
+        }
+    ],
+    "graph": null
+}

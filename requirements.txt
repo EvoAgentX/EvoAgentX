@@ -57,3 +57,7 @@ docker
 googlesearch-python
 wikipedia
 mcp
+requests
+beautifulsoup4
+PyPDF2
+selenium
