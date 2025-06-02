@@ -364,7 +364,7 @@ print(output)
 }
 ```
 
-如果您使用了 **SEW** 方法（该方法已被用于优化 `## Applications` 中的两个多智能体框架）来提升智能体的工作流程，请同时引用以下论文：
+如果您使用了 **SEW** 方法（该方法已被用于优化 [Applications](#applications) 中的两个多智能体框架）来提升智能体的工作流程，请同时引用以下论文：
 
 ```bibtex
 @article{liu2025sew,

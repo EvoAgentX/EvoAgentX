@@ -361,7 +361,7 @@ If you use **EvoAgentX** in your research or applications, please cite the follo
 }
 ```
 
-If your work leverages **SEW** (which was used to optimise the `## Applications` module in EvoAgentX) for improving agentic workflows, please also cite:
+If your work leverages **SEW** (which was used to optimise the two MAS in [Applications](#applications)) for improving agentic workflows, please also cite:
 
 ```bibtex
 @article{liu2025sew,
