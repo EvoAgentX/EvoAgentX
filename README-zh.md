@@ -66,6 +66,7 @@
 - [🙌 为EvoAgentX做贡献](#-为evoagentx做贡献)
 - [📚 致谢](#-致谢)
 - [📄 许可证](#-许可证)
+- [📚 引用说明](#-引用说明)
 
 ## 安装
 
@@ -344,3 +345,32 @@ print(output)
 ## 📄 许可证
 
 本仓库中的源代码根据[MIT许可证](./LICENSE)提供。
+
+当然可以，以下是这段 README 的中文版本，更适合在中文语境下使用：
+
+---
+
+## 📚 引用说明
+
+如果您在研究或应用中使用了 **EvoAgentX**，请引用以下文献：
+
+```bibtex
+@software{evoagentx,
+  title     = {EvoAgentX: Building a Self-Evolving Ecosystem of AI Agents},
+  author    = {EvoAgentX Team},
+  year      = {2025},
+  publisher = {GitHub},
+  url       = {https://github.com/EvoAgentX/EvoAgentX}
+}
+```
+
+如果您使用了 **SEW** 方法（该方法已被用于优化 `## Applications` 中的两个多智能体框架）来提升智能体的工作流程，请同时引用以下论文：
+
+```bibtex
+@article{liu2025sew,
+  title   = {SEW: Self-Evolving Agentic Workflows for Automated Code Generation},
+  author  = {Liu, Siwei and Fang, Jinyuan and Zhou, Han and Wang, Yingxu and Meng, Zaiqiao},
+  journal = {arXiv preprint arXiv:2505.18646},
+  year    = {2025}
+}
+```
