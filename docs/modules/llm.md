@@ -123,6 +123,35 @@ response = llm.generate(
 )
 ```
 
+### local models
+
+Right now, we support users to call local LLMs, using methods similar to the LiteLLM methods. In the future, we will support calling native models for richer functionality, but at the moment, they still have the problem of workflow format unification.
+
+**Basic Usage:**
+
+```python
+import json
+from evoagentx.models.model_configs import LiteLLMConfig
+from evoagentx.models import LiteLLM
+from evoagentx.workflow import WorkFlowGenerator, WorkFlowGraph, WorkFlow
+from evoagentx.agents import AgentManager
+
+# configure local Qwen3 model
+config = LiteLLMConfig(
+    llm_type="LiteLLM",
+    model="ollama/llama3",
+    api_base="http://localhost:11434",
+    is_local=True,
+    temperature=0.7,
+    max_tokens=1000,
+    output_response=True
+)
+
+# test model
+llm = LiteLLM(config)
+response = llm.generate(prompt="What is Agentic Workflow?")
+```
+
 ## Core Functions
 
 All LLM implementations in EvoAgentX provide a consistent set of core functions for generating text and managing the generation process.
