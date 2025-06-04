@@ -26,11 +26,11 @@ class LiteLLM(OpenAILLM):
 
         # Set model and extract the company name
         self.model = self.config.model
-        self.api_base = self.config.api_base  # 新增：保存 api_base
+        self.api_base = self.config.api_base  # udpate: api_base
         # company = self.model.split("/")[0] if "/" in self.model else "openai"
         company = infer_litellm_company_from_model(self.model)
 
-        if self.config.is_local or company == "local":  # 新增：处理本地模型
+        if self.config.is_local or company == "local":  # update: local model
             if not self.api_base:
                 raise ValueError("api_base is required for local models in LiteLLMConfig")
             # local llm doesn't need API key
@@ -97,7 +97,7 @@ class LiteLLM(OpenAILLM):
 
         try:
             completion_params = self.get_completion_params(**kwargs)
-            if self.config.is_local or infer_litellm_company_from_model(self.model) == "local":  # 新增：为本地模型添加 api_base
+            if self.config.is_local or infer_litellm_company_from_model(self.model) == "local":  # api_base for local model
                 completion_params["api_base"] = self.api_base
             response = completion(messages=messages, **completion_params)
             if stream:
@@ -146,7 +146,7 @@ class LiteLLM(OpenAILLM):
 
         try:
             completion_params = self.get_completion_params(**kwargs)
-            if self.config.is_local or infer_litellm_company_from_model(self.model) == "local":  # 新增：为本地模型添加 api_base
+            if self.config.is_local or infer_litellm_company_from_model(self.model) == "local":  #api_base
                 completion_params["api_base"] = self.api_base
             response = await acompletion(messages=messages, **completion_params)
             if stream:
