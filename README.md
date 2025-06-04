@@ -66,6 +66,7 @@
 - [🙌 Contributing to EvoAgentX](#-contributing-to-evoagentx)
 - [📚 Acknowledgements](#-acknowledgements)
 - [📄 License](#-license)
+- [📚 Citation](#-citation)
 
 ## Installation
 
@@ -344,3 +345,29 @@ This project builds upon several outstanding open-source projects: [AFlow](https
 ## 📄 License
 
 Source code in this repository is made available under the [MIT License](./LICENSE).
+
+
+## 📚 Citation
+
+If you use **EvoAgentX** in your research or applications, please cite the following:
+
+```bibtex
+@software{evoagentx,
+  title     = {EvoAgentX: Building a Self-Evolving Ecosystem of AI Agents},
+  author    = {EvoAgentX Team},
+  year      = {2025},
+  publisher = {GitHub},
+  url       = {https://github.com/EvoAgentX/EvoAgentX}
+}
+```
+
+If your work leverages **SEW** (which was used to optimise the two MAS in [Applications](#applications)) for improving agentic workflows, please also cite:
+
+```bibtex
+@article{liu2025sew,
+  title   = {SEW: Self-Evolving Agentic Workflows for Automated Code Generation},
+  author  = {Liu, Siwei and Fang, Jinyuan and Zhou, Han and Wang, Yingxu and Meng, Zaiqiao},
+  journal = {arXiv preprint arXiv:2505.18646},
+  year    = {2025}
+}
+```
