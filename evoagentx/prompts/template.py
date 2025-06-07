@@ -7,14 +7,15 @@ from typing import Union, Optional, List, Any, Type
 from ..core.logging import logger 
 from ..core.module import BaseModule 
 from ..models.base_model import LLMOutputParser, PARSER_VALID_MODE 
-
+from ..tools import Tool
+from ..prompts.tool_calling import TOOL_CALLING_TEMPLATE
 
 class PromptTemplate(BaseModule):
 
     instruction: str = Field(description="The instruction that the LLM will follow.")
     context: Optional[str] = Field(default=None, description="Additional context that can help the LLM understand the instruction.")
     constraints: Optional[Union[List[str], str]] = Field(default=None, description="Constraints that the LLM must follow.")
-    tools: Optional[List[str]] = Field(default=None, description="Tools that the LLM can use.")
+    tools: Optional[List[Tool]] = Field(default=None, description="Tools that the LLM can use.")
     demonstrations: Optional[List[dict]] = Field(default=None, description="Examples of how to use the instruction.")
     history: Optional[List[Any]] = Field(default=None, description="History of the conversation between the user and the LLM.")
 
@@ -180,9 +181,10 @@ class PromptTemplate(BaseModule):
     def render_tools(self) -> str:
         if not self.tools:
             return ""
-        # TODO: check the tool descriptions to be consistent with tool use
-        tools_str = "\n".join(f"- {tool}" for tool in self.tools)
-        return f"### Tools\nYou can use the following tools or capabilities (if applicable):\n{tools_str}\n" 
+        tools_schemas = [tool.get_tool_schemas() for tool in self.tools]
+        tools_schemas = [j for i in tools_schemas for j in i]
+        tool_calling_instructions = [tool.get_tool_prompt() for tool in self.tools]
+        return TOOL_CALLING_TEMPLATE.format(tools_description=tools_schemas, additional_context=tool_calling_instructions)
     
     def render_constraints(self) -> str:
         if not self.constraints:
@@ -308,9 +310,9 @@ class StringTemplate(PromptTemplate):
         result = "### Examples\n" + "\n\n".join(demo_str_list) + "\n\n=== End of Examples ===\n"
         return result
 
-    # def render_history(self) -> str:
-    #     logger.warning(f"`render_history` method is not supported for `{self.__class__.__name__}`. Returning empty string.")
-    #     return ""
+    def render_history(self) -> str:
+        result = "### History\n{history}".format(history=self.history)
+        return result
     
     def render_inputs(self, inputs_format: Type[LLMOutputParser], values: dict) -> str:
 
@@ -372,8 +374,8 @@ class StringTemplate(PromptTemplate):
                     custom_output_format=custom_output_format
                 )
             )
-        # if self.history:
-        #     prompt_pieces.append(self.render_history())
+        if self.history:
+            prompt_pieces.append(self.render_history())
         
         if inputs_format or values:
             prompt_pieces.append("-"*20)
@@ -384,6 +386,9 @@ class StringTemplate(PromptTemplate):
             prompt_pieces.append(f"### Outputs Format\n{custom_output_format}")
         else:
             prompt_pieces.append(self.render_outputs(outputs_format, parse_mode, title_format))
+        
+        if self.tools:
+            prompt_pieces.append(self.render_tools())
         
         prompt_pieces = [piece for piece in prompt_pieces if piece]
         prompt = "\n".join(prompt_pieces)
