@@ -18,6 +18,23 @@ async def test_processing():
     """
     Test the basic synchronous processing endpoint.
     
+    Curl commands used:
+    ```bash
+    # Health check
+    curl -X GET http://localhost:8001/health
+    
+    # Basic processing request
+    curl -X POST http://localhost:8001/process \
+      -H "Content-Type: application/json" \
+      -d '{
+        "parameters": {
+          "sample_param": "test_value",
+          "another_param": 42
+        },
+        "timeout": 10
+      }'
+    ```
+    
     This demonstrates:
     - Simple HTTP request/response pattern
     - No streaming, just direct result
@@ -59,6 +76,24 @@ async def test_processing():
 def test_streaming():
     """
     Test the task-based streaming pattern.
+    
+    Curl commands used:
+    ```bash
+    # Start streaming task
+    curl -X POST http://localhost:8001/stream/process \
+      -H "Content-Type: application/json" \
+      -d '{
+        "parameters": {
+          "stream_param": "test_stream",
+          "iterations": 5
+        },
+        "timeout": 30
+      }'
+    
+    # Connect to SSE stream (returns task_id from above)
+    curl -N http://localhost:8001/stream/{task_id} \
+      -H "Accept: text/event-stream"
+    ```
     
     This demonstrates:
     - Starting a task and getting a task_id
@@ -108,6 +143,28 @@ def test_streaming():
 def test_workflow_generation():
     """
     Test task-based streaming for workflow generation.
+    
+    Curl commands used:
+    ```bash
+    # Start workflow generation task
+    curl -X POST http://localhost:8001/stream/workflow/generate \
+      -H "Content-Type: application/json" \
+      -d '{
+        "goal": "Create a simple data processing workflow that reads a CSV file and generates a summary report",
+        "llm_config": {
+          "model": "gpt-4o-mini",
+          "openai_key": "your_openai_key_here",
+          "stream": true,
+          "output_response": true,
+          "max_tokens": 16000
+        },
+        "timeout": 180
+      }'
+    
+    # Connect to workflow generation SSE stream
+    curl -N http://localhost:8001/stream/{task_id} \
+      -H "Accept: text/event-stream"
+    ```
     
     This demonstrates:
     - Using the streaming pattern specifically for workflow generation
@@ -172,6 +229,12 @@ def test_client_session():
     """
     Test client session creation - the foundation of persistent streaming.
     
+    Curl commands used:
+    ```bash
+    # Create client session
+    curl -X POST http://localhost:8001/connect
+    ```
+    
     This demonstrates:
     - Creating a persistent client session
     - Getting a client_id and persistent stream URL
@@ -197,6 +260,28 @@ def test_client_session():
 def start_task_and_get_result(client_id, stream_url, task_config, timeout=180):
     """
     Helper function: Start a single task and wait for its specific result.
+    
+    Curl commands used:
+    ```bash
+    # Start workflow generation for specific client
+    curl -X POST http://localhost:8001/client/{client_id}/workflow/generate \
+      -H "Content-Type: application/json" \
+      -d '{
+        "goal": "Create a simple email notification workflow",
+        "llm_config": {
+          "model": "gpt-4o-mini",
+          "openai_key": "your_openai_key_here",
+          "stream": true,
+          "output_response": true,
+          "max_tokens": 8000
+        },
+        "timeout": 120
+      }'
+    
+    # Connect to client SSE stream
+    curl -N http://localhost:8001/stream/client/{client_id} \
+      -H "Accept: text/event-stream"
+    ```
     
     This demonstrates:
     - How to extract results from a multi-task stream
@@ -275,6 +360,31 @@ def test_single_task_with_result():
     """
     Test getting a single workflow result using client sessions.
     
+    Curl commands used:
+    ```bash
+    # 1. Create client session
+    curl -X POST http://localhost:8001/connect
+    
+    # 2. Start workflow generation for client
+    curl -X POST http://localhost:8001/client/{client_id}/workflow/generate \
+      -H "Content-Type: application/json" \
+      -d '{
+        "goal": "Create a simple email notification workflow",
+        "llm_config": {
+          "model": "gpt-4o-mini",
+          "openai_key": "your_openai_key_here",
+          "stream": true,
+          "output_response": true,
+          "max_tokens": 8000
+        },
+        "timeout": 120
+      }'
+    
+    # 3. Listen to client events
+    curl -N http://localhost:8001/stream/client/{client_id} \
+      -H "Accept: text/event-stream"
+    ```
+    
     This demonstrates:
     - How to use client sessions for single workflow generation
     - Capturing and using the workflow result programmatically
@@ -327,6 +437,31 @@ def test_single_task_with_result():
 def test_client_workflow_generation():
     """
     Test basic client-session workflow generation with event monitoring.
+    
+    Curl commands used:
+    ```bash
+    # 1. Create client session
+    curl -X POST http://localhost:8001/connect
+    
+    # 2. Connect to client SSE stream (keep this running)
+    curl -N http://localhost:8001/stream/client/{client_id} \
+      -H "Accept: text/event-stream"
+    
+    # 3. In another terminal, start workflow generation
+    curl -X POST http://localhost:8001/client/{client_id}/workflow/generate \
+      -H "Content-Type: application/json" \
+      -d '{
+        "goal": "Create a workflow for processing customer feedback data and generating insights",
+        "llm_config": {
+          "model": "gpt-4o-mini",
+          "openai_key": "your_openai_key_here",
+          "stream": true,
+          "output_response": true,
+          "max_tokens": 16000
+        },
+        "timeout": 180
+      }'
+    ```
     
     This demonstrates:
     - Client session workflow generation
@@ -411,6 +546,43 @@ def test_client_workflow_generation():
 def test_multiple_tasks_single_client():
     """
     Test multiple concurrent workflow generations on a single client session.
+    
+    Curl commands used:
+    ```bash
+    # 1. Create client session
+    curl -X POST http://localhost:8001/connect
+    
+    # 2. Connect to client SSE stream (keep this running)
+    curl -N http://localhost:8001/stream/client/{client_id} \
+      -H "Accept: text/event-stream"
+    
+    # 3. In other terminals, start multiple tasks concurrently
+    # Task 1:
+    curl -X POST http://localhost:8001/client/{client_id}/workflow/generate \
+      -H "Content-Type: application/json" \
+      -d '{
+        "goal": "Create a data validation workflow for incoming user data",
+        "llm_config": {
+          "model": "gpt-4o-mini",
+          "openai_key": "your_openai_key_here",
+          "max_tokens": 8000
+        },
+        "timeout": 120
+      }'
+    
+    # Task 2:
+    curl -X POST http://localhost:8001/client/{client_id}/workflow/generate \
+      -H "Content-Type: application/json" \
+      -d '{
+        "goal": "Create a reporting workflow for monthly sales analysis",
+        "llm_config": {
+          "model": "gpt-4o-mini",
+          "openai_key": "your_openai_key_here",
+          "max_tokens": 8000
+        },
+        "timeout": 120
+      }'
+    ```
     
     This demonstrates:
     - The power of persistent client sessions
@@ -572,6 +744,12 @@ def test_list_clients():
     """
     Test the client listing endpoint for debugging and monitoring.
     
+    Curl commands used:
+    ```bash
+    # List all active clients
+    curl -X GET http://localhost:8001/clients
+    ```
+    
     This demonstrates:
     - Server-side session management
     - Debugging capabilities for active sessions
@@ -598,6 +776,28 @@ def test_list_clients():
 def test_stream_workflow_generation():
     """
     Test streaming workflow generation (task-based pattern).
+    
+    Curl commands used:
+    ```bash
+    # Start streaming workflow generation
+    curl -X POST http://localhost:8001/stream/workflow/generate \
+      -H "Content-Type: application/json" \
+      -d '{
+        "goal": "Create a simple data processing workflow that reads a CSV file",
+        "llm_config": {
+          "model": "gpt-4o-mini",
+          "openai_key": "your_openai_key_here",
+          "stream": true,
+          "output_response": true,
+          "max_tokens": 16000
+        },
+        "timeout": 180
+      }'
+    
+    # Connect to the SSE stream (use task_id from above response)
+    curl -N http://localhost:8001/stream/{task_id} \
+      -H "Accept: text/event-stream"
+    ```
     
     This demonstrates:
     - Traditional task-based streaming for workflow generation
@@ -641,6 +841,24 @@ def test_stream_workflow_generation():
 def test_simple_workflow_generation():
     """
     Test the simple synchronous workflow generation endpoint.
+    
+    Curl commands used:
+    ```bash
+    # Simple synchronous workflow generation
+    curl -X POST http://localhost:8001/workflow/generate \
+      -H "Content-Type: application/json" \
+      -d '{
+        "goal": "Create a simple email notification workflow for new user registrations",
+        "llm_config": {
+          "model": "gpt-4o-mini",
+          "openai_key": "your_openai_key_here",
+          "stream": true,
+          "output_response": true,
+          "max_tokens": 8000
+        },
+        "timeout": 120
+      }'
+    ```
     
     This demonstrates:
     - The simplest possible workflow generation pattern
