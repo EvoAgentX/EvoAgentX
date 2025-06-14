@@ -6,7 +6,7 @@ from typing import Dict, Literal, Callable, Optional, List
 import sqlite3
 
 from .base import DBStoreBase
-from ..schema import TableType, MemoryStore, AgentStore, WorkflowStore, HistoryStore
+from evoagentx.storages.schema import TableType, MemoryStore, AgentStore, WorkflowStore, HistoryStore, IndexStore
 
 
 # Helper function to generate SQL for creating a table
@@ -24,7 +24,7 @@ def _create_table(table: str, column: List[str]) -> str:
     """
     if not column:
         raise ValueError("Column list cannot be empty")
-    
+
     # Quote column names to handle reserved keywords and add commas
     column_defs = [f'"{column[0]}" TEXT PRIMARY KEY'] + [f'"{col}" TEXT' for col in column[1:]]
     table_column = ", ".join(column_defs)
@@ -69,11 +69,11 @@ def check_db_format(func: Callable) -> Callable:
     def worker(self, metadata, *args, **kwargs):
         # Extract table and store type from kwargs
         table = kwargs.get("table", None)
-        store_type = kwargs.get("store_type")   # memory, workflow, agent, history
+        store_type = kwargs.get("store_type")   # memory, workflow, agent, history, index
 
         # Use default table name if none provided
         if table is None:
-            table = getattr(TableType, store_type)
+            table = store_type
 
         # Validate metadata based on store type and convert to Pydantic model
         if store_type == TableType.store_memory:
@@ -91,17 +91,20 @@ def check_db_format(func: Callable) -> Callable:
         elif store_type == TableType.store_history:
             column = list(HistoryStore.model_fields.keys())
             metadata = HistoryStore.model_validate(metadata, strict=False)
+        elif store_type == TableType.store_indexing:
+            column = list(IndexStore.model_fields.keys())
+            metadata = IndexStore.model_validate(metadata, strict=False)
         else:
             raise ValueError("The value of store type is not valid.")
         
         # Create table if it doesn't exist
         table_column = _create_table(table, column)
-        # import pdb;pdb.set_trace()
+
         with self._lock:
             with self.connection:
                 self.connection.execute(table_column)
                 self.connection.commit()
-        
+
         kwargs["metadata"] = metadata
         return func(self, *args, **kwargs)
     
@@ -126,7 +129,7 @@ class SQLite(DBStoreBase):
         self._lock = threading.Lock()
     
     @check_db_format
-    def insert_memory(self, metadata: MemoryStore, store_type: Optional[Literal["memory", "agent", "workflow", "history"]], 
+    def insert_memory(self, metadata: MemoryStore, store_type: Optional[Literal["memory", "agent", "workflow", "history", "indexing"]], 
                       table: Optional[str]=None, *args, **kwargs):
         """
         Insert memory metadata into the specified table.
@@ -150,7 +153,7 @@ class SQLite(DBStoreBase):
                 self.connection.commit()
 
     @check_db_format
-    def insert_agent(self, metadata: AgentStore, store_type: Optional[Literal["memory", "agent", "workflow", "history"]], 
+    def insert_agent(self, metadata: AgentStore, store_type: Optional[Literal["memory", "agent", "workflow", "history", "indexing"]], 
                      table: Optional[str]=None, *args, **kwargs):
         """
         Insert agent metadata into the specified table.
@@ -175,7 +178,7 @@ class SQLite(DBStoreBase):
                 self.connection.commit()
 
     @check_db_format
-    def insert_workflow(self, metadata: WorkflowStore, store_type: Optional[Literal["memory", "agent", "workflow", "history"]], 
+    def insert_workflow(self, metadata: WorkflowStore, store_type: Optional[Literal["memory", "agent", "workflow", "history", "indexing"]], 
                         table: Optional[str]=None, *args, **kwargs):
         """
         Insert workflow metadata into the specified table.
@@ -200,7 +203,7 @@ class SQLite(DBStoreBase):
                 self.connection.commit()
 
     @check_db_format
-    def insert_history(self, metadata: HistoryStore, store_type: Optional[Literal["memory", "agent", "workflow", "history"]], 
+    def insert_history(self, metadata: HistoryStore, store_type: Optional[Literal["memory", "agent", "workflow", "history", "indexing"]], 
                        table: Optional[str]=None, *args, **kwargs):
         """
         Insert history metadata into the specified table.
@@ -224,7 +227,31 @@ class SQLite(DBStoreBase):
                 )
                 self.connection.commit()
 
-    def insert(self, metadata: Dict, store_type: Optional[Literal["memory", "agent", "workflow", "history"]], 
+    @check_db_format
+    def insert_index(self, metadata: IndexStore, store_type: Optional[Literal["memory", "agent", "workflow", "history", "indexing"]], 
+                     table: Optional[str]=None, *args, **kwargs):
+        """
+        Insert index metadata into the specified table.
+
+        Attributes:
+            metadata (IndexStore): The index metadata to insert.
+            store_type (str): The type of store (e.g., 'index').
+            table (Optional[str]): The table name; defaults to 'index' if None.
+        """
+        with self._lock:
+            with self.connection:
+                if table is None:
+                    table = TableType.store_indexing
+
+                insert_string = _insert_meta(table, list(IndexStore.model_fields.keys()))
+                self.connection.execute(
+                    insert_string,
+                    tuple([json.dumps(meta) if not isinstance(meta, str) else meta 
+                           for meta in metadata.model_dump().values()])
+                )
+                self.connection.commit()
+
+    def insert(self, metadata: Dict, store_type: Optional[Literal["memory", "agent", "workflow", "history", "indexing"]], 
                table: Optional[str]=None, *args, **kwargs):
         """
         Generic insert method that delegates to specific insert methods based on store_type.
@@ -243,10 +270,12 @@ class SQLite(DBStoreBase):
             self.insert_workflow(metadata, store_type=store_type, table=table, *args, **kwargs)
         elif store_type == TableType.store_history:
             self.insert_history(metadata, store_type=store_type, table=table, *args, **kwargs)
+        elif store_type == TableType.store_indexing:
+            self.insert_index(metadata, store_type=store_type, table=table, *args, **kwargs)
         else:
             raise ValueError("Invalid store_type provided.")
 
-    def delete(self, metadata_id: str, store_type: Optional[Literal["memory", "agent", "workflow", "history"]], table: Optional[str]=None, *args, **kwargs):
+    def delete(self, metadata_id: str, store_type: Optional[Literal["memory", "agent", "workflow", "history", "indexing"]], table: Optional[str]=None, *args, **kwargs):
         """
         Delete metadata by its ID from the specified table.
 
@@ -273,7 +302,7 @@ class SQLite(DBStoreBase):
                     # Logger
                     return False
 
-    def update(self, metadata_id: str, new_metadata: Dict=None, store_type: Optional[Literal["memory", "agent", "workflow", "history"]]=None, 
+    def update(self, metadata_id: str, new_metadata: Dict=None, store_type: Optional[Literal["memory", "agent", "workflow", "history", "indexing"]]=None, 
                table: Optional[str]=None, *args, **kwargs):
         """
         Update metadata by its ID in the specified table.
@@ -291,7 +320,7 @@ class SQLite(DBStoreBase):
         with self._lock:
             with self.connection:
                 if table is None:
-                    table = getattr(TableType, store_type)
+                    table = store_type
                 
                 # Validate new_metadata with the appropriate Pydantic model
                 if store_type == TableType.store_memory:
@@ -306,6 +335,9 @@ class SQLite(DBStoreBase):
                 elif store_type == TableType.store_history:
                     columns = list(HistoryStore.model_fields.keys())
                     new_metadata = HistoryStore.model_validate(new_metadata)
+                elif store_type == TableType.store_indexing:
+                    columns = list(IndexStore.model_fields.keys())
+                    new_metadata = IndexStore.model_validate(new_metadata)
                 else:
                     raise ValueError("Invalid store_type provided.")
                 
@@ -321,7 +353,7 @@ class SQLite(DBStoreBase):
                 self.connection.commit()
                 return cursor.rowcount > 0
     
-    def get_by_id(self, metadata_id: str, store_type: Optional[Literal["memory", "agent", "workflow", "history"]], 
+    def get_by_id(self, metadata_id: str, store_type: Optional[Literal["memory", "agent", "workflow", "history", "indexing"]], 
                   table: Optional[str]=None, *args, **kwargs):
         """
         Retrieve metadata by its ID from the specified table.
@@ -338,7 +370,7 @@ class SQLite(DBStoreBase):
         with self._lock:
             with self.connection:
                 if table is None:
-                    table = getattr(TableType, store_type)
+                    table = store_type
                 
                 # Determine columns based on store_type
                 if store_type == TableType.store_memory:
@@ -349,6 +381,8 @@ class SQLite(DBStoreBase):
                     columns = list(WorkflowStore.model_fields.keys())
                 elif store_type == TableType.store_history:
                     columns = list(HistoryStore.model_fields.keys())
+                elif store_type == TableType.store_indexing:
+                    columns = list(IndexStore.model_fields.keys())
                 else:
                     raise ValueError("Invalid store_type provided.")
                 try:
@@ -389,7 +423,7 @@ class SQLite(DBStoreBase):
                 
                 return table_info
 
-    def _get_id_column(self, store_type: Optional[Literal["memory", "agent", "workflow", "history"]]) -> str:
+    def _get_id_column(self, store_type: Optional[Literal["memory", "agent", "workflow", "history", "indexing"]]) -> str:
         """
         Helper method to get the primary key column name for a store type.
 
@@ -410,5 +444,7 @@ class SQLite(DBStoreBase):
             return list(WorkflowStore.model_fields.keys())[0]
         elif store_type == TableType.store_history:
             return list(HistoryStore.model_fields.keys())[0]
+        elif store_type == TableType.store_indexing:
+            return list(IndexStore.model_fields.keys())[0]      
         else:
             raise ValueError("Invalid store_type provided.")
