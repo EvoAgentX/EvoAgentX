@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+sse-starlette
+pydantic
+aiohttp
+sseclient-py
+requests
