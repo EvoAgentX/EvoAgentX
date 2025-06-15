@@ -5,7 +5,9 @@ This tutorial walks you through using EvoAgentX's powerful tool ecosystem. Tools
 1. **Understanding the Tool Architecture**: Learn about the base Tool class and its functionality
 2. **Code Interpreters**: Execute Python code safely using Python and Docker interpreters
 3. **Search Tools**: Access information from the web using Wikipedia and Google search tools
-4. **MCP Tools**: Connect to external services using the Model Context Protocol
+4. **File Operations**: Handle file reading and writing with special support for different file formats
+5. **Browser Automation**: Control web browsers to interact with websites and web applications
+6. **MCP Tools**: Connect to external services using the Model Context Protocol
 
 By the end of this tutorial, you'll understand how to leverage these tools in your own agents and workflows.
 
@@ -452,13 +454,494 @@ for i, result in enumerate(results.get("results", [])):
 
 ---
 
-## 4. MCP Tools
+## 4. File Operations
+
+EvoAgentX provides tools for handling file operations, including reading and writing files with special support for different file formats like PDFs.
+
+### 4.1 FileTool
+
+**The FileTool provides file handling capabilities with special support for different file formats. It offers standard file operations for text files and specialized handlers for formats like PDF, which use PyPDF2 for reading and basic PDF creation functionality.**
+
+#### 4.1.1 Setup
+
+```python
+from evoagentx.tools.file_tool import FileTool
+
+# Initialize the file tool
+file_tool = FileTool()
+
+# Get all available tools/methods
+available_tools = file_tool.get_tools()
+print(f"Available methods: {[tool.__name__ for tool in available_tools]}")
+# Output: ['read_file', 'write_file', 'append_file']
+```
+
+#### 4.1.2 Available Methods
+
+The `FileTool` provides exactly **3 callable methods** accessible via `get_tools()`:
+
+##### Method 1: read_file(file_path)
+
+**Description**: Reads content from a file with special handling for different file types.
+
+**Usage Example**:
+```python
+# Read a text file
+text_result = file_tool.read_file("examples/sample.txt")
+print(text_result)
+
+# Read a PDF file (automatically detected by extension)
+pdf_result = file_tool.read_file("examples/document.pdf")
+print(pdf_result)
+```
+
+**Return Type**: `dict`
+
+**Sample Return**:
+```python
+# For text files
+{
+    "success": True,
+    "content": "This is the content of the text file.",
+    "file_path": "examples/sample.txt",
+    "file_type": ".txt"
+}
+
+# For PDF files
+{
+    "success": True,
+    "content": "Extracted text from the PDF document...",
+    "file_path": "examples/document.pdf",
+    "file_type": "pdf",
+    "pages": 5
+}
+```
+
+---
+
+##### Method 2: write_file(file_path, content, mode)
+
+**Description**: Writes content to a file with special handling for different file types.
+
+**Usage Example**:
+```python
+# Write to a text file
+text_result = file_tool.write_file(
+    "examples/output.txt", 
+    "This is new content for the file."
+)
+
+# Write to a PDF file (creates a basic PDF)
+pdf_result = file_tool.write_file(
+    "examples/new_document.pdf", 
+    "This content will be in a PDF."
+)
+```
+
+**Return Type**: `dict`
+
+**Sample Return**:
+```python
+{
+    "success": True,
+    "message": "Content written to examples/output.txt",
+    "file_path": "examples/output.txt"
+}
+```
+
+---
+
+##### Method 3: append_file(file_path, content)
+
+**Description**: Appends content to a file with special handling for different file types.
+
+**Usage Example**:
+```python
+# Append to a text file
+result = file_tool.append_file(
+    "examples/log.txt", 
+    "\nNew log entry: Operation completed."
+)
+print(result)
+```
+
+**Return Type**: `dict`
+
+**Sample Return**:
+```python
+{
+    "success": True,
+    "message": "Content appended to examples/log.txt",
+    "file_path": "examples/log.txt"
+}
+```
+
+#### 4.1.3 Setup Hints
+
+- **File Type Detection**: The tool automatically detects file types based on file extensions and applies appropriate handlers.
+
+- **PDF Support**: 
+  - Reading PDFs uses PyPDF2 to extract text content from all pages
+  - Writing PDFs creates basic PDF documents (for advanced PDF creation with text formatting, consider using reportlab)
+  - PDF appending is currently limited and may require additional libraries
+
+- **Error Handling**: All methods return a dictionary with `success` field indicating whether the operation succeeded, and an `error` field if it failed.
+
+- **File Paths**: Use absolute or relative paths. The tool will create directories if they don't exist when writing files.
+
+---
+
+## 5. Browser Automation
+
+EvoAgentX provides powerful browser automation tools for controlling web browsers to interact with websites and web applications.
+
+### 5.1 BrowserTool
+
+**The BrowserTool provides comprehensive browser automation capabilities using Selenium WebDriver. It allows agents to navigate websites, interact with elements, fill forms, and extract information from web pages with full visual browser control or headless operation.**
+
+#### 5.1.1 Setup and Initialization
+
+```python
+from evoagentx.tools.browser_tool import BrowserTool
+
+# Initialize with visible browser window
+browser_tool = BrowserTool(
+    browser_type="chrome",
+    headless=False,
+    timeout=10
+)
+
+# Initialize with headless browser (no visible window)
+browser_tool = BrowserTool(
+    browser_type="chrome",
+    headless=True,
+    timeout=10
+)
+
+# Get all available tools/methods
+available_tools = browser_tool.get_tools()
+print(f"Available methods: {[tool.__name__ for tool in available_tools]}")
+# Output: ['initialize_browser', 'navigate_to_url', 'input_text', 'browser_click', 'browser_snapshot', 'browser_console_messages', 'close_browser']
+
+# IMPORTANT: Always initialize the browser before using other methods
+result = browser_tool.initialize_browser()
+if result["status"] == "success":
+    print("Browser is ready for use!")
+```
+
+#### 5.1.2 Available Methods
+
+The `BrowserTool` provides exactly **7 callable methods** accessible via `get_tools()`:
+
+##### Method 1: initialize_browser()
+
+**Description**: Starts or restarts a browser session. **MUST be called before any other browser operations.**
+
+**Usage Example**:
+```python
+# Initialize the browser
+result = browser_tool.initialize_browser()
+print(result)
+```
+
+**Return Type**: `dict`
+
+**Sample Return**:
+```python
+{
+    "status": "success",
+    "message": "Browser initialized successfully"
+}
+```
+
+---
+
+##### Method 2: navigate_to_url(url)
+
+**Description**: Navigates to a specific URL and captures a snapshot of interactive elements.
+
+**Usage Example**:
+```python
+# Navigate to a website
+result = browser_tool.navigate_to_url("https://www.google.com")
+print(f"Title: {result['title']}")
+print(f"Found {len(result['snapshot']['interactive_elements'])} interactive elements")
+
+# Show available elements
+for elem in result['snapshot']['interactive_elements'][:3]:
+    print(f"Element {elem['id']}: {elem['description']}")
+```
+
+**Return Type**: `dict`
+
+**Sample Return**:
+```python
+{
+    "status": "success",
+    "current_url": "https://www.google.com",
+    "title": "Google",
+    "snapshot": {
+        "interactive_elements": [
+            {"id": "e0", "description": "Search textbox", "element_type": "input"},
+            {"id": "e1", "description": "Google Search button", "element_type": "button"},
+            {"id": "e2", "description": "I'm Feeling Lucky button", "element_type": "button"}
+        ]
+    }
+}
+```
+
+---
+
+##### Method 3: input_text(element, ref, text, submit)
+
+**Description**: Types text into an input field using element references from snapshots.
+
+**Usage Example**:
+```python
+# Type text in a search box (element e0 from snapshot)
+result = browser_tool.input_text(
+    element="Search box",
+    ref="e0",
+    text="artificial intelligence",
+    submit=False
+)
+
+# Type and submit with Enter key
+result = browser_tool.input_text(
+    element="Search box",
+    ref="e0", 
+    text="machine learning",
+    submit=True
+)
+```
+
+**Return Type**: `dict`
+
+**Sample Return**:
+```python
+{
+    "status": "success",
+    "message": "Text input successful",
+    "element_ref": "e0"
+}
+```
+
+---
+
+##### Method 4: browser_click(element, ref)
+
+**Description**: Clicks on buttons, links, or other clickable elements using references from snapshots.
+
+**Usage Example**:
+```python
+# Click a button (element e1 from snapshot)
+result = browser_tool.browser_click(
+    element="Search button",
+    ref="e1"
+)
+print(result)
+```
+
+**Return Type**: `dict`
+
+**Sample Return**:
+```python
+{
+    "status": "success", 
+    "message": "Element clicked successfully",
+    "element_ref": "e1"
+}
+```
+
+---
+
+##### Method 5: browser_snapshot()
+
+**Description**: Captures a fresh snapshot of the current page with all interactive elements.
+
+**Usage Example**:
+```python
+# Take a new snapshot after page changes
+result = browser_tool.browser_snapshot()
+print(f"Found {len(result['interactive_elements'])} elements")
+```
+
+**Return Type**: `dict`
+
+**Sample Return**:
+```python
+{
+    "title": "Google Search Results", 
+    "current_url": "https://www.google.com/search?q=ai",
+    "interactive_elements": [
+        {"id": "e0", "description": "Search results link", "element_type": "link"},
+        {"id": "e1", "description": "Next page button", "element_type": "button"}
+    ]
+}
+```
+
+---
+
+##### Method 6: browser_console_messages()
+
+**Description**: Retrieves JavaScript console messages (logs, warnings, errors) from the browser for debugging.
+
+**Usage Example**:
+```python
+# Get console messages for debugging
+result = browser_tool.browser_console_messages()
+print("Console messages:")
+for msg in result.get("messages", []):
+    print(f"[{msg['level']}] {msg['message']}")
+```
+
+**Return Type**: `dict`
+
+**Sample Return**:
+```python
+{
+    "status": "success",
+    "messages": [
+        {"level": "INFO", "message": "Page loaded successfully", "timestamp": "2024-01-01T12:00:00"},
+        {"level": "WARNING", "message": "Deprecated API usage detected", "timestamp": "2024-01-01T12:00:01"}
+    ]
+}
+```
+
+---
+
+##### Method 7: close_browser()
+
+**Description**: Closes the browser and ends the session. **MUST be called when done to free resources.**
+
+**Usage Example**:
+```python
+# Close the browser
+result = browser_tool.close_browser()
+print(result)
+```
+
+**Return Type**: `dict`
+
+**Sample Return**:
+```python
+{
+    "status": "success",
+    "message": "Browser closed successfully"
+}
+```
+
+#### 5.1.3 Complete Workflow Example
+
+Here's a complete example showing proper initialization and cleanup:
+
+```python
+from evoagentx.tools.browser_tool import BrowserTool
+
+# Step 1: Initialize the tool
+browser_tool = BrowserTool(headless=False, timeout=10)
+
+try:
+    # Step 2: Initialize browser session
+    init_result = browser_tool.initialize_browser()
+    if init_result["status"] != "success":
+        raise Exception(f"Failed to initialize browser: {init_result}")
+    
+    # Step 3: Navigate to website
+    nav_result = browser_tool.navigate_to_url("https://www.google.com")
+    elements = nav_result["snapshot"]["interactive_elements"]
+    
+    # Step 4: Find search elements
+    search_input = next((e for e in elements if "search" in e["description"].lower() and "input" in e["description"].lower()), None)
+    search_button = next((e for e in elements if "search" in e["description"].lower() and "button" in e["description"].lower()), None)
+    
+    if search_input and search_button:
+        # Step 5: Perform search
+        browser_tool.input_text(element="Search box", ref=search_input["id"], text="EvoAgentX")
+        browser_tool.browser_click(element="Search button", ref=search_button["id"])
+        
+        # Step 6: Get console messages for debugging
+        console_result = browser_tool.browser_console_messages()
+        print(f"Console messages: {len(console_result.get('messages', []))}")
+    
+except Exception as e:
+    print(f"Browser operation failed: {e}")
+    
+finally:
+    # Step 7: ALWAYS close the browser to free resources
+    close_result = browser_tool.close_browser()
+    print(f"Browser cleanup: {close_result['message']}")
+```
+
+#### 5.1.4 Setup Hints
+
+- **Browser Requirements**: 
+  - Chrome is the default and most stable option
+  - Ensure you have Chrome or ChromeDriver installed for Selenium
+  - For other browsers, install the appropriate WebDriver
+
+- **Initialization and Cleanup**:
+  - **ALWAYS** call `initialize_browser()` first - no other methods will work without it
+  - **ALWAYS** call `close_browser()` when done to free system resources
+  - Use try-finally blocks to ensure cleanup happens even if errors occur
+  - The browser tool maintains internal state, so proper initialization/cleanup is critical
+
+- **Headless vs Visual Mode**:
+  - Set `headless=False` to see the browser window (useful for debugging and demonstrations)
+  - Set `headless=True` for production or automated workflows
+  - Visual mode helps understand what the automation is doing
+
+- **Element References and Snapshots**:
+  - All interactions use element IDs like "e0", "e1", "e2" from snapshots
+  - Element IDs are refreshed after navigation or page changes
+  - Always use the most recent snapshot's element references
+  - The `navigate_to_url()` method automatically captures a snapshot
+  - Use `browser_snapshot()` to refresh element references after dynamic content changes
+
+- **Method Execution Order**:
+  ```python
+  # Required workflow pattern
+  browser_tool.initialize_browser()          # 1. Start browser (required first)
+  nav_result = browser_tool.navigate_to_url(url)  # 2. Go to page, get elements
+  browser_tool.input_text(ref="e0", text="query")  # 3. Use element refs from snapshot
+  browser_tool.browser_click(ref="e1")       # 4. Click using element refs
+  browser_tool.close_browser()               # 5. Clean up (required last)
+  ```
+
+- **Error Handling Best Practices**:
+  ```python
+  browser_tool = BrowserTool(headless=False)
+  try:
+      # Always check initialization result
+      init_result = browser_tool.initialize_browser()
+      if init_result["status"] != "success":
+          raise Exception("Browser initialization failed")
+      
+      # Your browser operations here
+      nav_result = browser_tool.navigate_to_url("https://example.com")
+      # ... more operations
+      
+  except Exception as e:
+      print(f"Browser operation failed: {e}")
+  finally:
+      # CRITICAL: Always close browser to free resources
+      browser_tool.close_browser()
+  ```
+
+- **Timeouts and Performance**:
+  - The `timeout` parameter controls how long to wait for elements to load
+  - Increase timeout for slow websites or complex pages
+  - Use `browser_console_messages()` to debug JavaScript errors or performance issues
+
+---
+
+## 6. MCP Tools
 
 **The Model Context Protocol (MCP) toolkit provides a standardized way to connect to external services through the MCP protocol. It enables agents to access specialized tools like job search services, data processing utilities, and other MCP-compatible APIs without requiring direct integration of each service.**
 
-### 4.1 MCPToolkit
+### 6.1 MCPToolkit
 
-#### 4.1.1 Setup
+#### 6.1.1 Setup
 
 ```python
 from evoagentx.tools.mcp import MCPToolkit
@@ -479,7 +962,7 @@ config = {
 mcp_toolkit = MCPToolkit(config=config)
 ```
 
-#### 4.1.2 Available Methods
+#### 6.1.2 Available Methods
 
 The `MCPToolkit` provides the following callable methods:
 
@@ -520,7 +1003,7 @@ mcp_toolkit.disconnect()
 
 **Return Type**: `None`
 
-#### 4.1.3 Using MCP Tools
+#### 6.1.3 Using MCP Tools
 
 Once you have obtained the tools from the MCPToolkit, you can use them like any other EvoAgentX tool:
 
@@ -544,7 +1027,7 @@ if hirebase_tool:
     print(result)
 ```
 
-#### 4.1.4 Setup Hints
+#### 6.1.4 Setup Hints
 
 - **Configuration File**: The configuration file should follow the MCP protocol's server configuration format:
   ```json
@@ -598,7 +1081,9 @@ In this tutorial, we've explored the tool ecosystem in EvoAgentX:
 1. **Tool Architecture**: Understood the base Tool class and its standardized interface
 2. **Code Interpreters**: Learned how to execute Python code securely using both Python and Docker interpreters
 3. **Search Tools**: Discovered how to access web information using Wikipedia and Google search tools
-4. **MCP Tools**: Learned how to connect to external services using the Model Context Protocol
+4. **File Operations**: Learned how to handle file operations with special support for different file formats
+5. **Browser Automation**: Learned how to control web browsers to interact with websites and web applications
+6. **MCP Tools**: Learned how to connect to external services using the Model Context Protocol
 
 Tools in EvoAgentX extend your agents' capabilities by providing access to external resources and computation. By combining these tools with agents and workflows, you can build powerful AI systems that can retrieve information, perform calculations, and interact with the world.
 

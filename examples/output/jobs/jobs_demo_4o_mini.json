@@ -1,0 +1,197 @@
+{
+    "class_name": "WorkFlowGraph",
+    "goal": "\n    \n                Read and analyze the pdf resume at examples/output/jobs/test_pdf.pdf, then find 5 real job opportunities based on the content of the resume by search the website.\n                \n    \n    It would be better to include a short summary on the resume at the beginning of the output.\n    You should use the tools to find real job opportunities and read resume.\n    I already give you the path in this goal. You should take \"goal\" as the only input at beginning.\n    The output should be well-formatted.\n    You should return every detailed information you collected from the website, inclduing job title, company name, location, detailed job description, detailed job requirements, salary, job posting link, etc.\n    \n    ",
+    "nodes": [
+        {
+            "class_name": "WorkFlowNode",
+            "name": "read_and_analyze_resume",
+            "description": "Extract key information from the PDF resume located at the specified path, including skills, experiences, and education.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "goal",
+                    "type": "string",
+                    "description": "The user's goal in textual format.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "resume_analysis",
+                    "type": "object",
+                    "description": "An object containing extracted information such as skills, experiences, and education from the resume.",
+                    "required": true
+                }
+            ],
+            "reason": "This sub-task is crucial as it provides the foundational information needed to find relevant job opportunities.",
+            "agents": [
+                {
+                    "name": "resume_analysis_agent",
+                    "description": "This agent reads the PDF resume and extracts key information, such as skills, experiences, and education, to create a structured analysis for further use.",
+                    "inputs": [
+                        {
+                            "name": "goal",
+                            "type": "string",
+                            "description": "The user's goal in textual format.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "resume_analysis",
+                            "type": "object",
+                            "description": "An object containing extracted information such as skills, experiences, and education from the resume.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Objective\nExtract key information from the provided resume PDF to identify skills, experiences, and education.\n\n### Instructions\n1. Use the input goal: <input>{goal}</input> to understand the user's requirements for the resume analysis.\n2. Access the PDF file at the specified path: examples/output/jobs/test_pdf.pdf.\n3. Read the content of the PDF using the File Tool to extract information regarding skills, work experiences, and educational background.\n4. Organize the extracted data into a structured object that captures the significant points relevant to job applications.\n5. Return the structured analysis as the output.\n\n### Output Format\nYour final output should ALWAYS in the following format:\n\n## Thought\nBriefly explain the reasoning process for extracting information from the resume.\n\n## resume_analysis\nAn object that includes extracted details like skills, experience, and education to support job search efforts.",
+                    "tool_names": [
+                        "File Tool"
+                    ]
+                }
+            ],
+            "status": "pending"
+        },
+        {
+            "class_name": "WorkFlowNode",
+            "name": "search_job_opportunities",
+            "description": "Use the analyzed information from the resume to search for 5 suitable job opportunities on relevant job websites.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "goal",
+                    "type": "string",
+                    "description": "The original full programming task requirements.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "resume_analysis",
+                    "type": "object",
+                    "description": "An object containing the extracted information from the resume.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "job_opportunities",
+                    "type": "array",
+                    "description": "An array of objects, each object representing a job opportunity with detailed information.",
+                    "required": true
+                }
+            ],
+            "reason": "This sub-task ensures that the job search is tailored to match the credentials and experiences of the candidate as outlined in the resume.",
+            "agents": [
+                {
+                    "name": "job_search_agent",
+                    "description": "This agent searches for job opportunities based on the candidate's resume analysis and the user's goal, ensuring the matches are relevant and applicable.",
+                    "inputs": [
+                        {
+                            "name": "goal",
+                            "type": "string",
+                            "description": "The original full programming task requirements.",
+                            "required": true
+                        },
+                        {
+                            "name": "resume_analysis",
+                            "type": "object",
+                            "description": "An object containing the extracted information from the resume.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "job_opportunities",
+                            "type": "array",
+                            "description": "An array of objects, each object representing a job opportunity with detailed information.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Objective\nSearch for suitable job opportunities based on the extracted information from the resume and the user's requirements.\n\n### Instructions\n1. Read and comprehend the original programming task requirements: <input>{goal}</input>.\n2. Understand the extracted information from the resume analysis: <input>{resume_analysis}</input>.\n3. Utilize relevant job search engines or tools to identify job opportunities tailored to the credentials and experiences outlined in the resume analysis.\n4. Ensure that 5 job opportunities are found based on the search criteria.\n5. Structure the collected job opportunities into an array that includes the job title, company name, location, detailed job description, job requirements, salary, and job posting link.\n\n### Output Format\nYour final output should ALWAYS in the following format:\n\n## Thought\nBriefly explain the reasoning process for achieving the objective.\n\n## job_opportunities\nProvide an array of objects, each representing a job opportunity with all relevant details.",
+                    "tool_names": [
+                        "hirebase"
+                    ]
+                }
+            ],
+            "status": "pending"
+        },
+        {
+            "class_name": "WorkFlowNode",
+            "name": "format_job_opportunities_output",
+            "description": "Organize the collected job opportunities into a well-formatted output that includes all relevant details such as job title, company name, location, job description, requirements, salary, and posting link.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "goal",
+                    "type": "string",
+                    "description": "The original full programming task requirements.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "job_opportunities",
+                    "type": "array",
+                    "description": "An array of job opportunities obtained from the search.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "formatted_output",
+                    "type": "string",
+                    "description": "A well-formatted string that summarizes the job opportunities collected, including all necessary details.",
+                    "required": true
+                }
+            ],
+            "reason": "This sub-task ensures that the final output is clearly structured and easy to read, fulfilling the user's request for a well-formatted result.",
+            "agents": [
+                {
+                    "name": "job_opportunity_formatting_agent",
+                    "description": "This agent formats the array of job opportunities into a well-structured output string, providing a detailed summary that includes all relevant information such as job title, company name, location, and more.",
+                    "inputs": [
+                        {
+                            "name": "goal",
+                            "type": "string",
+                            "description": "The original full programming task requirements.",
+                            "required": true
+                        },
+                        {
+                            "name": "job_opportunities",
+                            "type": "array",
+                            "description": "An array of job opportunities obtained from the search.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "formatted_output",
+                            "type": "string",
+                            "description": "A well-formatted string that summarizes the job opportunities collected, including all necessary details.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Objective\nFormat the array of job opportunities into a well-structured and easily readable output string that summarizes all relevant details.\n\n### Instructions\n1. Read the user's goal: <input>{goal}</input>\n2. Analyze the input array of job opportunities: <input>{job_opportunities}</input>\n3. For each job opportunity in the array:\n   - Extract details including job title, company name, location, job description, requirements, salary, and posting link.\n4. Organize these details into a coherent and formatted output string that aligns with the user's request for clarity and structure.\n5. Return the final formatted output string as the result.\n\n### Output Format\nYour final output should ALWAYS in the following format:\n\n## Thought\nBriefly explain the reasoning process for formatting the job opportunities output.\n\n## formatted_output\nA well-formatted string that summarizes the job opportunities collected, including all necessary details."
+                }
+            ],
+            "status": "pending"
+        }
+    ],
+    "edges": [
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "read_and_analyze_resume",
+            "target": "search_job_opportunities",
+            "priority": 0
+        },
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "search_job_opportunities",
+            "target": "format_job_opportunities_output",
+            "priority": 0
+        }
+    ],
+    "graph": null
+}

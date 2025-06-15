@@ -4,7 +4,7 @@ import tarfile
 import uuid
 import docker
 from pathlib import Path
-from typing import ClassVar, Dict, Any, List
+from typing import ClassVar, Dict, Any, List, Optional
 from .interpreter_base import BaseInterpreter
 import os
 from pydantic import Field
@@ -31,8 +31,8 @@ class DockerInterpreter(BaseInterpreter):
     container_directory:str = Field(default="/home/app/", description="The directory to use for the container")
     container_command:str = Field(default="tail -f /dev/null", description="The command to use for the container")
     tmp_directory:str = Field(default="/tmp", description="The directory to use for the container")
-    image_tag:str = Field(default=None, description="The Docker image tag to use")
-    dockerfile_path:str = Field(default=None, description="Path to the Dockerfile to build")
+    image_tag:Optional[str] = Field(default=None, description="The Docker image tag to use")
+    dockerfile_path:Optional[str] = Field(default=None, description="Path to the Dockerfile to build")
     
     class Config:
         arbitrary_types_allowed = True  # Allow non-pydantic types like sets
@@ -40,8 +40,8 @@ class DockerInterpreter(BaseInterpreter):
     def __init__(
         self, 
         name:str = "DockerInterpreter",
-        image_tag:str = None,
-        dockerfile_path:str = None,
+        image_tag:Optional[str] = None,
+        dockerfile_path:Optional[str] = None,
         require_confirm:bool = False,
         print_stdout:bool = True,
         print_stderr:bool = True,

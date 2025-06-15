@@ -7,9 +7,11 @@ from .search_google_f import SearchGoogleFree
 from .search_wiki import SearchWiki
 from .search_google import SearchGoogle
 from .mcp import MCPClient, MCPToolkit
+from .browser_tool import BrowserTool
+from .file_tool import FileTool
 
 
 __all__ = ["Tool", "BaseInterpreter", "DockerInterpreter", 
            "PythonInterpreter", "SearchBase", "SearchGoogleFree", "SearchWiki", "SearchGoogle",
-           "MCPClient", "MCPToolkit"]
+           "MCPClient", "MCPToolkit", "BrowserTool", "FileTool"]
 

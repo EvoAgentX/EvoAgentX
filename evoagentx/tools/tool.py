@@ -32,3 +32,6 @@ class Tool(BaseModule):
     # Legacy method - to be deprecated
     def get_tool_descriptions(self) -> List[str]:
         raise NotImplementedError("All tools must implement get_tool_descriptions")
+
+    def get_tool_prompt(self) -> str:
+        return ""
