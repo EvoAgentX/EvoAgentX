@@ -9,4 +9,5 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install -e .[dev]
-      - run: pytest --cov-fail-under=80 --cov-config=.coveragerc
+      - run: pytest --cov=evoagentx/utils --cov=evoagentx/optimizers \ --cov-config=.coveragerc --cov-report=term-missing --cov-branch \ --cov-fail-under=80
+
