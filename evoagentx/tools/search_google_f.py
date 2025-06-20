@@ -1,6 +1,7 @@
 from .search_base import SearchBase
+from .tool import Tool, ToolKit
 from googlesearch import search as google_f_search
-from typing import Dict, Any, List, Callable, Optional
+from typing import Dict, Any, List, Optional
 from evoagentx.core.logging import logger
 
 class SearchGoogleFree(SearchBase):
@@ -75,21 +76,11 @@ class SearchGoogleFree(SearchBase):
             logger.error(f"Error in free Google search: {str(e)}")
             return {"results": [], "error": str(e)}
     
-    def get_tool_schemas(self) -> List[Dict[str, Any]]:
-        """
-        Returns the OpenAI-compatible function schema for the free Google search tool.
-        
-        Returns:
-            list[Dict[str, Any]]: Function schema in OpenAI format
-        """
-        return [{
-            "type": "function",
-            "function": {
-                "name": "search",
-                "description": "Search Google without requiring an API key and retrieve content from search results.",
-                "parameters": {
-                "type": "object",
-                "properties": {
+
+class GoogleFreeSearchTool(Tool):
+    name: str = "google_free_search"
+    description: str = "Search Google without requiring an API key and retrieve content from search results"
+    inputs: Dict[str, Dict[str, str]] = {
                     "query": {
                         "type": "string",
                         "description": "The search query to execute on Google"
@@ -102,17 +93,59 @@ class SearchGoogleFree(SearchBase):
                         "type": "integer",
                         "description": "Maximum number of words to include in content per result. None means no limit. Default: None"
                     }
-                },
-                "required": ["query"]
-                }
-            }
-        }]
+    }
+    required: Optional[List[str]] = ["query"]
+    
+    def __init__(self, search_google_free: SearchGoogleFree = None):
+        super().__init__()
+        self.search_google_free = search_google_free
+    
+    def __call__(self, query: str, num_search_pages: int = None, max_content_words: int = None) -> Dict[str, Any]:
+        """Execute Google free search using the SearchGoogleFree instance."""
+        if not self.search_google_free:
+            raise RuntimeError("Google free search instance not initialized")
+        
+        try:
+            return self.search_google_free.search(query, num_search_pages, max_content_words)
+        except Exception as e:
+            return {"results": [], "error": f"Error executing Google free search: {str(e)}"}
 
-    def get_tools(self) -> List[Callable]:
-        return [self.search]
 
-    def get_tool_descriptions(self) -> List[str]:
-        return [
-            "Free Google Search Tool that queries Google without requiring an API key."
+class GoogleFreeSearchToolKit(ToolKit):
+    def __init__(
+        self,
+        name: str = "GoogleFreeSearchToolKit",
+        num_search_pages: Optional[int] = 5,
+        max_content_words: Optional[int] = None,
+        **kwargs
+    ):
+        # Create the shared Google free search instance
+        search_google_free = SearchGoogleFree(
+            name="GoogleFreeSearch",
+            num_search_pages=num_search_pages,
+            max_content_words=max_content_words,
+            **kwargs
+        )
+        
+        # Create tools with the shared search instance
+        tools = [
+            GoogleFreeSearchTool(search_google_free=search_google_free)
         ]
+        
+        # Initialize parent with tools
+        super().__init__(name=name, tools=tools)
+        
+        # Store search_google_free as instance variable
+        self.search_google_free = search_google_free
+    
+    def get_tool_prompt(self) -> str:
+        """Returns a tool instruction prompt for the agent to use the Google free search tools"""
+        return """** Google Free Search Tools **
+You are provided with Google Free Search Tools, which allow you to search Google without requiring API keys and retrieve content from search results.
+Available tools:
+- google_free_search: Search Google without API keys and retrieve content from search results
+
+This tool uses web scraping to get Google search results and doesn't require any API keys or configuration.
+Results include titles, content snippets, and URLs from the search results.
+        """
 

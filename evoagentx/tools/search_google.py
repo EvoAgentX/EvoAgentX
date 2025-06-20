@@ -1,7 +1,8 @@
 import requests
 import os
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from .search_base import SearchBase
+from .tool import Tool, ToolKit
 from evoagentx.core.logging import logger
 import dotenv
 dotenv.load_dotenv()
@@ -103,21 +104,11 @@ class SearchGoogle(SearchBase):
             logger.error(f"Error searching Google: {str(e)}")
             return {"results": [], "error": str(e)}
 
-    def get_tool_schemas(self) -> list[Dict[str, Any]]:
-        """
-        Returns the OpenAI-compatible function schema for the Google search tool.
-        
-        Returns:
-            list[Dict[str, Any]]: Function schema in OpenAI format
-        """
-        return [{
-            "type": "function",
-            "function": {
-                "name": "search",
-                "description": "Search Google and retrieve content from search results.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
+
+class GoogleSearchTool(Tool):
+    name: str = "google_search"
+    description: str = "Search Google using the Custom Search API and retrieve content from search results"
+    inputs: Dict[str, Dict[str, str]] = {
                         "query": {
                             "type": "string",
                             "description": "The search query to execute on Google"
@@ -130,20 +121,58 @@ class SearchGoogle(SearchBase):
                             "type": "integer",
                             "description": "Maximum number of words to include in content per result. None means no limit. Default: None"
                         }
-                    },
-                    "required": ["query"]
-                }
-            }
-        }]
+    }
+    required: Optional[List[str]] = ["query"]
     
-    def get_tools(self):
-        return [self.search]
+    def __init__(self, search_google: SearchGoogle = None):
+        super().__init__()
+        self.search_google = search_google
+    
+    def __call__(self, query: str, num_search_pages: int = None, max_content_words: int = None) -> Dict[str, Any]:
+        """Execute Google search using the SearchGoogle instance."""
+        if not self.search_google:
+            raise RuntimeError("Google search instance not initialized")
         
-    def get_tool_descriptions(self) -> list[str]:
-        """
-        Returns a brief description of the Google search tool.
+        try:
+            return self.search_google.search(query, num_search_pages, max_content_words)
+        except Exception as e:
+            return {"results": [], "error": f"Error executing Google search: {str(e)}"}
+
+
+class GoogleSearchToolKit(ToolKit):
+    def __init__(
+        self,
+        name: str = "GoogleSearchToolKit",
+        num_search_pages: Optional[int] = 5,
+        max_content_words: Optional[int] = None,
+        **kwargs
+    ):
+        # Create the shared Google search instance
+        search_google = SearchGoogle(
+            name="SearchGoogle",
+            num_search_pages=num_search_pages,
+            max_content_words=max_content_words,
+            **kwargs
+        )
         
-        Returns:
-            list[str]: Tool descriptions
+        # Create tools with the shared search instance
+        tools = [
+            GoogleSearchTool(search_google=search_google)
+        ]
+        
+        # Initialize parent with tools
+        super().__init__(name=name, tools=tools)
+        
+        # Store search_google as instance variable
+        self.search_google = search_google
+    
+    def get_tool_prompt(self) -> str:
+        """Returns a tool instruction prompt for the agent to use the Google search tools"""
+        return """** Google Search Tools **
+You are provided with Google Search Tools, which allow you to search Google using the Custom Search API and retrieve content from search results.
+Available tools:
+- google_search: Search Google and retrieve content from search results using the Custom Search API
+
+The tools require GOOGLE_API_KEY and GOOGLE_SEARCH_ENGINE_ID environment variables to be set.
+Results include titles, content snippets, and URLs from the search results.
         """
-        return ["Search Google and retrieve content from search results."]

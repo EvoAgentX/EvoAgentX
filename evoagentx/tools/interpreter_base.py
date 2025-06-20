@@ -1,9 +1,9 @@
-from .tool import Tool
+from ..core.module import BaseModule
 
-class BaseInterpreter(Tool):
+class BaseInterpreter(BaseModule):
     """
     Base class for interpreter tools that execute code securely.
-    Implements the standard tool interface with get_tool_schemas and execute methods.
+    Provides common functionality for interpreter operations.
     """
 
     def __init__(

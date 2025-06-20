@@ -10,7 +10,7 @@ from ..core.registry import MODULE_REGISTRY
 from ..core.parser import Parser
 from ..core.message import Message
 from ..models.base_model import BaseLLM, LLMOutputParser
-from ..tools.tool import Tool 
+from ..tools.tool import ToolKit 
 from ..prompts.context_extraction import CONTEXT_EXTRACTION
 from ..prompts.template import PromptTemplate  
 
@@ -116,7 +116,7 @@ class Action(BaseModule):
         name (str): Unique identifier for the action.
         description (str): Human-readable description of what the action does.
         prompt (Optional[str]): Optional prompt template for this action.
-        tools (Optional[List[Tool]]): Optional list of tools that can be used by this action.
+        tools (Optional[List[ToolKit]]): Optional list of tools that can be used by this action.
         inputs_format (Optional[Type[ActionInput]]): Optional class defining the expected input structure.
         outputs_format (Optional[Type[Parser]]): Optional class defining the expected output structure.
     """
@@ -125,7 +125,7 @@ class Action(BaseModule):
     description: str
     prompt: Optional[str] = None
     prompt_template: Optional[PromptTemplate] = None 
-    tools: Optional[List[Tool]] = None # specify the possible tool for the action
+    tools: Optional[List[ToolKit]] = None # specify the possible tool for the action
     inputs_format: Optional[Type[ActionInput]] = None # specify the input format of the action
     outputs_format: Optional[Type[Parser]] = None  # specify the possible structured output format
 
