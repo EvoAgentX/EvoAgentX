@@ -1,43 +1,60 @@
-import textgrad as tg
-from textgrad import Variable
-from textgrad.loss import TextLoss, MultiFieldEvaluation
-from textgrad.optimizer import TextualGradientDescent
-from textgrad.autograd import StringBasedFunction
-from pydantic import Field, PositiveInt
+# ruff: noqa: E402
 import os
-from tqdm import tqdm
-from typing import List, Literal, Optional
+import shutil
 from copy import deepcopy
-import numpy as np
+from typing import Any, Iterator, List, Literal, Optional, Tuple, Union
 
+import numpy as np
+from pydantic import Field, PositiveInt
+from tqdm import tqdm
+
+from ..agents import Agent, CustomizeAgent
+from ..benchmark.benchmark import Benchmark, CodingBenchmark
+from ..core.callbacks import suppress_logger_info
 from ..core.logging import logger
 from ..core.module import BaseModule
-from ..core.callbacks import suppress_logger_info
-from ..models.base_model import BaseLLM
-from ..benchmark.benchmark import Benchmark, CodingBenchmark
 from ..evaluators import Evaluator
-from ..workflow.workflow_graph import SequentialWorkFlowGraph, WorkFlowNode
-from ..agents import CustomizeAgent
+from ..models.base_model import BaseLLM
+from ..prompts import PromptTemplate
+from ..workflow.workflow_graph import WorkFlowGraph, WorkFlowNode
+
+# Check if logs folder exists before importing textgrad
+log_folder_exists = os.path.exists("./logs")
+
+import textgrad as tg
+from textgrad import Variable
+from textgrad import logger as tg_logger
+from textgrad import sh as tg_file_handler
+from textgrad.autograd import StringBasedFunction
+from textgrad.loss import MultiFieldEvaluation, TextLoss
+from textgrad.optimizer import TextualGradientDescent
+
 from ..prompts.optimizers.textgrad_optimizer import (
-    GENERAL_LOSS_PROMPT, 
-    CODE_LOSS_PROMPT, 
-    NO_ANSWER_LOSS_PROMPT, 
-    OPTIMIZER_SYSTEM_PROMPT, 
-    OPTIMIZER_CONSTRAINTS, 
-    PERSONAL_FINANCE_ADVISOR_EXAMPLE, 
-    FITNESS_COACH_EXAMPLE
+    CODE_LOSS_PROMPT,
+    GENERAL_LOSS_PROMPT,
+    NO_ANSWER_LOSS_PROMPT,
+    OPTIMIZER_CONSTRAINTS,
+    OPTIMIZER_SYSTEM_PROMPT,
+    PERSONAL_FINANCE_ADVISOR_EXAMPLE,
+    FITNESS_COACH_EXAMPLE,
+    CODE_REVIEW_EXAMPLE,
 )
+
+tg_logger.removeHandler(tg_file_handler)
+# remove the logs folder created by textgrad
+if not log_folder_exists and os.path.exists("./logs"):
+    shutil.rmtree("./logs")
 
 
 class CustomAgentCall:
     """A custom agent call with textgrad.Variable inputs and output."""
-    def __init__(self, agent: CustomizeAgent):
+    def __init__(self, agent: Agent):
         self.agent = agent
-        self.last_outputs: dict[str, str] = None
+        self.last_outputs: dict[str, str] = dict()
     
     def __call__(
         self, 
-        prompt_template: Variable, 
+        instruction: Variable, 
         system_prompt: Variable,
         **inputs: Variable
     ) -> Variable:
@@ -64,23 +81,23 @@ class CustomAgentCall:
 
 class TextGradAgent:
     """An agent that takes textgrad.Variable inputs and returns a textgrad.Variable response.
-    This class is used to replace EvoAgentX CustomizeAgent in SequentialWorkFlowGraph to allow TextGrad optimization.
+    This class is used to replace EvoAgentX Agent in WorkFlowGraph to allow TextGrad optimization.
     """
     def __init__(
         self, 
-        agent: CustomizeAgent,
-        optimize_mode: Literal["all", "system_prompt", "prompt_template"] = "all"
+        agent: Agent,
+        optimize_mode: Literal["all", "system_prompt", "instruction"] = "all"
     ):
         self.name = agent.name
 
         require_grad = {
-            "all": {"system_prompt": True, "prompt_template": True}, 
-            "system_prompt": {"system_prompt": True, "prompt_template": False}, 
-            "prompt_template": {"system_prompt": False, "prompt_template": True}
+            "all": {"system_prompt": True, "instruction": True}, 
+            "system_prompt": {"system_prompt": True, "instruction": False}, 
+            "instruction": {"system_prompt": False, "instruction": True}
         }
 
         system_prompt_require_grad = require_grad[optimize_mode]["system_prompt"]
-        prompt_template_require_grad = require_grad[optimize_mode]["prompt_template"]
+        instruction_require_grad = require_grad[optimize_mode]["instruction"]
 
         self.system_prompt = Variable(
             agent.system_prompt, 
@@ -88,10 +105,10 @@ class TextGradAgent:
             role_description=f"{self.name}'s system prompt"
         )
         
-        self.prompt_template = Variable(
-            agent.prompt, 
-            requires_grad=prompt_template_require_grad, 
-            role_description=f"{self.name}'s instruction prompt template"
+        self.instruction = Variable(
+            agent.actions[0].prompt_template.instruction,
+            requires_grad=instruction_require_grad, 
+            role_description=f"{self.name}'s instruction prompt"
         )
 
         self._agent_call = CustomAgentCall(agent)
@@ -102,13 +119,11 @@ class TextGradAgent:
     def __call__(self, inputs: dict[str, Variable]) -> Variable:
         """Given textgrad.Variable inputs, generates a textgrad.Variable output."""
 
-        forward_inputs = dict(
-            {
-                "prompt_template": self.prompt_template, 
-                "system_prompt": self.system_prompt,
-                **inputs
-            }
-        )
+        forward_inputs: dict[str, Variable] = {
+            "instruction": self.instruction, 
+            "system_prompt": self.system_prompt,
+            **inputs
+        }
 
         output_variable = self.forward(forward_inputs, self.output_description)
         output_variable.parsed_outputs = self._agent_call.last_outputs
@@ -118,11 +133,11 @@ class TextGradAgent:
 
 
 class TextGradOptimizer(BaseModule):
-    """Optimizes the prompt templates and system prompts in a workflow using TextGrad.
-    For more information, see https://github.com/zou-group/textgrad.
+    """Uses TextGrad to optimize agents' system prompts and instructions in a multi-agent workflow.
+    For more information on TextGrad, see https://github.com/zou-group/textgrad.
     """
-    graph: SequentialWorkFlowGraph = Field(description="The workflow to optimize.")
-    optimize_mode: Literal["all", "system_prompt", "prompt_template"] = Field(default="all", description="The mode to optimize the workflow.")
+    graph: WorkFlowGraph = Field(description="The workflow to optimize.")
+    optimize_mode: Literal["all", "system_prompt", "instruction"] = Field(default="all", description="The mode to optimize the workflow. 'all' optimizes both system prompts and instructions, 'system_prompt' only optimizes system prompts, and 'instruction' only optimizes instructions.")
     executor_llm: BaseLLM = Field(default=None, description="The LLM to use for execution.")
     optimizer_llm: BaseLLM = Field(default=None, description="The LLM to use for optimization.")
     batch_size: PositiveInt = Field(default=1, description="The batch size for optimization.")
@@ -134,16 +149,18 @@ class TextGradOptimizer(BaseModule):
     save_interval: Optional[PositiveInt] = Field(default=None, description="Save the workflow every `save_interval` steps.")
     save_path: str = Field(default="./", description="The path to save the optimized workflow.")
     rollback: bool = Field(default=True, description="Whether to rollback to the best graph after each evaluation during optimization.")
+    constraints: List[str] = Field(default=[], description="The constraints for optimization. e.g. ['They system prompt must not exceed 100 words.']")
 
 
     def init_module(self, **kwargs):
+        self._validate_graph_compatibility(self.graph)
         self._snapshot: List[dict] = []
         self.output_lookup = self._create_output_lookup()
         
 
     def _init_textgrad(self, dataset: Benchmark, use_answers: bool = True):
         # Disable TextGrad's short variable value to allow the optimizer to receive the full variable value
-        def disable_short_variable_value(self):
+        def disable_short_variable_value(self, n_words_offset: int = 10):
             return self.value
         Variable.get_short_value = disable_short_variable_value
 
@@ -171,22 +188,26 @@ class TextGradOptimizer(BaseModule):
         
         # Textgrad optimizer
         if self.optimize_mode == "all":
-            optimize_variables = self._get_all_system_prompts() + self._get_all_prompt_templates()
+            optimize_variables = self._get_all_system_prompts() + self._get_all_instructions()
         elif self.optimize_mode == "system_prompt":
             optimize_variables = self._get_all_system_prompts()
-        elif self.optimize_mode == "prompt_template":
-            optimize_variables = self._get_all_prompt_templates()
+        elif self.optimize_mode == "instruction":
+            optimize_variables = self._get_all_instructions()
+        else:
+            raise ValueError("Unsupported `optimize_mode`, should be one of 'all', 'system_prompt', 'instruction'.")
+
+        OPTIMIZER_CONSTRAINTS.extend(self.constraints)
         
         self.textgrad_optimizer = TextualGradientDescent(
             parameters=optimize_variables, 
             engine=self.optimizer_engine,
             constraints=OPTIMIZER_CONSTRAINTS,
             optimizer_system_prompt=OPTIMIZER_SYSTEM_PROMPT,
-            in_context_examples=[PERSONAL_FINANCE_ADVISOR_EXAMPLE, FITNESS_COACH_EXAMPLE]
+            in_context_examples=[PERSONAL_FINANCE_ADVISOR_EXAMPLE, FITNESS_COACH_EXAMPLE, CODE_REVIEW_EXAMPLE]
         )
 
 
-    def optimize(self, dataset: Benchmark, use_answers: bool = True, seed: Optional[int] = None):
+    def optimize(self, dataset: Benchmark, use_answers: bool = True, seed: Optional[int] = None) -> None:
         """Optimizes self.graph using `dataset`.
         
         Args:
@@ -198,7 +219,7 @@ class TextGradOptimizer(BaseModule):
         """
         self._init_textgrad(dataset, use_answers)
  
-        def iterator():
+        def iterator() -> Iterator[Tuple[List[dict[str, str]],  Optional[List[Union[str, dict[str, str]]]]]]:
             epoch = 0
             while True:
                 # Shuffle train data every epoch
@@ -220,7 +241,7 @@ class TextGradOptimizer(BaseModule):
             inputs, labels = next(data_iterator)
             self.step(inputs, labels, dataset, use_answers)
 
-            if self.eval_interval is not None and (step + 1) % self.eval_interval == 0:
+            if self.eval_every_n_steps is not None and (step + 1) % self.eval_every_n_steps == 0:
                 logger.info(f"Evaluating the workflow at step {step+1} ...")
                 with suppress_logger_info():
                     metrics = self.evaluate(dataset, **self.eval_config)
@@ -242,7 +263,7 @@ class TextGradOptimizer(BaseModule):
                         else:
                             # If the current average score is worse than the best average score, roll back to the best snapshot
                             logger.info(f"Metrics are worse than the best snapshot which has {best_snapshot['metrics']}. Rolling back to the best snapshot.")
-                            best_graph = SequentialWorkFlowGraph.from_dict(best_snapshot["graph"])
+                            best_graph = WorkFlowGraph.from_dict(best_snapshot["graph"])
                             self.graph = best_graph
                             self._create_textgrad_agents()
 
@@ -259,16 +280,23 @@ class TextGradOptimizer(BaseModule):
             self.save(os.path.join(self.save_path, f"{dataset.name}_textgrad_best.json"), graph=best_graph)
 
         
-    def step(self, inputs: List[dict[str, str]], labels: Optional[List[str|dict[str, str]]], dataset: Benchmark, use_answers: bool = True):
+    def step(
+        self, 
+        inputs: list[dict[str, str]], 
+        labels: Optional[list[Union[str, dict[str, str]]]], 
+        dataset: Benchmark, 
+        use_answers: bool = True
+    ) -> None:
         """Performs one optimization step using a batch of data."""
 
-        if labels is None and use_answers:
-            raise ValueError("Labels must be provided if `use_answers` is True.")
-
         losses = []
+        logger.info("Executing workflow...")
 
         if use_answers:
-            for input, label in zip(inputs, labels):
+            if labels is None:
+                raise ValueError("Labels must be provided if `use_answers` is True.")
+
+            for input, label in zip(inputs, labels, strict=True):
                 output = self.forward(input)
                 if isinstance(label, str):
                     label = Variable(label, requires_grad=False, role_description="correct answer for the query")
@@ -290,18 +318,13 @@ class TextGradOptimizer(BaseModule):
                 losses.append(loss)
 
         total_loss = tg.sum(losses)
+        logger.info("Computing gradients...")
         total_loss.backward(self.optimizer_engine)
+        logger.info("Updating agents...")
         self.textgrad_optimizer.step()
         self.textgrad_optimizer.zero_grad()
-
-        # Checks if all the prompt templates contain the required inputs.
-        # If not, fix them by appending the input placeholders at the end.
-        for node in self.graph.nodes:
-            prompt_template = node.textgrad_agent.prompt_template.value
-            prompt_template = self._add_missing_input_placeholder(prompt_template, node)
-            node.textgrad_agent.prompt_template.value = prompt_template
-
         self._update_workflow_graph()
+        logger.info("Agents updated")
 
 
     def forward(self, inputs: dict[str, str]) -> Variable:
@@ -317,7 +340,7 @@ class TextGradOptimizer(BaseModule):
         self, 
         dataset: Benchmark, 
         eval_mode: str = "dev", 
-        graph: Optional[SequentialWorkFlowGraph] = None,
+        graph: Optional[WorkFlowGraph] = None,
         indices: Optional[List[int]] = None,
         sample_k: Optional[int] = None,
         **kwargs
@@ -327,7 +350,7 @@ class TextGradOptimizer(BaseModule):
         Args:
             dataset (Benchmark): The dataset to evaluate the workflow on.
             eval_mode (str): The evaluation mode. Choices: ["test", "dev", "train"].
-            graph (SequentialWorkFlowGraph, optional): The graph to evaluate. If not provided, use the graph in the optimizer.
+            graph (WorkFlowGraph, optional): The graph to evaluate. If not provided, use the graph in the optimizer.
             indices (List[int], optional): The indices of the data to evaluate the workflow on.
             sample_k (int, optional): The number of data to evaluate the workflow on. If provided, a random sample of size `sample_k` will be used.
         
@@ -364,12 +387,12 @@ class TextGradOptimizer(BaseModule):
         return avg_metrics
 
 
-    def save(self, path: str, graph: Optional[SequentialWorkFlowGraph] = None, ignore: List[str] = []):
+    def save(self, path: str, graph: Optional[WorkFlowGraph] = None, ignore: List[str] = []) -> None:
         """Save the workflow graph containing the optimized prompts to a file. 
 
         Args:
             path (str): The path to save the workflow graph.
-            graph (SequantialWorkFlowGraph, optional): The graph to save. If not provided, use the graph in the optimizer.
+            graph (WorkFlowGraph, optional): The graph to save. If not provided, use the graph in the optimizer.
             ignore (List[str]): The keys to ignore when saving the workflow graph.
         """
         if graph is None:
@@ -377,18 +400,18 @@ class TextGradOptimizer(BaseModule):
         graph.save_module(path, ignore=ignore)
 
 
-    def log_snapshot(self, graph: SequentialWorkFlowGraph, metrics: dict):
+    def log_snapshot(self, graph: WorkFlowGraph, metrics: dict) -> None:
         """Log the snapshot of the workflow."""
         self._snapshot.append(
             {
                 "index": len(self._snapshot),
-                "graph": deepcopy(graph.get_graph_info()),
+                "graph": deepcopy(graph.get_config()),
                 "metrics": metrics,
             }
         )
 
 
-    def restore_best_graph(self):
+    def restore_best_graph(self) -> None:
         """Restore the best graph from the snapshot and set it to `self.graph`."""
         if len(self._snapshot) == 0:
             logger.info("No snapshot found. No graph to restore.")
@@ -438,18 +461,20 @@ class TextGradOptimizer(BaseModule):
             for key, value in initial_inputs.items():
                 for input in self.graph.get_node(initial_node).inputs:
                     if input.name == key:
-                        variable_description = input.description
-                        break
-                initial_input_variable = Variable(
-                    value,
-                    requires_grad=False,
-                    role_description=variable_description,
-                )
-                variables[key] = initial_input_variable
-        return variables
+                        initial_input_variable = Variable(
+                            value,
+                            requires_grad=False,
+                            role_description=input.description,
+                        )
+                        variables[key] = initial_input_variable
+                        if len(variables) == len(initial_inputs):
+                            return variables
+        missing_inputs = set(initial_inputs.keys()) - set(variables.keys())
+        raise ValueError(f"Initial inputs do not match the inputs of the initial nodes. Missing inputs: {missing_inputs}")
 
 
-    def _compute_node(self, node: str | WorkFlowNode, initial_inputs: dict[str, Variable]) -> Variable:
+
+    def _compute_node(self, node: Union[str, WorkFlowNode], initial_inputs: dict[str, Variable]) -> Variable:
         """Computes the output of a node in the workflow graph by recursively computing the required inputs.
 
         Args:
@@ -483,14 +508,22 @@ class TextGradOptimizer(BaseModule):
         return output_variable
         
    
-    def _create_textgrad_agent(self, node: str | WorkFlowNode) -> TextGradAgent:
+    def _create_textgrad_agent(self, node: Union[str, WorkFlowNode]) -> TextGradAgent:
         """Creates a textgrad agent for a given node in a WorkFlowGraph."""
         if isinstance(node, str):
             node = self.graph.get_node(node)
 
-        agent_dict = node.agents[0]
-        agent = CustomizeAgent(llm=self.executor_llm, **agent_dict)
-
+        if isinstance(node.agents[0], dict):
+            agent_llm = node.agents[0].get("llm")
+            agent_llm_config = node.agents[0].get("llm_config")
+            if agent_llm is None and agent_llm_config is None:
+                node.agents[0]["llm"] = self.executor_llm
+            # CustomizeAgent.from_dict creates a CustomizeAgent if dict follows CustomizeAgent format
+            # creates an Agent if dict follows Agent format
+            agent: Union[CustomizeAgent, Agent] = CustomizeAgent.from_dict(node.agents[0])
+        else:
+            raise ValueError(f"Unsupported agent type {type(node.agents[0])}. Expected 'dict'.")
+            
         textgrad_agent = TextGradAgent(agent, self.optimize_mode)
         return textgrad_agent
 
@@ -501,14 +534,52 @@ class TextGradOptimizer(BaseModule):
             node.textgrad_agent = self._create_textgrad_agent(node)
 
 
+    def _update_agent_prompts(self, agent_dict: dict[str, Any], system_prompt: str, instruction: str) -> dict[str, Any]:
+        agent_dict["system_prompt"] = system_prompt
+        if "actions" in agent_dict:
+            # Agent has actions in its dict
+            agent_dict["actions"][0]["prompt_template"] = self._update_agent_instructions(
+                agent_dict["actions"][0]["prompt_template"], 
+                instruction
+            )
+        else:
+            # CustomizeAgent does not have actions in its dict
+            agent_dict["prompt_template"] = self._update_agent_instructions(
+                agent_dict["prompt_template"], 
+                instruction
+            )
+        return agent_dict
+
+
+    def _update_agent_instructions(
+        self, 
+        prompt_template: Union[PromptTemplate, dict[str, str]], 
+        instruction: str
+    ) -> Union[PromptTemplate, dict[str, str]]:
+
+        if isinstance(prompt_template, PromptTemplate):
+            prompt_template.set_instruction(instruction)
+        elif isinstance(prompt_template, dict):
+            prompt_template["instruction"] = instruction
+        else:
+            raise ValueError(f"Unsupported prompt template type {type(prompt_template)}. Expected 'PromptTemplate' or 'dict'.")
+        return prompt_template
+
+
     def _update_workflow_graph(self):
         """Updates the workflow graph with the latest prompts from the textgrad optimization."""
         for node in self.graph.nodes:
-            node.agents[0]['prompt'] = node.textgrad_agent.prompt_template.value
-            node.agents[0]['system_prompt'] = node.textgrad_agent.system_prompt.value
+            if isinstance(node.agents[0], dict):
+                node.agents[0] = self._update_agent_prompts(
+                    node.agents[0], 
+                    node.textgrad_agent.system_prompt.value, 
+                    node.textgrad_agent.instruction.value
+                )
+            else:
+                raise ValueError(f"Unsupported agent type {type(node.agents[0])}. Expected 'dict'.")
 
 
-    def _select_graph_with_highest_score(self, return_metrics: bool = False) -> SequentialWorkFlowGraph | tuple[SequentialWorkFlowGraph, Optional[dict]]:
+    def _select_graph_with_highest_score(self, return_metrics: bool = False) -> Union[WorkFlowGraph, tuple[WorkFlowGraph, Optional[dict]]]:
         """Select the graph in `self._snapshot` with the highest score."""
         if len(self._snapshot) == 0:
             if return_metrics:
@@ -518,11 +589,8 @@ class TextGradOptimizer(BaseModule):
         snapshot_scores = [np.mean(list(snapshot["metrics"].values())) for snapshot in self._snapshot]
         best_index = np.argmax(snapshot_scores)
 
-        if isinstance(self.graph, SequentialWorkFlowGraph):
-            graph = SequentialWorkFlowGraph.from_dict(self._snapshot[best_index]["graph"])
-        else:
-            raise ValueError(f"Invalid graph type: {type(self.graph)}. The graph should be an instance of `SequentialWorkFlowGraph`.")
-        
+        graph = WorkFlowGraph.from_dict(self._snapshot[best_index]["graph"])
+
         if return_metrics:
             return graph, self._snapshot[best_index]["metrics"]
         return graph
@@ -536,31 +604,12 @@ class TextGradOptimizer(BaseModule):
         return system_prompts
 
     
-    def _get_all_prompt_templates(self) -> List[Variable]:
+    def _get_all_instructions(self) -> List[Variable]:
         """Gets all prompt templates from the textgrad agents."""
-        prompt_templates = []
+        instructions = []
         for node in self.graph.nodes:
-            prompt_templates.append(node.textgrad_agent.prompt_template)
-        return prompt_templates
-
-    
-    def _add_missing_input_placeholder(self, prompt_template: str, node: str | WorkFlowNode) -> str:
-        """If placeholders for the required inputs are missing in the node's prompt template, add them.
-        Otherwise, returns the original prompt template.
-        """
-        if isinstance(node, str):
-            node = self.graph.get_node(node)
-
-        for input in node.inputs:
-            if "<input>{" + input.name + "}</input>" not in prompt_template:
-                if "{" + input.name + "}" in prompt_template:
-                    # Only missing input tags
-                    prompt_template = prompt_template.replace("{" + input.name + "}", "<input>{" + input.name + "}</input>")
-                else:
-                    # Missing both input tags and input placeholders
-                    prompt_template += "\n\n" + input.description + ":\n<input>{" + input.name + "}</input>"
-        
-        return prompt_template
+            instructions.append(node.textgrad_agent.instruction)
+        return instructions
 
 
     def _create_output_lookup(self) -> dict[str, str]:
@@ -570,5 +619,30 @@ class TextGradOptimizer(BaseModule):
             for output in node.outputs:
                 output_name_to_node_name[output.name] = node.name
         return output_name_to_node_name
-            
 
+
+    def _validate_graph_compatibility(self, graph: WorkFlowGraph) -> None:
+        """Checks if the graph is compatible with the textgrad optimizer."""
+        for node in graph.nodes:
+            if len(node.agents) > 1:
+                raise ValueError("TextGrad optimizer only supports workflows where every node only has a single agent.")
+            else:
+                agent = node.agents[0]
+                if not isinstance(agent, dict):
+                    raise ValueError(f"Unsupported agent type {type(agent)}. Expected 'dict'.")
+                else:
+                    if "actions" in agent:
+                        # Agent has actions in its dict
+                        # All agents have a `ContextExtraction` action, filter it out
+                        non_ContextExtraction_actions = [
+                            action for action in agent["actions"] if action["class_name"] != "ContextExtraction"
+                        ]
+                        if len(non_ContextExtraction_actions) > 1:
+                            raise ValueError(f"TextGrad optimizer only supports workflows where every agent only has a single action. {agent['name']} has {len(non_ContextExtraction_actions)} actions.")
+                        if "prompt_template" not in non_ContextExtraction_actions[0]:
+                            raise ValueError(f"Please provide a PromptTemplate for {agent['name']}.")
+                    else:
+                        # CustomizeAgent does not have actions in its dict
+                        if "prompt_template" not in agent:
+                            raise ValueError(f"Please provide a PromptTemplate for {agent['name']}.")
+                    

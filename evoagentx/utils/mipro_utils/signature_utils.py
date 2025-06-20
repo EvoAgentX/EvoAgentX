@@ -1,5 +1,4 @@
 from dspy import Signature, InputField, OutputField
-from typing import Optional, Dict, Type, Union
 from ...prompts.template import PromptTemplate
 from ...optimizers.engine.registry import ParamRegistry
 from ...utils.mipro_utils.register_utils import MiproRegistry

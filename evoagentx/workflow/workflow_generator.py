@@ -2,6 +2,7 @@ import json
 from typing import Optional, List
 from pydantic import Field, PositiveInt 
 
+import time
 from ..core.logging import logger
 from ..core.module import BaseModule
 # from ..core.base_config import Parameter
@@ -14,10 +15,7 @@ from ..agents.workflow_reviewer import WorkFlowReviewer
 from ..actions.task_planning import TaskPlanningOutput
 from ..actions.agent_generation import AgentGenerationOutput
 from ..workflow.workflow_graph import WorkFlowGraph, WorkFlowNode, WorkFlowEdge
-
-
 class WorkFlowGenerator(BaseModule):
-
     """
     Automated workflow generation system based on high-level goals.
     
@@ -33,15 +31,12 @@ class WorkFlowGenerator(BaseModule):
         workflow_reviewer: Component for reviewing and improving workflows
         num_turns: Number of refinement iterations for the workflow
     """
-
     llm: Optional[BaseLLM] = None
     task_planner: Optional[TaskPlanner] = Field(default=None, description="Responsible for breaking down the high-level task into manageable sub-tasks.")
     agent_generator: Optional[AgentGenerator] = Field(default=None, description="Assigns or generates the appropriate agent(s) to handle each sub-task.")
     workflow_reviewer: Optional[WorkFlowReviewer] = Field(default=None, description="Provides feedback and reflections to improve the generated workflow.")
     num_turns: Optional[PositiveInt] = Field(default=0, description="Specifies the number of refinement iterations for the generated workflow.")
-
     def init_module(self):
-
         if self.task_planner is None:
             if self.llm is None:
                 raise ValueError("Must provide `llm` when `task_planner` is None")
@@ -58,21 +53,92 @@ class WorkFlowGenerator(BaseModule):
         #         raise ValueError(f"Must provide `llm` when `workflow_reviewer` is None")
         #     self.workflow_reviewer = WorkFlowReviewer(llm=self.llm)
 
-    def generate_workflow(self, goal: str, existing_agents: Optional[List[Agent]] = None, **kwargs) -> WorkFlowGraph:
+    def _execute_with_retry(self, operation_name: str, operation, retries_left: int = 1, **kwargs):
+        """Helper method to execute operations with retry logic.
+        
+        Args:
+            operation_name: Name of the operation for logging
+            operation: Callable that performs the operation
+            retries_left: Number of retry attempts remaining
+            **kwargs: Additional arguments to pass to the operation
+            
+        Returns:
+            Tuple of (operation_result, number_of_retries_used)
+            
+        Raises:
+            ValueError: If operation fails after all retries are exhausted
+        """
+        cur_retries = 0
+
+        while cur_retries <= retries_left:  # Changed < to <= to include the initial try
+            try:
+                logger.info(f"{operation_name} (attempt {cur_retries + 1}/{retries_left + 1}) ...")
+                result = operation(**kwargs)
+                return result, cur_retries
+            except Exception as e:
+                if cur_retries == retries_left:
+                    raise ValueError(f"Failed to {operation_name} after {cur_retries + 1} attempts.\nError: {e}")
+                sleep_time = 2 ** cur_retries
+                logger.error(f"Failed to {operation_name} in {cur_retries + 1} attempts. Retry after {sleep_time} seconds.\nError: {e}")
+                time.sleep(sleep_time)
+                cur_retries += 1
+
+    def generate_workflow(self, goal: str, existing_agents: Optional[List[Agent]] = None, retry: int = 1, **kwargs) -> WorkFlowGraph:
+        # Validate input
+        if not goal or len(goal.strip()) < 10:
+            raise ValueError("Goal must be at least 10 characters and descriptive")
 
         plan_history, plan_suggestion = "", ""
-        # generate the initial workflow
-        logger.info(f"Generating a workflow for: {goal} ...")
-        plan = self.generate_plan(goal=goal, history=plan_history, suggestion=plan_suggestion)
-        workflow = self.build_workflow_from_plan(goal=goal, plan=plan)
+
+        # Generate the initial workflow plan
+        cur_retries = 0
+        plan, added_retries = self._execute_with_retry(
+            operation_name="Generating a workflow plan",
+            operation=self.generate_plan,
+            retries_left=retry,
+            goal=goal,
+            history=plan_history,
+            suggestion=plan_suggestion
+        )
+        cur_retries += added_retries
+
+        # Build workflow from plan
+        workflow, added_retries = self._execute_with_retry(
+            operation_name="Building workflow from plan",
+            operation=self.build_workflow_from_plan,
+            retries_left=retry - cur_retries,
+            goal=goal,
+            plan=plan
+        )
+        cur_retries += added_retries
+
+        # Validate initial workflow structure
+        logger.info("Validating initial workflow structure...")
+        workflow._validate_workflow_structure()
         logger.info(f"Successfully generate the following workflow:\n{workflow.get_workflow_description()}")
+
         # generate / assigns the initial agents
         logger.info("Generating agents for the workflow ...")
-        workflow = self.generate_agents(goal=goal, workflow=workflow, existing_agents=existing_agents)
-        return workflow
-    
-    def generate_plan(self, goal: str, history: Optional[str] = None, suggestion: Optional[str] = None) -> TaskPlanningOutput:
+        workflow, added_retries = self._execute_with_retry(
+            operation_name="Generating agents for the workflow",
+            operation=self.generate_agents,
+            retries_left=retry - cur_retries,
+            goal=goal,
+            workflow=workflow,
+            existing_agents=existing_agents
+        )
 
+        # Validate workflow after agent generation
+        logger.info("Validating workflow after agent generation...")
+        workflow._validate_workflow_structure()
+        # Validate that all nodes have agents
+        for node in workflow.nodes:
+            if not node.agents:
+                raise ValueError(f"Node {node.name} has no agents assigned after agent generation")
+
+        return workflow
+
+    def generate_plan(self, goal: str, history: Optional[str] = None, suggestion: Optional[str] = None) -> TaskPlanningOutput:
         history = "" if history is None else history
         suggestion = "" if suggestion is None else suggestion
         task_planner: TaskPlanner = self.task_planner
@@ -118,9 +184,7 @@ class WorkFlowGenerator(BaseModule):
         return workflow
     
     # def review_plan(self, goal: str, )
-
     def build_workflow_from_plan(self, goal: str, plan: TaskPlanningOutput) -> WorkFlowGraph:
-
         nodes: List[WorkFlowNode] = plan.sub_tasks
         # infer edges from sub-tasks' inputs and outputs
         edges: List[WorkFlowEdge] = []

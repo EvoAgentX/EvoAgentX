@@ -1062,7 +1062,7 @@ class WorkFlowGraph(BaseModule):
     
     def get_config(self) -> dict:
         """
-        Get a dictionary containing all necessary configuration to recreate this agent.
+        Get a dictionary containing all necessary configuration to recreate this workflow graph.
         
         Returns:
             dict: A configuration dictionary that can be used to initialize a new WorkFlowGraph instance

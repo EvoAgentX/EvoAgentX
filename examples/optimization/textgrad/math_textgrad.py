@@ -1,13 +1,14 @@
 from dotenv import load_dotenv
-from evoagentx.models import OpenAILLM, OpenAILLMConfig
-from evoagentx.benchmark import MATH  
-from evoagentx.workflow import SequentialWorkFlowGraph
-from evoagentx.agents.agent_manager import AgentManager
-from evoagentx.evaluators import Evaluator
-from evoagentx.optimizers import TextGradOptimizer
-from evoagentx.core.callbacks import suppress_logger_info 
-from evoagentx.core.logging import logger
 
+from evoagentx.agents.agent_manager import AgentManager
+from evoagentx.benchmark import MATH
+from evoagentx.core.callbacks import suppress_logger_info
+from evoagentx.core.logging import logger
+from evoagentx.evaluators import Evaluator
+from evoagentx.models import OpenAILLM, OpenAILLMConfig
+from evoagentx.optimizers import TextGradOptimizer
+from evoagentx.prompts import StringTemplate
+from evoagentx.workflow import SequentialWorkFlowGraph
 
 load_dotenv()
 
@@ -43,7 +44,7 @@ math_graph_data = {
             "outputs": [
                 {"name": "answer", "type": "str", "required": True, "description": "The generated answer."}
             ],
-            "prompt": "Answer the math question. The answer should be in box format, e.g., \\boxed{{123}}\n\nProblem: {problem}",
+            "prompt_template": StringTemplate(instruction="Answer the math question. The answer should be in box format, e.g., \\boxed{{123}}\n"),
             "parse_mode": "str"
         }
     ] 
@@ -79,11 +80,12 @@ def main():
         batch_size=3,
         max_steps=20,
         evaluator=evaluator,
-        eval_interval=1,
+        eval_every_n_steps=1,
         eval_rounds=1,
         save_interval=None,
         save_path="./",
-        rollback=True
+        rollback=True,
+        constraints=[]
     )
 
     logger.info("Evaluating workflow on test set...")

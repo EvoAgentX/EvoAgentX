@@ -23,6 +23,7 @@ from evoagentx.optimizers import TextGradOptimizer
 from evoagentx.models import OpenAILLMConfig, OpenAILLM
 from evoagentx.workflow import SequentialWorkFlowGraph
 from evoagentx.core.callbacks import suppress_logger_info
+from evoagentx.prompts import StringTemplate
 ```
 
 ### Configure the LLM Model
@@ -41,7 +42,7 @@ optimizer_llm = OpenAILLM(config=optimizer_config)
 ## 3. Setting Up the Components
 
 ### Step 1: Initialize the Workflow
-Currently, `TextGradOptimizer` only supports `SequentialWorkFlowGraph`. See [Workflow Graph](../modules/workflow_graph.md) for more information on `SequentialWorkFlowGraph`. For this example, let us create the
+`TextGradOptimizer` only supports `SequentialWorkFlowGraph` and a specific variant of `WorkFlowGraph`. The workflow graph must have exactly one agent per node and each agent must only have one action. See [Workflow Graph](../modules/workflow_graph.md) for more information on `SequentialWorkFlowGraph` and `WorkFlowGraph`. For this example, let us create the
 simplest workflow with only a single node.
 
 ```python
@@ -57,7 +58,7 @@ math_graph_data = {
             "outputs": [
                 {"name": "answer", "type": "str", "required": True, "description": "The generated answer."}
             ],
-            "prompt": "Answer the math question. The answer should be in box format, e.g., \\boxed{{123}}\n\nProblem: {problem}",
+            "prompt_template": StringTemplate(instruction="Answer the math question. The answer should be in box format, e.g., \\boxed{{123}}"),
             "parse_mode": "str"
         }
     ] 
@@ -65,6 +66,9 @@ math_graph_data = {
 
 workflow_graph = SequentialWorkFlowGraph.from_dict(math_graph_data)
 ```
+
+`TextGradOptimizer` requires each agent be configured with a prompt template, rather than specifying the prompt using a string. This allows for a clear separation between the part of the prompt intended for optimization (i.e. instruction) and those that should remain unchanged (e.g. context, demonstrations). For more information on prompt templates, see [Prompt Template](../modules/prompt_template.md).
+
 
 ### Step 2: Prepare the dataset
 
@@ -117,8 +121,8 @@ The TextGradOptimizer can be configured with various parameters to control the o
 
 - `graph`: The workflow graph to optimize
 - `optimize_mode`: The mode of optimization:
-    * "all": optimize prompts and system prompts
-    * "prompt": optimize only the prompts
+    * "all": optimize both instruction prompts and system prompts
+    * "instruction": optimize only the instruction prompts
     * "system_prompt": optimize only the system prompts
 - `executor_llm`: The LLM used to execute the workflow
 - `optimizer_llm`: The LLM used to optimize the workflow
@@ -131,6 +135,7 @@ The TextGradOptimizer can be configured with various parameters to control the o
 - `save_interval`: The number of steps between saving the workflow graph
 - `save_path`: The path to save the workflow graph
 - `rollback`: Whether to rollback to the best workflow graph during optimization
+- `constraints`: An optional list of constraints for optimization. For example, "The system prompt must not exceed 100 words".
 
 
 ```python
@@ -142,11 +147,12 @@ textgrad_optimizer = TextGradOptimizer(
     batch_size=3,
     max_steps=20,
     evaluator=evaluator,
-    eval_interval=1,
+    eval_every_n_steps=1,
     eval_rounds=1,
     save_interval=None,
     save_path="./",
-    rollback=True
+    rollback=True,
+    constraints=[]
 )
 ```
 
@@ -202,7 +208,11 @@ Below is an example of a saved workflow graph after optimization using `TextGrad
                     "required": true
                 }
             ],
-            "prompt": "To solve the math problem, follow these steps:\n\n1. **Contextual Overview**: Begin with a brief overview of the problem-solving strategy, using logical reasoning and mathematical principles to derive the solution. Include any relevant geometric or algebraic insights.\n\n2. **Key Steps Identification**: Break down the problem-solving process into distinct parts:\n   - Identify the relevant mathematical operations and properties, such as symmetry, roots of unity, or trigonometric identities.\n   - Perform the necessary calculations, ensuring each step logically follows from the previous one.\n   - Present the final answer.\n\n3. **Conciseness and Clarity**: Provide a clear and concise explanation of your solution, avoiding unnecessary repetition. Use consistent formatting and notation throughout.\n\n4. **Mathematical Justification**: Explain the reasoning behind each step to ensure the solution is well-justified. Include explanations of reference angles, geometric interpretations, and any special conditions or edge cases.\n\n5. **Verification Step**: Include a quick verification step to confirm the accuracy of your calculations. Consider recalculating key values if initial assumptions were incorrect.\n\n6. **Visual Aids**: Where applicable, include diagrams or sketches to visually represent the problem and solution, enhancing understanding.\n\n7. **Final Answer Presentation**: Present the final answer clearly and ensure it is boxed, reflecting the correct solution. Verify that it aligns with the problem's requirements and any known correct solutions.\n\nProblem: <input>{problem}</input>",
+            "prompt": null,
+            "prompt_template": {
+                "class_name": "StringTemplate",
+                "instruction": "To solve the math problem, follow these steps:\n\n1. **Contextual Overview**: Begin with a brief overview of the problem-solving strategy, using logical reasoning and mathematical principles to derive the solution. Include any relevant geometric or algebraic insights.\n\n2. **Key Steps Identification**: Break down the problem-solving process into distinct parts:\n   - Identify the relevant mathematical operations and properties, such as symmetry, roots of unity, or trigonometric identities.\n   - Perform the necessary calculations, ensuring each step logically follows from the previous one.\n   - Present the final answer.\n\n3. **Conciseness and Clarity**: Provide a clear and concise explanation of your solution, avoiding unnecessary repetition. Use consistent formatting and notation throughout.\n\n4. **Mathematical Justification**: Explain the reasoning behind each step to ensure the solution is well-justified. Include explanations of reference angles, geometric interpretations, and any special conditions or edge cases.\n\n5. **Verification Step**: Include a quick verification step to confirm the accuracy of your calculations. Consider recalculating key values if initial assumptions were incorrect.\n\n6. **Visual Aids**: Where applicable, include diagrams or sketches to visually represent the problem and solution, enhancing understanding.\n\n7. **Final Answer Presentation**: Present the final answer clearly and ensure it is boxed, reflecting the correct solution. Verify that it aligns with the problem's requirements and any known correct solutions."
+            },
             "system_prompt": "You are a math-focused assistant dedicated to providing clear, concise, and educational solutions to mathematical problems. Your goal is to deliver structured and pedagogically sound explanations, ensuring mathematical accuracy and logical reasoning. Begin with a brief overview of the problem-solving approach, followed by detailed calculations, and conclude with a verification step. Use precise mathematical notation and consider potential edge cases. Present the final answer clearly, using the specified format, and incorporate visual aids or analogies where appropriate to enhance understanding and engagement. \n\nExplicitly include geometric explanations when applicable, describing the geometric context and relationships. Emphasize the importance of visual aids, such as diagrams or sketches, to enhance understanding. Ensure consistency in formatting and mathematical notation. Provide a brief explanation of the reference angle concept and its significance. Include contextual explanations of trigonometric identities and their applications. Critically evaluate initial assumptions and verify geometric properties before proceeding. Highlight the use of symmetry and conjugate pairs in complex numbers. Encourage re-evaluation and verification of steps, ensuring logical flow and clarity. Focus on deriving the correct answer and consider problem-specific strategies or known techniques.",
             "parse_mode": "str",
             "parse_func": null,

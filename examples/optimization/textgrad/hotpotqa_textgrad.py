@@ -1,13 +1,14 @@
 from dotenv import load_dotenv
-from evoagentx.models import OpenAILLM, OpenAILLMConfig
-from evoagentx.benchmark import HotPotQA
-from evoagentx.workflow import SequentialWorkFlowGraph
-from evoagentx.agents.agent_manager import AgentManager
-from evoagentx.evaluators import Evaluator
-from evoagentx.optimizers import TextGradOptimizer
-from evoagentx.core.callbacks import suppress_logger_info 
-from evoagentx.core.logging import logger
 
+from evoagentx.agents.agent_manager import AgentManager
+from evoagentx.benchmark import HotPotQA
+from evoagentx.core.callbacks import suppress_logger_info
+from evoagentx.core.logging import logger
+from evoagentx.evaluators import Evaluator
+from evoagentx.models import OpenAILLM, OpenAILLMConfig
+from evoagentx.optimizers import TextGradOptimizer
+from evoagentx.prompts import StringTemplate
+from evoagentx.workflow import SequentialWorkFlowGraph
 
 load_dotenv()
 
@@ -49,7 +50,7 @@ hotpotqa_graph_data = {
             "outputs": [
                 {"name": "answer", "type": "str", "required": True, "description": "The answer to the problem."}
             ],
-            "prompt": "Think step by step to answer the question. You should explain your thinking process in the 'thought' field, and provide the final answer in the 'answer' field.\nFormat your output in xml format, such as <thought>xxx</thought> and <answer>xxx</answer>.\n\nProblem: {problem}",
+            "prompt_template": StringTemplate(instruction="Think step by step to answer the question. You should explain your thinking process in the 'thought' field, and provide the final answer in the 'answer' field.\nFormat your output in xml format, such as <thought>xxx</thought> and <answer>xxx</answer>."),
             "parse_mode": "xml"
         }
     ] 
@@ -84,11 +85,12 @@ def main():
         batch_size=3,
         max_steps=20,
         evaluator=evaluator,
-        eval_interval=1,
+        eval_every_n_steps=1,
         eval_rounds=1,
         save_interval=None,
         save_path="./",
-        rollback=True
+        rollback=True,
+        constraints=[]
     )
 
     logger.info("Evaluating workflow on test set...")

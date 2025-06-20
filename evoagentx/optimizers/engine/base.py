@@ -63,7 +63,7 @@ class BaseOptimizer(abc.ABC):
         - (best_cfg, history): best config found and full search history
         """
         if self.program is None:
-            program = EntryPoint.get_entry()
+            self.program = EntryPoint.get_entry()
         if self.program is None:
             raise RuntimeError("No entry function provided or registered.")
         print(f"Starting optimization from entry: {self.program.__name__}")

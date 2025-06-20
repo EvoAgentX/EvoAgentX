@@ -145,7 +145,7 @@ class TestCodeReview(Action):
         self, 
         name: str="TestCodeReview", 
         description: str="Review the code based on requirements", 
-        prompt: str="Review the following code based on the requirements:\n\nRequirements: {requirements}\n\nCode:\n{code}. You should output a JSON object with the following fields: 'review'.", 
+        prompt: str="Review the following code based on the requirements:\n\nRequirements: {requirements}\n\nCode:\n{code}.\n\nYou should output a JSON object with the following format:\n```json\n{{\n'review': '...'\n}}\n```", 
         inputs_format: ActionInput=None, 
         outputs_format: ActionOutput=None, 
         **kwargs

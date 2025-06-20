@@ -13,7 +13,7 @@
 
 [![EvoAgentX Homepage](https://img.shields.io/badge/EvoAgentX-Homepage-blue?logo=homebridge)](https://evoagentx.org/)
 [![Docs](https://img.shields.io/badge/-Documentation-0A66C2?logo=readthedocs&logoColor=white&color=7289DA&labelColor=grey)](https://EvoAgentX.github.io/EvoAgentX/)
-[![Discord](https://img.shields.io/badge/Chat-Discord-5865F2?&logo=discord&logoColor=white)](https://discord.gg/w3x2YrCa)
+[![Discord](https://img.shields.io/badge/Chat-Discord-5865F2?&logo=discord&logoColor=white)](https://discord.gg/8hdQyKCY)
 [![Twitter](https://img.shields.io/badge/Follow-@EvoAgentX-e3dee5?&logo=x&logoColor=white)](https://x.com/EvoAgentX)
 [![Wechat](https://img.shields.io/badge/WeChat-EvoAgentX-brightgreen?logo=wechat&logoColor=white)](./assets/wechat_info.md)
 [![GitHub star chart](https://img.shields.io/github/stars/EvoAgentX/EvoAgentX?style=social)](https://star-history.com/#EvoAgentX/EvoAgentX)
@@ -314,7 +314,7 @@ Explore how to effectively use EvoAgentX with the following resources:
 📢 Stay connected and be part of the **EvoAgentX** journey!  
 🚩 Join our community to get the latest updates, share your ideas, and collaborate with AI enthusiasts worldwide.
 
-- [Discord](https://discord.gg/w3x2YrCa) — Chat, discuss, and collaborate in real-time.
+- [Discord](https://discord.gg/8hdQyKCY) — Chat, discuss, and collaborate in real-time.
 - [X (formerly Twitter)](https://x.com/EvoAgentX) — Follow us for news, updates, and insights.
 - [WeChat](https://github.com/EvoAgentX/EvoAgentX/blob/main/assets/wechat_info.md) — Connect with our Chinese community.
 

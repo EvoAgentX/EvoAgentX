@@ -1,7 +1,10 @@
 from __future__ import annotations
-import abc, asyncio, inspect, random, re
+import abc
+import inspect
+import random
+import re
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Tuple, Sequence, Union
+from typing import Any, Callable, Dict, List, Tuple
 
 
 # Regular expression to match indexing expressions like foo[0] or bar["key"]
@@ -228,9 +231,9 @@ class Workflow:
         self.few_shot = "Q: 1+1=?\nA: 2"
         self.sampler = Sampler()
 
-    @parameter_registry("name", ["a", "self.system_prompt"])
+    # @parameter_registry("name", ["a", "self.system_prompt"])
     def execute(self):
-        a = 000 
+        # a = 000 
         pass 
 
     def run(self):

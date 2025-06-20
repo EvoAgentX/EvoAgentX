@@ -4,7 +4,7 @@ import os
 import shutil
 import tempfile
 from evoagentx.core.module_utils import save_json
-from evoagentx.benchmark.math import MATH
+from evoagentx.benchmark.math_benchmark import MATH
 
 class TestMath(unittest.TestCase):
 
@@ -37,7 +37,7 @@ class TestMath(unittest.TestCase):
         os.makedirs(os.path.dirname(test_file), exist_ok=True)
         save_json(self.sample_data2, test_file, type="json")
     
-    @patch("evoagentx.benchmark.math.download_raw_math_data")
+    @patch("evoagentx.benchmark.math_benchmark.download_raw_math_data")
     def test_load_data(self, mock_download): 
         # create test files 
         self.create_test_files()

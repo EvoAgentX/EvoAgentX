@@ -61,8 +61,6 @@ class ExampleOptimizer(BaseOptimizer):
 
 # optimizers/evaluators.py (可选文件)
 
-from typing import Dict, Any
-
 def simple_accuracy_evaluator(output: Dict[str, Any]) -> float:
     """
     Example evaluator function that expects the output dict to contain:

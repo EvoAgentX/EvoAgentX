@@ -1,13 +1,14 @@
 from dotenv import load_dotenv
-from evoagentx.models import OpenAILLM, OpenAILLMConfig
-from evoagentx.benchmark import MBPP  
-from evoagentx.workflow import SequentialWorkFlowGraph
-from evoagentx.agents.agent_manager import AgentManager
-from evoagentx.evaluators import Evaluator
-from evoagentx.optimizers import TextGradOptimizer
-from evoagentx.core.callbacks import suppress_logger_info 
-from evoagentx.core.logging import logger
 
+from evoagentx.agents.agent_manager import AgentManager
+from evoagentx.benchmark import MBPP
+from evoagentx.core.callbacks import suppress_logger_info
+from evoagentx.core.logging import logger
+from evoagentx.evaluators import Evaluator
+from evoagentx.models import OpenAILLM, OpenAILLMConfig
+from evoagentx.optimizers import TextGradOptimizer
+from evoagentx.prompts import StringTemplate
+from evoagentx.workflow import SequentialWorkFlowGraph
 
 load_dotenv()
 
@@ -43,7 +44,7 @@ mbpp_graph_data = {
             "outputs": [
                 {"name": "code", "type": "str", "required": True, "description": "The generated code."}
             ],
-            "prompt": "Generate a functional and correct Python code for the given problem.\n\nProblem: {problem}",
+            "prompt_template": StringTemplate(instruction="Generate a functional and correct Python code for the given problem."),
             "parse_mode": "str"
         }
     ] 
@@ -79,11 +80,12 @@ def main():
         batch_size=3,
         max_steps=20,
         evaluator=evaluator,
-        eval_interval=1,
+        eval_every_n_steps=1,
         eval_rounds=1,
         save_interval=None,
         save_path="./",
-        rollback=True
+        rollback=True,
+        constraints=[]
     )
 
     logger.info("Evaluating workflow on test set...")

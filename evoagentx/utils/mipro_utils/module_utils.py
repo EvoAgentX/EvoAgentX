@@ -5,7 +5,8 @@ from pydantic import Field
 import dspy
 from ...optimizers.engine.registry import ParamRegistry  # Replace with your own path
 from typing import List
-import warnings
+# import warnings
+from ...core.logging import logger
 from ...prompts.template import PromptTemplate
 from dspy.utils.saving import get_dependency_versions
 from pathlib import Path
@@ -130,18 +131,16 @@ class PromptTuningModule(dspy.Module):
             register_element = self.registry.get(register_name)
 
             if isinstance(register_element, PromptTemplate):
-                predict.instructions = register_element.instruction
+                predict.signature.instructions = register_element.instruction
                 predict.demos = register_element.demonstrations
             elif isinstance(register_element, str):
-                predict.instructions = register_element
+                predict.signature.instructions = register_element
                 predict.demos = []
             else:
-                warnings.warn(f"Unsupported register element type: {type(register_element)}")
+                logger.warning(f"Unsupported register element type: {type(register_element)}")
                 # raise ValueError(f"Unsupported register element type: {type(register_element)}")
         
         return self
-
-
 
     def escape_braces(self, text):
         """
@@ -206,8 +205,9 @@ class PromptTuningModule(dspy.Module):
             prompt = prompt.replace(f"{{{{{name}}}}}", f"{{{name}}}")
         prompt = prompt.replace(r"{{{{", r"{{").replace(r"}}}}", r"}}")
 
-        if verbose and modified_messages:
-            warnings.warn("Prompt modified: " + " | ".join(modified_messages))
+        # if verbose and modified_messages:
+            # logger.warning("Prompt modified: " + " | ".join(modified_messages))
+        
         return prompt
     
     def get_field_type(self, field: Field) -> str:
@@ -242,6 +242,37 @@ class PromptTuningModule(dspy.Module):
         """
         return self.registry.get(register_name) is not None and isinstance(self.registry.get(register_name), PromptTemplate)
 
+    def get_demos(self, demos: list) -> List[dict]:
+        result = [] 
+        for demo in demos:
+            if isinstance(demo, dspy.Example):
+                demo = demo.toDict()
+            result.append(demo)
+        return result
+    
+    def _inject_demos_to_string(self, instruction: str, demos: List[dict], input_names: List[str], output_names: List[str]) -> str:
+        """
+        Inject demos to the instruction.
+        """
+        if not demos:
+            return instruction
+        
+        def _escape_braces(text: str) -> str:
+            return text.replace("{", "{{").replace("}", "}}")
+        
+        def format_demo(demo: dict) -> str:
+            demo_str = "Inputs:\n"
+            inputs = {name: demo.get(name, "Not provided") for name in input_names}
+            demo_str += "\n".join([f"{name}:\n{_escape_braces(str(value))}" for name, value in inputs.items()])
+            demo_str += "\n\nOutputs:\n"
+            outputs = {name: demo.get(name, "Not provided") for name in output_names}
+            demo_str += "\n".join([f"{name}:\n{_escape_braces(str(value))}" for name, value in outputs.items()])
+            return demo_str
+        
+        demos_string = "\n\n".join([f"Example {i+1}:\n{format_demo(demo)}" for i, demo in enumerate(demos)])
+        prompt = f"{instruction}\n\nThe following are some examples:\n{demos_string}"
+        return prompt
+    
     def sync_predict_inputs_to_program(self):
         """
         Synchronize current input values from all predictors back to the registry.
@@ -263,6 +294,7 @@ class PromptTuningModule(dspy.Module):
             demos = predict.demos
 
             input_names = [name for name, field in predict.signature.fields.items() if self.get_field_type(field) == 'input']
+            output_names = [name for name, field in predict.signature.fields.items() if self.get_field_type(field) == 'output'] 
 
             signature_name = signature.__name__
             register_name = self.signature_name2register_name[signature_name]
@@ -270,11 +302,13 @@ class PromptTuningModule(dspy.Module):
             if self.is_prompt_template(register_name):
                 prompt_template: PromptTemplate = self.registry.get(register_name)
                 prompt_template.instruction = instruction
-                prompt_template.demonstrations = demos
+                prompt_template.demonstrations = self.get_demos(demos)
                 self.registry.set(register_name, prompt_template)
             else:
                 instruction = self._validate_prompt(instruction, input_names)
-                self.registry.set(register_name, instruction)
+                # self.registry.set(register_name, instruction)
+                prompt = self._inject_demos_to_string(instruction, self.get_demos(demos), input_names, output_names)
+                self.registry.set(register_name, prompt)
     
     def constrcut_trace(self, execution_data: dict) -> dict:
         """
@@ -301,10 +335,10 @@ class PromptTuningModule(dspy.Module):
             # Check if input_names and output_names exist in execution data
             for name in input_names:
                 if name not in execution_data:
-                    warnings.warn(f"Input {name} not found in execution data")
+                    logger.warning(f"Input {name} not found in execution data")
             for name in output_names:
                 if name not in execution_data:
-                    warnings.warn(f"Output {name} not found in execution data")
+                    logger.warning(f"Output {name} not found in execution data")
 
             # Add input_names and output_names from execution data to trace
             for name in input_names:
@@ -359,12 +393,6 @@ class PromptTuningModule(dspy.Module):
             dspy_trace.extend(trace)
 
         return output
-    
-    def save(self, path, save_program=False):
-        return super().save(path, save_program)
-    
-    def load(self, path):
-        return super().load(path)
 
     def deepcopy(self):
         """
@@ -380,7 +408,9 @@ class PromptTuningModule(dspy.Module):
         """
         try:
             # If the instance itself is copyable, we can just deep copy it
-            return copy.deepcopy(self)
+            new_instance = copy.deepcopy(self)
+            setattr(new_instance, "program", self.program)
+            return new_instance
         except Exception:
             pass
 
@@ -402,6 +432,8 @@ class PromptTuningModule(dspy.Module):
                         # If even shallow copy fails, just copy the reference
                         setattr(new_instance, attr, value)
         
+        # set the new instance's program to the original program
+        setattr(new_instance, "program", self.program)
         return new_instance
     
     def save(self, path, save_program=False):
@@ -422,13 +454,26 @@ class PromptTuningModule(dspy.Module):
             save_program (bool): If True, save the whole module to a directory via cloudpickle, otherwise only save
                 the state.
         """
+        
         metadata = {}
         metadata["dependency_versions"] = get_dependency_versions()
         path = Path(path)
 
-        if not path.exists():
-            # Create the directory (and any parent directories)
-            path.mkdir(parents=True)
+        if not path.is_dir():
+            # file
+            if not path.parent.exists():
+                path.parent.mkdir(parents=True)
+        else:
+            # directory
+            if not path.exists():
+                # Create the directory (and any parent directories)
+                if not path.exists():
+                # Create the directory (and any parent directories)
+                    path.mkdir(parents=True)
+
+        if hasattr(self.program, "save"):
+            self.program.save(str(path))
+            return 
 
         if save_program:
             if path.suffix:
@@ -447,7 +492,7 @@ class PromptTuningModule(dspy.Module):
                     "or consider using state-only saving by setting `save_program=False`."
                 )
             with open(path / "metadata.json", "w") as f:
-                ujson.dump(metadata, f, indent=2)
+                ujson.dump(metadata, f, indent=4)
 
             return
 
@@ -456,7 +501,7 @@ class PromptTuningModule(dspy.Module):
         if path.suffix == ".json":
             try:
                 with open(path, "w") as f:
-                    f.write(ujson.dumps(state, indent=2))
+                    f.write(ujson.dumps(state, indent=4))
             except Exception as e:
                 raise RuntimeError(
                     f"Failed to save state to {path} with error: {e}. Your DSPy program may contain non "
@@ -478,6 +523,11 @@ class PromptTuningModule(dspy.Module):
         """
         path = Path(path)
 
+        if hasattr(self.program, "load"):
+            self.program.load(str(path))
+            # todo: sync the program's parameters to the signature
+            return 
+
         if path.suffix == ".json":
             with open(path) as f:
                 state = ujson.loads(f.read())
@@ -491,7 +541,7 @@ class PromptTuningModule(dspy.Module):
         saved_dependency_versions = state["metadata"]["dependency_versions"]
         for key, saved_version in saved_dependency_versions.items():
             if dependency_versions[key] != saved_version:
-                warnings.warning(
+                logger.warning(
                     f"There is a mismatch of {key} version between saved model and current environment. "
                     f"You saved with `{key}=={saved_version}`, but now you have "
                     f"`{key}=={dependency_versions[key]}`. This might cause errors or performance downgrade "
@@ -499,4 +549,6 @@ class PromptTuningModule(dspy.Module):
                     "saving environment."
                 )
         self.load_state(state)
+        self.sync_predict_inputs_to_program() # sync the signature values to the program parameters 
+
         

@@ -52,6 +52,8 @@ class OpenAILLMConfig(LLMConfig):
 class LiteLLMConfig(LLMConfig):
 
     llm_type: str = "LiteLLM"
+    api_base: Optional[str] = Field(default=None, description="Base URL for the LLM API (e.g., http://localhost:11434/v1 for Ollama)") 
+    is_local: Optional[bool] = Field(default=False, description="Whether the model is running locally (e.g., Ollama)")
 
     # LLM keys
     openai_key: Optional[str] = Field(default=None, description="the API key used to authenticate OpenAI requests")
@@ -153,5 +155,40 @@ class OpenRouterConfig(LLMConfig):
     tool_choice: Optional[Union[str, dict]] = Field(default=None, description="Controls which tool is called by model. Can be 'none', 'auto', 'required', or specific tool configuration.")
 
     stream: Optional[bool] = Field(default=None, description="If set to true, it sends partial message deltas. Tokens will be sent as they become available, with the stream terminated by a [DONE] message.")
+    def __str__(self):
+        return self.model
+
+
+class AliyunLLMConfig(LLMConfig):
+    llm_type: str = "AliyunLLM"
+    aliyun_api_key: Optional[str] = Field(default=None, description="The API key used to authenticate Aliyun requests")
+    aliyun_access_key_id: Optional[str] = Field(default=None, description="The Access Key ID for Aliyun authentication")
+    aliyun_access_key_secret: Optional[str] = Field(default=None, description="The Access Key Secret for Aliyun authentication")
+    
+    # generation parameters
+    temperature: Optional[float] = Field(default=None, description="The temperature used to control randomness in generation. Higher values increase diversity.")
+    top_p: Optional[float] = Field(default=None, description="Nucleus sampling parameter. Only sample from tokens with cumulative probability greater than top_p.")
+    max_tokens: Optional[int] = Field(default=None, description="Maximum number of tokens to generate in the response.")
+    top_k: Optional[int] = Field(default=None, description="Top-k sampling parameter. Only sample from the top k tokens at each step.")
+    repetition_penalty: Optional[float] = Field(default=None, description="Penalty for repeated tokens. Higher values discourage repetition.")
+    stream: Optional[bool] = Field(default=None, description="If set to true, enables streaming response where partial results are sent as they become available.")
+    timeout: Optional[Union[float, int]] = Field(default=None, description="Timeout in seconds for completion requests (defaults to 600 seconds).")
+
+    # tools
+    tools: Optional[List] = Field(default=None, description="A list of tools or functions the model may call. Aliyun supports function calling for specific models.")
+    tool_choice: Optional[str] = Field(default=None, description="Controls whether the model should call a tool. Options include 'none' (no tool call), 'auto' (model decides), or a specific tool name.")
+    
+    # model-specific parameters
+    model_name: Optional[str] = Field(default=None, description="The name of the Aliyun model to use, e.g., 'qwen-max', 'qwen-turbo'.")
+    enable_search: Optional[bool] = Field(default=None, description="Whether to enable web search augmentation for the model, if supported.")
+    
+    # output format
+    response_format: Optional[Union[BaseModel, dict]] = Field(default=None, description="Specifies the format of the model output, e.g., JSON schema for structured responses.")
+    output_modalities: Optional[List] = Field(default=None, description="Output types the model should generate, e.g., ['text', 'image'] for multimodal models.")
+
+    # token probabilities
+    logprobs: Optional[bool] = Field(default=None, description="Whether to return log probabilities of output tokens. Supported by some Aliyun models.")
+    top_logprobs: Optional[int] = Field(default=None, description="Number of most likely tokens to return with log probabilities at each position. Requires logprobs to be true.")
+    
     def __str__(self):
         return self.model

@@ -19,6 +19,7 @@ nltk>=3.9.1
 numpy>=1.26.4
 openai>=1.55.3
 litellm>=1.55.6
+dashscope>=1.23.4
 # pydantic>=2.9.0
 pydantic>=2.9.0,<=2.10.6
 pydantic-settings==2.8.1
