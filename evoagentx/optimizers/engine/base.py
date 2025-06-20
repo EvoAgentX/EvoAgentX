@@ -1,4 +1,4 @@
-from typing import Any, Callable, Dict, List, Tuple, Optional
+from typing import Any, Callable, Dict, List, Optional
 import abc
 from .decorators import EntryPoint
 from .registry import ParamRegistry
