@@ -34,6 +34,7 @@ matplotlib>=3.10.0
 transformers>=4.47.1
 datasets>=3.4.0
 faiss-cpu==1.8.0.post1
+# faiss-gpu
 textgrad>=0.1.8
 dspy
 
@@ -59,3 +60,15 @@ docker
 googlesearch-python
 wikipedia
 mcp
+
+# rag
+# Should install torch
+neo4j
+llama-index
+llama-index-vector-stores-faiss
+llama-index-graph-stores-neo4j
+llama-index-embeddings-huggingface
+sentence-transformers
+docx2txt
+python-pptx 
+Pillow
