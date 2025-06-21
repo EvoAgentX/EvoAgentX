@@ -7,6 +7,7 @@ from tenacity import (
 )
 from dashscope import Generation  # aliyun DashScope SDK
 import dashscope
+
 from ..core.registry import register_model
 from .model_configs import AliyunLLMConfig
 from .base_model import BaseLLM
@@ -106,18 +107,19 @@ class AliyunLLM(BaseLLM):
         output = ""
         try:
             for chunk in response:
-                if hasattr(chunk, 'output'):
-                    if hasattr(chunk.output, 'text'):
-                        content = chunk.output.text
-                    elif hasattr(chunk.output, 'choices') and chunk.output.choices:
-                        content = chunk.output.choices[0].message.content
-                    else:
-                        continue
-                        
-                    if content:
-                        if output_response:
-                            print(content, end="", flush=True)
-                        output += content
+                if not hasattr(chunk, 'output') or chunk.output is None:
+                    error_msg = getattr(chunk, 'message', 'Invalid chunk format from model')
+                    raise ValueError(f"Model stream chunk error: {error_msg}")
+                if hasattr(chunk.output, 'text'):
+                    content = chunk.output.text
+                elif hasattr(chunk.output, 'choices') and chunk.output.choices:
+                    content = chunk.output.choices[0].message.content
+                else:
+                    continue
+                if content:
+                    if output_response:
+                        print(content, end="", flush=True)
+                    output += content
         except Exception as e:
             print(f"Error processing stream: {str(e)}")
             if not output:
@@ -140,18 +142,19 @@ class AliyunLLM(BaseLLM):
         output = ""
         try:
             async for chunk in response:
-                if hasattr(chunk, 'output'):
-                    if hasattr(chunk.output, 'text'):
-                        content = chunk.output.text
-                    elif hasattr(chunk.output, 'choices') and chunk.output.choices:
-                        content = chunk.output.choices[0].message.content
-                    else:
-                        continue
-                        
-                    if content:
-                        if output_response:
-                            print(content, end="", flush=True)
-                        output += content
+                if not hasattr(chunk, 'output') or chunk.output is None:
+                    error_msg = getattr(chunk, 'message', 'Invalid chunk format from model')
+                    raise ValueError(f"Model stream chunk error: {error_msg}")
+                if hasattr(chunk.output, 'text'):
+                    content = chunk.output.text
+                elif hasattr(chunk.output, 'choices') and chunk.output.choices:
+                    content = chunk.output.choices[0].message.content
+                else:
+                    continue
+                if content:
+                    if output_response:
+                        print(content, end="", flush=True)
+                    output += content
         except Exception as e:
             print(f"Error processing async stream: {str(e)}")
             if not output:
@@ -172,10 +175,10 @@ class AliyunLLM(BaseLLM):
             str: The complete response text.
         """
         try:
-            if not hasattr(response, 'output'):
-                raise ValueError("Invalid response format from model")
+            if not hasattr(response, 'output') or response.output is None:
+                error_msg = getattr(response, 'message', 'Invalid response format from model')
+                raise ValueError(f"Model response error: {error_msg}")
             
-            # Handle the actual response format
             if hasattr(response.output, 'text'):
                 output = response.output.text
             elif hasattr(response.output, 'choices') and response.output.choices:
@@ -233,6 +236,8 @@ class AliyunLLM(BaseLLM):
         Returns:
             List[str]: List of generated responses.
         """
+        if not isinstance(batch_messages, list) or not batch_messages:
+            raise ValueError("batch_messages must be a non-empty list of message lists")
         return [self.single_generate(messages=one_messages, **kwargs) for one_messages in batch_messages]
 
     async def single_generate_async(self, messages: List[dict], **kwargs) -> str:
@@ -251,7 +256,6 @@ class AliyunLLM(BaseLLM):
         
         try:
             completion_params = self.get_completion_params(**kwargs)
-            # 
             loop = asyncio.get_event_loop()
             response = await loop.run_in_executor(
                 None,
@@ -379,3 +383,4 @@ class AliyunLLM(BaseLLM):
             cost_manager.update_cost(cost=cost, model=self.config.model)
         except Exception as e:
             logger.warning(f"Error updating cost: {str(e)}")
+
