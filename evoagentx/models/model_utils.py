@@ -29,6 +29,8 @@ def infer_litellm_company_from_model(model: str) -> str:
             company = "deepseek"
         elif "openrouter" in model:
             company = "openrouter"
+        elif "azure" in model.lower():
+            company = "azure"
         else:
             company = "openai"
     return company

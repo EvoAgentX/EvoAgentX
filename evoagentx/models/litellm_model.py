@@ -41,6 +41,13 @@ class LiteLLM(OpenAILLM):
                 if not self.config.openai_key:
                     raise ValueError("OpenAI API key is required for OpenAI models. You should set `openai_key` in LiteLLMConfig")
                 os.environ["OPENAI_API_KEY"] = self.config.openai_key
+            elif company == "azure":
+                if not self.config.azure_key or not self.config.azure_endpoint:
+                    raise ValueError("Azure OpenAI key and endpoint are required for Azure models. You should set `azure_key` and `azure_endpoint` in LiteLLMConfig")
+                os.environ["AZURE_API_KEY"] = self.config.azure_key
+                os.environ["AZURE_API_BASE"] = self.config.azure_endpoint
+                if self.config.api_version:
+                    os.environ["AZURE_API_VERSION"] = self.config.api_version
             elif company == "deepseek":
                 if not self.config.deepseek_key:
                     raise ValueError("DeepSeek API key is required for DeepSeek models. You should set `deepseek_key` in LiteLLMConfig")
@@ -76,8 +83,8 @@ class LiteLLM(OpenAILLM):
         self._default_ignore_fields = [
             "llm_type", "output_response", "openai_key", "deepseek_key", "anthropic_key", 
             "gemini_key", "meta_llama_key", "openrouter_key", "openrouter_base", "perplexity_key", 
-            "groq_key", "api_base", "is_local"
-        ] # parameters in OpenAILLMConfig that are not OpenAI models' input parameters 
+            "groq_key", "api_base", "is_local", "azure_endpoint", "azure_key", "api_version"
+        ] # parameters in LiteLLMConfig that are not LiteLLM models' input parameters 
     
     @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(5))
     def single_generate(self, messages: List[dict], **kwargs) -> str:
@@ -97,8 +104,13 @@ class LiteLLM(OpenAILLM):
 
         try:
             completion_params = self.get_completion_params(**kwargs)
-            if self.config.is_local or infer_litellm_company_from_model(self.model) == "local":  # update save api_base fro local model
+            company = infer_litellm_company_from_model(self.model)
+            if self.config.is_local or company == "local":  # update save api_base for local model
                 completion_params["api_base"] = self.api_base
+            elif company == "azure":  # Add Azure OpenAI specific parameters
+                completion_params["api_base"] = self.config.azure_endpoint
+                completion_params["api_version"] = self.config.api_version
+                completion_params["api_key"] = self.config.azure_key
             response = completion(messages=messages, **completion_params)
             if stream:
                 output = self.get_stream_output(response, output_response=output_response)
@@ -146,8 +158,13 @@ class LiteLLM(OpenAILLM):
 
         try:
             completion_params = self.get_completion_params(**kwargs)
-            if self.config.is_local or infer_litellm_company_from_model(self.model) == "local":  # add api base for local model
+            company = infer_litellm_company_from_model(self.model)
+            if self.config.is_local or company == "local":  # add api base for local model
                 completion_params["api_base"] = self.api_base
+            elif company == "azure":  # Add Azure OpenAI specific parameters
+                completion_params["api_base"] = self.config.azure_endpoint
+                completion_params["api_version"] = self.config.api_version
+                completion_params["api_key"] = self.config.azure_key
             response = await acompletion(messages=messages, **completion_params)
             if stream:
                 if hasattr(response, "__aiter__"):
