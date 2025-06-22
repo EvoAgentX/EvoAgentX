@@ -1,13 +1,13 @@
 import requests
 from bs4 import BeautifulSoup
 from typing import Tuple, Optional
-from .tool import Tool
+from ..core.module import BaseModule
 from pydantic import Field
 
-class SearchBase(Tool):
+class SearchBase(BaseModule):
     """
     Base class for search tools that retrieve information from various sources.
-    Implements the standard tool interface with get_tool_schemas and execute methods.
+    Provides common functionality for search operations.
     """
     
     num_search_pages: Optional[int] = Field(default=5, description="Number of search results to retrieve")

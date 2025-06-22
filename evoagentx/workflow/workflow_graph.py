@@ -18,6 +18,7 @@ from ..agents.agent import Agent
 from ..utils.utils import generate_dynamic_class_name, make_parent_folder
 from ..prompts.workflow.sew_workflow import SEW_WORKFLOW
 from ..prompts.utils import DEFAULT_SYSTEM_PROMPT
+from ..tools.tool import Tool
 
 
 class WorkFlowNodeState(str, Enum):
@@ -1092,9 +1093,11 @@ class SequentialWorkFlowGraph(WorkFlowGraph):
                 "output_parser" (optional): Type[ActionOutput],
                 "parse_mode" (optional): str, default is "str" 
                 "parse_func" (optional): Callable,
-                "parse_title" (optional): str 
+                "parse_title" (optional): str ,
+                "tools" (optional): List[Tool]
             }
     """
+    tools: Optional[List[Tool]] = []
 
     def __init__(self, goal: str, tasks: List[dict], **kwargs):
         nodes = self._infer_nodes_from_tasks(tasks=tasks)
@@ -1127,6 +1130,7 @@ class SequentialWorkFlowGraph(WorkFlowGraph):
         agent_parse_mode = task.get("parse_mode", "str")
         agent_parse_func = task.get("parse_func", None)
         agent_parse_title = task.get("parse_title", None)
+        tools = task.get("tools", [])
 
         node = WorkFlowNode.from_dict(
             {
@@ -1146,7 +1150,8 @@ class SequentialWorkFlowGraph(WorkFlowGraph):
                         "output_parser": agent_output_parser,
                         "parse_mode": agent_parse_mode,
                         "parse_func": agent_parse_func,
-                        "parse_title": agent_parse_title
+                        "parse_title": agent_parse_title,
+                        "tools": tools
                     }
                 ],
             }
@@ -1171,7 +1176,8 @@ class SequentialWorkFlowGraph(WorkFlowGraph):
                     "system_prompt": node.agents[0].get("system_prompt", None),
                     "parse_mode": node.agents[0].get("parse_mode", "str"), 
                     "parse_func": node.agents[0].get("parse_func", None).__name__ if node.agents[0].get("parse_func", None) else None,
-                    "parse_title": node.agents[0].get("parse_title", None)
+                    "parse_title": node.agents[0].get("parse_title", None),
+                    "tools": node.agents[0].get("tools", [])
                 }
                 for node in self.nodes
             ]
