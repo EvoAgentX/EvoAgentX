@@ -1,6 +1,6 @@
 import os
 import random  
-from typing import Any, Dict
+from typing import Any
 
 from .benchmark import Benchmark
 from .measures import exact_match_score
