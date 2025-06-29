@@ -14,8 +14,10 @@ from .approval_manager import (
 from .interceptor_agent import (
     HITLBaseAgent,
     HITLInterceptorAgent,
+    HITLUserInputCollectorAgent,
     HITLConversationAgent,
     HITLInterceptorAction,
+    HITLUserInputCollectorAction,
     HITLPostExecutionAction,
     HITLConversationAction
 )
@@ -34,8 +36,10 @@ __all__ = [
     # HITL Agent and Action
     'HITLBaseAgent',
     'HITLInterceptorAgent',
+    'HITLUserInputCollectorAgent',
     'HITLConversationAgent',
     'HITLInterceptorAction',
+    'HITLUserInputCollectorAction',
     'HITLPostExecutionAction',
     'HITLConversationAction'
 ] 

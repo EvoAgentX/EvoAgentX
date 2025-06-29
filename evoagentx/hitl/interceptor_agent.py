@@ -94,7 +94,18 @@ class HITLBaseAgent(Agent):
     """
     Include all Agent classes for hitl use case
     """
-    pass
+    def _get_unique_class_name(self, candidate_name: str) -> str:
+        
+        if not MODULE_REGISTRY.has_module(candidate_name):
+            return candidate_name 
+        
+        i = 1 
+        while True:
+            unique_name = f"{candidate_name}V{i}"
+            if not MODULE_REGISTRY.has_module(unique_name):
+                break
+            i += 1 
+        return unique_name
 
 class HITLInterceptorAgent(HITLBaseAgent):
     """HITL Interceptor Agent - Intercept the execution of other agents"""
@@ -150,20 +161,136 @@ class HITLInterceptorAgent(HITLBaseAgent):
         Get the name of the HITL agent. Useful when the name of HITL agent is generated dynamically.
         """
         return self.name
+    
 
-    def _get_unique_class_name(self, candidate_name: str) -> str:
+class HITLUserInputCollectorAction(Action):
+    """HITL User Input Collector Action - Collect user input for the HITL Interceptor"""
+    
+    def __init__(
+        self,
+        name: str = None,
+        agent_name: str = None,
+        description: str = "A pre-defined action to collect user input for the HITL Interceptor",
+        interaction_type: HITLInteractionType = HITLInteractionType.COLLECT_USER_INPUT,
+        input_fields: dict = None,
+        **kwargs
+        ):
+        if not name:
+            pass # TODO: generate name
         
-        if not MODULE_REGISTRY.has_module(candidate_name):
-            return candidate_name 
+        super().__init__(name=name, description=description, **kwargs)
         
-        i = 1 
-        while True:
-            unique_name = f"{candidate_name}V{i}"
-            if not MODULE_REGISTRY.has_module(unique_name):
-                break
-            i += 1 
-        return unique_name
+        self.interaction_type = interaction_type
+        self.input_fields = input_fields or {}
+        self.agent_name = agent_name
 
+    def execute(self, llm, inputs: dict, hitl_manager: HITLManager, sys_msg: str = None, **kwargs) -> Tuple[dict, str]:
+        try:
+            # get current running loop
+            loop = asyncio.get_running_loop()
+            if loop:
+                pass
+            # if in async context, cannot use asyncio.run()
+            raise RuntimeError("Cannot use asyncio.run() in async context. Use async_execute directly.")
+        except RuntimeError:
+            # if not in async context, use asyncio.run()
+            return asyncio.run(self.async_execute(llm, inputs, hitl_manager, sys_msg=sys_msg, **kwargs))
+
+    async def async_execute(self, llm, inputs: dict, hitl_manager: HITLManager, sys_msg: str = None, **kwargs) -> Tuple[dict, str]:
+        """
+        Asynchronous execution of HITL User Input Collector
+        """
+    
+        task_name = kwargs.get('wf_task', 'Unknown Task')
+        workflow_goal = kwargs.get('wf_goal', None)
+
+        # request user input from HITL manager
+        response = await hitl_manager.request_user_input(
+            task_name=task_name,
+            agent_name=self.agent_name,
+            action_name=self.name,
+            input_fields=self.input_fields,
+            workflow_goal=workflow_goal
+        )
+        
+        result = {
+            "hitl_decision": response.decision,
+            "collected_user_input": response.modified_content or {},
+            "hitl_feedback": response.feedback
+        }
+        
+        # Map collected user input to outputs if output format is defined
+        if self.outputs_format:
+            for output_name in self.outputs_format.get_attrs():
+                if output_name in response.modified_content:
+                    result[output_name] = response.modified_content[output_name]
+        
+        prompt = f"HITL User Input Collector executed: {self.name}"
+        if result["hitl_decision"] == HITLDecision.CONTINUE:
+            prompt += f"\nUser input collection completed: {result['collected_user_input']}"
+            return result, prompt
+        elif result["hitl_decision"] == HITLDecision.REJECT:
+            prompt += "\nUser cancelled input or error occurred"
+            sys.exit()
+
+class HITLUserInputCollectorAgent(HITLBaseAgent):
+    """HITL User Input Collector Agent - Collect user input for the HITL Interceptor"""
+    
+    def __init__(self,
+                 name: str = None,
+                 input_fields: dict = None,
+                 interaction_type: HITLInteractionType = HITLInteractionType.COLLECT_USER_INPUT,
+                 **kwargs):
+
+        # generate agent name
+        if name:
+            agent_name = f"HITL_User_Input_Collector_{name}"
+        else:
+            pass # TODO: generate name
+
+        super().__init__(
+            name=agent_name,
+            description="HITL User Input Collector - Collect predefined user inputs",
+            is_human=True,
+            **kwargs
+        )
+
+        self.interaction_type = interaction_type
+        self.input_fields = input_fields or {}
+
+        # generation Action name
+        action_name_validated = False
+        name_i = 0
+        action_name = None
+        while not action_name_validated:
+            action_name = "HITLUserInputCollectorAction"+f"_{name_i}"
+            if MODULE_REGISTRY.has_module(action_name):
+                continue
+            else:
+                action_name_validated = True
+        # add user input collector action
+        action = HITLUserInputCollectorAction(
+            name=action_name,
+            agent_name=agent_name,
+            interaction_type=interaction_type,
+            input_fields=self.input_fields
+        )
+        
+        self.add_action(action)
+
+    def get_hitl_agent_name(self) -> str:
+        """
+        Get the name of the HITL agent. Useful when the name of HITL agent is generated dynamically.
+        """
+        return self.name
+    
+    def set_input_fields(self, input_fields: dict):
+        """Set the input fields for user input collection"""
+        self.input_fields = input_fields
+        # Update the action's input fields as well
+        for action in self.actions:
+            if isinstance(action, HITLUserInputCollectorAction):
+                action.input_fields = input_fields
 
 class HITLConversationAgent(HITLBaseAgent):
     pass

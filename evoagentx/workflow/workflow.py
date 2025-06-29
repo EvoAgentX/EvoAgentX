@@ -360,7 +360,7 @@ class WorkFlow(BaseModule):
             agent._get_unique_class_name(
                 generate_dynamic_class_name(hitl_action.class_name+" action_input")
             ),
-            **hitl_inputs_data_fields,
+            **(hitl_inputs_data_fields or {}),
             __base__= ActionInput
         )
         
@@ -380,7 +380,7 @@ class WorkFlow(BaseModule):
             agent._get_unique_class_name(
                 generate_dynamic_class_name(hitl_action.class_name+" action_output")
             ),
-            **hitl_outputs_data_fields,
+            **(hitl_outputs_data_fields or {}),
             __base__=ActionOutput
         )
         hitl_action.inputs_format = inputs_format

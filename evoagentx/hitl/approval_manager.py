@@ -1,5 +1,6 @@
 import asyncio
 import json
+import sys
 from typing import Dict
 from pydantic import Field
 from ..core.logging import logger
@@ -282,5 +283,199 @@ Mode: {'Pre-Execution Approval' if mode == HITLMode.PRE_EXECUTION else 'Post-Exe
             base_info += f"\nparameters to be executed:\n{json.dumps(context.action_inputs, ensure_ascii=False, indent=2)}"
         else:
             base_info += f"\nexecution_result:\n{json.dumps(context.execution_result, ensure_ascii=False, indent=2) if context.execution_result else 'None'}"
+        
+        return base_info
+
+
+    async def request_user_input(
+        self,
+        task_name: str,
+        agent_name: str,
+        action_name: str,
+        input_fields: dict,
+        workflow_goal: str = None,
+        display_context: dict = None,
+        timeout: float = 3600.0
+    ) -> HITLResponse:
+        """Request user input based on predefined fields"""
+        
+        if not self.active:
+            # HITL is not active, return empty input
+            return HITLResponse(
+                request_id="auto_approved",
+                decision=HITLDecision.CONTINUE,
+                modified_content={},
+                feedback="HITL not active, returning empty input"
+            )
+        
+        # create HITL context
+        context = HITLContext(
+            task_name=task_name,
+            agent_name=agent_name,
+            action_name=action_name,
+            workflow_goal=workflow_goal,
+            action_inputs={"input_fields": input_fields},
+            execution_result=None,
+            display_context=display_context or {}
+        )
+        
+        # generate prompt message for user input collection
+        prompt_message = self._generate_user_input_prompt_message(context, input_fields)
+        
+        # create request
+        request = HITLRequest(
+            interaction_type=HITLInteractionType.COLLECT_USER_INPUT,
+            mode=HITLMode.PRE_EXECUTION,
+            context=context,
+            prompt_message=prompt_message
+        )
+        
+        # create Future to wait for response
+        future = asyncio.Future()
+        self._pending_requests[request.request_id] = future
+        
+        # display request and wait for response in CLI
+        try:
+            response = await self._handle_user_input_collection(request, input_fields, timeout)
+            future.set_result(response)
+            return response
+        except asyncio.TimeoutError:
+            response = HITLResponse(
+                request_id=request.request_id,
+                decision=HITLDecision.REJECT,
+                feedback="Timeout: No user input received"
+            )
+            future.set_result(response)
+            return response
+        finally:
+            # clean up
+            self._pending_requests.pop(request.request_id, None)
+
+    async def _handle_user_input_collection(self, request: HITLRequest, input_fields: dict, timeout: float) -> HITLResponse:
+        """Handle user input collection"""
+        
+        print("\n" + "="*80)
+        print("📝 User input collection request")
+        print("="*80)
+        print(request.prompt_message)
+        print("="*80)
+        
+        try:
+            def get_user_inputs():
+                collected_inputs = {}
+                
+                print("\nPlease provide the following inputs:")
+                for field_name, field_info in input_fields.items():
+                    field_type = field_info.get('type', 'string')
+                    description = field_info.get('description', '')
+                    required = field_info.get('required', True)
+                    default_value = field_info.get('default', None)
+                    
+                    while True:
+                        prompt_text = f"\n{field_name}"
+                        if description:
+                            prompt_text += f" ({description})"
+                        if not required:
+                            prompt_text += " [optional]"
+                        if default_value is not None:
+                            prompt_text += f" [default: {default_value}]"
+                        prompt_text += ": "
+                        
+                        user_input = input(prompt_text).strip()
+                        
+                        # Handle empty input
+                        if not user_input:
+                            if not required and default_value is not None:
+                                user_input = str(default_value)
+                            elif not required:
+                                user_input = ""
+                            else:
+                                print(f"Field '{field_name}' is required, please provide input.")
+                                continue
+                        
+                        # Type conversion and validation
+                        try:
+                            if field_type == 'int':
+                                # collected_inputs[field_name] = int(user_input) if user_input else None
+                                collected_inputs[field_name] = str(user_input) if user_input else None  # prepare_action_prompt do not accept int
+                            elif field_type == 'float':
+                                # collected_inputs[field_name] = float(user_input) if user_input else None
+                                collected_inputs[field_name] = str(user_input) if user_input else None
+                            elif field_type == 'bool':
+                                collected_inputs[field_name] = user_input.lower() in ['true', '1', 'yes', 'y'] if user_input else None
+                            else:  # string or others
+                                collected_inputs[field_name] = user_input
+                            break
+                        except ValueError:
+                            print(f"Input format error, field '{field_name}' needs {field_type} type value.")
+                            continue
+                
+                # Confirmation
+                print("\nCollected inputs:")
+                for field_name, value in collected_inputs.items():
+                    print(f"  {field_name}: {value}")
+                
+                while True:
+                    confirm = input("\nConfirm these inputs? [y]es / [n]o / [r]etry: ").lower().strip()
+                    if confirm in ['y', 'yes']:
+                        return collected_inputs
+                    elif confirm in ['n', 'no']:
+                        sys.exit()
+                    elif confirm in ['r', 'retry']:
+                        return get_user_inputs()  # Retry input collection
+                    else:
+                        print("Invalid input, please input 'y', 'n' or 'r'")
+            
+            # Run blocking input in event loop
+            loop = asyncio.get_event_loop()
+            collected_data = await loop.run_in_executor(None, get_user_inputs)
+            
+            if collected_data is not None:
+                return HITLResponse(
+                    request_id=request.request_id,
+                    decision=HITLDecision.CONTINUE,
+                    modified_content=collected_data,
+                    feedback="User input collection completed"
+                )
+            else:
+                return HITLResponse(
+                    request_id=request.request_id,
+                    decision=HITLDecision.REJECT,
+                    feedback="User cancelled input"
+                )
+                
+        except Exception as e:
+            logger.error(f"User input collection error: {e}")
+            return HITLResponse(
+                request_id=request.request_id,
+                decision=HITLDecision.REJECT,
+                feedback=f"Error: {str(e)}"
+            )
+
+    def _generate_user_input_prompt_message(self, context: HITLContext, input_fields: dict) -> str:
+        """Generate prompt message for user input collection"""
+        
+        base_info = f"""
+Task: {context.task_name}
+Agent: {context.agent_name}
+Action: {context.action_name}
+Workflow Goal: {context.workflow_goal or 'N/A'}
+
+User input fields to be collected:
+"""
+        
+        for field_name, field_info in input_fields.items():
+            field_type = field_info.get('type', 'string')
+            description = field_info.get('description', '')
+            required = field_info.get('required', True)
+            default_value = field_info.get('default', None)
+            
+            base_info += f"\n- {field_name} ({field_type})"
+            if description:
+                base_info += f": {description}"
+            if not required:
+                base_info += " [optional]"
+            if default_value is not None:
+                base_info += f" [default: {default_value}]"
         
         return base_info
