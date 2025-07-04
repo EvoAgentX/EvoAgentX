@@ -686,9 +686,9 @@ class MiproOptimizer(BaseOptimizer, MIPROv2):
         self.model.reset()
 
     def restore_best_program(self):
-        # todo: implement this
-        pass 
-
+        self.program.load(path = os.path.join(self.save_path, "best_program.json"))
+        return self.program
+        
     def _get_input_keys(self, dataset: Benchmark) -> Optional[List[str]]:
 
         input_keys = None
