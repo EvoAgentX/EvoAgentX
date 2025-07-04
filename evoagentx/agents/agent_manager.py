@@ -1,8 +1,8 @@
 import threading
 from enum import Enum
-from copy import deepcopy
-from pydantic import Field
 from typing import Union, Optional, Dict, List
+from pydantic import Field
+from copy import deepcopy
 
 from .agent import Agent
 # from .agent_generator import AgentGenerator
@@ -11,7 +11,7 @@ from ..core.module import BaseModule
 from ..core.decorators import atomic_method
 from ..storages.base import StorageHandler
 from ..models.model_configs import LLMConfig
-
+from ..tools.tool import Toolkit, Tool
 class AgentState(str, Enum):
     AVAILABLE = "available"
     RUNNING = "running"
@@ -30,6 +30,7 @@ class AgentManager(BaseModule):
     agent_states: Dict[str, AgentState] = Field(default_factory=dict) # agent_name to AgentState mapping
     storage_handler: Optional[StorageHandler] = None # used to load and save agent from storage.
     # agent_generator: Optional[AgentGenerator] = None # used to generate agents for a specific subtask
+    tools: Optional[List[Union[Toolkit, Tool]]] = None
 
     def init_module(self):
         self._lock = threading.Lock()
@@ -141,19 +142,24 @@ class AgentManager(BaseModule):
         Returns:
             Agent: the instantiated agent instance.
         """
+        
         agent_data = deepcopy(agent_data)
         agent_llm_config = agent_data.get("llm_config", llm_config)
         if not agent_data.get("is_human", False) and not agent_llm_config:
             raise ValueError("`agent_data` should contain a `llm_config` key or `llm_config` should be provided.")
-        
+
         if agent_llm_config:
             if isinstance(agent_llm_config, dict):
                 agent_data["llm_config"] = agent_llm_config
             elif isinstance(agent_llm_config, LLMConfig):
                 agent_data["llm_config"] = agent_llm_config.to_dict()
-            else:
-                raise ValueError(f"llm_config must be a dictionary or an instance of LLMConfig. Got {type(agent_llm_config)}.") 
         
+        tool_mapping = {}
+        if self.tools is not None:
+            for tool in self.tools:
+                tool_mapping[tool.name] = tool
+        if agent_data.get("tool_names", None):
+            agent_data["tools"] = [tool_mapping[tool_name] for tool_name in agent_data["tool_names"]]
         return CustomizeAgent.from_dict(data=agent_data)
     
     def get_agent_name(self, agent: Union[str, dict, Agent]) -> str:
@@ -213,6 +219,15 @@ class AgentManager(BaseModule):
             llm_config (Optional[LLMConfig]): The LLM configuration to be used for the agent. Only used when the `agent` is a dictionary, used to create a CustomizeAgent. 
             **kwargs (Any): Additional parameters for agent creation
         """
+        # Check for 'tool' key and convert it to 'tools' if needed
+        if isinstance(agent, dict) and "tool_names" in agent:
+            tools_mapping = {}
+            if self.tools is not None:
+                for tool in self.tools:
+                    tools_mapping[tool.name] = tool
+            agent["tools"] = [tools_mapping[tool_name] for tool_name in agent["tool_names"]]
+            agent["tools"] = [tool if isinstance(tool, Toolkit) else Toolkit(name=tool.name, tools=[tool]) for tool in agent["tools"]]
+        
         agent_name = self.get_agent_name(agent=agent)
         if self.has_agent(agent_name=agent_name):
             return

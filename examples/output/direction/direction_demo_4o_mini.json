@@ -1,0 +1,242 @@
+{
+    "class_name": "WorkFlowGraph",
+    "goal": "Read and analyze the candidate's pdf resume at examples/output/jobs/test_pdf.pdf, and recommend one future PHD directions based on the resume. You should provide a list of 5 review papers about the topic for the candidate to learn more about this direction as well.The input is one parameter called \"goal\", and the output is a markdown report. \n    You should firstly read the pdf resume and summarize the background and recommend one future PHD direction based on the resume.\n    Then you should find 3 trending Review Papers about the topic by searching the keyword on arxiv (by searching web instead of using your out-dated training data) and provide the link of the papers.\n    Lastly you should summarize all the information and provide a detailed markdown report.\n    If you cannot find the papers, you should say \"I cannot find the papers\".\n    ",
+    "nodes": [
+        {
+            "class_name": "WorkFlowNode",
+            "name": "resume_analysis",
+            "description": "Read and analyze the candidate's PDF resume to summarize their background and recommend a future PhD direction.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "goal",
+                    "type": "string",
+                    "description": "The user's goal in textual format.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "phd_direction",
+                    "type": "string",
+                    "description": "The recommended future PhD direction based on the resume analysis.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "candidate_summary",
+                    "type": "string",
+                    "description": "A summary of the candidate's background and qualifications extracted from the resume.",
+                    "required": true
+                }
+            ],
+            "reason": "This step provides an understanding of the candidate's qualifications and areas of expertise necessary for making informed PhD recommendations.",
+            "agents": [
+                {
+                    "name": "resume_analysis_agent",
+                    "description": "This agent reads and analyzes the candidate's PDF resume to extract background information and recommend a future PhD direction.",
+                    "inputs": [
+                        {
+                            "name": "goal",
+                            "type": "string",
+                            "description": "The user's goal in textual format.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "phd_direction",
+                            "type": "string",
+                            "description": "The recommended future PhD direction based on the resume analysis.",
+                            "required": true
+                        },
+                        {
+                            "name": "candidate_summary",
+                            "type": "string",
+                            "description": "A summary of the candidate's background and qualifications extracted from the resume.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Objective\nAnalyze the candidate's PDF resume to derive a summary of their qualifications and suggest a suitable PhD direction based on their background and skills.\n\n### Instructions\n1. Read the PDF resume located at the specified path.\n2. Extract key details that reflect the candidate's professional background, education, skills, and relevant experiences.\n3. Based on this extracted information, analyze and identify a potential PhD direction that aligns with the candidate\u2019s qualifications and the user's goal: <input>{goal}</input>.\n4. Provide a summarized insight into the candidate\u2019s qualifications and the recommended direction for their PhD studies.\n\n### Output Format\nYour final output should ALWAYS in the following format:\n\n## Thought\nBriefly explain the reasoning process for analyzing the candidate's resume and making the PhD recommendation.\n\n## phd_direction\nThe recommended PhD direction based on the analyzed qualifications.\n\n## candidate_summary\nA summary of the candidate's background and qualifications extracted from the resume.",
+                    "tool_names": [
+                        "FileToolkit"
+                    ]
+                }
+            ],
+            "status": "pending"
+        },
+        {
+            "class_name": "WorkFlowNode",
+            "name": "literature_search",
+            "description": "Search for 3 trending review papers related to the recommended PhD direction on arxiv.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "goal",
+                    "type": "string",
+                    "description": "The user's goal in textual format.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "phd_direction",
+                    "type": "string",
+                    "description": "The recommended PhD direction from the resume analysis.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "review_papers",
+                    "type": "array",
+                    "description": "A list of links to 3 review papers related to the recommended PhD direction.",
+                    "required": true
+                }
+            ],
+            "reason": "Finding current literature ensures that the candidate has access to relevant research and trends in their potential field of study.",
+            "agents": [
+                {
+                    "name": "literature_search_agent",
+                    "description": "This agent searches for trending review papers on arXiv based on the recommended PhD direction and returns a list of links to those papers.",
+                    "inputs": [
+                        {
+                            "name": "goal",
+                            "type": "string",
+                            "description": "The user's goal in textual format.",
+                            "required": true
+                        },
+                        {
+                            "name": "phd_direction",
+                            "type": "string",
+                            "description": "The recommended PhD direction from the resume analysis.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "review_papers",
+                            "type": "array",
+                            "description": "A list of links to 3 review papers related to the recommended PhD direction.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Objective\nSearch for 3 trending review papers related to the recommended PhD direction from the resume analysis on arXiv.\n\n### Instructions\n1. Use the goal provided: <input>{goal}</input> to understand the context of the search.\n2. Utilize the phd_direction gathered from the resume analysis: <input>{phd_direction}</input> as the main keyword for searching.\n3. Access the arxiv-mcp-server to search for papers based on the recommended PhD direction.\n4. Aim to find 3 trending review papers that match the criteria.\n5. Return the links to these papers. If no papers are found, respond with 'I cannot find the papers'.\n\n### Output Format\nYour final output should ALWAYS in the following format:\n\n## Thought\nBriefly explain the reasoning process for achieving the objective.\n\n## review_papers\nProvide the links to the 3 trending review papers.",
+                    "tool_names": [
+                        "arxiv-mcp-server"
+                    ]
+                }
+            ],
+            "status": "pending"
+        },
+        {
+            "class_name": "WorkFlowNode",
+            "name": "report_generation",
+            "description": "Summarize the information gathered into a detailed markdown report.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "goal",
+                    "type": "string",
+                    "description": "The user's goal in textual format.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "candidate_summary",
+                    "type": "string",
+                    "description": "Summary of the candidate's background from the resume analysis.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "phd_direction",
+                    "type": "string",
+                    "description": "The recommended PhD direction based on the resume.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "review_papers",
+                    "type": "array",
+                    "description": "List of links to 3 review papers fetched from the literature search.",
+                    "required": false
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "markdown_report",
+                    "type": "string",
+                    "description": "The finalized markdown report summarizing all findings and recommendations.",
+                    "required": true
+                }
+            ],
+            "reason": "The report presents the analysis, recommendations, and literature in a structured format, making it easy for the candidate to grasp the information.",
+            "agents": [
+                {
+                    "name": "report_generation_agent",
+                    "description": "This agent compiles the user's goal, candidate background summary, PhD direction, and review papers into a structured markdown report.",
+                    "inputs": [
+                        {
+                            "name": "goal",
+                            "type": "string",
+                            "description": "The user's goal in textual format.",
+                            "required": true
+                        },
+                        {
+                            "name": "candidate_summary",
+                            "type": "string",
+                            "description": "Summary of the candidate's background from the resume analysis.",
+                            "required": true
+                        },
+                        {
+                            "name": "phd_direction",
+                            "type": "string",
+                            "description": "The recommended PhD direction based on the resume.",
+                            "required": true
+                        },
+                        {
+                            "name": "review_papers",
+                            "type": "array",
+                            "description": "List of links to 3 review papers fetched from the literature search.",
+                            "required": false
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "markdown_report",
+                            "type": "string",
+                            "description": "The finalized markdown report summarizing all findings and recommendations.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Objective\nSummarize the information gathered into a detailed markdown report based on inputs about the candidate and the recommended PhD direction.\n\n### Instructions\n1. Begin by outlining the user's goal: <input>{goal}</input>.\n2. Include a summary of the candidate's background based on the provided text: <input>{candidate_summary}</input>.\n3. Clearly state the recommended PhD direction: <input>{phd_direction}</input>.\n4. If available, list the links to relevant review papers: <input>{review_papers}</input>. If no papers are found, note this in the report.\n5. Format all this information into a coherent markdown report, ensuring clarity and structure for easy reading.\n\n### Output Format\nYour final output should ALWAYS in the following format:\n\n## Thought\nBriefly explain the reasoning process for creating this markdown report.\n\n## markdown_report\nProvide a structured markdown report summarizing the user's goal, candidate's background, PhD direction, and any relevant literature."
+                }
+            ],
+            "status": "pending"
+        }
+    ],
+    "edges": [
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "resume_analysis",
+            "target": "literature_search",
+            "priority": 0
+        },
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "resume_analysis",
+            "target": "report_generation",
+            "priority": 0
+        },
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "literature_search",
+            "target": "report_generation",
+            "priority": 0
+        }
+    ],
+    "graph": null
+}

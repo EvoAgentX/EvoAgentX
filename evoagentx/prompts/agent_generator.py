@@ -76,7 +76,7 @@ You are tasked with generating agents to complete a sub-task within a workflow. 
         ...
     ],
     "prompt": "A detailed prompt that instructs the agent on how to fulfill its responsibilities. Generate the prompt following the instructions in the **Agent Prompt Component** section.", 
-    "tool": ["optional, The tools the agent may use, selected from the tools listed in the '### Tools' section. If no tool is required, set this field to `null`, otherwise set as a list of str."]
+    "tool_names": ["optional, The tools the agent may use, selected from the tools listed in the '### Tools' section. If no tool is required, set this field to `null`, otherwise set as a list of str."]
 }}
 ```
 5.2 **Agent Prompt Component**: The `prompt` field of the agent should be a string that uses the following format:
@@ -230,7 +230,7 @@ You are tasked with generating agents to complete a sub-task within a workflow. 
         ...
     ],
     "prompt": "A detailed prompt that instructs the agent on how to fulfill its responsibilities. Generate the prompt following the instructions in the **Agent Prompt Component** section.", 
-    "tool": ["optional, The tools the agent may use, selected from the tools listed in the '### Tools' section. If no tool is required or no tools are provided, set this field to `null`, otherwise set as a list of str."]
+    "tool_names": ["optional, The tools the agent may use, selected from the tools listed in the '### Tools' section. If no tool is required or no tools are provided, set this field to `null`, otherwise set as a list of str."]
 }}
 ```
 5.2 **Agent Prompt Component**: The `prompt` field of the agent should be a string that uses the following template:
@@ -307,10 +307,9 @@ You should STRICTLY use the above template to generate the `prompt` field of the
         }}
     ], 
     "prompt": "### Objective\\nRefine the given initial code by incorporating the parsed requirements and addressing the review feedback to produce a cleaner, more efficient, and maintainable final solution.\\n\\n### Instructions\\n1. Read and understand the clarified requirements: <input>{{parsed_requirements}}</input>\\n2. Review the initial code: <input>{{initial_code}}</input>\\n3. Analyze the review feedback: <input>{{review_feedback}}</input>\\n4. Identify the improvements required to meet the clarified requirements and address all the feedback.\\n5. Implement necessary modifications to the code. Optimize, clean up, ensure maintainability, and follow best practices.\\n6. Produce the final refined code as the output.\\n\\n### Output Format\\nYour final output should ALWAYS in the following format:\\n\\n## Thought\\nBriefly explain the reasoning process for refining the given initial code\\n\\n## final_code\\nThe final, refined Python code for the factorial function.",
-    "tools": null
+    "tool_names": null
 }}
 ```
-
 ### Output Format
 Your final output should ALWAYS in the following format:
 
@@ -351,6 +350,10 @@ Let's begin.
 {existing_agents}
 
 ### Tools
+If tools are provided, you should follow the following rules:
+ - You should only use real tools provided in the "### Tools" section. You should never come up with new tools.
+ - You should include the correct tool name in the "### Tools" section.
+ 
 {tools}
 
 ### User's Goal:

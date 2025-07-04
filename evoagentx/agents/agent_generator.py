@@ -14,7 +14,7 @@ class AgentGenerator(Agent):
         name = kwargs.pop("name") if "name" in kwargs else AGENT_GENERATOR["name"]
         description = kwargs.pop("description") if "description" in kwargs else AGENT_GENERATOR["description"]
         system_prompt = kwargs.pop("system_prompt") if "system_prompt" in kwargs else AGENT_GENERATOR["system_prompt"]
-        actions = kwargs.pop("actions") if "actions" in kwargs else [AgentGeneration()]
+        actions = kwargs.pop("actions") if "actions" in kwargs else [AgentGeneration(tools=kwargs.pop("tools", []))]
         super().__init__(name=name, description=description, system_prompt=system_prompt, actions=actions, **kwargs)
     
     @property

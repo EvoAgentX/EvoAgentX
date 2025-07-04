@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 """
-Example demonstrating how to use the PythonInterpreter and DockerInterpreter tools.
-This script provides examples for running simple Python code and script files.
+Example demonstrating how to use various toolkits from EvoAgentX.
+This script provides comprehensive examples for:
+- PythonInterpreter and DockerInterpreter tools for code execution
+- BrowserToolkit with auto-initialization and auto-cleanup
+- Search toolkits (Wikipedia, Google, Google Free)
+- File operations with different file types
+- MCP toolkit integration
 """
 
 import os
@@ -11,12 +16,16 @@ from pathlib import Path
 # Add the parent directory to sys.path to import from evoagentx
 sys.path.append(str(Path(__file__).parent.parent))
 
-from evoagentx.tools.interpreter_python import PythonInterpreter
-from evoagentx.tools.interpreter_docker import DockerInterpreter
-from evoagentx.tools.search_wiki import SearchWiki
-from evoagentx.tools.search_google import SearchGoogle
-from evoagentx.tools.search_google_f import SearchGoogleFree
-from evoagentx.tools.mcp import MCPToolkit
+from evoagentx.tools import (
+    PythonInterpreterToolkit,
+    DockerInterpreterToolkit,
+    WikipediaSearchToolkit,
+    GoogleSearchToolkit,
+    GoogleFreeSearchToolkit,
+    MCPToolkit,
+    FileToolkit,
+    BrowserToolkit
+)
 
 
 def run_simple_hello_world(interpreter):
@@ -205,14 +214,19 @@ except ImportError as e:
 
 def run_search_examples():
     """
-    Run examples using the search tools (Wikipedia, Google, and Google Free).
+    Run examples using the search toolkits (Wikipedia, Google, and Google Free).
     """
     print("\n===== SEARCH TOOLS EXAMPLES =====\n")
     
-    # Initialize search tools
-    wiki_search = SearchWiki(max_sentences=3)
-    google_search = SearchGoogle(num_search_pages=3, max_content_words=200)
-    google_free = SearchGoogleFree()
+    # Initialize search toolkits
+    wiki_toolkit = WikipediaSearchToolkit(max_summary_sentences=3)
+    google_toolkit = GoogleSearchToolkit(num_search_pages=3, max_content_words=200)
+    google_free_toolkit = GoogleFreeSearchToolkit()
+    
+    # Get the individual tools from toolkits
+    wiki_tool = wiki_toolkit.get_tool("wikipedia_search")
+    google_tool = google_toolkit.get_tool("google_search")
+    google_free_tool = google_free_toolkit.get_tool("google_free_search")
     
     # Example search query
     query = "artificial intelligence agent architecture"
@@ -221,7 +235,7 @@ def run_search_examples():
     try:
         print("\nWikipedia Search Example:")
         print("-" * 50)
-        wiki_results = wiki_search.search(query=query, num_search_pages=2)
+        wiki_results = wiki_tool(query=query, num_search_pages=2)
         
         if wiki_results.get("error"):
             print(f"Error: {wiki_results['error']}")
@@ -238,7 +252,7 @@ def run_search_examples():
     try:
         print("\nGoogle Search Example (requires API key):")
         print("-" * 50)
-        google_results = google_search.search(query=query)
+        google_results = google_tool(query=query)
         
         if google_results.get("error"):
             print(f"Error: {google_results['error']}")
@@ -254,7 +268,7 @@ def run_search_examples():
     try:
         print("\nGoogle Free Search Example:")
         print("-" * 50)
-        free_results = google_free.search(query=query, num_search_pages=2)
+        free_results = google_free_tool(query=query, num_search_pages=2)
         
         if free_results.get("error"):
             print(f"Error: {free_results['error']}")
@@ -268,16 +282,19 @@ def run_search_examples():
 
 
 def run_python_interpreter_examples():
-    """Run all examples using the Python Interpreter"""
+    """Run all examples using the Python InterpreterToolkit"""
     print("\n===== PYTHON INTERPRETER EXAMPLES =====\n")
     
-    # Initialize the Python interpreter with the current directory as project path
+    # Initialize the Python interpreter toolkit with the current directory as project path
     # and allow common standard library imports
-    interpreter = PythonInterpreter(
+    interpreter_toolkit = PythonInterpreterToolkit(
         project_path=os.getcwd(),
         directory_names=["examples", "evoagentx"],
         allowed_imports={"os", "sys", "time", "datetime", "math", "random", "platform"}
     )
+    
+    # Get the underlying interpreter instance for the examples
+    interpreter = interpreter_toolkit.python_interpreter
     
     # Run the examples
     run_simple_hello_world(interpreter)
@@ -289,18 +306,21 @@ def run_python_interpreter_examples():
 
 
 def run_docker_interpreter_examples():
-    """Run all examples using the Docker Interpreter"""
+    """Run all examples using the Docker InterpreterToolkit"""
     print("\n===== DOCKER INTERPRETER EXAMPLES =====\n")
     print("Running Docker interpreter examples...")
     
     try:
-        # Initialize the Docker interpreter with a standard Python image
-        interpreter = DockerInterpreter(
+        # Initialize the Docker interpreter toolkit with a standard Python image
+        interpreter_toolkit = DockerInterpreterToolkit(
             image_tag="python:3.9-slim",  # Using official Python image
             print_stdout=True,
             print_stderr=True,
             container_directory="/app"  # Better working directory for containerized apps
         )
+        
+        # Get the underlying interpreter instance for the examples
+        interpreter = interpreter_toolkit.docker_interpreter
         
         # Run the examples
         run_simple_hello_world(interpreter)
@@ -329,22 +349,25 @@ def run_mcp_example():
     
     try:
         # Initialize the MCP toolkit with the sample config
-        toolkit = MCPToolkit(config_path=config_path)
+        mcp_toolkit = MCPToolkit(config_path=config_path)
         
-        # Get all available tools
-        tools = toolkit.get_tools()
+        # Get all available toolkits
+        toolkits = mcp_toolkit.get_tools()
         
-        print(f"Available MCP tools: {len(tools)}")
-        for i, tool in enumerate(tools):
-            print(f"Tool {i+1}: {tool.name}")
-            print(f"Description: {tool.descriptions[0]}")
-            print("-" * 30)
+        print(f"Available MCP toolkits: {len(toolkits)}")
         
         # Find and use the hirebase search tool
         hirebase_tool = None
-        for tool in tools:
-            if "hire" in tool.name.lower() or "search" in tool.name.lower():
-                hirebase_tool = tool
+        for toolkit_item in toolkits:
+            for tool in toolkit_item.tools:
+                print(f"Tool: {tool.name}")
+                print(f"Description: {tool.description}")
+                print("-" * 30)
+                
+                if "hire" in tool.name.lower() or "search" in tool.name.lower():
+                    hirebase_tool = tool
+                    break
+            if hirebase_tool:
                 break
         
         if hirebase_tool:
@@ -356,7 +379,7 @@ def run_mcp_example():
             
             # Call the tool with the search query
             # Note: The actual parameter name might differ based on the tool's schema
-            result = hirebase_tool.tools[0](**{"query": search_query})
+            result = hirebase_tool(**{"query": search_query})
             
             print("\nSearch Results:")
             print("-" * 50)
@@ -368,27 +391,370 @@ def run_mcp_example():
         print(f"Error running MCP example: {str(e)}")
         print("Make sure the hirebase MCP server is properly configured with a valid API key.")
     finally:
-        if 'toolkit' in locals():
-            toolkit.disconnect()
+        if 'mcp_toolkit' in locals():
+            mcp_toolkit.disconnect()
+
+
+def run_file_tool_example():
+    """
+    Run an example using the FileToolkit to read and write PDF files.
+    """
+    print("\n===== FILE TOOL EXAMPLE =====\n")
+    
+    try:
+        # Initialize the file toolkit
+        file_toolkit = FileToolkit()
+        
+        # Get individual tools from the toolkit
+        read_tool = file_toolkit.get_tool("read_file")
+        write_tool = file_toolkit.get_tool("write_file")
+        append_tool = file_toolkit.get_tool("append_file")
+        
+        # Create sample content for a PDF
+        sample_content = """This is a sample PDF document created using the FileTool.
+This tool provides special handling for different file types.
+For PDF files, it uses PyPDF2 library for reading operations."""
+        
+        # Example PDF file path
+        pdf_path = os.path.join(os.getcwd(), "examples", "output", "sample_document.pdf")
+        
+        # Make sure the output directory exists
+        os.makedirs(os.path.dirname(pdf_path), exist_ok=True)
+        
+        print(f"Writing content to PDF file: {pdf_path}")
+        
+        # Write content to PDF file
+        write_result = write_tool(file_path=pdf_path, content=sample_content)
+        print("Write Result:")
+        print("-" * 30)
+        print(write_result)
+        print("-" * 30)
+        
+        # Read content from PDF file
+        print(f"\nReading content from PDF file: {pdf_path}")
+        read_result = read_tool(file_path=pdf_path)
+        print("Read Result:")
+        print("-" * 30)
+        print(read_result)
+        print("-" * 30)
+        
+        # Also demonstrate with a regular text file
+        text_path = os.path.join(os.getcwd(), "examples", "output", "sample_text.txt")
+        
+        print(f"\nWriting content to text file: {text_path}")
+        text_write_result = write_tool(file_path=text_path, content="This is a sample text file.")
+        print("Text Write Result:")
+        print("-" * 30)
+        print(text_write_result)
+        print("-" * 30)
+        
+        print(f"\nReading content from text file: {text_path}")
+        text_read_result = read_tool(file_path=text_path)
+        print("Text Read Result:")
+        print("-" * 30)
+        print(text_read_result)
+        print("-" * 30)
+        
+        # ===== APPEND FILE OPERATIONS =====
+        print("\n===== APPEND FILE OPERATIONS =====\n")
+        
+        # 1. Append to text file
+        print(f"Appending content to text file: {text_path}")
+        append_text_content = "\nThis line was appended to the text file."
+        text_append_result = append_tool(file_path=text_path, content=append_text_content)
+        print("Text Append Result:")
+        print("-" * 30)
+        print(text_append_result)
+        print("-" * 30)
+        
+        # Read the text file again to show appended content
+        print(f"\nReading text file after append: {text_path}")
+        text_read_after_append = read_tool(file_path=text_path)
+        print("Text File After Append:")
+        print("-" * 30)
+        print(text_read_after_append)
+        print("-" * 30)
+        
+        # 2. Append to PDF file
+        print(f"\nAppending content to PDF file: {pdf_path}")
+        append_pdf_content = "\n\nThis content was appended to the PDF document.\nIt demonstrates PDF append functionality."
+        pdf_append_result = append_tool(file_path=pdf_path, content=append_pdf_content)
+        print("PDF Append Result:")
+        print("-" * 30)
+        print(pdf_append_result)
+        print("-" * 30)
+        
+        # Read the PDF file again to show appended content
+        print(f"\nReading PDF file after append: {pdf_path}")
+        pdf_read_after_append = read_tool(file_path=pdf_path)
+        print("PDF File After Append:")
+        print("-" * 30)
+        print(pdf_read_after_append)
+        print("-" * 30)
+        
+        # 3. Append to log file
+        log_path = os.path.join(os.getcwd(), "examples", "output", "application.log")
+        print(f"\nCreating and appending to log file: {log_path}")
+        
+        # Initial log entry
+        initial_log = "2024-01-01 10:00:00 INFO Application started"
+        log_write_result = write_tool(file_path=log_path, content=initial_log)
+        print("Initial Log Write Result:")
+        print("-" * 30)
+        print(log_write_result)
+        print("-" * 30)
+        
+        # Append multiple log entries
+        log_entries = [
+            "\n2024-01-01 10:01:00 INFO User logged in",
+            "\n2024-01-01 10:02:00 WARNING Cache miss for key 'user_data'",
+            "\n2024-01-01 10:03:00 ERROR Database connection failed",
+            "\n2024-01-01 10:04:00 INFO Retrying database connection",
+            "\n2024-01-01 10:05:00 INFO Database connection restored"
+        ]
+        
+        for log_entry in log_entries:
+            append_result = append_tool(file_path=log_path, content=log_entry)
+            print(f"Appended: {log_entry.strip()}")
+        
+        # Read the complete log file
+        print(f"\nReading complete log file: {log_path}")
+        log_read_result = read_tool(file_path=log_path)
+        print("Complete Log File:")
+        print("-" * 30)
+        print(log_read_result)
+        print("-" * 30)
+        
+        # 4. Append to CSV file
+        csv_path = os.path.join(os.getcwd(), "examples", "output", "data.csv")
+        print(f"\nCreating and appending to CSV file: {csv_path}")
+        
+        # Initial CSV header and data
+        csv_header = "Name,Age,City,Occupation"
+        csv_write_result = write_tool(file_path=csv_path, content=csv_header)
+        print("CSV Header Write Result:")
+        print("-" * 30)
+        print(csv_write_result)
+        print("-" * 30)
+        
+        # Append CSV rows
+        csv_rows = [
+            "\nJohn Doe,30,New York,Engineer",
+            "\nJane Smith,25,Los Angeles,Designer",
+            "\nBob Johnson,35,Chicago,Manager",
+            "\nAlice Brown,28,San Francisco,Developer"
+        ]
+        
+        for csv_row in csv_rows:
+            append_result = append_tool(file_path=csv_path, content=csv_row)
+            print(f"Appended CSV row: {csv_row.strip()}")
+        
+        # Read the complete CSV file
+        print(f"\nReading complete CSV file: {csv_path}")
+        csv_read_result = read_tool(file_path=csv_path)
+        print("Complete CSV File:")
+        print("-" * 30)
+        print(csv_read_result)
+        print("-" * 30)
+        
+        # 5. Append to configuration file
+        config_path = os.path.join(os.getcwd(), "examples", "output", "config.ini")
+        print(f"\nCreating and appending to config file: {config_path}")
+        
+        # Initial config content
+        initial_config = """[DATABASE]
+host = localhost
+port = 5432
+name = myapp"""
+        
+        config_write_result = write_tool(file_path=config_path, content=initial_config)
+        print("Initial Config Write Result:")
+        print("-" * 30)
+        print(config_write_result)
+        print("-" * 30)
+        
+        # Append new config sections
+        additional_configs = [
+            "\n\n[CACHE]",
+            "\nredis_host = localhost",
+            "\nredis_port = 6379",
+            "\nttl = 3600",
+            "\n\n[LOGGING]",
+            "\nlevel = INFO",
+            "\nfile = /var/log/myapp.log",
+            "\nmax_size = 10MB"
+        ]
+        
+        for config_line in additional_configs:
+            append_result = append_tool(file_path=config_path, content=config_line)
+        
+        print("Appended additional configuration sections")
+        
+        # Read the complete config file
+        print(f"\nReading complete config file: {config_path}")
+        config_read_result = read_tool(file_path=config_path)
+        print("Complete Config File:")
+        print("-" * 30)
+        print(config_read_result)
+        print("-" * 30)
+        
+        # 6. Demonstrate error handling for non-existent file append
+        non_existent_path = os.path.join(os.getcwd(), "examples", "output", "non_existent.txt")
+        print(f"\nTesting append to non-existent file: {non_existent_path}")
+        error_append_result = append_tool(file_path=non_existent_path, content="This should create a new file")
+        print("Append to Non-existent File Result:")
+        print("-" * 30)
+        print(error_append_result)
+        print("-" * 30)
+        
+        # Verify the file was created
+        if error_append_result.get("success"):
+            print(f"Reading newly created file: {non_existent_path}")
+            new_file_read = read_tool(file_path=non_existent_path)
+            print("Newly Created File Content:")
+            print("-" * 30)
+            print(new_file_read)
+            print("-" * 30)
+        
+    except Exception as e:
+        print(f"Error running file tool example: {str(e)}")
+
+
+def run_browser_tool_example():
+    """
+    Run an example using the BrowserToolkit with auto-initialization and auto-cleanup.
+    Goes to Google, searches for "test", demonstrating the simplified browser API.
+    """
+    print("\n===== BROWSER TOOL EXAMPLE =====\n")
+    
+    try:
+        # Initialize the browser toolkit (browser auto-initializes when first used)
+        browser_toolkit = BrowserToolkit(headless=True, timeout=10)
+        
+        # Get individual tools from the toolkit
+        nav_tool = browser_toolkit.get_tool("navigate_to_url")
+        input_tool = browser_toolkit.get_tool("input_text")
+        click_tool = browser_toolkit.get_tool("browser_click")
+        snapshot_tool = browser_toolkit.get_tool("browser_snapshot")
+        
+        print("Step 1: Navigating to Google (browser auto-initializes)...")
+        nav_result = nav_tool(url="https://www.google.com")
+        print("Navigation Result:")
+        print("-" * 30)
+        print(f"Status: {nav_result.get('status')}")
+        print(f"URL: {nav_result.get('current_url')}")
+        print(f"Title: {nav_result.get('title')}")
+        
+        # Show available interactive elements
+        if nav_result.get("snapshot") and nav_result["snapshot"].get("interactive_elements"):
+            elements = nav_result["snapshot"]["interactive_elements"]
+            print(f"Found {len(elements)} interactive elements:")
+            for elem in elements[:5]:  # Show first 5 elements
+                print(f"  - {elem['id']}: {elem.get('description', 'No description')}")
+        print("-" * 30)
+        
+        if nav_result.get("status") == "success":
+            # Find the search input box and search button
+            elements = nav_result.get("snapshot", {}).get("interactive_elements", [])
+            search_input_ref = None
+            search_button_ref = None
+            
+            for elem in elements:
+                desc = elem.get("description", "").lower()
+                label = elem.get("label", "").lower()
+                purpose = elem.get("purpose", "").lower()
+                
+                # Look for search input field
+                if (elem.get("editable") and 
+                    ("search" in desc or "search" in label or "search" in purpose)):
+                    search_input_ref = elem["id"]
+                # Look for search button
+                elif (elem.get("interactable") and 
+                      ("search" in desc or "search" in label or "search" in purpose) and
+                      ("button" in purpose or elem.get("category") == "action")):
+                    search_button_ref = elem["id"]
+            
+            if search_input_ref:
+                print(f"\nStep 2: Typing 'test' in search box (element {search_input_ref})...")
+                input_result = input_tool(
+                    element="Search box", 
+                    ref=search_input_ref, 
+                    text="test", 
+                    submit=False
+                )
+                print("Input Result:")
+                print("-" * 30)
+                print(f"Status: {input_result.get('status')}")
+                print(f"Message: {input_result.get('message')}")
+                print("-" * 30)
+                
+                if input_result.get("status") == "success":
+                    if search_button_ref:
+                        print(f"\nStep 3: Clicking search button (element {search_button_ref})...")
+                        click_result = click_tool(
+                            element="Search button", 
+                            ref=search_button_ref
+                        )
+                        print("Click Result:")
+                        print("-" * 30)
+                        print(f"Status: {click_result.get('status')}")
+                        print(f"Message: {click_result.get('message')}")
+                        print(f"Current URL: {click_result.get('current_url')}")
+                        print("-" * 30)
+                    else:
+                        print("\nStep 3: Search button not found, submitting with Enter key...")
+                        submit_result = input_tool(
+                            element="Search box", 
+                            ref=search_input_ref, 
+                            text="", 
+                            submit=True
+                        )
+                        print("Submit Result:")
+                        print("-" * 30)
+                        print(f"Status: {submit_result.get('status')}")
+                        print(f"Message: {submit_result.get('message')}")
+                        print("-" * 30)
+                    
+                    # Take a final snapshot to see the results page
+                    print("\nStep 4: Taking snapshot of results page...")
+                    final_snapshot = snapshot_tool()
+                    if final_snapshot.get("status") == "success":
+                        print(f"Results page title: {final_snapshot.get('title')}")
+                        print(f"Results page URL: {final_snapshot.get('url')}")
+                        interactive_elements = final_snapshot.get("interactive_elements", [])
+                        print(f"Found {len(interactive_elements)} interactive elements on results page")
+            else:
+                print("\nNo search input field found on the page")
+        
+        print("\nBrowser will automatically close when the toolkit goes out of scope...")
+        print("(No manual cleanup required)")
+        
+    except Exception as e:
+        print(f"Error running browser tool example: {str(e)}")
+        print("Browser will still automatically cleanup on exit")
 
 
 def main():
     """Main function to run all examples"""
     print("===== INTERPRETER TOOL EXAMPLES =====")
     
+    # Run file tool example
+    run_file_tool_example()
+    
+    # Run browser tool example
+    run_browser_tool_example()
+    
     # Run MCP toolkit example
     run_mcp_example()
     
-    # # Run Python interpreter examples
+    # Run Python interpreter examples
     run_python_interpreter_examples()
     
-    # # Run Docker interpreter examples
+    # Run Docker interpreter examples
     run_docker_interpreter_examples()
     
-    # # Run search tools examples
+    # Run search tools examples
     run_search_examples()
-    
-
     
     print("\n===== ALL EXAMPLES COMPLETED =====")
 
