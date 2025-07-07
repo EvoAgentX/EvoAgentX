@@ -340,6 +340,8 @@ class PromptTuningModule(dspy.Module):
                 if name not in execution_data:
                     logger.warning(f"Output {name} not found in execution data")
 
+            from pdb import set_trace; set_trace()
+
             # Add input_names and output_names from execution data to trace
             for name in input_names:
                 if name in execution_data:
@@ -347,6 +349,8 @@ class PromptTuningModule(dspy.Module):
             for name in output_names:
                 if name in execution_data:
                     output_dict[name] = execution_data[name]
+
+            from pdb import set_trace; set_trace()
             
             trace_tuple = (predict, input_dict, output_dict)
             trace.append(trace_tuple)

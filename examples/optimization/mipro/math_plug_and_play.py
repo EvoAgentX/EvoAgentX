@@ -81,7 +81,6 @@ class CustomProgram:
     
 
 def main():
-
     openai_config = OpenAILLMConfig(model="gpt-4o-mini", openai_key=OPENAI_API_KEY, stream=True, output_response=False)
     executor_llm = OpenAILLM(config=openai_config)
     optimizer_config = OpenAILLMConfig(model="gpt-4o", openai_key=OPENAI_API_KEY, stream=True, output_response=False)

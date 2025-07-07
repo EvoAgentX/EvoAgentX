@@ -687,7 +687,11 @@ class MiproOptimizer(BaseOptimizer, MIPROv2):
 
     def restore_best_program(self):
         # todo: implement this
-        pass 
+        if self.save_path:
+            self.best_program_path = os.path.join(self.save_path, "best_program.json")
+            self.model.load(self.best_program_path)
+        else:
+            raise ValueError("No save path provided. Please set `save_path` to restore the best program.")
 
     def _get_input_keys(self, dataset: Benchmark) -> Optional[List[str]]:
 

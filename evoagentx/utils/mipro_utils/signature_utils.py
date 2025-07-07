@@ -269,7 +269,7 @@ def signature_from_registry(
         else:
             # if the key is not a valid identifier, we need to add an underscore
             # 打印warning
-            print(f"Warning: The key `{key}` is not a valid identifier, so we will add an underscore to it.")
+            print(f"Warning: The key `{key}` contains identifier unsupported by Signature, so we will use the default signature name.")
             signature_name = f"DefaultSignature_{len(signature_dict)}"
 
         signature_class = make_signature(signature=sig, 
