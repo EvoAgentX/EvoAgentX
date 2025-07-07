@@ -91,7 +91,6 @@ def main():
 
     logger.info("Optimizing workflow...")
     optimizer.optimize(dataset=benchmark)
-    from pdb import set_trace; set_trace()
     optimizer.restore_best_program() # restore the best graph from the saved path 
 
     logger.info("Evaluating program on test set...")

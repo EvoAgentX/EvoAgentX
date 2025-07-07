@@ -23,6 +23,17 @@ class MathSplits(MATH):
     def _load_data(self):
         # load the original test data 
         super()._load_data()
+        # obtan the algebra subset
+        train_data_algebra_subset = [example for example in self.get_train_data() if example["type"] == "Algebra"]
+        test_data_algebra_subset = [example for example in self.get_test_data() if example["type"] == "Algebra"]
+        self._train_data = train_data_algebra_subset
+        self._test_data = test_data_algebra_subset
+        import numpy as np 
+        np.random.seed(42)
+        permutation = np.random.permutation(len(self._test_data))
+        self._train_data = [self._train_data[idx] for idx in permutation[:350]]
+        self._test_data = [self._test_data[idx] for idx in permutation[:350]]
+        """
         # split the data into dev and test
         import numpy as np 
         np.random.seed(42)
@@ -32,6 +43,7 @@ class MathSplits(MATH):
         # self._train_data = [full_test_data[idx] for idx in permutation[:50]]
         self._train_data = [full_test_data[idx] for idx in permutation[:100]]
         self._test_data = [full_test_data[idx] for idx in permutation[100:200]]
+        """
 
     # define the input keys. 
     # If defined, the corresponding input key and value will be passed to the __call__ method of the program, 
@@ -77,7 +89,7 @@ class CustomProgram:
         prompt = self.prompt.format(problem=problem)
         response = self.model.generate(prompt=prompt)
         solution = response.content
-        return solution, {"problem": problem, "solution": solution}
+        return solution, {"problem": problem, "solution": solution, "prompt_output": response}
     
 
 def main():
@@ -89,11 +101,14 @@ def main():
     benchmark = MathSplits()
     program = CustomProgram(model=executor_llm)
 
-    # register the parameters to optimize 
+    # register the parameters to optimize, the parameter can be a string (prompt) or a PromptTemplate instance.
     registry = MiproRegistry()
-    # MiproRegistry requires specify the input_names and output_names for the specific parameter. 
-    # The input_names and output_names should appear in the execution_data returned by the program's __call__ method. 
-    registry.track(program, "prompt", input_names=["problem"], output_names=["solution"])
+    # MiproRegistry requires specify the `input_names`, `output_names` and `raw_output_name` for the specific parameter. 
+    # The `inputs_names` should exactly match the names of input placeholders in the string (when using prompt) or the names of variables in the `inputs_format` (when using PromptTemplate instance).
+    # The `output_names` should match the names of the parameter's outputs. 
+    # The `raw_output_name` should specify the name of the parameter's raw LLM output. 
+    # The `input_names`, `output_names` and `raw_output_name` should appear in the execution_data returned by the program's __call__ method. 
+    registry.track(program, "prompt", input_names=["problem"], output_names=["solution"], raw_output_name="prompt_output")
 
     # optimize the program 
     # `evaluator` is optional. If not provided, the optimizer will construct an evaluator based on the `evaluate` method of the benchmark. 
