@@ -14,15 +14,17 @@ from ..core.logging import logger
 from ..core.module import BaseModule
 from ..evaluators.alphaevolve_evaluator import AlphaEvolveEvaluator
 from ..models.base_model import BaseLLM
-from ..utils.alphaevolve_utils import (
+from ..utils.alphaevolve_utils.code_utils import (
     apply_diff,
     extract_code_language,
     extract_diffs,
     format_diff_summary,
-    format_metrics_safe,
     parse_full_rewrite,
 )
-from ..utils.alphaevolve_utils.format_utils import format_improvement_safe
+from ..utils.alphaevolve_utils.format_utils import (
+    format_improvement_safe,
+    format_metrics_safe,
+)
 from .alphaevolve.config import AlphaEvolveDatabaseConfig, AlphaEvolvePromptConfig
 from .alphaevolve.database import AlphaEvolveDatabase, Program
 from .alphaevolve.ensemble import LLMEnsemble
