@@ -18,7 +18,8 @@ from ..prompts.optimizers.alphaevolve_optimizer import (
     BASE_EVALUATOR_SYSTEM_TEMPLATE,
     EVALUATION_TEMPLATE,
 )
-from ..utils.alphaevolve_utils import TaskPool, format_metrics_safe, run_in_executor
+from ..utils.alphaevolve_utils.async_utils import TaskPool, run_in_executor
+from ..utils.alphaevolve_utils.format_utils import format_metrics_safe
 
 
 @dataclass
