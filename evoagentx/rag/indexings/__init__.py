@@ -3,6 +3,7 @@ from typing import Dict, Any, Optional
 from llama_index.core.embeddings import BaseEmbedding
 
 from evoagentx.core.logging import logger
+from evoagentx.models.base_model import BaseLLM
 from evoagentx.storages.base import StorageHandler
 from .base import IndexType, BaseIndexWrapper
 from .vector_index import VectorIndexing
@@ -21,7 +22,7 @@ class IndexFactory:
         embed_model: BaseEmbedding,
         storage_handler: StorageHandler,
         index_config: Dict[str, Any] = None,
-        node_parser: Optional[Any] = None  # Unused, kept for compatibility
+        llm: Optional[BaseLLM] = None  # For graph entity extract
     ) -> BaseIndexWrapper:
         """Create an index based on configuration.
         
@@ -47,7 +48,8 @@ class IndexFactory:
                 index_config=index_config
             )
         elif index_type == IndexType.GRAPH:
-            raise NotImplementedError()
+            index = GraphIndexing(embed_model=embed_model, storage_handler=storage_handler, index_config=index_config, llm=llm)
+        
         elif index_type == IndexType.SUMMARY:
             raise NotImplementedError()
         elif index_type == IndexType.TREE:

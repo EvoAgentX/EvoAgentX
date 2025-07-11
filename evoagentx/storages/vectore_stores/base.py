@@ -15,3 +15,8 @@ class VectorStoreBase(ABC):
     def get_vector_store(self) -> BasePydanticVectorStore:
         """Return the LlamaIndex-compatible vector store."""
         pass
+
+    @abstractmethod
+    async def aload(self):
+        """Asynchronously load a single node into the vector store."""
+        pass
