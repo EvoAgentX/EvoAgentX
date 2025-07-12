@@ -325,6 +325,11 @@ class WorkFlow(BaseModule):
                         f"You may need to check the `inputs` and `outputs` of the nodes to ensure that all the required inputs of node '{node.name}' are provided "
                         f"by either its predecessors or the `inputs` parameter in the `execute` method."
                     )
+        
+        for node in self.graph.nodes:
+            for agent in node.agents:
+                if hasattr(agent, "forbidden_in_workflow") and (agent.forbidden_in_workflow):
+                    raise ValueError(f"The Agent of class {agent.__class__} is forbidden to be used in the workflow.")
 
     def _prepare_single_hitl_agent(self, agent: Agent, node: WorkFlowNode):
         """
