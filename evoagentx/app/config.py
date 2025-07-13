@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     MONGODB_URL: str
     MONGODB_DB_NAME: str
     
+    # PostgreSQL settings
+    POSTGRESQL_URL: str
+    
     # Supabase settings
     SUPABASE_URL: str
     SUPABASE_KEY: str
