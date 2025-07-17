@@ -3,7 +3,6 @@ import json
 import asyncio
 from uuid import uuid4
 from datetime import datetime
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Union, Optional, Sequence, Dict, Any, Tuple
 
 from llama_index.core.schema import NodeWithScore, TextNode, RelatedNodeInfo
@@ -20,11 +19,12 @@ from .retrievers.base import RetrieverType
 from .schema import Chunk, Corpus, ChunkMetadata, IndexMetadata, Query, RagResult
 from evoagentx.storages.base import StorageHandler
 from evoagentx.storages.schema import IndexStore
+from evoagentx.models.base_model import BaseLLM
 from evoagentx.core.logging import logger
 
 
 class RAGEngine:
-    def __init__(self, config: RAGConfig, storage_handler: StorageHandler):
+    def __init__(self, config: RAGConfig, storage_handler: StorageHandler, llm: Optional[BaseLLM] = None):
         self.config = config
         self.storage_handler = storage_handler  # Maybe reinit the vector_store by the load funcion.
         self.embedding_factory = EmbeddingFactory()
@@ -32,6 +32,7 @@ class RAGEngine:
         self.chunk_factory = ChunkFactory()
         self.retriever_factory = RetrieverFactory()
         self.postprocessor_factory = PostprocessorFactory()
+        self.llm = llm  # LLM for entity extractor
 
         # Initialize reader
         self.reader = LLamaIndexReader(
@@ -50,7 +51,7 @@ class RAGEngine:
             provider=self.config.embedding.provider,
             model_config=self.config.embedding.model_dump(exclude_unset=True),
         )
-        
+
         # Dynamic Check the dimensions in StorageHandler
         if (self.storage_handler.vector_store is not None) and (self.embed_model.dimensions is not None):
             if self.storage_handler.storageConfig.vectorConfig.dimensions != self.embed_model.dimensions:
@@ -115,7 +116,7 @@ class RAGEngine:
             raise
 
     def add(self, index_type: str, nodes: Union[Corpus, List[NodeWithScore], List[TextNode]], 
-            corpus_id: str = None) -> None:
+            corpus_id: str = None) -> Sequence[str]:
         """Add nodes to an index for a specific corpus.
 
         Initializes an index if it doesn't exist and inserts nodes, updating metadata with corpus_id and index_type.
@@ -125,6 +126,9 @@ class RAGEngine:
             nodes (Union[Corpus, List[NodeWithScore], List[TextNode]]): Nodes or Corpus to add.
             corpus_id (str, optional): Identifier for the corpus. Defaults to a UUID if None.
 
+        Return:
+            return a sequence with id of each added node.
+            
         Raises:
             Exception: If index creation or node insertion fails.
         """
@@ -139,25 +143,29 @@ class RAGEngine:
                     index_type=index_type,
                     embed_model=self.embed_model.get_embedding_model(),
                     storage_handler=self.storage_handler,
-                    index_config=self.config.index.model_dump(exclude_unset=True) if self.config.index else {}
+                    index_config=self.config.index.model_dump(exclude_unset=True) if self.config.index else {},
+                    llm=self.llm,
                 )
                 self.indices[corpus_id][index_type] = index
                 self.retrievers[corpus_id][index_type] = self.retriever_factory.create(
-                    retriever_type=self.config.retrieval.retrivel_type,
+                    retriever_type=index_type,
+                    llm=self.llm,
                     index=index.get_index(),
                     graph_store=index.get_index().storage_context.graph_store,
                     embed_model=self.embed_model.get_embedding_model(),
-                    query=Query(query_str="", top_k=self.config.retrieval.top_k if self.config.retrieval else 5)
+                    query=Query(query_str="", top_k=self.config.retrieval.top_k if self.config.retrieval else 5),
+                    storage_handler=self.storage_handler,
                 )
 
             nodes_to_insert = nodes.to_llama_nodes() if isinstance(nodes, Corpus) else nodes
             for node in nodes_to_insert:
                 node.metadata.update({"corpus_id": corpus_id, "index_type": index_type})
-            self.indices[corpus_id][index_type].insert_nodes(nodes_to_insert)
+            nodes_ids = self.indices[corpus_id][index_type].insert_nodes(nodes_to_insert)
             logger.info(f"Added {len(nodes_to_insert)} nodes to {index_type} index for corpus {corpus_id}")
+            return nodes_ids
         except Exception as e:
             logger.error(f"Failed to add nodes to {index_type} index for corpus {corpus_id}: {str(e)}")
-            raise
+            return []
 
     def delete(self, corpus_id: str, index_type: Optional[str] = None, 
                node_ids: Optional[Union[str, List[str]]] = None, 
@@ -242,7 +250,8 @@ class RAGEngine:
             raise
 
     def save(self, output_path: Optional[str] = None, corpus_id: Optional[str] = None, 
-                index_type: Optional[str] = None, table: Optional[str] = None) -> None:
+                index_type: Optional[str] = None, table: Optional[str] = None, 
+                graph_exported: bool = False) -> None:
         """Save indices to files or database.
 
         Serializes corpus chunks to JSONL files and metadata to JSON files if output_path is provided,
@@ -253,6 +262,7 @@ class RAGEngine:
             corpus_id (Optional[str]): Specific corpus to save. If None, saves all corpora.
             index_type (Optional[str]): Specific index type to save. If None, saves all indices.
             table (Optional[str]): Database table name for index data. Defaults to 'indexing' if None.
+            graph_exported (bool): If True, export graph nodes and relations for graph indices. Defaults to False.
 
         Raises:
             Exception: If saving fails or file operations encounter errors.
@@ -270,6 +280,15 @@ class RAGEngine:
                 for idx_type in target_indices:
                     index = self.indices[cid][idx_type]
 
+                    # Skip saving for graph indices unless graph_exported is True
+                    if idx_type == IndexType.GRAPH and not graph_exported:
+                        logger.warning(f"Skipping save for graph index {idx_type} in corpus {cid} as graph_exported is False")
+                        continue
+
+                    # For graph indices, include kg_nodes and kg_rels if graph_exported is True
+                    if idx_type == IndexType.GRAPH and graph_exported:
+                        index.build_kv_store()  # FIXME: Computer's memory may increase dramatically
+
                     # Convert index nodes to Corpus
                     chunks = [
                         Chunk.from_llama_node(node_data)
@@ -284,7 +303,7 @@ class RAGEngine:
                         corpus_id=cid,
                         index_type=idx_type,
                         collection_name=vector_config.get("qdrant_collection_name", "default_collection"),
-                        dimension=vector_config.get("dimensions", 1536),
+                        dimension=self.embed_model.dimensions,
                         vector_db_type=vector_config.get("vector_name", None),
                         graph_db_type=graph_config.get("graph_name", None),
                         embedding_model_name=self.config.embedding.model_name,
@@ -480,45 +499,34 @@ class RAGEngine:
                     index_type=index_type,
                     embed_model=self.embed_model.get_embedding_model(),
                     storage_handler=self.storage_handler,
-                    index_config=self.config.index.model_dump(exclude_unset=True) if self.config.index else {}
+                    index_config=self.config.index.model_dump(exclude_unset=True) if self.config.index else {},
+                    llm=self.llm
                 )
                 self.indices[corpus_id][index_type] = index
-
+                
                 retriever_type = RetrieverType.GRAPH if index_type == IndexType.GRAPH else RetrieverType.VECTOR
                 self.retrievers[corpus_id][index_type] = self.retriever_factory.create(
                     retriever_type=retriever_type,
+                    llm=self.llm,
                     index=index.get_index(),
-                    graph_store=index.get_index().storage_context.graph_store if index_type == IndexType.GRAPH else None,
+                    graph_store=index.get_index().storage_context.graph_store,
                     embed_model=self.embed_model.get_embedding_model(),
-                    query=Query(query_str="", top_k=self.config.retrieval.top_k if self.config.retrieval else 5)
+                    query=Query(query_str="", top_k=self.config.retrieval.top_k if self.config.retrieval else 5),
+                    storage_handler=self.storage_handler
                 )
 
             nodes = corpus.to_llama_nodes()
-            for node in nodes:
-                node.metadata.update({"corpus_id": corpus_id, "index_type": index_type})
-            self.indices[corpus_id][index_type].insert_nodes(nodes)
+            self.indices[corpus_id][index_type].load(nodes)
             logger.info(f"Inserted {len(nodes)} nodes into {index_type} index for corpus {corpus_id}")
         except Exception as e:
             logger.error(f"Failed to load index for corpus {corpus_id}, index_type {index_type}: {str(e)}")
             raise
 
-    async def _retrieve_async(self, retriever: BaseRetrieverWrapper, query: Query):
-        """Asynchronously retrieve results using a retriever.
+    async def query_async(self, query: Union[str, Query], corpus_id: Optional[str] = None,
+                        query_transforms: Optional[List] = None) -> RagResult:
+        """Execute a query across indices and return processed results asynchronously.
 
-        Args:
-            retriever (BaseRetrieverWrapper): Retriever to process the query.
-            query (Query): Query parameters for retrieval.
-
-        Returns:
-            RagResult: Retrieved results.
-        """
-        return await retriever.aretrieve(query)
-
-    def query(self, query: Union[str, Query], corpus_id: Optional[str] = None,
-              query_transforms: Optional[List] = None) -> RagResult:
-        """Execute a query across indices and return processed results.
-
-        Performs query preprocessing, multi-threaded retrieval, and post-processing.
+        Performs query preprocessing, asynchronous retrieval, and post-processing.
 
         Args:
             query (Union[str, Query]): Query string or Query object.
@@ -546,39 +554,42 @@ class RAGEngine:
 
             results = []
             target_corpora = [corpus_id] if corpus_id else self.indices.keys()
-            with ThreadPoolExecutor(max_workers=self.config.num_workers or 4) as executor:
-                future_to_retriever = {}
-                for cid in target_corpora:
-                    for idx_type, retriever in self.retrievers[cid].items():
-                        if query.metadata_filters and query.metadata_filters.get("index_type") and \
-                           query.metadata_filters["index_type"] != idx_type:
-                            continue
-                        future = executor.submit(
-                            asyncio.run, self._retrieve_async(
-                                retriever, Query(
-                                    query_str=query.query_str,
-                                    top_k=query.top_k or self.config.retrieval.top_k,   # dynamic top_k. check if None, init by config
-                                    similarity_cutoff=query.similarity_cutoff,
-                                    keyword_filters=query.keyword_filters,
-                                    metadata_filters=query.metadata_filters
-                                )
-                            )
+
+            # Create all retrieval tasks
+            tasks = []
+            for cid in target_corpora:
+                for idx_type, retriever in self.retrievers[cid].items():
+                    if query.metadata_filters and query.metadata_filters.get("index_type") and \
+                    query.metadata_filters["index_type"] != idx_type:
+                        continue
+                    
+                    task = retriever.aretrieve(
+                        Query(
+                            query_str=query.query_str,
+                            top_k=query.top_k or self.config.retrieval.top_k,
+                            similarity_cutoff=query.similarity_cutoff,
+                            keyword_filters=query.keyword_filters,
+                            metadata_filters=query.metadata_filters
                         )
-                        future_to_retriever[future] = (cid, idx_type)
-                
-                for future in as_completed(future_to_retriever):
-                    cid, idx_type = future_to_retriever[future]
-                    try:
-                        result = future.result()
-                        results.append(result)
-                        logger.info(f"Retrieved {len(result.corpus.chunks)} chunks from {idx_type} retriever for corpus {cid}")
-                    except Exception as e:
-                        logger.error(f"Retrieval failed for {idx_type} in corpus {cid}: {str(e)}")
+                    )
+                    tasks.append((task, cid, idx_type))
+
+            # Run all retrievals concurrently
+            retrieval_tasks = [task for task, _, _ in tasks]
+            retrieval_results = await asyncio.gather(*retrieval_tasks, return_exceptions=True)
+
+            # Process results
+            for (_, cid, idx_type), result in zip(tasks, retrieval_results):
+                if isinstance(result, Exception):
+                    logger.error(f"Retrieval failed for {idx_type} in corpus {cid}: {str(result)}")
+                else:
+                    results.append(result)
+                    logger.info(f"Retrieved {len(result.corpus.chunks)} chunks from {idx_type} retriever for corpus {cid}")
 
             if not results:
                 return RagResult(corpus=Corpus(chunks=[]), scores=[], metadata={"query": query.query_str})
 
-            # Check the 'similarity_cutoff' and 'keyword_filters' in query. If None, init by the config
+            # Check the 'similarity_cutoff' and 'keyword_filters' in query
             query.similarity_cutoff = self.config.retrieval.similarity_cutoff if query.similarity_cutoff is None else query.similarity_cutoff
             query.keyword_filters = self.config.retrieval.keyword_filters if query.keyword_filters is None else query.keyword_filters
 
@@ -601,3 +612,8 @@ class RAGEngine:
         except Exception as e:
             logger.error(f"Query failed: {str(e)}")
             raise
+
+    def query(self, query: Union[str, Query], corpus_id: Optional[str] = None,
+            query_transforms: Optional[List] = None) -> RagResult:
+        """Synchronous wrapper for the async query method."""
+        return asyncio.run(self.query_async(query, corpus_id, query_transforms))

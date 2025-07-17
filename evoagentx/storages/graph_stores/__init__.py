@@ -33,7 +33,7 @@ class GraphStoreFactory:
             required_fields = ["uri", "username", "password"]
             if not all(field in store_config for field in required_fields):
                 raise ValueError("Neo4j requires uri, username, and password")
-            graph_store = Neo4jGraphStoreWrapper(**store_config).get_graph_store()
+            graph_store = Neo4jGraphStoreWrapper(**store_config)
         else:
             raise ValueError(f"Unsupported graph store type: {store_type}")
         logger.info(f"Created graph store: {store_type}")

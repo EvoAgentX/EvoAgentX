@@ -53,6 +53,9 @@ class StorageHandler(BaseModule):
         """
         vector_config = self.storageConfig.vectorConfig
         if vector_config is not None:
+            if self.vector_store is not None:
+                del self.vector_store
+
             vector_config_dict = vector_config.model_dump()
             self.vector_store = VectorStoreFactory().create(
                 store_type=vector_config.vector_name,

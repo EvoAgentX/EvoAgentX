@@ -107,10 +107,6 @@ class OpenAIEmbedding(BaseEmbedding):
         """Asynchronous query embedding."""
         return self._get_query_embedding(query)
 
-    async def _aget_text_embedding(self, text: str) -> List[float]:
-        """Asynchronous text embedding."""
-        return self._get_text_embedding(text)
-
     def _get_text_embeddings(self, texts: List[str]) -> List[List[float]]:
         """Get embeddings for a list of texts synchronously."""
         try:
@@ -125,10 +121,6 @@ class OpenAIEmbedding(BaseEmbedding):
         except Exception as e:
             logger.error(f"Failed to encode texts: {str(e)}")
             raise
-
-    async def _aget_text_embeddings(self, texts: List[str]) -> List[List[float]]:
-        """Asynchronous batch text embedding."""
-        return self._get_text_embeddings(texts)
 
 
 class OpenAIEmbeddingWrapper(BaseEmbeddingWrapper):
@@ -147,6 +139,7 @@ class OpenAIEmbeddingWrapper(BaseEmbeddingWrapper):
         self._dimensions = MODEL_DIMENSIONS.get(self.model_name, None) or dimensions
         self.base_url = base_url
         self.kwargs = kwargs
+        self._embedding_model = None
         self._embedding_model = self.get_embedding_model()
 
     def get_embedding_model(self) -> BaseEmbedding:
