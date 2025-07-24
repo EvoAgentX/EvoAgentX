@@ -16,8 +16,8 @@ primary_region = 'sea'
 
   [[http_service.checks]]
     interval = '10m'
-    timeout = '5s'
-    grace_period = '30s'
+    timeout = '10s'
+    grace_period = '60s'
     method = 'GET'
     path = '/health'
     protocol = 'http'

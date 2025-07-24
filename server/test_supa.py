@@ -14,6 +14,15 @@ import os
 import requests
 import json
 from datetime import datetime
+from dotenv import load_dotenv
+
+# Load environment variables
+server_dir = os.path.dirname(__file__)
+env_file = os.path.join(server_dir, 'app.env')
+load_dotenv(env_file, override=True)
+
+# Get access token
+ACCESS_TOKEN = os.getenv("EAX_ACCESS_TOKEN", "default_secret_token_change_me")
 
 # =============================================================================
 # CONFIGURATION - Modify these values for your test
@@ -32,6 +41,12 @@ TEST_CONFIG = {
     # Test Metadata
     "test_name": "EvoAgentX Workflow Lifecycle Test via Server API",
     "test_description": "Testing project setup, workflow generation, and execution phases through HTTP endpoints"
+}
+
+# Common headers for all requests
+HEADERS = {
+    "Content-Type": "application/json",
+    "eax-access-token": ACCESS_TOKEN
 }
 
 # =============================================================================
@@ -62,7 +77,7 @@ def test_phase_1_project_setup(config):
         response = requests.post(
             f"{config['server_url']}/project/setup",
             json=setup_request,
-            headers={"Content-Type": "application/json"}
+            headers=HEADERS
         )
         
         if response.status_code == 200:
@@ -72,7 +87,7 @@ def test_phase_1_project_setup(config):
             print(f"   Task info generated: {result.get('task_info') is not None}")
             
             # Verify creation by checking status
-            status_response = requests.get(f"{config['server_url']}/workflow/{config['workflow_id']}/status")
+            status_response = requests.get(f"{config['server_url']}/workflow/{config['workflow_id']}/status", headers={"eax-access-token": ACCESS_TOKEN})
             if status_response.status_code == 200:
                 workflow_status = status_response.json()
                 print(f"✅ Verification: Found workflow in database")
@@ -108,35 +123,25 @@ def test_phase_2_workflow_generation(config):
         print(f"   Workflow ID: {config['workflow_id']}")
         print(f"   Using task_info from setup phase")
         
-        # Call workflow generation API endpoint
+        # Call generation API endpoint
         response = requests.post(
             f"{config['server_url']}/workflow/generate",
             json=generation_request,
-            headers={"Content-Type": "application/json"}
+            headers=HEADERS
         )
         
         if response.status_code == 200:
             result = response.json()
-            print(f"✅ Workflow generated successfully")
+            print(f"✅ Workflow generated via API")
             print(f"   Status: {result.get('status', 'unknown')}")
-            print(f"   Workflow graph generated: {result.get('workflow_graph') is not None}")
+            print(f"   Workflow graph available: {result.get('workflow_graph') is not None}")
             
             # Verify generation by checking status
-            status_response = requests.get(f"{config['server_url']}/workflow/{config['workflow_id']}/status")
+            status_response = requests.get(f"{config['server_url']}/workflow/{config['workflow_id']}/status", headers={"eax-access-token": ACCESS_TOKEN})
             if status_response.status_code == 200:
                 workflow_status = status_response.json()
-                print(f"✅ Verification: Workflow generation completed")
+                print(f"✅ Verification: Workflow generation confirmed")
                 print(f"   Generation Complete: {workflow_status.get('phases', {}).get('generation_complete', False)}")
-                
-                # Check if workflow_graph exists
-                if workflow_status.get('workflow_graph'):
-                    graph = workflow_status['workflow_graph']
-                    nodes_count = len(graph.get('nodes', []))
-                    edges_count = len(graph.get('edges', []))
-                    print(f"   Graph nodes: {nodes_count}")
-                    print(f"   Graph edges: {edges_count}")
-                    print(f"   Response: {result}")
-                
                 return True
             else:
                 print("❌ Verification failed: Could not retrieve workflow status")
@@ -153,7 +158,7 @@ def test_phase_2_workflow_generation(config):
 def test_phase_3_workflow_execution(config):
     """
     Phase 3: Workflow Execution
-    Executes workflow via API with test inputs.
+    Executes the generated workflow with provided inputs via API.
     """
     print("\n⚡ PHASE 3: Workflow Execution")
     print("=" * 40)
@@ -161,39 +166,45 @@ def test_phase_3_workflow_execution(config):
     execution_request = {
         "workflow_id": config["workflow_id"],
         "inputs": {
-            "goal": "Analyze data and provide insights",
+            "goal": "Create a comprehensive stock analysis report for AAPL",
+            "analysis_type": "technical_and_fundamental",
+            "timeframe": "5_years"
         }
     }
     
     try:
         print(f"🚀 Executing workflow via API...")
         print(f"   Workflow ID: {config['workflow_id']}")
-        print(f"   Input keys: {list(execution_request['inputs'].keys())}")
+        print(f"   Input goal: {execution_request['inputs']['goal']}")
         print(f"   Using workflow_graph from generation phase")
         
-        # Call workflow execution API endpoint
+        # Call execution API endpoint
         response = requests.post(
             f"{config['server_url']}/workflow/execute",
             json=execution_request,
-            headers={"Content-Type": "application/json"}
+            headers=HEADERS
         )
         
         if response.status_code == 200:
             result = response.json()
-            print(f"✅ Workflow executed successfully")
+            print(f"✅ Workflow executed via API")
             print(f"   Execution result available: {result.get('execution_result') is not None}")
             
             # Show brief summary of execution result
             exec_result = result.get('execution_result')
+            if exec_result:
+                print(f"   Execution result type: {type(exec_result)}")
+                if isinstance(exec_result, dict) and 'message' in exec_result:
+                    print(f"   Result preview: {str(exec_result['message'])[:100]}...")
+                elif isinstance(exec_result, str):
+                    print(f"   Result preview: {exec_result[:100]}...")
             
             # Verify execution by checking status
-            status_response = requests.get(f"{config['server_url']}/workflow/{config['workflow_id']}/status")
+            status_response = requests.get(f"{config['server_url']}/workflow/{config['workflow_id']}/status", headers={"eax-access-token": ACCESS_TOKEN})
             if status_response.status_code == 200:
                 workflow_status = status_response.json()
-                print(f"✅ Verification: Workflow execution completed")
+                print(f"✅ Verification: Workflow execution confirmed")
                 print(f"   Execution Complete: {workflow_status.get('phases', {}).get('execution_complete', False)}")
-                print(f"   Response: {result}")
-                
                 return True
             else:
                 print("❌ Verification failed: Could not retrieve workflow status")
@@ -214,7 +225,7 @@ def display_final_workflow_state(config):
     
     try:
         # Get workflow status via API
-        response = requests.get(f"{config['server_url']}/workflow/{config['workflow_id']}/status")
+        response = requests.get(f"{config['server_url']}/workflow/{config['workflow_id']}/status", headers={"eax-access-token": ACCESS_TOKEN})
         
         if response.status_code != 200:
             print("❌ Workflow not found")
@@ -280,7 +291,7 @@ def test_server_health(config):
     print("=" * 30)
     
     try:
-        response = requests.get(f"{config['server_url']}/health")
+        response = requests.get(f"{config['server_url']}/health", headers=HEADERS)
         if response.status_code == 200:
             print("✅ Server is healthy and responding")
             return True

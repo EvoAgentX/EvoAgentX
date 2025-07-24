@@ -17,6 +17,15 @@ import asyncio
 import websockets
 import requests
 from datetime import datetime
+from dotenv import load_dotenv
+
+# Load environment variables
+server_dir = os.path.dirname(__file__)
+env_file = os.path.join(server_dir, 'app.env')
+load_dotenv(env_file, override=True)
+
+# Get access token
+ACCESS_TOKEN = os.getenv("EAX_ACCESS_TOKEN", "default_secret_token_change_me")
 
 # =============================================================================
 # CONFIGURATION - Modify these values for your test
@@ -36,6 +45,12 @@ TEST_CONFIG = {
     # Test Metadata
     "test_name": "EvoAgentX WebSocket Workflow Lifecycle Test via Server API",
     "test_description": "Testing project setup, workflow generation, and WebSocket execution phases through HTTP endpoints"
+}
+
+# Common headers for all requests
+HEADERS = {
+    "Content-Type": "application/json",
+    "eax-access-token": ACCESS_TOKEN
 }
 
 # =============================================================================
@@ -66,7 +81,7 @@ def test_phase_1_project_setup(config):
         response = requests.post(
             f"{config['server_url']}/project/setup",
             json=setup_request,
-            headers={"Content-Type": "application/json"}
+            headers=HEADERS
         )
         
         if response.status_code == 200:
@@ -76,7 +91,7 @@ def test_phase_1_project_setup(config):
             print(f"   Task info generated: {result.get('task_info') is not None}")
             
             # Verify creation by checking status
-            status_response = requests.get(f"{config['server_url']}/workflow/{config['workflow_id']}/status")
+            status_response = requests.get(f"{config['server_url']}/workflow/{config['workflow_id']}/status", headers={"eax-access-token": ACCESS_TOKEN})
             if status_response.status_code == 200:
                 workflow_status = status_response.json()
                 print(f"✅ Verification: Found workflow in database")
@@ -112,24 +127,24 @@ def test_phase_2_workflow_generation(config):
         print(f"   Workflow ID: {config['workflow_id']}")
         print(f"   Using task_info from setup phase")
         
-        # Call workflow generation API endpoint
+        # Call generation API endpoint
         response = requests.post(
             f"{config['server_url']}/workflow/generate",
             json=generation_request,
-            headers={"Content-Type": "application/json"}
+            headers=HEADERS
         )
         
         if response.status_code == 200:
             result = response.json()
-            print(f"✅ Workflow generated successfully")
+            print(f"✅ Workflow generated via API")
             print(f"   Status: {result.get('status', 'unknown')}")
-            print(f"   Workflow graph generated: {result.get('workflow_graph') is not None}")
+            print(f"   Workflow graph available: {result.get('workflow_graph') is not None}")
             
             # Verify generation by checking status
-            status_response = requests.get(f"{config['server_url']}/workflow/{config['workflow_id']}/status")
+            status_response = requests.get(f"{config['server_url']}/workflow/{config['workflow_id']}/status", headers={"eax-access-token": ACCESS_TOKEN})
             if status_response.status_code == 200:
                 workflow_status = status_response.json()
-                print(f"✅ Verification: Workflow generation completed")
+                print(f"✅ Verification: Workflow generation confirmed")
                 print(f"   Generation Complete: {workflow_status.get('phases', {}).get('generation_complete', False)}")
                 
                 # Check if workflow_graph exists
@@ -179,7 +194,7 @@ async def test_phase_3_websocket_workflow_execution(config):
         response = requests.post(
             f"{config['server_url']}/workflow/execute_ws",
             json=execution_request,
-            headers={"Content-Type": "application/json"}
+            headers=HEADERS
         )
         
         if response.status_code != 200:
@@ -274,7 +289,7 @@ async def test_phase_3_websocket_workflow_execution(config):
             return False
             
         # Verify final execution state
-        status_response = requests.get(f"{config['server_url']}/workflow/{config['workflow_id']}/status")
+        status_response = requests.get(f"{config['server_url']}/workflow/{config['workflow_id']}/status", headers={"eax-access-token": ACCESS_TOKEN})
         if status_response.status_code == 200:
             workflow_status = status_response.json()
             print(f"\n✅ Verification: Final workflow state")
@@ -296,7 +311,7 @@ def display_final_workflow_state(config):
     print("=" * 40)
     
     try:
-        response = requests.get(f"{config['server_url']}/workflow/{config['workflow_id']}/status")
+        response = requests.get(f"{config['server_url']}/workflow/{config['workflow_id']}/status", headers={"eax-access-token": ACCESS_TOKEN})
         if response.status_code == 200:
             workflow = response.json()
             
@@ -322,7 +337,7 @@ def test_server_health(config):
     print("=" * 40)
     
     try:
-        response = requests.get(f"{config['server_url']}/health", timeout=5)
+        response = requests.get(f"{config['server_url']}/health", headers={"eax-access-token": ACCESS_TOKEN}, timeout=5)
         if response.status_code == 200:
             print("✅ Server is healthy!")
             return True

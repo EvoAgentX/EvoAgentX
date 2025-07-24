@@ -12,7 +12,7 @@ from evoagentx.models.model_configs import OpenAILLMConfig, OpenRouterConfig
 from evoagentx.models.model_utils import create_llm_instance
 from evoagentx.agents.agent_manager import AgentManager
 from evoagentx.core.module_utils import parse_json_from_text
-from evoagentx.tools import MCPToolkit, FileTool
+from evoagentx.tools import MCPToolkit
 
 from .prompts import WORKFLOW_GENERATION_PROMPT, TASK_INFO_PROMPT_SUDO, CONNECTION_INSTRUCTION_PROMPT
 from .db import database

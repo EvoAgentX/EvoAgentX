@@ -1,3 +1,16 @@
+# Fly.io Tutorial codes
+```cmd
+fly version
+fly auth whoami
+fly apps list
+fly status
+fly secrets list
+fly secrets set EAX_ACCESS_TOKEN=sample_token
+fly deploy
+```
+
+
+
 # EvoAgentX Server - Hybrid SSE Workflow Generation API
 
 A powerful, flexible server for AI workflow generation with multiple API patterns to suit different use cases. Choose from simple synchronous APIs, task-based streaming, or persistent client sessions based on your needs.
@@ -9,6 +22,7 @@ A powerful, flexible server for AI workflow generation with multiple API pattern
 - **AI Workflow Generation**: LLM-powered workflow creation
 - **Concurrent Processing**: Multiple tasks per client session
 - **Resource Management**: Automatic session cleanup and monitoring
+- **Access Control**: Simple token-based authentication for all endpoints
 - **Production Ready**: Error handling, timeouts, and proper resource management
 
 ## 🏗️ Architecture Overview
@@ -56,7 +70,8 @@ cd EvoAgentX/server
 pip install -r requirements.txt
 
 # Set up environment variables
-echo "OPENAI_API_KEY=your_openai_key_here" > .env
+cp sample_app.env app.env
+# Edit app.env and set your API keys and access token
 ```
 
 ### Running the Server
@@ -73,7 +88,35 @@ python -m server.main
 ```bash
 # Run the comprehensive test suite
 python -m server.test_client
+
+# Test access control
+python -m server.test_access_control
 ```
+
+## 🔐 Access Control
+
+All API endpoints require authentication using the `eax-access-token` header. This provides basic security to prevent unauthorized access to your server.
+
+### Configuration
+
+1. Set your access token in `app.env`:
+```bash
+EAX_ACCESS_TOKEN=your_secret_access_token_here_change_this
+```
+
+2. Include the token in all API requests:
+```python
+headers = {"eax-access-token": "your_secret_access_token_here_change_this"}
+
+response = requests.get('http://localhost:8001/health', headers=headers)
+```
+
+### Security Notes
+
+- **Change the default token**: The default token is `default_secret_token_change_me` - change this immediately in production
+- **Keep it secret**: Never commit your access token to version control
+- **Use HTTPS**: In production, always use HTTPS to protect the token in transit
+- **Token rotation**: Consider rotating the token periodically for better security
 
 ## 🎯 API Patterns
 
@@ -85,14 +128,18 @@ We offer three distinct patterns for different use cases:
 ```python
 import requests
 
-response = requests.post('http://localhost:8001/workflow/generate', json={
-    "goal": "Create an email notification workflow",
-    "llm_config": {
-        "model": "gpt-4o-mini",
-        "openai_key": "your_key_here",
-        "max_tokens": 8000
-    }
-})
+headers = {"eax-access-token": "your_secret_access_token_here_change_this"}
+
+response = requests.post('http://localhost:8001/workflow/generate', 
+                        json={
+                            "goal": "Create an email notification workflow",
+                            "llm_config": {
+                                "model": "gpt-4o-mini",
+                                "openai_key": "your_key_here",
+                                "max_tokens": 8000
+                            }
+                        },
+                        headers=headers)
 
 workflow = response.json()
 print(f"Generated workflow: {workflow['workflow_graph']}")
@@ -108,12 +155,16 @@ print(f"Generated workflow: {workflow['workflow_graph']}")
 import requests
 from sseclient import SSEClient
 
+headers = {"eax-access-token": "your_secret_access_token_here_change_this"}
+
 # Start the task
-response = requests.post('http://localhost:8001/stream/workflow/generate', json=config)
+response = requests.post('http://localhost:8001/stream/workflow/generate', 
+                        json=config, headers=headers)
 task_data = response.json()
 
 # Connect to the task's SSE stream
-response = requests.get(f'http://localhost:8001{task_data["stream_url"]}', stream=True)
+response = requests.get(f'http://localhost:8001{task_data["stream_url"]}', 
+                       stream=True, headers=headers)
 messages = SSEClient(response)
 
 # Receive real-time updates
@@ -134,18 +185,23 @@ for msg in messages.events():
 import requests
 from sseclient import SSEClient
 
+headers = {"eax-access-token": "your_secret_access_token_here_change_this"}
+
 # Connect and get persistent session
-client_response = requests.post('http://localhost:8001/connect')
+client_response = requests.post('http://localhost:8001/connect', headers=headers)
 client_data = client_response.json()
 client_id = client_data["client_id"]
 
 # Open persistent SSE connection
-response = requests.get(f'http://localhost:8001{client_data["stream_url"]}', stream=True)
+response = requests.get(f'http://localhost:8001{client_data["stream_url"]}', 
+                       stream=True, headers=headers)
 messages = SSEClient(response)
 
 # Start multiple tasks through the same connection
-requests.post(f'http://localhost:8001/client/{client_id}/workflow/generate', json=config1)
-requests.post(f'http://localhost:8001/client/{client_id}/workflow/generate', json=config2)
+requests.post(f'http://localhost:8001/client/{client_id}/workflow/generate', 
+             json=config1, headers=headers)
+requests.post(f'http://localhost:8001/client/{client_id}/workflow/generate', 
+             json=config2, headers=headers)
 
 # All updates come through the same stream
 for msg in messages.events():

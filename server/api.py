@@ -1,9 +1,11 @@
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Depends, Header
 from sse_starlette.sse import EventSourceResponse
 from typing import Dict, Any, Optional, List
 import json
 import asyncio
 import uuid
+import os
+from dotenv import load_dotenv
 from datetime import datetime
 from contextlib import asynccontextmanager
 
@@ -23,10 +25,34 @@ from .task_manager import (
     is_client_session_active, add_task_to_client, send_to_client
 )
 
+load_dotenv('server/app.env', override = True)
+
+# Access control dependency
+async def verify_access_token(eax_access_token: Optional[str] = Header(None, alias="eax-access-token")):
+    """
+    Verify the access token from the header.
+    Returns the token if valid, raises HTTPException if invalid.
+    """
+    expected_token = os.getenv("EAX_ACCESS_TOKEN", "default_secret_token_change_me")
+    
+    if not eax_access_token:
+        raise HTTPException(
+            status_code=401, 
+            detail="Access token required. Please provide 'eax-access-token' in the header."
+        )
+    
+    if eax_access_token != expected_token:
+        raise HTTPException(
+            status_code=403, 
+            detail="Invalid access token. Access denied."
+        )
+    
+    return eax_access_token
+
 app = FastAPI(title="Processing Server")
 
 @app.post("/process", response_model=ProcessResponse)
-async def process_request(config: Config) -> ProcessResponse:
+async def process_request(config: Config, token: str = Depends(verify_access_token)) -> ProcessResponse:
     """
     Process the incoming request with the given configuration.
     Returns a task ID that can be used to retrieve results.
@@ -38,7 +64,7 @@ async def process_request(config: Config) -> ProcessResponse:
 
 # Updated workflow-based endpoints (using original project endpoints)
 @app.post("/project/setup", response_model=ProjectSetupResponse)
-async def setup_new_project(request: ProjectSetupRequest) -> ProjectSetupResponse:
+async def setup_new_project(request: ProjectSetupRequest, token: str = Depends(verify_access_token)) -> ProjectSetupResponse:
     """
     Phase 1: Setup workflow and generate task_info.
     This is the first phase of the workflow process.
@@ -50,7 +76,7 @@ async def setup_new_project(request: ProjectSetupRequest) -> ProjectSetupRespons
         raise HTTPException(status_code=500, detail=f"Error setting up workflow: {str(e)}")
 
 @app.post("/workflow/generate", response_model=ProjectWorkflowGenerationResponse)
-async def generate_workflow_for_project_api(request: ProjectWorkflowGenerationRequest) -> ProjectWorkflowGenerationResponse:
+async def generate_workflow_for_project_api(request: ProjectWorkflowGenerationRequest, token: str = Depends(verify_access_token)) -> ProjectWorkflowGenerationResponse:
     """
     Phase 2: Generate workflow graph based on task_info.
     This is the second phase of the workflow process.
@@ -65,7 +91,7 @@ async def generate_workflow_for_project_api(request: ProjectWorkflowGenerationRe
         raise HTTPException(status_code=500, detail=f"Error generating workflow: {str(e)}")
 
 @app.post("/workflow/execute", response_model=ProjectWorkflowExecutionResponse)
-async def execute_workflow_for_project_api(request: ProjectWorkflowExecutionRequest) -> ProjectWorkflowExecutionResponse:
+async def execute_workflow_for_project_api(request: ProjectWorkflowExecutionRequest, token: str = Depends(verify_access_token)) -> ProjectWorkflowExecutionResponse:
     """
     Phase 3: Execute workflow with provided inputs.
     This is the third phase of the workflow process.
@@ -78,7 +104,7 @@ async def execute_workflow_for_project_api(request: ProjectWorkflowExecutionRequ
 
 # Workflow management endpoints
 @app.get("/workflow/{workflow_id}/status")
-async def get_workflow_status(workflow_id: str):
+async def get_workflow_status(workflow_id: str, token: str = Depends(verify_access_token)):
     """
     Get the current status and details of a workflow.
     Shows which phase the workflow is in and all stored data.
@@ -108,7 +134,7 @@ async def get_workflow_status(workflow_id: str):
         raise HTTPException(status_code=500, detail=f"Error getting workflow status: {str(e)}")
 
 @app.get("/workflows")
-async def get_all_workflows():
+async def get_all_workflows(token: str = Depends(verify_access_token)):
     """
     List all workflows in the system with their current status.
     """
@@ -143,7 +169,7 @@ async def get_all_workflows():
         raise HTTPException(status_code=500, detail=f"Error listing workflows: {str(e)}")
 
 @app.post("/stream/process")
-async def start_stream_process(config: Config):
+async def start_stream_process(config: Config, token: str = Depends(verify_access_token)):
     """
     Start a streaming process and return a task ID.
     """
@@ -151,7 +177,7 @@ async def start_stream_process(config: Config):
 
 # New client-session endpoints
 @app.post("/connect", response_model=ClientConnectResponse)
-async def connect_client() -> ClientConnectResponse:
+async def connect_client(token: str = Depends(verify_access_token)) -> ClientConnectResponse:
     """
     Create a new client session and return client ID with stream URL.
     """
@@ -164,7 +190,7 @@ async def connect_client() -> ClientConnectResponse:
     )
 
 @app.get("/stream/client/{client_id}")
-async def stream_client_updates(client_id: str):
+async def stream_client_updates(client_id: str, token: str = Depends(verify_access_token)):
     """
     Persistent SSE stream for a client session.
     """
@@ -176,7 +202,7 @@ async def stream_client_updates(client_id: str):
     )
 
 @app.delete("/client/{client_id}")
-async def disconnect_client(client_id: str):
+async def disconnect_client(client_id: str, token: str = Depends(verify_access_token)):
     """
     Disconnect a client session.
     """
@@ -262,7 +288,7 @@ async def client_event_generator(client_id: str, timeout: int = 3600):
         await asyncio.sleep(0.5)
 
 @app.get("/stream/{task_id}")
-async def stream_results(task_id: str):
+async def stream_results(task_id: str, token: str = Depends(verify_access_token)):
     """
     Stream results for a given task ID using Server-Sent Events.
     """
@@ -275,7 +301,7 @@ async def stream_results(task_id: str):
     )
 
 @app.post("/workflow/execute_stream")
-async def execute_workflow_for_project_stream_api(request: ProjectWorkflowExecutionRequest):
+async def execute_workflow_for_project_stream_api(request: ProjectWorkflowExecutionRequest, token: str = Depends(verify_access_token)):
     """
     Phase 3: Execute workflow with provided inputs (Streaming version).
     Returns stream information to connect to the execution stream.
@@ -296,10 +322,14 @@ async def execute_workflow_for_project_stream_api(request: ProjectWorkflowExecut
 async def websocket_endpoint(websocket: WebSocket, task_id: str):
     """
     WebSocket endpoint for streaming workflow execution updates.
+    Note: WebSocket connections don't support headers in the same way, 
+    so we'll need to handle authentication differently for WebSocket.
     """
     await websocket.accept()
     
     try:
+        # For WebSocket, we'll accept the connection but could add token validation
+        # in the message protocol if needed
         start_time = datetime.now()
         last_index = 0
         
@@ -346,7 +376,7 @@ async def websocket_endpoint(websocket: WebSocket, task_id: str):
             pass
 
 @app.post("/workflow/execute_ws")
-async def execute_workflow_for_project_ws_api(request: ProjectWorkflowExecutionRequest):
+async def execute_workflow_for_project_ws_api(request: ProjectWorkflowExecutionRequest, token: str = Depends(verify_access_token)):
     """
     Phase 3: Execute workflow with provided inputs (WebSocket version).
     Returns WebSocket connection information.
@@ -369,7 +399,7 @@ async def health_check():
     return {"status": "healthy"}
 
 @app.get("/debug/database")
-async def debug_database():
+async def debug_database(token: str = Depends(verify_access_token)):
     """Debug endpoint to view database contents"""
     from .db import database
     
@@ -397,7 +427,7 @@ async def debug_database():
         raise HTTPException(status_code=500, detail=f"Error reading database: {str(e)}")
 
 @app.get("/clients")
-async def list_clients():
+async def list_clients(token: str = Depends(verify_access_token)):
     """List all active client sessions (for debugging)"""
     from .task_manager import client_sessions
     active_clients = []
@@ -414,7 +444,7 @@ async def list_clients():
     return {"active_clients": active_clients, "total": len(active_clients)} 
 
 @app.get("/project/{project_id}/status")
-async def get_project_status(project_id: str):
+async def get_project_status(project_id: str, token: str = Depends(verify_access_token)):
     """
     Get the current status and information for a specific project.
     """
@@ -435,7 +465,7 @@ async def get_project_status(project_id: str):
     }
 
 @app.get("/projects")
-async def get_all_projects():
+async def get_all_projects(token: str = Depends(verify_access_token)):
     """
     List all projects in the system.
     """
