@@ -1,6 +1,6 @@
 import os
 import random  
-from typing import Any
+from typing import Any, List
 
 from .benchmark import Benchmark
 from .measures import exact_match_score
@@ -75,6 +75,8 @@ class BIGBenchHard(Benchmark):
 
         self._data = task_data
         self._train_data = [] 
+    def get_input_keys(self) -> List[str]:
+        return ["input"]
     
     def _get_label(self, example: Any) -> Any:
         return example["target"]
