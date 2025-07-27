@@ -139,16 +139,20 @@ def build_customize_agent_with_inputs_and_outputs_and_prompt_template():
         description="Writes Python code based on requirements",
         prompt_template= StringTemplate(
             instruction="Write Python code that implements the provided `requirement`",
-            # demonstrations=[
-            #     {
-            #         "requirement": "print 'hello world'",
-            #         "code": "print('hello world')"
-            #     }, 
-            #     {
-            #         "requirement": "print 'Test Demonstration'",
-            #         "code": "print('Test Demonstration')"
-            #     }
-            # ]
+            demonstrations=[
+                {
+                    "requirement": "print 'hello world'",
+                    "code": "print('hello world')"
+                }, 
+                {
+                    "requirement": "create a function that calculates the sum of two numbers",
+                    "code": "def add_numbers(a, b):\n    return a + b"
+                },
+                {
+                    "requirement": "create a class for a simple calculator with basic operations",
+                    "code": "class Calculator:\n    def add(self, a, b):\n        return a + b\n    \n    def subtract(self, a, b):\n        return a - b\n    \n    def multiply(self, a, b):\n        return a * b\n    \n    def divide(self, a, b):\n        if b == 0:\n            raise ValueError('Cannot divide by zero')\n        return a / b"
+                }
+            ]
         ), # no need to specify input placeholders in the instruction of the prompt template
         llm_config=model_config,
         inputs=[
@@ -470,6 +474,18 @@ def test_xml_parse_mode_with_template():
                     "output": """Found the following information:
                     <people>Sarah and Mike</people>
                     <places>Paris</places>"""
+                },
+                {
+                    "text": "Dr. Johnson and Professor Smith attended the conference in Tokyo and Kyoto.",
+                    "output": """Found the following information:
+                    <people>Dr. Johnson and Professor Smith</people>
+                    <places>Tokyo and Kyoto</places>"""
+                },
+                {
+                    "text": "The team visited Microsoft headquarters in Seattle and then flew to Google's office in Mountain View.",
+                    "output": """Found the following information:
+                    <people>The team</people>
+                    <places>Microsoft headquarters in Seattle and Google's office in Mountain View</places>"""
                 }
             ]
         ),

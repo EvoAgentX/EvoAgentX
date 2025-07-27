@@ -63,6 +63,20 @@ def create_browser_research_agent():
                 "Include visual content insights when possible",
                 "Organize findings for content creation use",
                 "Prioritize social media platforms and viral content"
+            ],
+            demonstrations=[
+                {
+                    "topic": "AI productivity tools",
+                    "research_info": "AI tools gaining popularity among professionals for productivity. Key findings: 73% of professionals use AI daily, 40% faster task completion, reduced burnout levels, enhanced creativity. Trending platforms: ChatGPT, Notion AI, Claude. Visual content shows modern workspaces with AI interfaces."
+                },
+                {
+                    "topic": "remote work trends",
+                    "research_info": "Remote work trends and home office setups. Popular hashtags: #WFHLife #HomeOffice #RemoteWork. Visual content shows laptop setups, coffee cups, Zoom backgrounds. Key insights: flexible schedules, work-life balance, tech setup importance."
+                },
+                {
+                    "topic": "sustainable technology",
+                    "research_info": "Green tech innovations and eco-friendly solutions. Key trends: renewable energy adoption, electric vehicles, smart home sustainability. Popular hashtags: #GreenTech #Sustainability #CleanEnergy. Visual content shows solar panels, electric cars, smart home devices."
+                }
             ]
         ),
         llm_config=llm_config,
@@ -98,10 +112,22 @@ def create_content_generation_agent():
             ],
             demonstrations=[
                 {
-                    "research_info": "AI tools gaining popularity among professionals for productivity",
+                    "research_info": "AI tools gaining popularity among professionals for productivity. Key findings: 73% of professionals use AI daily, 40% faster task completion, reduced burnout levels, enhanced creativity. Trending platforms: ChatGPT, Notion AI, Claude. Visual content shows modern workspaces with AI interfaces.",
                     "style": "professional",
                     "platform": "LinkedIn",
                     "post_content": "🚀 The productivity revolution is here! New data shows 73% of professionals are now using AI tools daily.\n\nKey insights:\n• 40% faster task completion\n• Reduced burnout levels\n• Enhanced creativity\n\nWhich AI tool has transformed your workflow? Share your experience below! 👇\n\n#AI #Productivity #FutureOfWork #Innovation"
+                },
+                {
+                    "research_info": "Remote work trends and home office setups. Popular hashtags: #WFHLife #HomeOffice #RemoteWork. Visual content shows laptop setups, coffee cups, Zoom backgrounds. Key insights: flexible schedules, work-life balance, tech setup importance.",
+                    "style": "casual",
+                    "platform": "Instagram",
+                    "post_content": "Working from home got you feeling like a tech guru? 😎\n\nMy setup: laptop + coffee + endless Zoom calls\n\nWhat's your WFH essential? Drop your setup below! 👇\n\n#RemoteWork #HomeOffice #WFHLife #TechSetup"
+                },
+                {
+                    "research_info": "Green tech innovations and eco-friendly solutions. Key trends: renewable energy adoption, electric vehicles, smart home sustainability. Popular hashtags: #GreenTech #Sustainability #CleanEnergy. Visual content shows solar panels, electric cars, smart home devices.",
+                    "style": "informative",
+                    "platform": "Twitter",
+                    "post_content": "🌱 The future is green! Solar adoption up 40% this year.\n\nKey stats:\n• 2.5M new solar installations\n• EV sales doubled\n• Smart home energy savings: 25%\n\nWhat's your green tech story? 🌍\n\n#GreenTech #Sustainability #CleanEnergy #ClimateAction"
                 }
             ]
         ),
@@ -146,9 +172,19 @@ def create_image_generation_agent():
             ],
             demonstrations=[
                 {
-                    "post_content": "🚀 New AI productivity tools are changing how we work! Which one should you try first?",
-                    "research_info": "Focus on modern workspace and technology themes",
-                    "image_path": "A modern, minimalist workspace with floating holographic AI interface elements, clean desk with laptop, soft blue and purple gradient lighting, professional yet futuristic atmosphere, high contrast, vibrant colors, optimized for social media viewing"
+                    "post_content": "🚀 The productivity revolution is here! New data shows 73% of professionals are now using AI tools daily.",
+                    "research_info": "AI tools gaining popularity among professionals for productivity. Key findings: 73% of professionals use AI daily, 40% faster task completion, reduced burnout levels, enhanced creativity. Trending platforms: ChatGPT, Notion AI, Claude. Visual content shows modern workspaces with AI interfaces.",
+                    "image_path": "./social_media_images/ai_workspace_001.png"
+                },
+                {
+                    "post_content": "Working from home got you feeling like a tech guru? 😎",
+                    "research_info": "Remote work trends and home office setups. Popular hashtags: #WFHLife #HomeOffice #RemoteWork. Visual content shows laptop setups, coffee cups, Zoom backgrounds. Key insights: flexible schedules, work-life balance, tech setup importance.",
+                    "image_path": "./social_media_images/home_office_002.jpg"
+                },
+                {
+                    "post_content": "🌱 The future is green! Solar adoption up 40% this year.",
+                    "research_info": "Green tech innovations and eco-friendly solutions. Key trends: renewable energy adoption, electric vehicles, smart home sustainability. Popular hashtags: #GreenTech #Sustainability #CleanEnergy. Visual content shows solar panels, electric cars, smart home devices.",
+                    "image_path": "./social_media_images/green_tech_003.png"
                 }
             ]
         ),

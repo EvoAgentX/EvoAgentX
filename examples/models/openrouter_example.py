@@ -122,16 +122,24 @@ def build_customize_agent_with_inputs_and_outputs_and_prompt_template():
         description="Writes Python code based on requirements",
         prompt_template= StringTemplate(
             instruction="Write Python code that implements the provided `requirement`",
-            # demonstrations=[
-            #     {
-            #         "requirement": "print 'hello world'",
-            #         "code": "print('hello world')"
-            #     }, 
-            #     {
-            #         "requirement": "print 'Test Demonstration'",
-            #         "code": "print('Test Demonstration')"
-            #     }
-            # ]
+            demonstrations=[
+                {
+                    "requirement": "print 'hello world'",
+                    "code": "print('hello world')"
+                }, 
+                {
+                    "requirement": "create a function that adds two numbers",
+                    "code": "def add_numbers(a, b):\n    return a + b"
+                },
+                {
+                    "requirement": "create a function that calculates the factorial of a number",
+                    "code": "def factorial(n):\n    if n == 0 or n == 1:\n        return 1\n    else:\n        return n * factorial(n - 1)"
+                },
+                {
+                    "requirement": "create a class for a simple calculator",
+                    "code": "class Calculator:\n    def add(self, a, b):\n        return a + b\n    \n    def subtract(self, a, b):\n        return a - b\n    \n    def multiply(self, a, b):\n        return a * b\n    \n    def divide(self, a, b):\n        if b == 0:\n            raise ValueError('Cannot divide by zero')\n        return a / b"
+                }
+            ]
         ), # no need to specify input placeholders in the instruction of the prompt template
         llm_config=openrouter_config,
         inputs=[
