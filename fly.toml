@@ -10,7 +10,7 @@ primary_region = 'sea'
   internal_port = 8001
   force_https = true
   auto_stop_machines = 'stop'
-  auto_start_machines = true
+  auto_start_machines = false
   min_machines_running = 0
   processes = ['app']
 
