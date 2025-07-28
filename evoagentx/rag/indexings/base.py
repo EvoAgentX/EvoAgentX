@@ -36,6 +36,11 @@ class BaseIndexWrapper(ABC):
         pass
 
     @abstractmethod
+    def load(self) -> None:
+        """Load all nodes from the index."""
+        pass
+
+    @abstractmethod
     def clear(self) -> None:
         """Clear all nodes from the index."""
         pass

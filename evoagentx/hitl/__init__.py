@@ -22,6 +22,15 @@ from .interceptor_agent import (
     HITLConversationAction
 )
 
+from .special_hitl_agent import (
+    HITLOutsideConversationAgent,
+    HITLOutsideConversationAction,
+)
+
+SPECIAL_HITL_AGENT_REGISTRY = [
+    HITLOutsideConversationAgent,
+]
+
 __all__ = [
     # HITL data model
     'HITLDecision',
@@ -41,5 +50,12 @@ __all__ = [
     'HITLInterceptorAction',
     'HITLUserInputCollectorAction',
     'HITLPostExecutionAction',
-    'HITLConversationAction'
+    'HITLConversationAction',
+    
+    # Special HITL Agent
+    'HITLOutsideConversationAgent',
+    'HITLOutsideConversationAction',
+
+    # Special HITL Agent Registry
+    'SPECIAL_HITL_AGENT_REGISTRY',
 ] 

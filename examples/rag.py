@@ -7,7 +7,8 @@ from dotenv import load_dotenv
 from evoagentx.core.logging import logger
 from evoagentx.storages.base import StorageHandler
 from evoagentx.rag.rag import RAGEngine
-from evoagentx.storages.storages_config import VectorStoreConfig, DBConfig, StoreConfig
+from evoagentx.models import OpenRouterConfig, OpenRouterLLM
+from evoagentx.storages.storages_config import VectorStoreConfig, DBConfig, GraphStoreConfig, StoreConfig
 from evoagentx.rag.rag_config import RAGConfig, ReaderConfig, ChunkerConfig, IndexConfig, EmbeddingConfig, RetrievalConfig
 from evoagentx.rag.schema import Query, Corpus, Chunk, ChunkMetadata
 from evoagentx.benchmark.hotpotqa import HotPotQA, download_raw_hotpotqa_data
@@ -30,7 +31,14 @@ store_config = StoreConfig(
         dimensions=768,    # 1536: text-embedding-ada-002, 384: bge-small-en-v1.5, 768: nomic-embed-text
         index_type="flat_l2",
     ),
-    graphConfig=None,
+    graphConfig=GraphStoreConfig(
+        graph_name="neo4j",
+        uri="bolt://localhost:7687",
+        username= "neo4j",
+        password= "12345678",
+        database="neo4j",
+    ),
+    # graphConfig=None,
     path="./debug/data/hotpotqa/cache/indexing"
 )
 storage_handler = StorageHandler(storageConfig=store_config)
@@ -59,11 +67,16 @@ embedding=EmbeddingConfig(
     )
 """
 # For ollama example
+# embedding=EmbeddingConfig(
+#         provider="openai",
+#         model_name="text-embedding-ada-002",
+#         api_key=os.environ["OPENAI_API_KEY"],
+# )
 embedding=EmbeddingConfig(
-        provider="openai",
-        model_name="text-embedding-ada-002",
-        api_key=os.environ["OPENAI_API_KEY"],
-    )
+        provider="huggingface",
+        model_name=r"debug/weights/bge-small-en-v1.5",
+        device="cuda:0"
+)
 
 rag_config = RAGConfig(
     reader=ReaderConfig(
@@ -79,9 +92,9 @@ rag_config = RAGConfig(
         max_chunks=None
     ),
     embedding=embedding,
-    index=IndexConfig(index_type="vector"),
+    index=IndexConfig(index_type="graph"),
     retrieval=RetrievalConfig(
-        retrivel_type="vector",
+        retrivel_type="graph",
         postprocessor_type="simple",
         top_k=10,  # Retrieve top-10 contexts
         similarity_cutoff=0.3,
@@ -89,7 +102,27 @@ rag_config = RAGConfig(
         metadata_filters=None
     )
 )
-search_engine = RAGEngine(config=rag_config, storage_handler=storage_handler)
+
+OPEN_ROUNTER_API_KEY = os.environ["OPEN_ROUNTER_API_KEY"]
+config = OpenRouterConfig(
+    openrouter_key=OPEN_ROUNTER_API_KEY,
+    temperature=0.3,
+    model="google/gemini-2.5-flash-lite-preview-06-17",
+)
+llm = OpenRouterLLM(config=config)
+
+# from evoagentx.models import OpenAILLMConfig, OpenAILLM
+
+# config = OpenAILLMConfig(
+#     model="gpt-4o-mini",
+#     temperature=0.7,
+#     max_tokens=1000,
+#     openai_key=os.environ["OPENAI_API_KEY"],
+# )
+
+# llm = OpenAILLM(config=config)
+
+search_engine = RAGEngine(config=rag_config, storage_handler=storage_handler, llm=llm)
 
 # Define Helper function and evaluation function
 def create_corpus_from_context(context: List[List], corpus_id: str) -> Corpus:
@@ -112,7 +145,7 @@ def create_corpus_from_context(context: List[List], corpus_id: str) -> Corpus:
             )
             chunk.metadata.title = title    # initilize a new attribute
             chunks.append(chunk)
-    return Corpus(chunks=chunks, corpus_id=corpus_id)
+    return Corpus(chunks=chunks[:4], corpus_id=corpus_id)
 
 def evaluate_retrieval(retrieved_chunks: List[Chunk], supporting_facts: List[List], top_k: int) -> Dict[str, float]:
     """Evaluate retrieved chunks against supporting facts."""
@@ -168,27 +201,48 @@ def run_evaluation(samples: List[Dict], top_k: int = 5) -> Dict[str, float]:
         corpus_id = sample["_id"]
         
         logger.info(f"Processing sample: {corpus_id}, question: {question}")
-        
         # Create and index corpus
         corpus = create_corpus_from_context(context, corpus_id)
         logger.info(f"Created corpus with {len(corpus.chunks)} chunks")
-        search_engine.add(index_type="vector", nodes=corpus, corpus_id=corpus_id)
+        search_engine.add(index_type="graph", nodes=corpus, corpus_id=corpus_id)
         
         # Query
         query = Query(query_str=question, top_k=top_k)
         result = search_engine.query(query, corpus_id=corpus_id)
         retrieved_chunks = result.corpus.chunks
         logger.info(f"Retrieved {len(retrieved_chunks)} chunks for query")
-        
+        logger.info(f"content:\n{retrieved_chunks}")
+    
         # Evaluate
         sample_metrics = evaluate_retrieval(retrieved_chunks, supporting_facts, top_k)
         for metric_name, value in sample_metrics.items():
             metrics[metric_name].append(value)
         logger.info(f"Metrics for sample {corpus_id}: {sample_metrics}")
         
-        # Clear index to avoid memory issues
-        search_engine.clear(corpus_id=corpus_id)
-    
+        CHECK_SAVE = False
+        if CHECK_SAVE:
+            # Test file
+            # search_engine.save(output_path="./debug/cache/test_cache", graph_exported=True)
+            # Test database
+            search_engine.save(graph_exported=True)
+            # Clear index to avoid memory issues
+            search_engine.clear(corpus_id=corpus_id)
+
+            search_engine1 = RAGEngine(config=rag_config, storage_handler=storage_handler, llm=llm)
+            # search_engine1.load(source="./debug/cache/test_cache", index_type="graph")
+            search_engine1.load(index_type="graph")
+
+            # Query
+            query = Query(query_str=question, top_k=top_k)
+            result = search_engine1.query(query, corpus_id=corpus_id)
+            retrieved_chunks = result.corpus.chunks
+            logger.info(f"Retrieved {len(retrieved_chunks)} chunks for query")
+            logger.info(f"content:\n{retrieved_chunks}")
+        
+            # Evaluate
+            sample_metrics = evaluate_retrieval(retrieved_chunks, supporting_facts, top_k)
+            logger.info(f"Metrics for sample {corpus_id}: {sample_metrics}")
+
     # Aggregate metrics
     avg_metrics = {name: sum(values) / len(values) for name, values in metrics.items()}
     return avg_metrics

@@ -32,7 +32,6 @@ class HuggingFaceEmbedding(BaseEmbedding):
 
         if not EmbeddingProvider.validate_model(EmbeddingProvider.HUGGINGFACE, model_name):
             raise ValueError(f"Unsupported HuggingFace model: {model_name}. Supported models: {SUPPORTED_MODELS['huggingface']}")
-
         try:
             self.model = SentenceTransformer(model_name, device=device, **model_kwargs)
             logger.debug(f"Initialized HuggingFace embedding model: {model_name}")
@@ -86,14 +85,6 @@ class HuggingFaceEmbedding(BaseEmbedding):
         """Asynchronous query embedding (falls back to sync)."""
         return self._get_query_embedding(query)
 
-    async def _aget_text_embedding(self, text: str) -> List[float]:
-        """Asynchronous text embedding (falls back to sync)."""
-        return self._get_text_embedding(text)
-
-    async def _aget_text_embeddings(self, texts: List[str]) -> List[List[float]]:
-        """Asynchronous batch text embedding (falls back to sync)."""
-        return self._get_text_embeddings(texts)
-
     @property
     def dimension(self) -> int:
         """Return the embedding dimension."""
@@ -114,6 +105,7 @@ class HuggingFaceEmbeddingWrapper(BaseEmbeddingWrapper):
         self.device = device
         self.normalize = normalize
         self.model_kwargs = model_kwargs
+        self._embedding_model = None
         self._embedding_model = self.get_embedding_model()
 
     def get_embedding_model(self) -> BaseEmbedding:

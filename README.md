@@ -43,6 +43,8 @@
 
 
 ## 🔥 Latest News
+- **[July 2025]** 🎉 **EvoAgentX** is on [arxiv](https://arxiv.org/abs/2507.03616)!
+- **[July 2025]** 🎉 **EvoAgentX** has achieved 1,000 stars!
 - **[May 2025]** 🎉 **EvoAgentX** has been officially released!
 
 ## ⚡ Get Started
@@ -353,6 +355,20 @@ We appreciate your interest in contributing to our open-source initiative. We pr
 
 [![Star History Chart](https://api.star-history.com/svg?repos=EvoAgentX/EvoAgentX&type=Date)](https://www.star-history.com/#EvoAgentX/EvoAgentX&Date)
 
+## 📖 Citation
+
+Please consider citing our work if you find EvoAgentX helpful:
+
+📄 [arXiv:2507.03616](https://arxiv.org/abs/2507.03616)
+
+```bibtex
+@article{wang2025evoagentx,
+  title={EvoAgentX: An Automated Framework for Evolving Agentic Workflows},
+  author={Wang, Yingxu and Liu, Siwei and Fang, Jinyuan and Meng, Zaiqiao},
+  journal={arXiv preprint arXiv:2507.03616},
+  year={2025}
+}
+```
 
 ## 📚 Acknowledgements 
 This project builds upon several outstanding open-source projects: [AFlow](https://github.com/FoundationAgents/MetaGPT/tree/main/metagpt/ext/aflow), [TextGrad](https://github.com/zou-group/textgrad), [DSPy](https://github.com/stanfordnlp/dspy), [LiveCodeBench](https://github.com/LiveCodeBench/LiveCodeBench), and more. We would like to thank the developers and maintainers of these frameworks for their valuable contributions to the open-source community.
