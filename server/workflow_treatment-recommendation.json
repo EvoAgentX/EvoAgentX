@@ -1,0 +1,124 @@
+{
+    "class_name": "WorkFlowGraph",
+    "goal": "\n## Background\nYou are an experienced workflow designer. You are given a workflow requirement and you should generate a workflow with given inputs and outputs formats.\n\n## Workflow Inputs:\n[{'name': 'diagnosis', 'type': 'string', 'description': 'The confirmed diagnosis of the disease'}]\n\n## Workflow Outputs:\n[{'name': 'treatment_options', 'type': 'array', 'description': 'Recommended treatment options'}]\n\n## Instructions\nPlease carefully analyze the following requirement documentation and generate a workflow with given inputs and outputs formats.\n\n## Key things to notice:\n- You should generate a workflow with given inputs and outputs formats.\n\n## Requirement documentation:\nRecommend treatment options based on the confirmed diagnosis of a pet's condition. The system will process the diagnosis and provide a list of recommended treatment options.\n\n",
+    "nodes": [
+        {
+            "class_name": "WorkFlowNode",
+            "name": "diagnosis_analysis",
+            "description": "Analyze the confirmed diagnosis of the pet's condition to determine the underlying medical issues.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "diagnosis",
+                    "type": "string",
+                    "description": "The confirmed diagnosis of the disease.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "analyzed_diagnosis",
+                    "type": "string",
+                    "description": "The analyzed interpretation of the diagnosis for further processing.",
+                    "required": true
+                }
+            ],
+            "reason": "This sub-task is necessary to understand the diagnosis clearly and ensure appropriate treatment options can be recommended.",
+            "agents": [
+                {
+                    "name": "diagnosis_analysis_agent",
+                    "description": "This agent analyzes the confirmed diagnosis of the pet\u2019s condition and provides an interpreted analysis for further processing.",
+                    "inputs": [
+                        {
+                            "name": "diagnosis",
+                            "type": "string",
+                            "description": "The confirmed diagnosis of the disease.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "analyzed_diagnosis",
+                            "type": "string",
+                            "description": "The analyzed interpretation of the diagnosis for further processing.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Objective\nAnalyze the confirmed diagnosis of the pet's condition to determine the underlying medical issues.\n\n### Instructions\n1. Receive the diagnosis: <input>{diagnosis}</input>.\n2. Review and interpret the diagnosis to understand potential medical issues.\n3. Formulate an analyzed interpretation based on common medical understandings of the diagnosis provided.\n4. Present the analyzed diagnosis as the output.\n\n### Output Format\nYour final output should ALWAYS in the following format:\n\n## Thought\nBriefly explain the reasoning process for analyzing the diagnosis.\n\n## analyzed_diagnosis\nThe analyzed interpretation of the diagnosis for further processing."
+                }
+            ],
+            "status": "pending"
+        },
+        {
+            "class_name": "WorkFlowNode",
+            "name": "treatment_recommendation",
+            "description": "Generate a list of recommended treatment options based on the analyzed diagnosis.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "diagnosis",
+                    "type": "string",
+                    "description": "The confirmed diagnosis of the disease.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "analyzed_diagnosis",
+                    "type": "string",
+                    "description": "The analyzed interpretation of the diagnosis from the previous sub-task.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "treatment_options",
+                    "type": "array",
+                    "description": "Recommended treatment options based on the diagnosis.",
+                    "required": true
+                }
+            ],
+            "reason": "This step utilizes the analyzed diagnosis to provide tailored treatment options for the pet's condition.",
+            "agents": [
+                {
+                    "name": "treatment_recommendation_agent",
+                    "description": "This agent generates a list of recommended treatment options based on the provided diagnosis and its analyzed interpretation, tailored to meet the specific needs of the pet's condition.",
+                    "inputs": [
+                        {
+                            "name": "diagnosis",
+                            "type": "string",
+                            "description": "The confirmed diagnosis of the disease.",
+                            "required": true
+                        },
+                        {
+                            "name": "analyzed_diagnosis",
+                            "type": "string",
+                            "description": "The analyzed interpretation of the diagnosis from the previous sub-task.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "treatment_options",
+                            "type": "array",
+                            "description": "Recommended treatment options based on the diagnosis.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Objective\nGenerate a list of recommended treatment options based on the analyzed diagnosis.\n\n### Instructions\n1. Review the confirmed diagnosis: <input>{diagnosis}</input>\n2. Analyze the interpretation of the diagnosis: <input>{analyzed_diagnosis}</input>\n3. Use the information gathered to determine suitable treatment options for the pet's condition.\n4. Compile the recommendations into a list format for easy reference.\n\n### Output Format\nYour final output should ALWAYS in the following format:\n\n## Thought\nBriefly explain the reasoning process for generating the list of treatment options based on the diagnosis.\n\n## treatment_options\nThe recommended treatment options based on the analyzed diagnosis."
+                }
+            ],
+            "status": "pending"
+        }
+    ],
+    "edges": [
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "diagnosis_analysis",
+            "target": "treatment_recommendation",
+            "priority": 0
+        }
+    ],
+    "graph": null
+}

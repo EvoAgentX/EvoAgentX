@@ -1,0 +1,124 @@
+{
+    "class_name": "WorkFlowGraph",
+    "goal": "\n## Background\nYou are an experienced workflow designer. You are given a workflow requirement and you should generate a workflow with given inputs and outputs formats.\n\n## Workflow Inputs:\n[{'name': 'symptoms', 'type': 'string', 'description': 'The symptoms exhibited by the pet'}]\n\n## Workflow Outputs:\n[{'name': 'possible_causes', 'type': 'array', 'description': 'Possible disease causes'}]\n\n## Instructions\nPlease carefully analyze the following requirement documentation and generate a workflow with given inputs and outputs formats.\n\n## Key things to notice:\n- You should generate a workflow with given inputs and outputs formats.\n\n## Requirement documentation:\nAnalyze the symptoms of pets to identify possible disease causes. The system will process the input symptoms and provide a list of possible causes.\n\n",
+    "nodes": [
+        {
+            "class_name": "WorkFlowNode",
+            "name": "symptom_analysis",
+            "description": "Analyze the pet symptoms provided as input for key characteristics and patterns.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "symptoms",
+                    "type": "string",
+                    "description": "The symptoms exhibited by the pet.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "analyzed_symptoms",
+                    "type": "string",
+                    "description": "The analyzed summary of the pet's symptoms, highlighting key characteristics.",
+                    "required": true
+                }
+            ],
+            "reason": "This sub-task is necessary to extract useful information from symptoms and prepare for further analysis.",
+            "agents": [
+                {
+                    "name": "symptom_analysis_agent",
+                    "description": "This agent analyzes the provided pet symptoms to extract key characteristics and patterns for further analysis.",
+                    "inputs": [
+                        {
+                            "name": "symptoms",
+                            "type": "string",
+                            "description": "The symptoms exhibited by the pet.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "analyzed_symptoms",
+                            "type": "string",
+                            "description": "The analyzed summary of the pet's symptoms, highlighting key characteristics.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Objective\nAnalyze the pet symptoms provided as input to extract key characteristics and patterns for further analysis.\n\n### Instructions\n1. Read the input symptoms: <input>{symptoms}</input>.\n2. Identify key features and characteristics present in the symptoms.\n3. Summarize the findings and create a concise representation of the analyzed symptoms.\n4. Ensure the output is clear and easy to understand for further processing.\n\n### Output Format\nYour final output should ALWAYS in the following format:\n\n## Thought\nBriefly explain the reasoning process for achieving the objective.\n\n## analyzed_symptoms\nProvide a summary highlighting the key characteristics of the analyzed symptoms."
+                }
+            ],
+            "status": "pending"
+        },
+        {
+            "class_name": "WorkFlowNode",
+            "name": "cause_identification",
+            "description": "Match the analyzed symptoms against a database of known disease causes to identify possible conditions.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "symptoms",
+                    "type": "string",
+                    "description": "The symptoms exhibited by the pet.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "analyzed_symptoms",
+                    "type": "string",
+                    "description": "The analyzed summary of the pet's symptoms.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "possible_causes",
+                    "type": "array",
+                    "description": "List of possible disease causes identified from the symptoms.",
+                    "required": true
+                }
+            ],
+            "reason": "This step links the extracted symptom data to potential medical conditions based on established knowledge.",
+            "agents": [
+                {
+                    "name": "cause_identification_agent",
+                    "description": "This agent matches the provided symptoms and analyzed symptoms against a comprehensive database of known disease causes to identify possible conditions affecting the pet.",
+                    "inputs": [
+                        {
+                            "name": "symptoms",
+                            "type": "string",
+                            "description": "The symptoms exhibited by the pet.",
+                            "required": true
+                        },
+                        {
+                            "name": "analyzed_symptoms",
+                            "type": "string",
+                            "description": "The analyzed summary of the pet's symptoms.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "possible_causes",
+                            "type": "array",
+                            "description": "List of possible disease causes identified from the symptoms.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Objective\nMatch the analyzed symptoms with known disease causes to identify possible conditions affecting the pet.\n\n### Instructions\n1. Retrieve the raw symptoms: <input>{symptoms}</input>.\n2. Read the analyzed summary of the symptoms: <input>{analyzed_symptoms}</input>.\n3. Analyze both inputs to identify key patterns or noteworthy indicators in the symptoms.\n4. Cross-reference this analysis with the database of known disease causes to locate any potential matches.\n5. Compile a list of these potential conditions as an output.\n\n### Output Format\nYour final output should ALWAYS in the following format:\n\n## Thought\nBriefly explain the reasoning process for achieving the objective.\n\n## possible_causes\nA list of possible disease causes identified from the pet's symptoms."
+                }
+            ],
+            "status": "pending"
+        }
+    ],
+    "edges": [
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "symptom_analysis",
+            "target": "cause_identification",
+            "priority": 0
+        }
+    ],
+    "graph": null
+}

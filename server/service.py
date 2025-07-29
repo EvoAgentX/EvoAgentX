@@ -14,18 +14,14 @@ from evoagentx.agents.agent_manager import AgentManager
 from evoagentx.core.module_utils import parse_json_from_text
 from evoagentx.tools import MCPToolkit
 
-from .prompts import WORKFLOW_GENERATION_PROMPT, TASK_INFO_PROMPT_SUDO, CONNECTION_INSTRUCTION_PROMPT
+from .prompts import WORKFLOW_GENERATION_PROMPT, WORKFLOW_GENERATION_GOAL_PROMPT, WORKFLOW_REQUIREMENT_PROMPT, TASK_INFO_PROMPT_SUDO, CONNECTION_INSTRUCTION_PROMPT
 from .db import database
 
 from .task_manager import (
-    store_task_result,
     create_stream_task,
     update_stream_task,
-    complete_stream_task,
-    send_to_client,
-    remove_task_from_client
+    complete_stream_task
 )
-from .models import ProcessResponse
 
 import sys
 import io
@@ -133,43 +129,6 @@ def read_tunnel_info():
     except Exception:
         return None
 
-def create_workflow_info(config: Dict[str, Any], execution_result: Dict[str, Any]) -> str:
-    """Create comprehensive workflow info string including public URL and other details"""
-    tunnel_info = read_tunnel_info()
-    
-    # Extract key information
-    public_url = tunnel_info.get("public_url", "Not available") if tunnel_info else "Not available"
-    local_url = tunnel_info.get("local_url", "Not available") if tunnel_info else "Not available"
-    
-    workflow_dict = config.get("workflow", {})
-    
-    # Build comprehensive workflow info string
-    workflow_info = f"""
-=== WORKFLOW EXECUTION INFORMATION ===
-Timestamp: {datetime.now().isoformat()}
-
-=== SERVER ACCESS INFORMATION ===
-Public URL: {public_url}
-Local URL: {local_url}
-
-=== WORKFLOW CONFIGURATION ===
-Workflow Status: {execution_result.get('status', 'Unknown')}
-LLM Configuration: {config.get('llm_config', {}).get('model', 'Unknown')}
-MCP Configuration: {'Enabled' if config.get('mcp_config') else 'Disabled'}
-
-=== EXECUTION RESULTS ===
-Execution Message: {execution_result.get('message', 'No message available')}
-Workflow Received: {execution_result.get('workflow_received', False)}
-LLM Config Received: {execution_result.get('llm_config_received', False)}
-MCP Config Received: {execution_result.get('mcp_config_received', False)}
-
-=== INPUTS PROVIDED ===
-{json.dumps(config.get('inputs', {}), indent=2)}
-
-""".strip()
-    
-    return workflow_info
-
 def create_task_info(project_id: str, goal: str, additional_info: Dict[str, Any] = None, public_url: str = None) -> dict:
     """Generate comprehensive task info string for a project"""
     task_prompt = TASK_INFO_PROMPT_SUDO.format(
@@ -228,95 +187,47 @@ def create_llm_config(llm_config_dict: Dict[str, Any]) -> LLMConfig:
         return OpenAILLMConfig(**llm_config_dict)
     
 
-async def process_task(config: Dict[str, Any]) -> Dict[str, Any]:
+async def extract_workflow_requirements(detailed_requirements: str) -> Dict[str, Any]:
     """
-    Placeholder for the actual processing logic.
-    This is where you'll implement your specific processing functionality.
+    Simple extraction function that:
+    - Takes detailed requirements document
+    - Uses WORKFLOW_REQUIREMENT_PROMPT to extract workflows and database info
+    - Simple validation
+    - Returns: {workflows: [...], database_information: {...}}
     """
-    # Simulate some processing time
-    await asyncio.sleep(2)
-    
-    # Example processing - replace this with your actual logic
-    return {
-        "processed": True,
-        "input_parameters": config,
-        "sample_output": "This is a sample result"
-    }
-
-async def handle_process_request(config: Dict[str, Any]) -> ProcessResponse:
-    """Handle a processing request and return a response"""
-    task_id = str(uuid.uuid4())
-    
-    # Process the task
-    result = await process_task(config)
-    
-    # Create response
-    response = ProcessResponse(
-        task_id=task_id,
-        status="completed",
-        result=result
-    )
-    
-    # Store the result
-    store_task_result(task_id, response)
-    
-    return response
-
-async def process_stream_task(task_id: str, config: Dict[str, Any]):
-    """
-    Process a streaming task and generate updates.
-    """
-    total_steps = 5
-    for step in range(total_steps):
-        # Simulate processing time for each step
-        await asyncio.sleep(1)
+    try:
+        # Use LLM to extract workflows and database info
+        llm_config = create_llm_config(default_llm_config)
+        llm = create_llm_instance(llm_config)
         
-        # Update progress
-        progress = {
-            "step": step + 1,
-            "total_steps": total_steps,
-            "timestamp": datetime.now().isoformat(),
-            "status": "processing",
-            "progress": ((step + 1) / total_steps) * 100,
-            "current_state": f"Processing step {step + 1}/{total_steps}"
-        }
+        # Format the prompt with the requirements
+        extraction_prompt = WORKFLOW_REQUIREMENT_PROMPT.format(requirement=detailed_requirements)
         
-        update_stream_task(task_id, progress)
-    
-    # Final result
-    final_result = {
-        "status": "completed",
-        "timestamp": datetime.now().isoformat(),
-        "result": {
-            "processed": True,
-            "input_parameters": config,
-            "final_output": "Streaming task completed successfully"
-        }
-    }
-    
-    update_stream_task(task_id, final_result)
-    complete_stream_task(task_id)
-
-async def start_streaming_task(config: Dict[str, Any]) -> Dict[str, Any]:
-    """Start a new streaming task"""
-    task_id = str(uuid.uuid4())
-    
-    # Initialize the stream task
-    create_stream_task(task_id, config)
-    
-    # Determine task type and start appropriate processing
-    task_type = config.get("task_type", "default")
-    
-    # Default processing task
-    asyncio.create_task(process_stream_task(task_id, config["parameters"]))
-    
-    return {
-        "task_id": task_id,
-        "status": "started",
-        "stream_url": f"/stream/{task_id}",
-        "task_type": task_type
-    } 
-
+        # Get LLM response
+        response = llm.single_generate([{"role": "user", "content": extraction_prompt}])
+        
+        # Parse JSON from response
+        extracted_data = parse_json_from_text(response)
+        
+        if not extracted_data:
+            raise ValueError(f"No JSON found in LLM response: {response}")
+        
+        try:
+            result = json.loads(extracted_data[0])
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON in LLM response: {extracted_data[0]}")
+        
+        # Simple validation
+        if "workflows" not in result:
+            raise ValueError("No workflows found in extracted data")
+        
+        if "database_information" not in result:
+            raise ValueError("No database information found in extracted data")
+        
+        return result
+        
+    except Exception as e:
+        raise ValueError(f"Error extracting workflow requirements: {str(e)}")
 
 async def generate_workflow_from_goal(goal: str, llm_config_dict: Dict[str, Any], mcp_config: dict = None) -> str:
     """
@@ -512,84 +423,86 @@ async def execute_workflow_from_config_with_capture(workflow: Dict[str, Any], ll
         }
 
 
+    
 
-def generate_project_id() -> str:
-    """Generate a unique project ID"""
-    return f"proj_{uuid.uuid4().hex[:12]}"
 
-async def setup_project(workflow_id: str, requirement_id: str, user_id: str) -> Dict[str, Any]:
+
+
+
+
+
+
+
+
+async def setup_project(detailed_requirements: str) -> Dict[str, Any]:
     """
-    Phase 1: Setup workflow and generate task_info.
-    Updated to use generalized database and retrieve requirement information.
+    Phase 1: Setup workflow with extraction AND generation.
+    Returns workflow information for multiple workflows.
     """
-    # Check if workflow already exists (for logging purposes)
-    existing_workflow = await database.find_one("workflows", {"id": workflow_id})
-    workflow_exists = existing_workflow is not None
+    # Extract workflows and database info
+    print(f"🔍 Extracting workflows from detailed requirements...")
+    extracted_data = await extract_workflow_requirements(detailed_requirements)
     
-    if workflow_exists:
-        print(f"🔄 Workflow {workflow_id} already exists, will update with new setup")
+    print(f"✅ Extracted {len(extracted_data['workflows'])} workflows")
     
-    # Retrieve requirement information from database
-    requirement = await database.find_one("requirements", {"id": requirement_id})
-    if not requirement:
-        raise ValueError(f"Requirement with ID {requirement_id} not found")
+    # Generate workflows for each extracted workflow
+    print(f"🏗️ Generating workflows...")
+    generated_workflows = []
+    for extracted_workflow in extracted_data["workflows"]:
+        print(f"   Generating workflow: {extracted_workflow['workflow_name']}")
+        
+        # Use WORKFLOW_GENERATION_GOAL_PROMPT with proper structure
+        formatted_goal = WORKFLOW_GENERATION_GOAL_PROMPT.format(
+            workflow_inputs=extracted_workflow["workflow_inputs"],
+            workflow_outputs=extracted_workflow["workflow_outputs"],
+            requirement=extracted_workflow["workflow_requirement"]
+        )
+        
+        # Generate workflow
+        workflow_graph = await generate_workflow_from_goal(
+            formatted_goal, 
+            default_llm_config, 
+            mcp_config={}
+        )
+        
+        generated_workflows.append({
+            "workflow_name": extracted_workflow["workflow_name"],
+            "workflow_id": extracted_workflow["workflow_id"],
+            "workflow_requirement": extracted_workflow["workflow_requirement"],
+            "workflow_inputs": extracted_workflow["workflow_inputs"],
+            "workflow_outputs": extracted_workflow["workflow_outputs"],
+            "workflow_graph": workflow_graph
+        })
     
-    # Extract goal from requirement description field
-    goal = requirement.get("description", "")
-    if not goal:
-        # Fallback to goal field if description is empty
-        goal = requirement.get("goal", f"Complete task for requirement {requirement_id}")
+    print(f"✅ Generated {len(generated_workflows)} workflows")
     
-    # Prepare additional info from requirement
-    additional_info = {
-        "title": requirement.get("title", ""),
-        "category": requirement.get("category", ""),
-        "status": requirement.get("status", ""),
-        "llm_config": default_llm_config
+    # Generate unique workflow_id and user_id
+    workflow_id = f"workflow_{uuid.uuid4().hex[:12]}"
+    user_id = f"user_{uuid.uuid4().hex[:8]}"
+    
+    # Store everything in workflow document
+    workflow_doc = {
+        "id": workflow_id,
+        "user_id": user_id,
+        "extracted_workflows": extracted_data["workflows"],
+        "generated_workflows": generated_workflows,
+        "database_information": extracted_data["database_information"],
+        "workflow_graph": generated_workflows,  # Store all generated workflows
+        "execution_result": None,
+        "status": "pending"  # Ready for execution
     }
     
-    # Get tunnel information
-    tunnel_info = read_tunnel_info()
-    public_url = tunnel_info.get("public_url") if tunnel_info else None
+    await database.insert("workflows", workflow_doc)
+    print(f"✅ Created new workflow {workflow_id}")
     
-    # Generate comprehensive task info (reusing existing logic)
-    task_info = create_task_info(
-        workflow_id, 
-        goal, 
-        additional_info, 
-        public_url
-    )
-    
-    if workflow_exists:
-        # Update existing workflow with complete new setup
-        await database.update(
-            "workflows",
-            {"id": workflow_id},
-            {
-                "user_id": user_id,
-                "requirement_id": requirement_id,
-                "task_info": task_info,
-                "workflow_graph": None,
-                "execution_result": None,
-                "status": "uninitialized"
-            }
-        )
-        print(f"✅ Updated existing workflow {workflow_id} with new setup")
-    else:
-        # Create new workflow document
-        workflow_doc = {
-            "id": workflow_id,
-            "user_id": user_id,
-            "requirement_id": requirement_id,
-            "task_info": task_info,
-            "workflow_graph": None,
-            "execution_result": None,
-            "status": "uninitialized"
-        }
-        await database.insert("workflows", workflow_doc)
-        print(f"✅ Created new workflow {workflow_id}")
-    
-    return task_info
+    # Return comprehensive workflow information
+    return {
+        "workflow_id": workflow_id,
+        "user_id": user_id,
+        "workflows": generated_workflows,
+        "database_information": extracted_data["database_information"],
+        "total_workflows": len(generated_workflows)
+    }
 
 async def get_project(workflow_id: str) -> Dict[str, Any]:
     """Retrieve workflow information from the database"""
@@ -700,7 +613,7 @@ async def generate_workflow_for_project(workflow_id: str) -> Dict[str, Any]:
 async def execute_workflow_for_project(workflow_id: str, inputs: Dict[str, Any]) -> Dict[str, Any]:
     """
     Phase 3: Execute workflow with provided inputs.
-    Updated to use new database structure.
+    Updated to handle multiple workflows from setup.
     """
     # Check if workflow exists
     workflow = await get_project(workflow_id)
@@ -715,51 +628,79 @@ async def execute_workflow_for_project(workflow_id: str, inputs: Dict[str, Any])
         # Update workflow status
         await update_project_status(workflow_id, "running")
         
-        # Get workflow graph
-        workflow_graph = workflow["workflow_graph"]
+        # Get workflow graphs (now a list of workflows)
+        workflow_graphs = workflow["workflow_graph"]
         
-        # Execute the workflow
-        execution_result = await execute_workflow_from_config(
-            workflow_graph, 
-            default_llm_config, 
-            mcp_config={}, 
-            inputs=inputs
-        )
+        if not isinstance(workflow_graphs, list):
+            raise ValueError(f"Workflow {workflow_id} has invalid workflow_graph format")
         
-        if execution_result is None:
+        # Execute each workflow
+        execution_results = []
+        for i, workflow_data in enumerate(workflow_graphs):
+            workflow_name = workflow_data.get("workflow_name", f"workflow_{i}")
+            workflow_graph = workflow_data.get("workflow_graph")
+            
+            if workflow_graph is None:
+                print(f"⚠️ Skipping workflow {workflow_name} - no graph available")
+                continue
+            
+            print(f"🚀 Executing workflow: {workflow_name}")
+            
+            # Execute the workflow
+            execution_result = await execute_workflow_from_config(
+                workflow_graph, 
+                default_llm_config, 
+                mcp_config={}, 
+                inputs=inputs
+            )
+            
+            if execution_result is None:
+                print(f"❌ Failed to execute workflow: {workflow_name}")
+                continue
+            
+            # Process execution result
+            if isinstance(execution_result, dict):
+                execution_message = execution_result.get("message", "")
+            else:
+                execution_message = str(execution_result)
+                
+            # Clean up markdown formatting from the message
+            if isinstance(execution_message, str):
+                if execution_message.startswith("```markdown"):
+                    execution_message = execution_message[11:]
+                if execution_message.endswith("```"):
+                    execution_message = execution_message[:-3]
+            
+            # Update execution_result with cleaned message
+            if isinstance(execution_result, dict):
+                execution_result["message"] = execution_message
+            else:
+                execution_result = execution_message
+            
+            execution_results.append({
+                "workflow_name": workflow_name,
+                "result": execution_result
+            })
+        
+        if not execution_results:
             await update_project_status(workflow_id, "failed")
             return {
                 "status": "failed",
-                "error": "Failed to execute workflow"
+                "error": "Failed to execute any workflows"
             }
-        
-        # Process execution result
-        if isinstance(execution_result, dict):
-            execution_message = execution_result.get("message", "")
-        else:
-            execution_message = str(execution_result)
-            
-        # Clean up markdown formatting from the message
-        if isinstance(execution_message, str):
-            if execution_message.startswith("```markdown"):
-                execution_message = execution_message[11:]
-            if execution_message.endswith("```"):
-                execution_message = execution_message[:-3]
-        
-        # Update execution_result with cleaned message
-        if isinstance(execution_result, dict):
-            execution_result["message"] = execution_message
-        else:
-            execution_result = execution_message
         
         # Update workflow storage with execution results
         await update_project_status(
             workflow_id, 
             "completed",
-            execution_result=execution_result
+            execution_result=execution_results
         )
         
-        return execution_result
+        return {
+            "status": "completed",
+            "results": execution_results,
+            "total_workflows": len(execution_results)
+        }
         
     except Exception as e:
         await update_project_status(workflow_id, "failed")
@@ -848,16 +789,45 @@ async def execute_workflow_for_project_stream(task_id: str, workflow_id: str, in
         monitor_task = asyncio.create_task(monitor_output())
         
         try:
-            # Execute the workflow with output capture
-            workflow_graph = workflow["workflow_graph"]
+            # Execute the workflows with output capture
+            workflow_graphs = workflow["workflow_graph"]
             
-            execution_result = await execute_workflow_from_config_with_capture(
-                workflow_graph, 
-                default_llm_config, 
-                mcp_config={}, 
-                inputs=inputs,
-                output_capture=output_capture
-            )
+            if not isinstance(workflow_graphs, list):
+                error_result = {
+                    "status": "error",
+                    "timestamp": datetime.now().isoformat(),
+                    "output_type": "error",
+                    "error": f"Workflow {workflow_id} has invalid workflow_graph format",
+                    "command_output": f"ERROR: Invalid workflow_graph format\n"
+                }
+                update_stream_task(task_id, error_result)
+                complete_stream_task(task_id)
+                return
+            
+            execution_results = []
+            for i, workflow_data in enumerate(workflow_graphs):
+                workflow_name = workflow_data.get("workflow_name", f"workflow_{i}")
+                workflow_graph = workflow_data.get("workflow_graph")
+                
+                if workflow_graph is None:
+                    output_capture.write_stdout(f"⚠️ Skipping workflow {workflow_name} - no graph available\n")
+                    continue
+                
+                output_capture.write_stdout(f"🚀 Executing workflow: {workflow_name}\n")
+                
+                execution_result = await execute_workflow_from_config_with_capture(
+                    workflow_graph, 
+                    default_llm_config, 
+                    mcp_config={}, 
+                    inputs=inputs,
+                    output_capture=output_capture
+                )
+                
+                if execution_result is not None:
+                    execution_results.append({
+                        "workflow_name": workflow_name,
+                        "result": execution_result
+                    })
             
             # Cancel monitoring task
             monitor_task.cancel()
@@ -877,43 +847,24 @@ async def execute_workflow_for_project_stream(task_id: str, workflow_id: str, in
                     "total_output_lines": len(output_capture.get_total_output())
                 })
             
-            if execution_result is None:
+            if not execution_results:
                 await update_project_status(workflow_id, "failed")
                 error_result = {
                     "status": "error",
                     "timestamp": datetime.now().isoformat(),
                     "output_type": "error",
-                    "error": "Failed to execute workflow",
+                    "error": "Failed to execute any workflows",
                     "command_output": "ERROR: Workflow execution failed\n"
                 }
                 update_stream_task(task_id, error_result)
                 complete_stream_task(task_id)
                 return
 
-            # Process execution result (same logic as original function)
-            if isinstance(execution_result, dict):
-                execution_message = execution_result.get("message", "")
-            else:
-                execution_message = str(execution_result)
-                
-            # Clean up markdown formatting from the message
-            if isinstance(execution_message, str):
-                if execution_message.startswith("```markdown"):
-                    execution_message = execution_message[11:]
-                if execution_message.endswith("```"):
-                    execution_message = execution_message[:-3]
-            
-            # Update execution_result with cleaned message
-            if isinstance(execution_result, dict):
-                execution_result["message"] = execution_message
-            else:
-                execution_result = execution_message
-            
             # Update workflow storage with execution results
             await update_project_status(
                 workflow_id, 
                 "completed",
-                execution_result=execution_result
+                execution_result=execution_results
             )
             
             # Final result with complete output

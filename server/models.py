@@ -1,39 +1,21 @@
 from pydantic import BaseModel
 from typing import Dict, Any, Optional, List
 
-class Config(BaseModel):
-    """Configuration model for processing requests"""
-    parameters: Dict[str, Any]
-    timeout: Optional[int] = 30  # default timeout in seconds
 
-class ProcessResponse(BaseModel):
-    """Response model for processing requests"""
-    task_id: str
-    status: str
-    result: Optional[Dict[str, Any]] = None
-
-# New models for client session functionality
-class ClientConnectResponse(BaseModel):
-    """Response model for client connection"""
-    client_id: str
-    stream_url: str
-
-class ClientTaskResponse(BaseModel):
-    """Response model for client task start"""
-    task_id: str
-    status: str
-    client_id: str
 
 # Updated workflow-based models (replacing project-based approach)
 class ProjectSetupRequest(BaseModel):
     """Request model for workflow setup - Phase 1"""
-    workflow_id: str
-    requirement_id: str
-    user_id: str
+    detailed_requirements: str  # Only input needed - system generates workflow_id and user_id
 
 class ProjectSetupResponse(BaseModel):
     """Response model for workflow setup - Phase 1"""
-    task_info: Dict[str, Any]
+    workflow_id: str
+    user_id: str
+    workflows: List[Dict[str, Any]]
+    database_information: Dict[str, Any]
+    total_workflows: int
+    message: str
 
 class ProjectWorkflowGenerationRequest(BaseModel):
     """Request model for workflow generation - Phase 2"""
