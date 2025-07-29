@@ -33,9 +33,9 @@ class ImageAnalysisTool(Tool):
     def __init__(self, api_key, model="openai/gpt-4o"):
         super().__init__()
         self.api_key = api_key
-        self.model = model
+        self.model = model                          
 
-    def __call__(
+    def __call__( 
         self,
         prompt: str,
         image_url: str = None,
