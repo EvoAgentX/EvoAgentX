@@ -11,6 +11,7 @@ from .request import RequestToolkit
 from .request_arxiv import ArxivToolkit
 from .browser_use import BrowserUseToolkit
 from .rss_feed import RSSToolkit
+from .database_faiss import FaissToolkit
 
 
 __all__ = [
@@ -26,6 +27,7 @@ __all__ = [
     "MCPToolkit",
     "RequestToolkit",
     "ArxivToolkit",
-    "BrowserUseToolkit"
+    "BrowserUseToolkit",
+    "FaissToolkit"
 ]
 
