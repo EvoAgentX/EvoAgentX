@@ -72,3 +72,94 @@ Your code should:
 
 Please ensure your code is efficient, well-commented, and follows Python best practices. The output should be limited to basic data types such as strings, integers, and floats. It is prohibited to transmit images or other file formats. The code output is intended for a text-based language model.
 """
+
+
+PREDICTOR_PROMPT = """
+Let's think step by step.
+
+Question: {problem}
+{context}
+Reasoning: Let's think step by step in order to produce the answer. We ...
+Answer: 
+
+You should format your output in xml format. For example, ouptut the answer in <reasoning>xxx</reasoning> and <answer>xxx</answer> format. 
+
+"""
+
+REFLECTOR_PROMPT = """
+Please review the answer and crticize on where might be wron. If you are absolutely sure it is correct, output 'True' in 'correctness'.
+
+Question: {problem}
+{context}
+Text: {text}
+Reasoning: Let's think step by step in order to produce the correctness. We ...
+Feedback:
+Correctness: True/False indicating if answer is correct given the question
+
+You should format your output in xml format. For example, ouptut the answer in <reasoning>xxx</reasoning>, <feedback>xxx</feedback> and <correctness>xxx</correctness> format. 
+"""
+
+REFINER_PROMPT = """
+Given previous attempts and feedback, carefully consider where you could go wrong in your latest attempt. Using insights from previous attempts, try to solve the task better. Show your final answer bracketed between <answer> and </answer> at the end.
+
+---
+Question: {problem}
+{context}
+Previous answer: {previous_answer}
+Reflection: {reflection}
+Correctness: {correctness}
+Reasoning: 
+Answer: 
+
+Please output your reasoning and final answer in the following xml format:
+<reasoning>xxx</reasoning>
+<answer>xxx</answer>
+"""
+
+SUMMARIZER_PROMPT = """"
+Based on the question, retrive relevant information from context that is ONLY helpful in answering the question. Include all key information. Do not repeat context
+
+Question: {problem}
+Context: {context}
+Summary: Only generate the summary. Start with Summary:
+
+You should format your output in xml format. For example, ouptut the answer in <summary>xxx</summary>
+"""
+
+DEBATER_PROMPT = """
+These are the solutions to the question from other agents. Examine the solutions from other agents in your rationale, finish by giving an updated answer. Let's think step by step. Provide a complete and correct code implementation in python.
+
+---
+Question: {problem}
+{context}
+Solutions: {solutions}
+Reasoning: Let's think step by step in order to examine the solutions from other agents. We ...
+
+index: You should return the index of the solution you choose to refine.
+Answer: 
+
+Please output your reasoning and final answer in the following xml format:
+<index>xxx</index>
+<reasoning>xxx</reasoning>
+<answer>xxx</answer>
+"""
+
+CODE_REFLECTOR_PROMPT = """
+Please determine the correctness of the solution in passing all test cases . If it
+fails , based on the error message and trackback , think step by step , carefully
+propose an updated solution in the answer output with a correct code
+implementation in python .
+
+---
+Question: {question}
+Previous Solution: {previous_solution}
+## Traceback
+It contains the test cases, execution results, and ground truth. If there is an error, the relevant traceback is given.
+Traceback: {traceback}
+## Correctness: 'True False' based on the correctness of executive feedback. If there
+is an error message, output 'False' 
+Correctness:
+Reasoning:
+
+You should format your output in xml format. For example, ouptut the answer in <reasoning>xxx</reasoning>, <correctness>xxx</correctness> and <answer>xxx</answer> format. 
+"""

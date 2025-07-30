@@ -1,15 +1,19 @@
 import os
-import json 
 from dotenv import load_dotenv
+# import evoagentx
+import json 
 from typing import Any, Tuple
 
+# 全局设置：关闭stream
+os.environ["OPENAI_STREAM"] = "false"  # 如果支持的话
+
 from evoagentx.benchmark import MATH
-from evoagentx.core.logging import logger
 from evoagentx.models import OpenAILLM, OpenAILLMConfig
 from evoagentx.optimizers import MiproOptimizer
 from evoagentx.core.callbacks import suppress_logger_info
 from evoagentx.utils.mipro_utils.register_utils import MiproRegistry
-from evoagentx.workflow.operators import Predictor
+
+
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
@@ -29,8 +33,8 @@ class MathSplits(MATH):
         full_test_data = self._test_data
         # radnomly select 50 samples for training and 100 samples for test
         # self._train_data = [full_test_data[idx] for idx in permutation[:50]]
-        self._train_data = [full_test_data[idx] for idx in permutation[:100]]
-        self._test_data = [full_test_data[idx] for idx in permutation[100:200]]
+        self._train_data = [full_test_data[idx] for idx in permutation[:5]]
+        self._test_data = [full_test_data[idx] for idx in permutation[50:150]]
 
     # define the input keys. 
     # If defined, the corresponding input key and value will be passed to the __call__ method of the program, 
@@ -54,11 +58,17 @@ class CustomProgram:
 
     def __init__(self, model: OpenAILLM):
         self.model = model 
-        self.prompt = "Let's think step by step to answer the math question: {problem}"
+        self.prompt = "Answer the following math problem: {problem}"
+        self.system_prompt = "You are a helpful math assistant."
+        self.follow_up_prompt = "Please explain your reasoning step by step."
     
     # the program must have a `save` and `load` method to save and load the program
     def save(self, path: str):
-        params = {"prompt": self.prompt}
+        params = {
+            "prompt": self.prompt,
+            "system_prompt": self.system_prompt,
+            "follow_up_prompt": self.follow_up_prompt
+        }
         with open(path, "w") as f:
             json.dump(params, f)
 
@@ -66,6 +76,8 @@ class CustomProgram:
         with open(path, "r") as f:
             params = json.load(f)
             self.prompt = params["prompt"]
+            self.system_prompt = params.get("system_prompt", "You are a helpful math assistant.")
+            self.follow_up_prompt = params.get("follow_up_prompt", "Please explain your reasoning step by step.")
     
     # the program must have a `__call__` method to execute the program.
     # It receives the key-values (specified by `get_input_keys` in the benchmark) of an input example, 
@@ -73,61 +85,49 @@ class CustomProgram:
     # where `prediction` is the program's output and `execution_data` is a dictionary that contains all the parameters' inputs and outputs. 
     def __call__(self, problem: str) -> Tuple[str, dict]:
         
-        prompt = self.prompt.format(problem=problem)
-        response = self.model.generate(prompt=prompt)
+        # 组合所有 prompt
+        full_prompt = f"{self.system_prompt}\n\n{self.prompt.format(problem=problem)}\n\n{self.follow_up_prompt}"
+        response = self.model.generate(prompt=full_prompt)
         solution = response.content
         return solution, {"problem": problem, "solution": solution}
     
 
-
-
 def main():
 
-    openai_config = OpenAILLMConfig(model="gpt-4o-mini", openai_key=OPENAI_API_KEY, stream=True, output_response=False)
+    openai_config = OpenAILLMConfig(model="gpt-4o-mini", openai_key=OPENAI_API_KEY, stream=False, output_response=True)
     executor_llm = OpenAILLM(config=openai_config)
-    optimizer_config = OpenAILLMConfig(model="gpt-4o", openai_key=OPENAI_API_KEY, stream=True, output_response=False)
+    optimizer_config = OpenAILLMConfig(model="gpt-4o", openai_key=OPENAI_API_KEY, stream=False, output_response=True)
     optimizer_llm = OpenAILLM(config=optimizer_config)
 
     benchmark = MathSplits()
-    # program = CustomProgram(model=executor_llm)
-    program = Predictor(llm=executor_llm)
+    program = CustomProgram(model=executor_llm)
 
     # register the parameters to optimize 
     registry = MiproRegistry()
     # MiproRegistry requires specify the input_names and output_names for the specific parameter. 
     # The input_names and output_names should appear in the execution_data returned by the program's __call__ method. 
-    registry.track(program, "prompt", input_names=["problem"], output_names=["reasoning","answer"])
-
-    print("\n before optimization \n")
-    print(program.prompt)
+    registry.track(program, "prompt", input_names=["problem"], output_names=["solution"])
+    registry.track(program, "system_prompt", input_names=["problem"], output_names=["solution"])
+    registry.track(program, "follow_up_prompt", input_names=["problem"], output_names=["solution"])
 
     # optimize the program 
-    # `evaluator` is optional. If not provided, the optimizer will construct an evaluator based on the `evaluate` method of the benchmark. 
     optimizer = MiproOptimizer(
         registry=registry, 
         program=program, 
         optimizer_llm=optimizer_llm,
-        max_bootstrapped_demos=4, 
-        max_labeled_demos=0,
-        num_threads=10,
-        eval_rounds=1, 
+        num_threads=2, 
+        eval_rounds=2, 
         auto="light",
-        save_path="example/"
+        
     )
 
-    logger.info("Optimizing program...")
-    optimizer.optimize(dataset=benchmark)
-    optimized_program = optimizer.restore_best_program()
-
-    # logger.info("Evaluating program on test set...")
-    # with suppress_logger_info():
-    #     results = optimizer.evaluate(dataset=benchmark, eval_mode="test")
-    # logger.info(f"Evaluation metrics (after optimization): {results}")
+    best_program = optimizer.optimize(dataset=benchmark)
+    print("优化后的 prompts:")
+    print(f"system_prompt: {best_program.system_prompt}")
+    print(f"prompt: {best_program.prompt}")
+    print(f"follow_up_prompt: {best_program.follow_up_prompt}")
     
-
-    print("\n after optimization:\n")
-    print(optimized_program.prompt)
-    print("\n\n")
+    best_program.save("examples/output/mipro/math_plug_and_play.json")
 
 if __name__ == "__main__":
     main()
