@@ -34,13 +34,76 @@ TEST_CONFIG = {
     "server_url": "http://localhost:8001",  # Change if server runs on different port
     
     # Test Data - Configure your test values here
-    "workflow_id": "042705af-ed39-4589-8a7f-00f13d5e6b03",  # This value goes into 'id' field in real DB
-    "user_id": "417b4875-e095-46d9-a46d-802dfef99d74",
-    "requirement_id": "04233f59-4670-452f-b823-c9d5560542bf",
+    "workflow_id": "550e8400-e29b-41d4-a716-446655440001",  # Proper UUID format for traditional workflow testing
+    
+    # New Setup Test Configuration
+    "detailed_requirements": """
+    # Pet Management System Requirements
+    
+    ## System Overview
+    Create a comprehensive pet management system with AI-powered disease analysis and treatment recommendations.
+    
+    ## AI Workflows Required
+    
+    ### 1. Disease Analysis Workflow
+    workflow_id: 550e8400-e29b-41d4-a716-446655440001
+    - **Purpose**: Analyze pet symptoms and medical history to identify potential diseases
+    - **Inputs**: 
+      - Pet symptoms (text)
+      - Pet medical history (text)
+      - Pet age and breed (text)
+    - **Outputs**:
+      - Disease analysis report (markdown)
+      - Confidence score (number)
+      - Recommended tests (list)
+    
+    ### 2. Treatment Recommendation Workflow
+    workflow_id: 550e8400-e29b-41d4-a716-446655440002
+    - **Purpose**: Generate treatment recommendations based on disease analysis
+    - **Inputs**:
+      - Disease analysis results (text)
+      - Pet age and weight (text)
+      - Available medications (text)
+    - **Outputs**:
+      - Treatment plan (markdown)
+      - Medication recommendations (list)
+      - Follow-up schedule (text)
+    
+    ## Database Entities
+    
+    ### Pets
+    - pet_id (string, required)
+    - name (string, required)
+    - species (string, required)
+    - breed (string, required)
+    - age (number, required)
+    - weight (number, required)
+    - owner_id (string, required)
+    
+    ### Medical Records
+    - record_id (string, required)
+    - pet_id (string, required)
+    - symptoms (text, required)
+    - diagnosis (text, required)
+    - treatment (text, required)
+    - date (date, required)
+    
+    ### Diseases
+    - disease_id (string, required)
+    - name (string, required)
+    - symptoms (text, required)
+    - treatments (text, required)
+    """,
+    
+    # Expected workflow IDs for verification
+    "expected_workflow_ids": [
+        "550e8400-e29b-41d4-a716-446655440001",  # Disease Analysis Workflow
+        "550e8400-e29b-41d4-a716-446655440002"   # Treatment Recommendation Workflow
+    ],
     
     # Test Metadata
     "test_name": "EvoAgentX Workflow Lifecycle Test via Server API",
-    "test_description": "Testing project setup, workflow generation, and execution phases through HTTP endpoints"
+    "test_description": "Testing new setup process and workflow lifecycle through HTTP endpoints"
 }
 
 # Common headers for all requests
@@ -53,6 +116,88 @@ HEADERS = {
 # TEST FUNCTIONS
 # =============================================================================
 
+def test_new_setup_process(config):
+    """
+    Test the new setup process with detailed requirements.
+    This uses the new setup approach that takes detailed requirements instead of workflow_id.
+    """
+    print("\n🧪 NEW SETUP PROCESS TEST")
+    print("=" * 40)
+    
+    setup_request = {
+        "detailed_requirements": config["detailed_requirements"]
+    }
+    
+    try:
+        print(f"🚀 Setting up workflow with detailed requirements via API...")
+        print(f"   Using detailed requirements only")
+        
+        # Call setup API endpoint
+        response = requests.post(
+            f"{config['server_url']}/project/setup",
+            json=setup_request,
+            headers=HEADERS
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            print(f"✅ New setup completed successfully via API!")
+            print(f"   Workflow ID: {result.get('workflow_id', 'Unknown')}")
+            print(f"   User ID: {result.get('user_id', 'Unknown')}")
+            print(f"   Total workflows: {result.get('total_workflows', 0)}")
+            print(f"   Database information: {result.get('database_information') is not None}")
+            print(f"   Message: {result.get('message', '')}")
+            
+            # Print workflow details and verify IDs
+            workflows = result.get('workflows', [])
+            expected_ids = config.get('expected_workflow_ids', [])
+            
+            print(f"\n📋 WORKFLOW ID VERIFICATION")
+            print("=" * 30)
+            
+            for i, workflow in enumerate(workflows, 1):
+                workflow_name = workflow.get('workflow_name', f'Workflow {i}')
+                workflow_id = workflow.get('workflow_id', 'Unknown')
+                
+                print(f"\n   Workflow {i}: {workflow_name}")
+                print(f"     - Extracted ID: {workflow_id}")
+                print(f"     - Inputs: {len(workflow.get('workflow_inputs', []))}")
+                print(f"     - Outputs: {len(workflow.get('workflow_outputs', []))}")
+                
+                # Verify ID matches expected
+                if i <= len(expected_ids):
+                    expected_id = expected_ids[i-1]
+                    if workflow_id == expected_id:
+                        print(f"     ✅ ID MATCHES EXPECTED: {expected_id}")
+                    else:
+                        print(f"     ❌ ID MISMATCH - Expected: {expected_id}, Got: {workflow_id}")
+                else:
+                    print(f"     ⚠️  No expected ID for workflow {i}")
+            
+            # Verify creation by checking status
+            workflow_id = result.get('workflow_id', 'Unknown')
+            status_response = requests.get(
+                f"{config['server_url']}/workflow/{workflow_id}/status", 
+                headers={"eax-access-token": ACCESS_TOKEN}
+            )
+            if status_response.status_code == 200:
+                workflow_status = status_response.json()
+                print(f"\n✅ Verification: Found workflow in database")
+                print(f"   Status: {workflow_status.get('status', 'unknown')}")
+                print(f"   Setup Complete: {workflow_status.get('phases', {}).get('setup_complete', False)}")
+                return True
+            else:
+                print(f"❌ Verification failed: {status_response.text}")
+                return False
+        else:
+            print(f"❌ New setup failed: {response.status_code}")
+            print(f"   Error: {response.text}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ New setup test failed: {e}")
+        return False
+
 def test_phase_1_project_setup(config):
     """
     Phase 1: Project Setup
@@ -63,15 +208,15 @@ def test_phase_1_project_setup(config):
     
     setup_request = {
         "workflow_id": config["workflow_id"],
-        "user_id": config["user_id"], 
-        "requirement_id": config["requirement_id"]
+        "user_id": "550e8400-e29b-41d4-a716-446655440000",  # Proper UUID format
+        "requirement_id": "6ba7b810-9dad-11d1-80b4-00c04fd430c8"  # Proper UUID format
     }
     
     try:
         print(f"🚀 Setting up workflow via API...")
         print(f"   Workflow ID: {config['workflow_id']}")
-        print(f"   User ID: {config['user_id']}")
-        print(f"   Requirement ID: {config['requirement_id']}")
+        print(f"   User ID: {setup_request['user_id']}")
+        print(f"   Requirement ID: {setup_request['requirement_id']}")
         
         # Call setup API endpoint
         response = requests.post(
@@ -316,8 +461,6 @@ def run_workflow_lifecycle_test():
     print(f"Description: {TEST_CONFIG['test_description']}")
     print(f"Server URL: {TEST_CONFIG['server_url']}")
     print(f"Workflow ID: {TEST_CONFIG['workflow_id']}")
-    print(f"User ID: {TEST_CONFIG['user_id']}")
-    print(f"Requirement ID: {TEST_CONFIG['requirement_id']}")
     
     try:
         # Test server health first
@@ -325,6 +468,12 @@ def run_workflow_lifecycle_test():
             print("❌ Server health check failed - stopping test")
             return
             
+        # Test new setup process first
+        print("\n🧪 TESTING NEW SETUP PROCESS")
+        new_setup_success = test_new_setup_process(TEST_CONFIG)
+        if not new_setup_success:
+            print("\n❌ New setup process failed. Proceeding with traditional workflow test...")
+        
         # Run all three phases
         results = []
         
@@ -357,6 +506,7 @@ def run_workflow_lifecycle_test():
         # Test Summary
         print(f"\n🎯 TEST SUMMARY")
         print("=" * 20)
+        print(f"🧪 New Setup Process: {'✅ PASSED' if new_setup_success else '❌ FAILED'}")
         for phase_name, success in results:
             status = "✅ PASSED" if success else "❌ FAILED"
             print(f"{phase_name}: {status}")
