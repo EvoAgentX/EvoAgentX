@@ -515,8 +515,5 @@ class CustomizeAgent(Agent):
         """
         config = self.get_customize_agent_info()
         config["llm_config"] = self.llm_config.to_dict()
-        tool_names = config.pop("tool_names", None)
-        if tool_names:
-            config["tools"] = [self._raw_tool_map[name] for name in tool_names]
         return config
     

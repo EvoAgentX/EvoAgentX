@@ -1,0 +1,401 @@
+{
+    "class_name": "WorkFlowGraph",
+    "goal": "Create a daily trading decision workflow for A-share stocks.\n\n## Workflow Overview:\nA multi-step workflow for daily trading decisions with fixed capital, making trading decisions based on market data and current positions.\n\n## Task Description:\n**Name:** daily_trading_decision\n**Description:** A comprehensive trading decision system that analyzes market data and generates daily trading operations with detailed analysis.\n\n## Input:\n- **goal** (string): Contains stock code, available funds, current positions, data folder path, output file path, and optional past report path\n\n## Output:\n- **trading_report** (string): A comprehensive daily trading report with complete analysis\n\n## Subtasks:\n1. **file_discovery**: List all files in the data folder and identify available data sources\n2. **data_loading**: Read relevant files based on file discovery results\n3. **trading_analysis**: Analyze market data and generate trading recommendations\n4. **performance_review**: Review past performance if past report is available\n5. **report_generation**: Compile comprehensive trading report\n\n## Agent Requirements:\nEach agent must:\n1. Use tool to discover available files in the specified data folder\n2. Use tool to read relevant files based on file names and paths\n3. Extract and present ALL data without omissions or truncations\n4. Generate comprehensive analysis based on actual data from files\n5. Create detailed reports with three sections:\n\n   **Section 1: TRADING OPERATIONS**\n   - **DECISION**: Buy/Sell/Hold with specific reasoning\n   - **POSITION ACTION**: Open new positions / Close existing positions / Add to positions / Reduce positions\n   - **QUANTITY**: Exact number of shares to trade\n   - **PRICE TARGETS**: Entry price, take profit levels, stop loss levels\n   - **CAPITAL ALLOCATION**: How much of available funds to use\n   - **POSITION SIZING**: Risk management and position sizing rationale\n\n   **Section 2: COMPREHENSIVE ANALYSIS**\n   - Technical analysis (MA, RSI, MACD, support/resistance)\n   - Fundamental analysis (earnings, news, institutional recommendations)\n   - Market sentiment and trends\n   - Risk assessment with specific metrics\n   - Complete data presentation from all files\n   - Detailed thinking process and methodology\n\n   **Section 3: PAST PERFORMANCE REVIEW** (if past report provided)\n   - Review of previous trading decisions\n   - Performance analysis and lessons learned\n   - Feedback on past recommendations\n   - Strategy adjustments based on historical performance\n\n4. Present all data in structured tables and clear sections\n5. Return the complete report content as output\n6. Base ALL analysis and recommendations on actual data read from files - never use fake or estimated data\n7. If no files are found in the folder, report this clearly and do not make up data\n8. Pass file discovery results to subsequent tasks for efficient data loading\n9. Each task should focus on its specific responsibility while using data from previous tasks\n10. **MANDATORY**: Every agent that needs data MUST use the \"read\" tool to read actual files\n11. **MANDATORY**: Never assume file contents - always read them using the \"read\" tool\n12. **MANDATORY**: If a file exists, read it; if it doesn't exist, report that clearly\n\n## Critical Instructions:\n- **file_discovery agent**: Use tool to discover all files in the data folder and pass file list to next task\n- **data_loading agent**: Use tool to read relevant files based on file names and paths, distinguish content by file type\n- **trading_analysis agent**: Analyze market data from loaded files and generate trading recommendations\n- **performance_review agent**: Review past performance if past report is available\n- **report_generation agent**: Compile all analysis into comprehensive report\n- Base all decisions on actual data from files\n- Include specific numbers for all recommendations (prices, quantities, percentages)\n- Present complete data tables without truncation\n- Return the entire report content without summarization\n- Provide professional explanations for all trading decisions\n- Consider current positions and available capital in decision making\n- Do not save files - return the complete report content as output\n- **CRITICAL**: Each agent MUST use tool to read actual files - NEVER make up data\n- **CRITICAL**: Present ALL data from all files - do not omit, truncate, or summarize any data\n- **CRITICAL**: NEVER use fake, estimated, or placeholder data - ONLY use real data from files\n- **CRITICAL**: If past report path is provided, read that file and use it for performance review\n- **CRITICAL**: Show complete data tables with every row and every column from all files\n- **CRITICAL**: Do not make up data if files are empty - report the actual file contents\n- **CRITICAL**: The tool is MANDATORY for accessing any file data\n- **CRITICAL**: If you cannot read a file, report the error but do not invent data\n",
+    "nodes": [
+        {
+            "class_name": "WorkFlowNode",
+            "name": "file_discovery",
+            "description": "Discover, classify, and filter files in the data folder to provide categorized file lists for different analysis tasks.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "goal",
+                    "type": "string",
+                    "description": "The user's goal in textual format, outlining the required data and analysis.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "background_files",
+                    "type": "array",
+                    "description": "An array of file paths relevant for background analysis (industry data, news, expert opinions, economic factors).",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "price_files",
+                    "type": "array",
+                    "description": "An array of file paths relevant for past price analysis (stock price data, technical indicators, price charts).",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "performance_files",
+                    "type": "array",
+                    "description": "An array of file paths relevant for performance review (past trading reports, performance data).",
+                    "required": true
+                }
+            ],
+            "reason": "This sub-task is crucial to efficiently categorize and filter relevant data files for each specific analysis task, improving workflow performance and accuracy.",
+            "agents": [
+                {
+                    "name": "file_discovery_agent",
+                    "description": "This agent discovers all files in the data folder and intelligently categorizes them based on their content and relevance to different analysis tasks.",
+                    "inputs": [
+                        {
+                            "name": "goal",
+                            "type": "string",
+                            "description": "The user's goal in textual format, outlining the required data and analysis.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "background_files",
+                            "type": "array",
+                            "description": "An array of file paths relevant for background analysis (industry data, news, expert opinions, economic factors).",
+                            "required": true
+                        },
+                        {
+                            "name": "price_files",
+                            "type": "array",
+                            "description": "An array of file paths relevant for past price analysis (stock price data, technical indicators, price charts).",
+                            "required": true
+                        },
+                        {
+                            "name": "performance_files",
+                            "type": "array",
+                            "description": "An array of file paths relevant for performance review (past trading reports, performance data).",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Objective\nDiscover, classify, and filter files in the data folder and reports folder to provide categorized file lists for different analysis tasks.\n\n### Instructions\n1. Parse the user's goal: <input>{goal}</input> to understand the data requirements and stock being analyzed.\n2. **CRITICAL**: Extract the data folder path and reports folder path from the goal.\n3. **CRITICAL**: Utilize tool to execute command line operations that list all files in BOTH the data folder AND the reports folder.\n4. **CRITICAL**: Analyze each file and determine if it's relevant for any of the three analysis tasks. Filter out files that are:\n   - System files (.DS_Store, .git, .gitignore, etc.)\n   - Temporary files (.tmp, .temp, .bak, etc.)\n   - Log files (.log)\n   - Configuration files (.config, .ini, .yaml, .yml)\n   - Executable files (.exe, .sh, .py, .js, etc.)\n   - Archive files (.zip, .tar, .gz, .rar)\n   - Files with no clear relevance to stock analysis\n   - Empty files or files with no meaningful content\n\n5. **CRITICAL**: Categorize the remaining relevant files into three groups:\n\n   **BACKGROUND FILES** (for background analysis):\n   - Files containing industry data, sector analysis, market news\n   - Expert opinions, analyst reports, research documents\n   - Economic indicators, macro trends, policy updates\n   - Market indices, benchmark data, sentiment analysis\n   - Company news, earnings reports, regulatory information\n   - Files with keywords: news, report, analysis, industry, sector, economic, policy, expert, analyst, sentiment, index, benchmark\n   - File extensions: .txt, .md, .pdf, .doc, .docx, .csv (if containing text data)\n   - **EXCLUDE**: Files with keywords: price, chart, technical, indicator, volume, pattern, trend, ma, rsi, macd, support, resistance\n   - **LOCATION**: Only from data folder\n\n   **PRICE FILES** (for past price analysis):\n   - Files containing stock price data, historical prices\n   - Technical indicators, price charts, trading data\n   - Volume data, price patterns, support/resistance levels\n   - Files with keywords: price, chart, technical, indicator, volume, pattern, trend, ma, rsi, macd, support, resistance\n   - File extensions: .csv, .json, .xlsx, .xls (if containing numerical data)\n   - Chart files: .png, .jpg, .svg (if containing price charts)\n   - **EXCLUDE**: Files with keywords: news, report, analysis, industry, sector, economic, policy, expert, analyst, sentiment, index, benchmark\n   - **LOCATION**: Only from data folder\n\n   **PERFORMANCE FILES** (for performance review):\n   - Past trading reports, performance summaries\n   - Historical trading decisions, backtest results\n   - Files with keywords: performance, report, trading, decision, backtest, history, previous, output\n   - File extensions: .md, .txt, .pdf, .json (if containing report data)\n   - **SPECIFIC**: Look for files with names like 'output_*.md', '*_back.md', '*_previous.md'\n   - **LOCATION**: From BOTH data folder AND reports folder\n   - **EXCLUDE**: Files that are clearly not performance-related\n\n6. **IMPORTANT**: If a file could belong to multiple categories, assign it to the most appropriate one based on its primary content.\n7. **IMPORTANT**: Consider file naming patterns, extensions, and directory structure for classification.\n8. **IMPORTANT**: Only include files that are clearly relevant to the specific analysis task.\n9. **CRITICAL**: For performance files, prioritize files from the reports folder over data folder.\n10. Return three categorized file lists with only relevant files to facilitate efficient analysis by downstream tasks.\n\n### Output Format\nYour final output should ALWAYS in the following format:\n\n## Thought\nBriefly explain the reasoning process for categorizing and filtering the discovered files.\n\n## background_files\nAn array of file paths relevant for background analysis (industry data, news, expert opinions, economic factors).\n\n## price_files\nAn array of file paths relevant for past price analysis (stock price data, technical indicators, price charts).\n\n## performance_files\nAn array of file paths relevant for performance review (past trading reports, performance data).",
+                    "tool_names": [
+                        "CMDToolkit"
+                    ]
+                }
+            ],
+            "status": "pending"
+        },
+        {
+            "class_name": "WorkFlowNode",
+            "name": "background_analysis",
+            "description": "Collect and analyze background information that affects stock prices, including industry data, news, expert opinions, market indices, and economic factors.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "goal",
+                    "type": "string",
+                    "description": "The user's goal in textual format.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "background_files",
+                    "type": "array",
+                    "description": "The array of file paths relevant for background analysis (industry data, news, expert opinions, economic factors).",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "background_info",
+                    "type": "object",
+                    "description": "A comprehensive collection of background information about the market environment that affects stock prices.",
+                    "required": true
+                }
+            ],
+            "reason": "This step is essential for understanding the broader market environment and external factors that influence stock prices, providing context for trading decisions.",
+            "agents": [
+                {
+                    "name": "background_analysis_agent",
+                    "description": "This agent collects and analyzes background information including industry data, news, expert opinions, and market indices that affect stock prices.",
+                    "inputs": [
+                        {
+                            "name": "goal",
+                            "type": "string",
+                            "description": "The user's goal in textual format.",
+                            "required": true
+                        },
+                        {
+                            "name": "background_files",
+                            "type": "array",
+                            "description": "The array of file paths relevant for background analysis (industry data, news, expert opinions, economic factors).",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "background_info",
+                            "type": "object",
+                            "description": "A comprehensive collection of background information about the market environment that affects stock prices.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Objective\nCollect and analyze background information that affects stock prices, including industry data, news, expert opinions, market indices, and economic factors. The final output should be a detailed collection of information (with sources like urls) about the industry/environment of stock, which will be passed to another agent to generate report.\n\n### Instructions\n1. Review the user's goal: <input>{goal}</input> to understand the specific stock and analysis requirements.\n2. **CRITICAL**: You have been provided with a list of background files: <input>{background_files}</input>\n3. **MANDATORY**: You MUST read each file in the background_files list using the read tool\n4. **MANDATORY**: Do NOT search for or discover any other files - only use the files provided in the background_files list\n5. **MANDATORY**: Read actual files using tools - NEVER use fake or estimated data\n6. **MANDATORY**: Present ALL data from all files without omissions or truncations\n7. **IMPORTANT**: Do NOT read stock price data, technical indicators, or price charts - focus only on external factors that influence prices\n8. Collect and organize background information including:\n   - Industry trends and sector performance\n   - News sentiment and market reactions (with URLs when available)\n   - Expert opinions and analyst recommendations\n   - Market indices correlation and divergence\n   - Economic factors affecting the stock\n   - Competitive landscape analysis\n   - Regulatory environment and policy changes\n   - Global market conditions and trends\n   - Market sentiment and investor behavior\n   - Company-specific developments and news\n9. **CRITICAL**: Base ALL analysis on actual data read from files - never use fake or estimated data\n10. **CRITICAL**: If the background_files list is empty, report this clearly and do not make up data\n11. **IMPORTANT**: For news items, extract and preserve URLs when available in the source data\n12. **IMPORTANT**: Structure news data with title, source, publish time, impact level, interpretation, and URL\n13. Focus on providing general information about the environment, not specific trading recommendations.\n14. Structure the information with clear sections and data tables.\n\n### Output Format\nYour final output should ALWAYS in the following format:\n\n## Thought\nBriefly explain the reasoning process for collecting and analyzing background information.\n\n## background_info\nA comprehensive object containing background information about:\n- Industry and sector trends\n- Market news and sentiment (with URLs when available)\n- Expert opinions and analyst views\n- Economic indicators and macro factors\n- Competitive landscape\n- Regulatory environment\n- Market indices and benchmarks\n- All raw data from files in structured format\n\nFor news items, include:\n- News title\n- Source\n- Publish time\n- Impact level (高/中/低)\n- Interpretation\n- URL (when available)",
+                    "tool_names": [
+                        "StorageToolkit"
+                    ]
+                }
+            ],
+            "status": "pending"
+        },
+        {
+            "class_name": "WorkFlowNode",
+            "name": "price_analysis",
+            "description": "Analyze stock price data, technical indicators, and price patterns to provide technical analysis for trading decisions.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "goal",
+                    "type": "string",
+                    "description": "The user's goal in textual format.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "price_files",
+                    "type": "array",
+                    "description": "The array of file paths relevant for price analysis (stock price data, technical indicators, price charts).",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "price_analysis",
+                    "type": "object",
+                    "description": "A comprehensive analysis of stock price data including technical indicators, patterns, and trading signals.",
+                    "required": true
+                }
+            ],
+            "reason": "This step is essential for analyzing historical price patterns, technical indicators, and generating trading signals based on price data.",
+            "agents": [
+                {
+                    "name": "price_analysis_agent",
+                    "description": "This agent analyzes stock price data, technical indicators, and price patterns to provide technical analysis for trading decisions.",
+                    "inputs": [
+                        {
+                            "name": "goal",
+                            "type": "string",
+                            "description": "The user's goal in textual format.",
+                            "required": true
+                        },
+                        {
+                            "name": "price_files",
+                            "type": "array",
+                            "description": "The array of file paths relevant for price analysis (stock price data, technical indicators, price charts).",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "price_analysis",
+                            "type": "object",
+                            "description": "A comprehensive analysis of stock price data including technical indicators, patterns, and trading signals.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Objective\nAnalyze stock price data, technical indicators, and price patterns to provide technical analysis for trading decisions. Only use real data, if information unclear use '-'.\n\n### Instructions\n1. Review the user's goal: <input>{goal}</input> to understand the specific stock and analysis requirements.\n2. **CRITICAL**: You have been provided with a list of price files: <input>{price_files}</input>\n3. **MANDATORY**: You MUST read each file in the price_files list using the read tool\n4. **MANDATORY**: Do NOT search for or discover any other files - only use the files provided in the price_files list\n5. **MANDATORY**: Read actual files using tools - NEVER use fake or estimated data\n6. **MANDATORY**: Present ALL data from all files without omissions or truncations\n7. **FOCUS**: Analyze ONLY stock price data, technical indicators, and price charts - focus on price-related information\n8. Analyze and organize price information including:\n   - Historical price trends and patterns\n   - Technical indicators (MA, RSI, MACD, Bollinger Bands)\n   - Support and resistance levels\n   - Volume analysis and price-volume relationships\n   - Price momentum and trend strength\n   - Chart patterns and formations\n   - Key price levels and breakouts\n   - Trading signals and entry/exit points\n   - Risk-reward ratios based on price data\n   - Price volatility and volatility patterns\n9. **CRITICAL**: Base ALL analysis on actual data read from files - never use fake or estimated data\n10. **CRITICAL**: If the price_files list is empty, report this clearly and do not make up data\n11. Focus on providing technical analysis and price-based insights, not fundamental analysis.\n12. Structure the information with clear sections and data tables.\n\n### Output Format\nYour final output should ALWAYS in the following format:\n\n## Thought\nBriefly explain the reasoning process for analyzing price data and technical indicators.\n\n## price_analysis\nA comprehensive object containing price analysis including:\n- Historical price trends and patterns\n- Technical indicators analysis (MA, RSI, MACD, etc.)\n- Support and resistance levels\n- Volume analysis\n- Trading signals and recommendations\n- Risk assessment based on price data\n- All raw price data from files in structured format",
+                    "tool_names": [
+                        "StorageToolkit"
+                    ]
+                }
+            ],
+            "status": "pending"
+        },
+        {
+            "class_name": "WorkFlowNode",
+            "name": "past_report_review",
+            "description": "Review past trading reports and extract past trading operations using tools to access past report files.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "goal",
+                    "type": "string",
+                    "description": "The user's goal in textual format.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "performance_files",
+                    "type": "array",
+                    "description": "The array of file paths relevant for past report review (past trading reports, performance data).",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "performance_analysis",
+                    "type": "string",
+                    "description": "A detailed analysis of past trading performance with extracted trading operations from previous reports.",
+                    "required": true
+                }
+            ],
+            "reason": "This sub-task is necessary to extract past trading operations from previous reports and derive learnings for future trading decisions.",
+            "agents": [
+                {
+                    "name": "past_report_review_agent",
+                    "description": "This agent reviews past trading reports using tools to access files and extracts past trading operations for historical analysis.",
+                    "inputs": [
+                        {
+                            "name": "goal",
+                            "type": "string",
+                            "description": "The user's goal in textual format.",
+                            "required": true
+                        },
+                        {
+                            "name": "performance_files",
+                            "type": "array",
+                            "description": "The array of file paths relevant for past report review (past trading reports, performance data).",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "performance_analysis",
+                            "type": "string",
+                            "description": "A detailed analysis of past trading performance with extracted trading operations from previous reports.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Objective\nRead past trading report files and extract specific trading operations and decisions from them to provide historical trading data for the final report.\n\n### Instructions\n1. Read and understand the user's goal: <input>{goal}</input>.\n2. **CRITICAL**: You have been provided with a list of performance files: <input>{performance_files}</input>\n3. **MANDATORY**: You MUST read each file in the performance_files list using the read tool\n4. **MANDATORY**: Do NOT search for or discover any other files - only use the files provided in the performance_files list\n5. **MANDATORY**: Read actual files using tools - NEVER use fake or estimated data\n6. **MANDATORY**: Present ALL data from all files without omissions or truncations\n7. **FOCUS**: Look for past trading reports and extract ONLY the following specific trading information:\n   - Trading decisions (买入/卖出/持有)\n   - Quantities traded (股数)\n   - Entry/exit prices (价格)\n   - Date of trades (交易日期)\n   - Reasons for decisions (决策理由)\n   - Target prices (目标价格)\n   - Stop loss levels (止损价格)\n   - Position changes (仓位变化)\n8. **STRUCTURE**: Organize the extracted data in a clear table format with columns:\n   - Date (日期)\n   - Decision (决策)\n   - Quantity (数量)\n   - Price (价格)\n   - Reason (理由)\n   - Target (目标价)\n   - Stop Loss (止损价)\n9. **CRITICAL**: If the performance_files list is empty, report this clearly and do not make up data\n10. **CRITICAL**: Only extract actual trading operations from past reports - do not include general analysis or market commentary\n11. **IMPORTANT**: Focus on finding and reading past trading report files (like output_*.md files) that contain actual trading decisions\n\n### Output Format\nYour final output should ALWAYS in the following format:\n\n## Thought\nBriefly explain the reasoning process for reading past report files and extracting trading operations.\n\n## performance_analysis\nA structured summary of past trading operations extracted from past report files in table format:\n\n| Date | Decision | Quantity | Price | Reason | Target | Stop Loss |\n|------|----------|----------|-------|--------|--------|-----------|\n| [日期] | [决策] | [数量] | [价格] | [理由] | [目标价] | [止损价] |\n\nInclude all trading operations found in the past report files. If no trading operations are found, clearly state this.",
+                    "tool_names": [
+                        "StorageToolkit"
+                    ]
+                }
+            ],
+            "status": "pending"
+        },
+        {
+            "class_name": "WorkFlowNode",
+            "name": "report_generation",
+            "description": "Compile all analyses including background analysis, past price analysis, and performance review into a comprehensive trading report.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "goal",
+                    "type": "string",
+                    "description": "The user's goal in textual format.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "background_info",
+                    "type": "object",
+                    "description": "A comprehensive collection of background information about the market environment that affects stock prices.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "price_analysis",
+                    "type": "object",
+                    "description": "The comprehensive analysis of past stock price data including patterns, trends, and technical indicators.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "performance_analysis",
+                    "type": "string",
+                    "description": "The past performance analysis with trading operations extracted from previous reports.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "trading_report",
+                    "type": "string",
+                    "description": "A comprehensive daily trading report including analysis and recommendations.",
+                    "required": true
+                }
+            ],
+            "reason": "This final sub-task ensures that all findings, insights, and recommendations are organized into a structured and clear report for the user.",
+            "agents": [
+                {
+                    "name": "report_generation_agent",
+                    "description": "This agent compiles all analyses into a comprehensive trading report using a structured template format with detailed sections and data tables.",
+                    "inputs": [
+                        {
+                            "name": "goal",
+                            "type": "string",
+                            "description": "The user's goal in textual format.",
+                            "required": true
+                        },
+                        {
+                            "name": "background_info",
+                            "type": "object",
+                            "description": "A comprehensive collection of background information about the market environment that affects stock prices.",
+                            "required": true
+                        },
+                        {
+                            "name": "price_analysis",
+                            "type": "object",
+                            "description": "The comprehensive analysis of past stock price data including patterns, trends, and technical indicators.",
+                            "required": true
+                        },
+                        {
+                            "name": "performance_analysis",
+                            "type": "string",
+                            "description": "The past performance analysis with trading operations extracted from previous reports.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "trading_report",
+                            "type": "string",
+                            "description": "A comprehensive daily trading report including analysis and recommendations.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Objective\nCompile all analyses into a comprehensive trading report using a structured template format with detailed sections and data tables.\n\n### Instructions\n1. Understand the user's goal outlined in <input>{goal}</input> to set context for the report.\n2. **CRITICAL**: Review and utilize ALL data from background analysis: <input>{background_info}</input>\n   - Use this for market environment analysis, industry trends, news sentiment, expert opinions, economic factors\n   - Include all tables and data from background analysis in the report\n3. **CRITICAL**: Review and utilize ALL data from price analysis: <input>{price_analysis}</input>\n   - Use this for technical analysis, price patterns, support/resistance levels, technical indicators\n   - Include all tables and data from price analysis in the report\n4. **CRITICAL**: Review and utilize ALL data from performance analysis: <input>{performance_analysis}</input>\n   - Use this for historical trading operations, past decisions, and performance data\n   - Include all trading operations tables and historical data in the report\n5. **CRITICAL**: Use the exact template format below - do not modify the structure.\n6. **CRITICAL**: Fill in ALL sections with actual data from ALL three analysis inputs.\n7. **CRITICAL**: Present complete data tables without omissions or truncations.\n8. **CRITICAL**: Base ALL analysis on actual data read from files - never use fake data.\n9. **CRITICAL**: Ensure NO information is lost - use ALL data from ALL three analysis agents.\n\n### MANDATORY REPORT TEMPLATE\n\n# 每日交易决策报告\n\n**日期**: [YYYY年MM月DD日]  \n**股票代码**: [STOCK_CODE]  \n**股票名称**: [STOCK_NAME]  \n**可用资金**: [AMOUNT] RMB  \n**当前持仓**: [SHARES] 股，平均成本 [AVG_PRICE] RMB  \n**持仓类型**: [POSITION_TYPE]  \n**报告生成时间**: [TIMESTAMP]\n\n## 一、交易操作决策\n\n### 1.1 核心决策\n| 决策类型 | 操作建议 | 执行理由 | 风险等级 |\n|----------|----------|----------|----------|\n| [买入/卖出/持有] | [具体操作] | [详细分析] | [高/中/低] |\n\n### 1.2 仓位管理\n| 当前仓位 | 目标仓位 | 调整数量 | 资金分配 |\n|----------|----------|----------|----------|\n| [当前股数] | [目标股数] | [±股数] | [金额] RMB |\n\n### 1.3 价格目标\n| 入场价格 | 止盈价格 | 止损价格 | 目标收益率 |\n|----------|----------|----------|------------|\n| [价格] | [价格] | [价格] | [百分比] |\n\n## 二、市场环境分析\n\n### 2.1 宏观经济指标\n| 指标名称 | 当前值 | 变化趋势 | 对股票影响 |\n|----------|--------|----------|------------|\n| CPI指数 | [数值] | [上升/下降] | [正面/负面] |\n| GDP增长率 | [数值] | [上升/下降] | [正面/负面] |\n| 市场指数 | [数值] | [上升/下降] | [正面/负面] |\n\n### 2.2 行业资金流向\n| 行业名称 | 资金流入 | 资金流出 | 净流入 | 排名 |\n|----------|----------|----------|--------|------|\n| [行业] | [金额] | [金额] | [金额] | [排名] |\n\n### 2.3 市场情绪指标\n| 指标名称 | 当前值 | 解读 | 影响程度 |\n|----------|--------|------|----------|\n| 期权波动率 | [数值] | [解读] | [高/中/低] |\n| 市场恐慌指数 | [数值] | [解读] | [高/中/低] |\n\n## 三、技术分析\n\n### 3.1 价格走势分析\n| 时间周期 | 开盘价 | 最高价 | 最低价 | 收盘价 | 涨跌幅 |\n|----------|--------|--------|--------|--------|--------|\n| [日期] | [价格] | [价格] | [价格] | [价格] | [百分比] |\n\n### 3.2 技术指标\n| 指标名称 | 当前值 | 信号 | 解读 |\n|----------|--------|------|------|\n| MA5 | [数值] | [买入/卖出] | [解读] |\n| MA20 | [数值] | [买入/卖出] | [解读] |\n| RSI | [数值] | [超买/超卖] | [解读] |\n| MACD | [数值] | [金叉/死叉] | [解读] |\n\n### 3.3 支撑阻力位\n| 类型 | 价格水平 | 强度 | 突破概率 |\n|------|----------|------|----------|\n| 支撑位 | [价格] | [强/中/弱] | [百分比] |\n| 阻力位 | [价格] | [强/中/弱] | [百分比] |\n\n## 四、基本面分析\n\n### 4.1 最新新闻动态\n| 新闻标题 | 来源 | 发布时间 | 影响程度 | 解读 | 链接 |\n|----------|------|----------|----------|------|\n| [标题] | [来源] | [时间] | [高/中/低] | [解读] |\n\n### 4.2 机构评级汇总\n| 机构名称 | 评级 | 目标价 | 评级日期 | 分析师 |\n|----------|------|--------|----------|--------|\n| [机构] | [评级] | [价格] | [日期] | [姓名] |\n\n### 4.3 行业地位分析\n- **市场份额**: [数据]\n- **竞争优势**: [分析]\n- **增长潜力**: [评估]\n\n## 五、风险评估\n\n### 5.1 风险因素\n| 风险类型 | 风险等级 | 影响程度 | 应对措施 |\n|----------|----------|----------|----------|\n| 市场风险 | [高/中/低] | [描述] | [措施] |\n| 行业风险 | [高/中/低] | [描述] | [措施] |\n| 个股风险 | [高/中/低] | [描述] | [措施] |\n\n### 5.2 风险控制策略\n- **止损设置**: [具体价格]\n- **仓位控制**: [最大仓位比例]\n- **分散投资**: [建议]\n\n## 六、历史表现回顾\n\n### 6.1 历史交易操作\n| 日期 | 决策 | 数量 | 价格 | 理由 | 目标价 | 止损价 |\n|------|------|------|------|------|--------|--------|\n| [日期] | [决策] | [数量] | [价格] | [理由] | [目标价] | [止损价] |\n\n### 6.2 交易统计\n| 指标 | 数值 | 说明 |\n|------|------|------|\n| 总交易次数 | [次数] | [统计期间] |\n| 盈利交易 | [次数] | [胜率] |\n| 亏损交易 | [次数] | [败率] |\n| 平均盈利 | [金额] | [计算方式] |\n| 平均亏损 | [金额] | [计算方式] |\n| 最大回撤 | [百分比] | [期间] |\n\n### 6.3 经验教训\n- **成功因素**: [分析]\n- **失败原因**: [分析]\n- **改进建议**: [具体建议]\n\n## 七、投资建议\n\n### 7.1 短期操作建议\n**建议**: [买入/卖出/持有]\n**理由**: [详细分析]\n**执行时间**: [具体时间]\n**预期收益**: [百分比]\n\n### 7.2 中长期策略\n**目标价格**: [价格]\n**持有周期**: [时间]\n**退出条件**: [具体条件]\n\n### 7.3 风险提示\n[重要风险提示和免责声明]\n\n---\n**报告生成时间**: [TIMESTAMP]  \n**数据来源**: [数据来源说明]  \n**免责声明**: [标准免责声明]\n\n### Output Format\nYour final output should ALWAYS in the following format:\n\n## Thought\nBriefly explain the reasoning process for compiling the trading report based on the gathered data.\n\n## trading_report\nThe comprehensive daily trading report using the exact template format above with all sections filled with actual data from ALL three analysis agents."
+                }
+            ],
+            "status": "pending"
+        }
+    ],
+    "edges": [
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "file_discovery",
+            "target": "background_analysis",
+            "priority": 0
+        },
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "file_discovery",
+            "target": "price_analysis",
+            "priority": 0
+        },
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "file_discovery",
+            "target": "past_report_review",
+            "priority": 0
+        },
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "background_analysis",
+            "target": "report_generation",
+            "priority": 0
+        },
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "price_analysis",
+            "target": "report_generation",
+            "priority": 0
+        },
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "past_report_review",
+            "target": "report_generation",
+            "priority": 0
+        }
+    ],
+    "graph": null
+}

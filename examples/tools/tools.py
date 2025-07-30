@@ -1,4 +1,14 @@
 #!/usr/bin/env python3
+
+"""
+To test with postgresql, you might need to run the following commands:
+# sudo service postgresql start
+# sudo -u postgres psql -c "CREATE USER testuser WITH PASSWORD 'testpass';"
+# sudo -u postgres psql -c "CREATE DATABASE testdb;"
+# sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE testdb TO testuser;"
+"""
+
+
 """
 Example demonstrating how to use various toolkits from EvoAgentX.
 This script provides comprehensive examples for:
@@ -7,10 +17,14 @@ This script provides comprehensive examples for:
 - Search toolkits (Wikipedia, Google, Google Free)
 - File operations with different file types
 - MCP toolkit integration
+- FAISS toolkit for semantic search and document management
+- PostgreSQL toolkit for relational database operations
+- MongoDB toolkit for document database operations
 """
 
 import os
 import sys
+import json
 from pathlib import Path
 
 # Add the parent directory to sys.path to import from evoagentx
@@ -22,11 +36,16 @@ from evoagentx.tools import (
     WikipediaSearchToolkit,
     GoogleSearchToolkit,
     GoogleFreeSearchToolkit,
+    DDGSSearchToolkit,
     MCPToolkit,
     FileToolkit,
     BrowserToolkit,
     ArxivToolkit,
-    BrowserUseToolkit
+    BrowserUseToolkit,
+    FaissToolkit,
+    PostgreSQLToolkit,
+    MongoDBToolkit,
+    RSSToolkit
 )
 
 
@@ -224,11 +243,13 @@ def run_search_examples():
     wiki_toolkit = WikipediaSearchToolkit(max_summary_sentences=3)
     google_toolkit = GoogleSearchToolkit(num_search_pages=3, max_content_words=200)
     google_free_toolkit = GoogleFreeSearchToolkit()
+    ddgs_toolkit = DDGSSearchToolkit(num_search_pages=3, max_content_words=200, backend="auto", region="us-en")
     
     # Get the individual tools from toolkits
     wiki_tool = wiki_toolkit.get_tool("wikipedia_search")
     google_tool = google_toolkit.get_tool("google_search")
     google_free_tool = google_free_toolkit.get_tool("google_free_search")
+    ddgs_tool = ddgs_toolkit.get_tool("ddgs_search")
     
     # Example search query
     query = "artificial intelligence agent architecture"
@@ -281,6 +302,23 @@ def run_search_examples():
                 print("-" * 30)
     except Exception as e:
         print(f"Error running free Google search: {str(e)}")
+    
+    # Run DDGS search example
+    try:
+        print("\nDDGS Search Example:")
+        print("-" * 50)
+        ddgs_results = ddgs_tool(query=query, num_search_pages=2, backend="duckduckgo")
+        
+        if ddgs_results.get("error"):
+            print(f"Error: {ddgs_results['error']}")
+        else:
+            for i, result in enumerate(ddgs_results.get("results", [])):
+                print(f"Result {i+1}: {result['title']}")
+                print(f"Result full: \n{result}")
+                print(f"URL: {result['url']}")
+                print("-" * 30)
+    except Exception as e:
+        print(f"Error running DDGS search: {str(e)}")
 
 
 def run_python_interpreter_examples():
@@ -873,33 +911,372 @@ def run_browser_use_tool_example():
         print("Note: Make sure you have the required dependencies installed and API keys set up.")
 
 
+def run_faiss_tool_example():
+    """Powerful example using FaissToolkit for semantic search and document management."""
+    print("\n===== FAISS TOOL EXAMPLE =====\n")
+    
+    # Check for OpenAI API key
+    if not os.getenv("OPENAI_API_KEY"):
+        print("❌ OPENAI_API_KEY not found - skipping FAISS example")
+        return
+    
+    try:
+        # Initialize FAISS toolkit with local storage
+        toolkit = FaissToolkit(
+            name="DemoFaissToolkit",
+            default_corpus_id="demo_corpus"
+        )
+        
+        print("✓ FaissToolkit initialized")
+        
+        # Get tools
+        insert_tool = toolkit.get_tool("faiss_insert")
+        query_tool = toolkit.get_tool("faiss_query")
+        stats_tool = toolkit.get_tool("faiss_stats")
+        delete_tool = toolkit.get_tool("faiss_delete")
+        
+        # Insert AI knowledge documents
+        documents = [
+            "Artificial Intelligence enables machines to perform tasks requiring human intelligence.",
+            "Machine learning allows computers to learn from data without explicit programming.",
+            "Deep learning uses neural networks with multiple layers for complex pattern recognition.",
+            "Natural Language Processing helps computers understand and generate human language.",
+            "Computer vision enables machines to interpret visual information from images and videos."
+        ]
+        
+        result = insert_tool(
+            documents=documents,
+            metadata={"source": "ai_knowledge", "topic": "artificial_intelligence"}
+        )
+        
+        if result["success"]:
+            print(f"✓ Inserted {result['data']['documents_inserted']} documents")
+            
+            # Perform semantic search
+            search_result = query_tool(
+                query="How do machines learn?",
+                top_k=3,
+                similarity_threshold=0.1
+            )
+            
+            if search_result["success"]:
+                print(f"✓ Found {search_result['data']['total_results']} relevant results")
+                for i, res in enumerate(search_result["data"]["results"], 1):
+                    print(f"  {i}. Score: {res['score']:.3f} - {res['content'][:80]}...")
+            
+            # Get statistics
+            stats_result = stats_tool()
+            if stats_result["success"]:
+                print(f"✓ Database stats: {stats_result['data']['total_corpora']} corpora")
+            
+            # Test delete functionality
+            print("\n🗑️ Testing delete functionality...")
+            delete_result = delete_tool(
+                metadata_filters={"source": "ai_knowledge"}
+            )
+            
+            if delete_result["success"]:
+                print(f"✓ Deleted documents with metadata filter")
+                
+                # Verify deletion
+                verify_result = query_tool(
+                    query="artificial intelligence",
+                    top_k=5,
+                    similarity_threshold=0.1
+                )
+                
+                if verify_result["success"]:
+                    remaining = verify_result['data']['total_results']
+                    print(f"✓ Remaining documents after deletion: {remaining}")
+        
+        print("\n✓ FaissToolkit test completed")
+        
+    except Exception as e:
+        print(f"Error: {str(e)}")
+
+
+def run_postgresql_tool_example():
+    """Powerful example using PostgreSQLToolkit for database operations."""
+    print("\n===== POSTGRESQL TOOL EXAMPLE =====\n")
+    
+    try:
+        # Initialize PostgreSQL toolkit with local storage
+        toolkit = PostgreSQLToolkit(
+            name="DemoPostgreSQLToolkit",
+            local_path="./demo_postgresql",
+            database_name="demo_db",
+            auto_save=True
+        )
+        
+        print("✓ PostgreSQLToolkit initialized")
+        
+        # Get tools
+        execute_tool = toolkit.get_tool("postgresql_execute")
+        find_tool = toolkit.get_tool("postgresql_find")
+        create_tool = toolkit.get_tool("postgresql_create")
+        delete_tool = toolkit.get_tool("postgresql_delete")
+        
+        # Create users table and insert data
+        create_sql = """
+        CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(100) NOT NULL,
+            email VARCHAR(100) UNIQUE NOT NULL,
+            age INTEGER,
+            department VARCHAR(50)
+        );
+        """
+        
+        result = create_tool(create_sql)
+        if result["success"]:
+            print("✓ Created users table")
+            
+            # Insert users
+            insert_sql = """
+            INSERT INTO users (name, email, age, department) VALUES
+            ('Alice Johnson', 'alice@example.com', 28, 'Engineering'),
+            ('Bob Smith', 'bob@example.com', 32, 'Marketing'),
+            ('Carol Davis', 'carol@example.com', 25, 'Engineering')
+            ON CONFLICT (email) DO NOTHING;
+            """
+            
+            result = execute_tool(insert_sql)
+            if result["success"]:
+                print("✓ Inserted users")
+                
+                # Query users - fix the field access issue
+                find_result = find_tool(
+                    "users",
+                    where="department = 'Engineering'",
+                    columns="name, age",
+                    sort="age ASC"
+                )
+                
+                if find_result["success"]:
+                    engineers = find_result["data"]
+                    print(f"✓ Found {len(engineers)} engineers:")
+                    for user in engineers:
+                        # Handle potential missing fields safely
+                        name = user.get('name', 'Unknown')
+                        age = user.get('age', 'N/A')
+                        print(f"  - {name} (age: {age})")
+                
+                # Test delete functionality
+                print("\n🗑️ Testing delete functionality...")
+                delete_result = delete_tool(
+                    "users",
+                    "department = 'Marketing'"
+                )
+                
+                if delete_result["success"]:
+                    deleted_count = delete_result["data"].get("rowcount", 0)
+                    print(f"✓ Deleted {deleted_count} marketing users")
+                    
+                    # Verify deletion
+                    verify_result = find_tool("users")
+                    if verify_result["success"]:
+                        remaining = verify_result["data"]
+                        print(f"✓ Remaining users after deletion: {len(remaining)}")
+        
+        print("\n✓ PostgreSQLToolkit test completed")
+        
+    except Exception as e:
+        print(f"Error: {str(e)}")
+
+
+def run_mongodb_tool_example():
+    """Powerful example using MongoDBToolkit for document operations."""
+    print("\n===== MONGODB TOOL EXAMPLE =====\n")
+    
+    try:
+        # Initialize MongoDB toolkit with local storage
+        toolkit = MongoDBToolkit(
+            name="DemoMongoDBToolkit",
+            local_path="./demo_mongodb",
+            database_name="demo_db",
+            auto_save=True
+        )
+        
+        print("✓ MongoDBToolkit initialized")
+        
+        # Get tools
+        execute_tool = toolkit.get_tool("mongodb_execute_query")
+        find_tool = toolkit.get_tool("mongodb_find")
+        delete_tool = toolkit.get_tool("mongodb_delete")
+        
+        # Insert products data - fix query format
+        products = [
+            {"id": "P001", "name": "Laptop", "category": "Electronics", "price": 999.99, "stock": 50},
+            {"id": "P002", "name": "Mouse", "category": "Electronics", "price": 29.99, "stock": 100},
+            {"id": "P003", "name": "Desk Chair", "category": "Furniture", "price": 199.99, "stock": 25}
+        ]
+        
+        # Use proper JSON string format
+        result = execute_tool(
+            query=json.dumps(products),
+            query_type="insert",
+            collection_name="products"
+        )
+        
+        if result["success"]:
+            print("✓ Inserted products")
+            
+            # Query products with filter
+            find_result = find_tool(
+                collection_name="products",
+                filter='{"category": "Electronics"}',
+                sort='{"price": -1}'
+            )
+            
+            if find_result["success"]:
+                electronics = find_result["data"]
+                print(f"✓ Found {len(electronics)} electronics products:")
+                for product in electronics:
+                    name = product.get('name', 'Unknown')
+                    price = product.get('price', 0)
+                    stock = product.get('stock', 0)
+                    print(f"  - {name}: ${price} (stock: {stock})")
+            
+            # Test delete functionality
+            print("\n🗑️ Testing delete functionality...")
+            delete_result = delete_tool(
+                collection_name="products",
+                filter='{"category": "Furniture"}',
+                multi=True
+            )
+            
+            if delete_result["success"]:
+                deleted_count = delete_result["data"].get("deleted_count", 0)
+                print(f"✓ Deleted {deleted_count} furniture products")
+                
+                # Verify deletion
+                verify_result = find_tool(collection_name="products")
+                if verify_result["success"]:
+                    remaining = verify_result["data"]
+                    print(f"✓ Remaining products after deletion: {len(remaining)}")
+        
+        print("\n✓ MongoDBToolkit test completed")
+        
+    except Exception as e:
+        print(f"Error: {str(e)}")
+
+
+def run_rss_tool_example():
+    """Powerful example using RSSToolkit for RSS feed operations."""
+    print("\n===== RSS TOOL EXAMPLE =====\n")
+    
+    try:
+        # Initialize RSS toolkit
+        toolkit = RSSToolkit(name="DemoRSSToolkit")
+        
+        print("✓ RSSToolkit initialized")
+        
+        # Get tools
+        fetch_tool = toolkit.get_tool("rss_fetch")
+        validate_tool = toolkit.get_tool("rss_validate")
+        monitor_tool = toolkit.get_tool("rss_monitor")
+        
+        # Test RSS feed URLs
+        test_feeds = [
+            "https://feeds.bbci.co.uk/news/rss.xml",  # BBC News
+            "https://rss.cnn.com/rss/edition.rss",    # CNN
+            "https://feeds.feedburner.com/TechCrunch" # TechCrunch
+        ]
+        
+        for feed_url in test_feeds:
+            print(f"\n--- Testing RSS Feed: {feed_url} ---")
+            
+            # Validate the feed
+            print("1. Validating RSS feed...")
+            validate_result = validate_tool(url=feed_url)
+            
+            if validate_result.get("success") and validate_result.get("is_valid"):
+                print(f"✓ Valid {validate_result.get('feed_type')} feed: {validate_result.get('title', 'Unknown')}")
+                
+                # Fetch the feed
+                print("2. Fetching RSS feed...")
+                fetch_result = fetch_tool(feed_url=feed_url, max_entries=3)
+                
+                if fetch_result.get("success"):
+                    entries = fetch_result.get("entries", [])
+                    print(f"✓ Fetched {len(entries)} entries from '{fetch_result.get('title')}'")
+                    
+                    # Display first few entries
+                    for i, entry in enumerate(entries[:2], 1):
+                        print(f"  Entry {i}: {entry.get('title', 'No title')}")
+                        print(f"    Published: {entry.get('published', 'Unknown')}")
+                        print(f"    Link: {entry.get('link', 'No link')}")
+                        print(f"    Author: {entry.get('author', 'Unknown')}")
+                        print()
+                
+                # Test monitoring for recent entries
+                print("3. Testing feed monitoring...")
+                from datetime import datetime, timedelta
+                yesterday = (datetime.now() - timedelta(days=1)).isoformat()
+                
+                monitor_result = monitor_tool(
+                    feed_url=feed_url,
+                    since_date=yesterday,
+                    max_entries=5
+                )
+                
+                if monitor_result.get("success"):
+                    new_entries = monitor_result.get("new_entries", [])
+                    print(f"✓ Found {len(new_entries)} new entries since yesterday")
+                    
+                    if new_entries:
+                        print("  Recent entries:")
+                        for entry in new_entries[:2]:
+                            print(f"    - {entry.get('title', 'No title')}")
+            else:
+                print(f"❌ Invalid or inaccessible feed: {validate_result.get('error', 'Unknown error')}")
+        
+        print("\n✓ RSSToolkit test completed")
+        
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        print("Note: RSS feed availability may vary. Some feeds may be temporarily unavailable.")
+
+
 def main():
     """Main function to run all examples"""
     print("===== INTERPRETER TOOL EXAMPLES =====")
     
-    # Run file tool example
-    run_file_tool_example()
+    # # Run file tool example
+    # run_file_tool_example()
     
-    # Run browser tool example
-    run_browser_tool_example()
+    # # Run browser tool example
+    # run_browser_tool_example()
     
-    # Run MCP toolkit example
-    run_mcp_example()
+    # # Run MCP toolkit example
+    # run_mcp_example()
     
-    # Run Python interpreter examples
-    run_python_interpreter_examples()
+    # # Run Python interpreter examples
+    # run_python_interpreter_examples()
     
-    # Run Docker interpreter examples
-    run_docker_interpreter_examples()
+    # # Run Docker interpreter examples
+    # run_docker_interpreter_examples()
     
     # Run search tools examples
     run_search_examples()
     
-    # Run arXiv tool example
-    run_arxiv_tool_example()
+    # # Run arXiv tool example
+    # run_arxiv_tool_example()
     
-    # Run BrowserUse tool example
-    run_browser_use_tool_example()
+    # # Run BrowserUse tool example
+    # run_browser_use_tool_example()
+    
+    # # Run FAISS tool example
+    # run_faiss_tool_example()
+    
+    # # Run PostgreSQL tool example
+    # run_postgresql_tool_example()
+    
+    # # Run MongoDB tool example
+    # run_mongodb_tool_example()
+    
+    # # Run RSS tool example
+    # run_rss_tool_example()
     
     print("\n===== ALL EXAMPLES COMPLETED =====")
 
