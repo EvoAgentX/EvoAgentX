@@ -2,8 +2,13 @@ import asyncio
 import json
 import os
 import uuid
+import queue
+import sys
+import threading
+import time
 from datetime import datetime
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional, Callable
+from io import StringIO
 from dotenv import load_dotenv
 
 from evoagentx.workflow import WorkFlowGenerator, WorkFlowGraph, WorkFlow
@@ -15,13 +20,7 @@ from evoagentx.core.module_utils import parse_json_from_text
 from evoagentx.tools import MCPToolkit
 
 from .prompts import WORKFLOW_GENERATION_PROMPT, WORKFLOW_GENERATION_GOAL_PROMPT, WORKFLOW_REQUIREMENT_PROMPT, TASK_INFO_PROMPT_SUDO, CONNECTION_INSTRUCTION_PROMPT
-from .db import database
-
-from .task_manager import (
-    create_stream_task,
-    update_stream_task,
-    complete_stream_task
-)
+from .db import database, requirement_database
 
 import sys
 import io
@@ -29,23 +28,25 @@ import threading
 import time
 from contextlib import redirect_stdout, redirect_stderr
 
-load_dotenv(os.path.join(os.path.dirname(__file__), "server", 'app.env'))
+load_dotenv(os.path.join(os.path.dirname(__file__), 'app.env'))
+MONGODB_URL = os.getenv("MONGODB_URL")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-# default_llm_config = {
-#     "model": "gpt-4o-mini",
-#     "openai_key": OPENAI_API_KEY,
-#     # "stream": True,
-#     "output_response": True,
-#     "max_tokens": 16000
-# }
+SUPABASE_BUCKET_REQUIREMENT = os.getenv("SUPABASE_BUCKET_REQUIREMENT")
 default_llm_config = {
-    "model": "openai/gpt-4o-mini",
-    "openrouter_key": OPENROUTER_API_KEY,
+    "model": "gpt-4o-mini",
+    "openai_key": OPENAI_API_KEY,
     # "stream": True,
     "output_response": True,
     "max_tokens": 16000
 }
+# default_llm_config = {
+#     "model": "openai/gpt-4o-mini",
+#     "openrouter_key": OPENROUTER_API_KEY,
+#     # "stream": True,
+#     "output_response": True,
+#     "max_tokens": 16000
+# }
 
 TUNNEL_INFO_PATH = "./server/tunnel_info.json"
 MCP_CONFIG_PATH = "./server/mcp.config"
@@ -60,116 +61,95 @@ sudo_execution_result = None
 
 # default_tools = MCPToolkit(config_path=MCP_CONFIG_PATH).get_tools()
 # default_tools += [FileTool()]
-default_tools = []
+from evoagentx.tools import GoogleFreeSearchToolkit, DDGSSearchToolkit, WikipediaSearchToolkit, ArxivToolkit, MongoDBToolkit, StorageToolkit, CMDToolkit, RSSToolkit
+default_tools = [GoogleFreeSearchToolkit(), DDGSSearchToolkit(), WikipediaSearchToolkit(), ArxivToolkit(), MongoDBToolkit(), StorageToolkit(), CMDToolkit(), RSSToolkit()]
 
-class OutputCapture:
-    """Capture stdout and stderr output for streaming"""
-    def __init__(self):
-        self.stdout_buffer = io.StringIO()
-        self.stderr_buffer = io.StringIO()
-        self.combined_output = []
-        self.lock = threading.Lock()
+def create_dynamic_mongodb_toolkit(database_name: str = None) -> MongoDBToolkit:
+    """
+    Create a MongoDB toolkit dynamically using the extracted database name.
+    
+    Args:
+        database_name: The database name extracted from requirements
         
-    def write_stdout(self, text):
-        """Write to stdout buffer"""
-        with self.lock:
-            self.stdout_buffer.write(text)
-            self.combined_output.append(('stdout', text, time.time()))
-            
-    def write_stderr(self, text):
-        """Write to stderr buffer"""
-        with self.lock:
-            self.stderr_buffer.write(text)
-            self.combined_output.append(('stderr', text, time.time()))
-            
-    def get_new_output(self, last_index=0):
-        """Get new output since last_index"""
-        with self.lock:
-            new_output = self.combined_output[last_index:]
-            return new_output
-            
-    def get_total_output(self):
-        """Get all captured output"""
-        with self.lock:
-            return self.combined_output.copy()
-
-class StreamingStdout:
-    """Custom stdout that captures output for streaming"""
-    def __init__(self, output_capture):
-        self.output_capture = output_capture
-        self.original_stdout = sys.stdout
-        
-    def write(self, text):
-        self.original_stdout.write(text)
-        self.output_capture.write_stdout(text)
-        
-    def flush(self):
-        self.original_stdout.flush()
-
-class StreamingStderr:
-    """Custom stderr that captures output for streaming"""
-    def __init__(self, output_capture):
-        self.output_capture = output_capture
-        self.original_stderr = sys.stderr
-        
-    def write(self, text):
-        self.original_stderr.write(text)
-        self.output_capture.write_stderr(text)
-        
-    def flush(self):
-        self.original_stderr.flush()
-
-def read_tunnel_info():
-    """Read tunnel information from JSON file"""
-    try:
-        if os.path.exists(TUNNEL_INFO_PATH):
-            with open(TUNNEL_INFO_PATH, "r") as f:
-                return json.load(f)
-        return None
-    except Exception:
-        return None
-
-def create_task_info(project_id: str, goal: str, additional_info: Dict[str, Any] = None, public_url: str = None) -> dict:
-    """Generate comprehensive task info string for a project"""
-    task_prompt = TASK_INFO_PROMPT_SUDO.format(
-        goal=goal,
-        additional_info=additional_info
+    Returns:
+        MongoDBToolkit instance configured with the database
+    """
+    if not database_name:
+        # If no database name provided, create a default toolkit
+        return MongoDBToolkit()
+    
+    # Create toolkit with the specific database name
+    return MongoDBToolkit(
+        connection_string=MONGODB_URL,
+        database_name=database_name
     )
+
+def create_tools_with_database(database_information: Dict[str, Any] = None) -> list:
+    """
+    Create tools list with dynamic MongoDB toolkit based on database information.
     
-    llm_config = create_llm_config(additional_info.get("llm_config", default_llm_config))
-    llm = create_llm_instance(llm_config)
-    response = llm.single_generate([{"role": "user", "content": task_prompt}])
+    Args:
+        database_information: Database information extracted from requirements
+        
+    Returns:
+        List of tools including dynamic MongoDB toolkit
+    """
+    tools = [GoogleFreeSearchToolkit(), DDGSSearchToolkit(), WikipediaSearchToolkit(), ArxivToolkit(), StorageToolkit(), CMDToolkit(), RSSToolkit()]
     
-    # Debug: Print the LLM response
-    print(f"LLM Response: {response}")
+    # Add dynamic MongoDB toolkit if database information is available
+    if database_information and database_information.get("database_name"):
+        database_name = database_information["database_name"]
+        mongodb_toolkit = create_dynamic_mongodb_toolkit(database_name)
+        tools.append(mongodb_toolkit)
+        print(f"🔧 Added dynamic MongoDB toolkit for database: {database_name}")
+    else:
+        # Add default MongoDB toolkit if no specific database info
+        tools.append(MongoDBToolkit())
+        print("🔧 Added default MongoDB toolkit")
     
-    task_info = parse_json_from_text(response)
+    return tools
+
+
+async def retrieve_requirement_from_storage(short_project_id: str) -> str:
+    """
+    Retrieve requirement document from Supabase storage using short_project_id.
     
-    # Debug: Print what parse_json_from_text extracted
-    print(f"Parsed JSON list: {task_info}")
-    
-    if not task_info:
-        raise ValueError(f"No JSON found in LLM response: {response}")
-    
+    Args:
+        short_project_id: The project identifier
+        
+    Returns:
+        str: The requirement document content as a string
+        
+    Raises:
+        Exception: If the requirement document cannot be retrieved
+    """
+    # from .sample_requirement import SAMPLE_REQUIREMENT
+    # return SAMPLE_REQUIREMENT
     try:
-        task_info = json.loads(task_info[0])
-    except json.JSONDecodeError as e:
-        print(f"JSON decode error: {e}")
-        print(f"Failed to parse: {task_info[0]}")
-        raise ValueError(f"Invalid JSON in LLM response: {task_info[0]}")
-    
-    # Add connection_instruction field using the template
-    connection_instruction = CONNECTION_INSTRUCTION_PROMPT.format(
-        project_id=project_id,
-        public_url=public_url or "Not available",
-        workflow_name=task_info.get("workflow_name", "Not available"),
-        workflow_description=task_info.get("workflow_description", "Not available"),
-        workflow_inputs=task_info.get("workflow_inputs", "Not available"),
-        workflow_outputs=task_info.get("workflow_outputs", "Not available")
-    )
-    task_info["connection_instruction"] = connection_instruction
-    
-    return task_info
+        # Use the existing requirement_database client
+        if not requirement_database.client:
+            raise Exception("Requirement database client not connected")
+        
+        # Construct file path
+        file_path = f"projects/{short_project_id}/requirement.md"
+        
+        # Download the requirement document using the existing client
+        response = (
+            requirement_database.client.storage
+            .from_(SUPABASE_BUCKET_REQUIREMENT)
+            .download(file_path)
+        )
+        
+        # Convert bytes to string
+        requirement_content = response.decode("utf-8")
+        
+        print(f"✅ Retrieved requirement document for project {short_project_id}")
+        return requirement_content
+        
+    except Exception as e:
+        print(f"❌ Error retrieving requirement document: {str(e)}")
+        raise Exception(f"Failed to retrieve requirement document: {str(e)}")
+
 
 def create_llm_config(llm_config_dict: Dict[str, Any]) -> LLMConfig:
     """
@@ -185,7 +165,41 @@ def create_llm_config(llm_config_dict: Dict[str, Any]) -> LLMConfig:
     else:
         # If openai_key is provided, use OpenAI regardless of model
         return OpenAILLMConfig(**llm_config_dict)
+
+
+
+async def get_workflow(workflow_id: str) -> Dict[str, Any]:
+    """Retrieve workflow information from the database"""
+    workflow = await database.find_one("workflows", {"id": workflow_id})
     
+    return workflow
+
+async def update_workflow_status(workflow_id: str, status: str, **kwargs):
+    """Update workflow status and other fields"""
+    # Update status and any additional fields
+    updates = {"status": status, "updated_at": datetime.now(), **kwargs}
+    await database.update(
+        "workflows", 
+        {"id": workflow_id}, 
+        updates
+    )
+
+async def list_workflows() -> Dict[str, Any]:
+    """List all workflows in the database"""
+    workflows = await database.find_many("workflows")
+    total_count = await database.count("workflows")
+    
+    active_projects = [
+        w["id"] for w in workflows 
+        if w.get("status") not in ["completed", "failed"]
+    ]
+    
+    return {
+        "projects": [w["id"] for w in workflows],
+        "total_count": total_count,
+        "active_projects": active_projects
+    }
+
 
 async def extract_workflow_requirements(detailed_requirements: str) -> Dict[str, Any]:
     """
@@ -256,7 +270,7 @@ async def generate_workflow_from_goal(goal: str, llm_config_dict: Dict[str, Any]
     workflow_graph: WorkFlowGraph = workflow_generator.generate_workflow(goal=goal)
     return workflow_graph
 
-async def execute_workflow_from_config(workflow: Dict[str, Any], llm_config_dict: Dict[str, Any], mcp_config: dict = None, inputs: Dict[str, Any] = None) -> Dict[str, Any]:
+async def execute_workflow_from_config(workflow: Dict[str, Any], llm_config_dict: Dict[str, Any], mcp_config: dict = None, inputs: Dict[str, Any] = None, database_information: Dict[str, Any] = None) -> Dict[str, Any]:
     """
     Execute a workflow with the given configuration.
     
@@ -265,6 +279,7 @@ async def execute_workflow_from_config(workflow: Dict[str, Any], llm_config_dict
         llm_config_dict: LLM configuration dictionary
         mcp_config: Optional MCP configuration dictionary
         inputs: Optional inputs dictionary to pass to async_execute
+        database_information: Optional database information for dynamic MongoDB toolkit creation
         
     Returns:
         Dict containing execution results and status
@@ -283,12 +298,19 @@ async def execute_workflow_from_config(workflow: Dict[str, Any], llm_config_dict
         
         llm_config = create_llm_config(llm_config_dict)
         llm = create_llm_instance(llm_config)
-        workflow_graph: WorkFlowGraph = WorkFlowGraph.from_dict(workflow)
+        
+        # Handle both WorkFlowGraph objects and dictionaries
+        if isinstance(workflow, WorkFlowGraph):
+            workflow_graph = workflow
+        else:
+            workflow_graph: WorkFlowGraph = WorkFlowGraph.from_dict(workflow)
+        
+        # Create tools with dynamic MongoDB toolkit
+        tools = []
         if mcp_config:
             mcp_toolkit = MCPToolkit(config=mcp_config)
             tools = mcp_toolkit.get_tools()
-        else:
-            tools = default_tools
+        tools += create_tools_with_database(database_information)
         
         agent_manager = AgentManager(tools=tools)
         agent_manager.add_agents_from_workflow(workflow_graph, llm_config=llm_config)
@@ -315,112 +337,6 @@ async def execute_workflow_from_config(workflow: Dict[str, Any], llm_config_dict
             "mcp_config_received": bool(mcp_config)
         }
 
-async def execute_workflow_from_config_with_capture(workflow: Dict[str, Any], llm_config_dict: Dict[str, Any], mcp_config: dict = None, inputs: Dict[str, Any] = None, output_capture: OutputCapture = None) -> Dict[str, Any]:
-    """
-    Execute a workflow with output capture for streaming.
-    Modified version of execute_workflow_from_config that captures stdout/stderr.
-    """
-    try:
-        if sudo_execution_result:
-            # Even for sudo, we can simulate some output
-            if output_capture:
-                output_capture.write_stdout("Starting sudo workflow execution...\n")
-                await asyncio.sleep(0.5)
-                output_capture.write_stdout("Initializing workflow components...\n")
-                await asyncio.sleep(0.5)
-                output_capture.write_stdout("Executing workflow logic...\n")
-                await asyncio.sleep(1)
-                output_capture.write_stdout("Workflow execution completed successfully!\n")
-                
-            return {
-                "status": "completed",
-                "message": sudo_execution_result,
-                "workflow_received": bool(workflow),
-                "llm_config_received": bool(llm_config_dict),
-                "mcp_config_received": bool(mcp_config)
-            }
-        
-        # Setup output capture
-        if output_capture:
-            streaming_stdout = StreamingStdout(output_capture)
-            streaming_stderr = StreamingStderr(output_capture)
-            
-            # Redirect stdout and stderr
-            original_stdout = sys.stdout
-            original_stderr = sys.stderr
-            sys.stdout = streaming_stdout
-            sys.stderr = streaming_stderr
-            
-            try:
-                output_capture.write_stdout("🚀 Starting workflow execution...\n")
-                
-                # Create LLM config and instance
-                output_capture.write_stdout("🔧 Creating LLM configuration...\n")
-                llm_config = create_llm_config(llm_config_dict)
-                llm = create_llm_instance(llm_config)
-                
-                # Create workflow graph
-                output_capture.write_stdout("📊 Loading workflow graph...\n")
-                workflow_graph: WorkFlowGraph = WorkFlowGraph.from_dict(workflow)
-                
-                # Setup tools
-                output_capture.write_stdout("🛠️ Setting up tools...\n")
-                if mcp_config:
-                    mcp_toolkit = MCPToolkit(config=mcp_config)
-                    tools = mcp_toolkit.get_tools()
-                    output_capture.write_stdout(f"   • Loaded {len(tools)} MCP tools\n")
-                else:
-                    tools = default_tools
-                    output_capture.write_stdout(f"   • Using {len(tools)} default tools\n")
-                
-                # Setup agent manager
-                output_capture.write_stdout("🤖 Setting up agent manager...\n")
-                agent_manager = AgentManager(tools=tools)
-                agent_manager.add_agents_from_workflow(workflow_graph, llm_config=llm_config)
-                
-                # Create and initialize workflow
-                output_capture.write_stdout("⚙️ Initializing workflow...\n")
-                workflow_instance = WorkFlow(graph=workflow_graph, agent_manager=agent_manager, llm=llm)
-                workflow_instance.init_module()
-                
-                # Execute workflow
-                output_capture.write_stdout("▶️ Executing workflow...\n")
-                if inputs:
-                    output_capture.write_stdout(f"   • Inputs: {inputs}\n")
-                
-                output = await workflow_instance.async_execute(inputs=inputs)
-                
-                output_capture.write_stdout("✅ Workflow execution completed!\n")
-                output_capture.write_stdout(f"   • Output: {str(output)[:200]}{'...' if len(str(output)) > 200 else ''}\n")
-                
-                return {
-                    "status": "completed",
-                    "message": output,
-                    "workflow_received": bool(workflow),
-                    "llm_config_received": bool(llm_config_dict),
-                    "mcp_config_received": bool(mcp_config)
-                }
-                
-            finally:
-                # Restore original stdout and stderr
-                sys.stdout = original_stdout
-                sys.stderr = original_stderr
-                
-        else:
-            # Fallback to original implementation if no output capture
-            return await execute_workflow_from_config(workflow, llm_config_dict, mcp_config, inputs)
-            
-    except Exception as e:
-        if output_capture:
-            output_capture.write_stderr(f"❌ Error in workflow execution: {str(e)}\n")
-            
-        return {
-            "status": "error",
-            "message": f"In the execution process, got error:\n{e}",
-            "workflow_received": bool(workflow),
-            "llm_config_received": bool(llm_config_dict),
-            "mcp_config_received": bool(mcp_config)
-        }
 
 
     
@@ -433,12 +349,18 @@ async def execute_workflow_from_config_with_capture(workflow: Dict[str, Any], ll
 
 
 
-
-async def setup_project(detailed_requirements: str) -> Dict[str, Any]:
+### _____________________________________________
+### Workflow CRUD 
+### _____________________________________________
+async def setup_project(short_project_id: str) -> List[Dict[str, Any]]:
     """
     Phase 1: Setup workflow with extraction AND generation.
-    Returns workflow information for multiple workflows.
+    Returns a list of workflow configurations.
     """
+    # Retrieve requirement document from storage
+    print(f"📥 Retrieving requirement document for project {short_project_id}...")
+    detailed_requirements = await retrieve_requirement_from_storage(short_project_id)
+    
     # Extract workflows and database info
     print(f"🔍 Extracting workflows from detailed requirements...")
     extracted_data = await extract_workflow_requirements(detailed_requirements)
@@ -465,122 +387,7 @@ async def setup_project(detailed_requirements: str) -> Dict[str, Any]:
             mcp_config={}
         )
         
-        generated_workflows.append({
-            "workflow_name": extracted_workflow["workflow_name"],
-            "workflow_id": extracted_workflow["workflow_id"],
-            "workflow_requirement": extracted_workflow["workflow_requirement"],
-            "workflow_inputs": extracted_workflow["workflow_inputs"],
-            "workflow_outputs": extracted_workflow["workflow_outputs"],
-            "workflow_graph": workflow_graph
-        })
-    
-    print(f"✅ Generated {len(generated_workflows)} workflows")
-    
-    # Generate unique workflow_id and user_id
-    workflow_id = f"workflow_{uuid.uuid4().hex[:12]}"
-    user_id = f"user_{uuid.uuid4().hex[:8]}"
-    
-    # Store everything in workflow document
-    workflow_doc = {
-        "id": workflow_id,
-        "user_id": user_id,
-        "extracted_workflows": extracted_data["workflows"],
-        "generated_workflows": generated_workflows,
-        "database_information": extracted_data["database_information"],
-        "workflow_graph": generated_workflows,  # Store all generated workflows
-        "execution_result": None,
-        "status": "pending"  # Ready for execution
-    }
-    
-    await database.insert("workflows", workflow_doc)
-    print(f"✅ Created new workflow {workflow_id}")
-    
-    # Return comprehensive workflow information
-    return {
-        "workflow_id": workflow_id,
-        "user_id": user_id,
-        "workflows": generated_workflows,
-        "database_information": extracted_data["database_information"],
-        "total_workflows": len(generated_workflows)
-    }
-
-async def get_project(workflow_id: str) -> Dict[str, Any]:
-    """Retrieve workflow information from the database"""
-    return await database.find_one("workflows", {"id": workflow_id})
-
-async def update_project_status(workflow_id: str, status: str, **kwargs):
-    """Update workflow status and other fields"""
-    # Update status and any additional fields
-    updates = {"status": status, **kwargs}
-    await database.update(
-        "workflows", 
-        {"id": workflow_id}, 
-        updates
-    )
-
-async def list_projects() -> Dict[str, Any]:
-    """List all workflows in the database"""
-    workflows = await database.find_many("workflows")
-    total_count = await database.count("workflows")
-    
-    active_projects = [
-        w["id"] for w in workflows 
-        if w.get("status") not in ["completed", "failed"]
-    ]
-    
-    return {
-        "projects": [w["id"] for w in workflows],
-        "total_count": total_count,
-        "active_projects": active_projects
-    }
-
-async def generate_workflow_for_project(workflow_id: str) -> Dict[str, Any]:
-    """
-    Phase 2: Generate workflow graph based on task_info.
-    Updated to use new database structure.
-    """
-    # Check if workflow exists
-    workflow = await get_project(workflow_id)
-    if not workflow:
-        raise ValueError(f"Workflow with ID {workflow_id} not found")
-    
-    # Check if setup was completed
-    if workflow.get("task_info") is None:
-        raise ValueError(f"Workflow {workflow_id} has not completed setup phase")
-    
-    task_info = workflow["task_info"]
-    
-    # Extract information for workflow generation
-    goal = task_info.get("workflow_description", "")
-    workflow_inputs = task_info.get("workflow_inputs", [])
-    workflow_outputs = task_info.get("workflow_outputs", [])
-    
-    # Format the prompt with goal, inputs, and outputs
-    formatted_goal = WORKFLOW_GENERATION_PROMPT.format(
-        goal=goal, 
-        inputs=workflow_inputs, 
-        outputs=workflow_outputs
-    )
-    
-    try:
-        # Update workflow status
-        await update_project_status(workflow_id, "running")
         
-        # Generate workflow graph
-        workflow_graph = await generate_workflow_from_goal(
-            formatted_goal, 
-            default_llm_config, 
-            mcp_config={}
-        )
-        
-        if workflow_graph is None:
-            await update_project_status(workflow_id, "failed")
-            return {
-                "workflow_graph": {},
-                "status": "failed"
-            }
-        
-        # Convert workflow_graph to serializable format
         try:
             if hasattr(workflow_graph, 'get_config'):
                 workflow_dict = workflow_graph.get_config()
@@ -594,69 +401,629 @@ async def generate_workflow_for_project(workflow_id: str) -> Dict[str, Any]:
         except Exception as e:
             workflow_dict = f"Workflow generated successfully (serialization error: {str(e)})"
         
-        # Update workflow storage with generated graph
-        await update_project_status(
-            workflow_id, 
-            "pending",
-            workflow_graph=workflow_dict
+        
+        generated_workflows.append({
+            "workflow_name": extracted_workflow["workflow_name"],
+            "workflow_id": extracted_workflow["workflow_id"],
+            "workflow_requirement": extracted_workflow["workflow_requirement"],
+            "workflow_inputs": extracted_workflow["workflow_inputs"],
+            "workflow_outputs": extracted_workflow["workflow_outputs"],
+            "workflow_graph": workflow_dict
+        })
+    
+    print(f"✅ Generated {len(generated_workflows)} workflows")
+    
+    # Insert each workflow as individual records and create workflow configs
+    workflow_configs = []
+    for workflow_data in generated_workflows:
+        workflow_id = workflow_data["workflow_id"]
+        # Create task_info with workflow details
+        task_info = {
+            "workflow_name": workflow_data["workflow_name"],
+            "workflow_requirement": workflow_data["workflow_requirement"],
+            "workflow_inputs": workflow_data["workflow_inputs"],
+            "workflow_outputs": workflow_data["workflow_outputs"],
+            "database_information": extracted_data["database_information"]
+        }
+        
+        # Create individual workflow document according to database schema
+        workflow_doc = {
+            "id": workflow_id,
+            "status": "pending",
+            "task_info": task_info,
+            "workflow_graph": workflow_data["workflow_graph"],
+            "short_project_id": short_project_id,
+            "execution_result": None
+        }
+        
+        await database.insert("workflows", workflow_doc)
+        print(f"✅ Created workflow record: {workflow_id}")
+        
+        # # Create workflow config for response
+        workflow_config = {
+            "workflow_id": workflow_id,
+            "workflow_name": workflow_data["workflow_name"],
+            "workflow_inputs": workflow_data["workflow_inputs"],
+            "workflow_outputs": workflow_data["workflow_outputs"],
+            "workflow_graph": workflow_data["workflow_graph"],
+        }
+        
+        workflow_configs.append(workflow_config)
+    
+    return workflow_configs
+
+async def generate_workflow(workflow_id: str) -> Dict[str, Any]:
+    """
+    Phase 2: Generate workflow graph based on task_info.
+    Updated to work with individual workflow records.
+    """
+    try:
+        # Check if workflow exists
+        workflow = await get_workflow(workflow_id)
+        if not workflow:
+            raise ValueError(f"Workflow with ID {workflow_id} not found")
+        
+        if workflow.get("task_info") is None or workflow.get("task_info").get("workflow_requirement") is None:
+            raise ValueError(f"Workflow {workflow_id} has no workflow requirement")
+        
+        formatted_goal = WORKFLOW_GENERATION_GOAL_PROMPT.format(
+            workflow_inputs=workflow["task_info"]["workflow_inputs"],
+            workflow_outputs=workflow["task_info"]["workflow_outputs"],
+            requirement=workflow["task_info"]["workflow_requirement"]
         )
         
+        workflow_graph = await generate_workflow_from_goal(
+                formatted_goal, 
+                default_llm_config, 
+                mcp_config={}
+            )
+        
+        # The workflow_graph now contains the single generated workflow from setup
+        workflow_graph = workflow["workflow_graph"]
+        
+        await database.update(
+            "workflows",
+            {"id": workflow_id},
+            {"workflow_graph": workflow_graph, "updated_at": datetime.now(), "status": "pending"}
+        )
         return {
-            "workflow_graph": workflow_dict,
+            "workflow_graph": workflow_graph,
             "status": "success"
         }
         
     except Exception as e:
-        await update_project_status(workflow_id, "failed")
-        raise ValueError(f"Error generating workflow: {str(e)}")
+        await update_workflow_status(workflow_id, "failed")
+        raise ValueError(f"Failed to generate workflow: {str(e)}")
 
-async def execute_workflow_for_project(workflow_id: str, inputs: Dict[str, Any]) -> Dict[str, Any]:
+async def execute_workflow(workflow_id: str, inputs: Dict[str, Any]) -> Dict[str, Any]:
     """
     Phase 3: Execute workflow with provided inputs.
-    Updated to handle multiple workflows from setup.
+    Updated to work with individual workflow records and correct database schema.
     """
-    # Check if workflow exists
-    workflow = await get_project(workflow_id)
-    if not workflow:
-        raise ValueError(f"Workflow with ID {workflow_id} not found")
+    try:
+        # Check if workflow exists
+        workflow = await get_workflow(workflow_id)
+        if not workflow:
+            raise ValueError(f"Workflow with ID {workflow_id} not found")
+        
+        # Check if workflow generation was completed
+        if workflow.get("workflow_graph") is None:
+            raise ValueError(f"Workflow {workflow_id} has not completed generation phase")
+        
+        # Update workflow status
+        await update_workflow_status(workflow_id, "running")
+        
+        # Get workflow graph (now a single workflow, not a list)
+        workflow_graph = workflow["workflow_graph"]
+        task_info = workflow.get("task_info", {})
+        workflow_name = task_info.get("workflow_name", workflow_id)
+        
+        if workflow_graph is None:
+            print(f"⚠️ No workflow graph available for {workflow_name}")
+            await update_workflow_status(workflow_id, "failed")
+            return {
+                "status": "failed",
+                "error": "No workflow graph available"
+            }
+        
+        print(f"🚀 Executing workflow: {workflow_name}")
+        
+        # Get database information for dynamic MongoDB toolkit
+        database_information = task_info.get("database_information")
+        
+        # Execute the workflow with database information
+        execution_result = await execute_workflow_from_config(
+            workflow_graph, 
+            default_llm_config, 
+            mcp_config={}, 
+            inputs=inputs,
+            database_information=database_information
+        )
+        
+        if execution_result is None:
+            print(f"❌ Failed to execute workflow: {workflow_name}")
+            await update_workflow_status(workflow_id, "failed")
+            return {
+                "status": "failed",
+                "error": "Failed to execute workflow"
+            }
+        
+        # Process execution result
+        if isinstance(execution_result, dict):
+            execution_message = execution_result.get("message", "")
+        else:
+            execution_message = str(execution_result)
+            
+        # Clean up markdown formatting from the message
+        if isinstance(execution_message, str):
+            if execution_message.startswith("```markdown"):
+                execution_message = execution_message[11:]
+            if execution_message.endswith("```"):
+                execution_message = execution_message[:-3]
+        
+        # Update execution_result with cleaned message
+        if isinstance(execution_result, dict):
+            execution_result["message"] = execution_message
+        else:
+            execution_result = execution_message
+        
+        # Update workflow storage with execution results
+        await update_workflow_status(
+            workflow_id, 
+            "completed",
+            execution_result=execution_result
+        )
+        
+        return {
+            "status": "completed",
+            "workflow_name": workflow_name,
+            "result": execution_result
+        }
+        
+    except Exception as e:
+        await update_workflow_status(workflow_id, "failed")
+        raise ValueError(f"Failed to execute workflow: {str(e)}")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+### _____________________________________________
+### WebSocket-based Workflow Execution with Real-time Logging
+### _____________________________________________
+
+import asyncio
+import json
+import queue
+import threading
+from typing import Optional, Dict, Any, Callable
+from loguru import logger
+from evoagentx.core.logging import save_logger, get_log_file
+
+class WebSocketEnhancedSink:
+    """
+    Enhanced WebSocket sink that captures loguru messages, stdin/stdout, and provides periodic updates.
+    """
     
-    # Check if workflow generation was completed
-    if workflow.get("workflow_graph") is None:
-        raise ValueError(f"Workflow {workflow_id} has not completed generation phase")
+    def __init__(self, websocket_send_func: Callable, workflow_id: str):
+        self.websocket_send_func = websocket_send_func
+        self.workflow_id = workflow_id
+        self.message_queue = queue.Queue()
+        self.running = True
+        self.stdout_buffer = StringIO()
+        self.stderr_buffer = StringIO()
+        self.last_update_time = time.time()
+        self.update_interval = 3.0  # Update every 3 seconds
+        
+        # Store original stdout/stderr
+        self.original_stdout = sys.stdout
+        self.original_stderr = sys.stderr
+        
+        # Start message processing thread
+        self.processing_thread = threading.Thread(target=self._process_messages, daemon=True)
+        self.processing_thread.start()
+        
+        # Start periodic update thread
+        self.update_thread = threading.Thread(target=self._periodic_updates, daemon=True)
+        self.update_thread.start()
+        
+        # Redirect stdout/stderr to capture output
+        self._redirect_output()
+    
+    def _redirect_output(self):
+        """Redirect stdout and stderr to capture output."""
+        class CapturingStream:
+            def __init__(self, original_stream, buffer, sink):
+                self.original_stream = original_stream
+                self.buffer = buffer
+                self.sink = sink
+            
+            def write(self, text):
+                self.original_stream.write(text)
+                self.buffer.write(text)
+                # Flush to ensure immediate capture
+                self.buffer.flush()
+                
+                # Send stdout/stderr messages immediately
+                if text.strip():
+                    self.sink._send_output_message("stdout" if self.original_stream == sys.stdout else "stderr", text)
+            
+            def flush(self):
+                self.original_stream.flush()
+                self.buffer.flush()
+        
+        # Create capturing streams
+        self.stdout_capturer = CapturingStream(sys.stdout, self.stdout_buffer, self)
+        self.stderr_capturer = CapturingStream(sys.stderr, self.stderr_buffer, self)
+        
+        # Redirect
+        sys.stdout = self.stdout_capturer
+        sys.stderr = self.stderr_capturer
+    
+    def capture_stdin_input(self, input_text: str):
+        """Capture stdin input and send via WebSocket."""
+        if input_text.strip():
+            input_data = {
+                "type": "input",
+                "timestamp": datetime.now().isoformat(),
+                "input_type": "stdin",
+                "content": input_text.strip(),
+                "workflow_id": self.workflow_id
+            }
+            
+            # Send immediately in a thread-safe way
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    asyncio.run_coroutine_threadsafe(
+                        self._send_websocket_message(input_data), 
+                        loop
+                    )
+            except RuntimeError:
+                # No event loop available, just print
+                print(f"Input message: stdin - {input_text.strip()}")
+    
+    def _restore_output(self):
+        """Restore original stdout and stderr."""
+        if hasattr(self, 'original_stdout'):
+            sys.stdout = self.original_stdout
+        if hasattr(self, 'original_stderr'):
+            sys.stderr = self.original_stderr
+    
+    def _send_output_message(self, output_type: str, content: str):
+        """Send stdout/stderr message via WebSocket."""
+        if not content.strip():
+            return
+            
+        output_data = {
+            "type": "output",
+            "timestamp": datetime.now().isoformat(),
+            "output_type": output_type,  # "stdout" or "stderr"
+            "content": content.strip(),
+            "workflow_id": self.workflow_id
+        }
+        
+        # Send immediately in a thread-safe way
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                asyncio.run_coroutine_threadsafe(
+                    self._send_websocket_message(output_data), 
+                    loop
+                )
+        except RuntimeError:
+            # No event loop available, just print
+            print(f"Output message: {output_type} - {content.strip()}")
+    
+    def write(self, message):
+        """Write method called by loguru for each log message."""
+        if self.running:
+            self.message_queue.put(message)
+    
+    def _periodic_updates(self):
+        """Send periodic status updates every 3 seconds."""
+        while self.running:
+            try:
+                time.sleep(self.update_interval)
+                if self.running:
+                    # Get current buffer contents
+                    stdout_content = self.stdout_buffer.getvalue()
+                    stderr_content = self.stderr_buffer.getvalue()
+                    
+                    # Send periodic update with comprehensive information
+                    update_data = {
+                        "type": "periodic_update",
+                        "timestamp": datetime.now().isoformat(),
+                        "workflow_id": self.workflow_id,
+                        "stdout_buffer": stdout_content[-1000:],  # Last 1000 chars
+                        "stderr_buffer": stderr_content[-1000:],  # Last 1000 chars
+                        "buffer_sizes": {
+                            "stdout": len(stdout_content),
+                            "stderr": len(stderr_content)
+                        },
+                        "status": "running",
+                        "message": f"Workflow execution in progress. Captured {len(stdout_content)} stdout chars, {len(stderr_content)} stderr chars"
+                    }
+                    
+                    try:
+                        loop = asyncio.get_event_loop()
+                        if loop.is_running():
+                            asyncio.run_coroutine_threadsafe(
+                                self._send_websocket_message(update_data), 
+                                loop
+                            )
+                    except RuntimeError:
+                        pass  # No event loop available
+                        
+            except Exception as e:
+                print(f"Error in periodic updates: {e}")
+    
+    def _process_messages(self):
+        """Process messages from queue and send via WebSocket."""
+        while self.running:
+            try:
+                message = self.message_queue.get(timeout=1)
+                if message:
+                    # Parse loguru message format
+                    log_data = self._parse_loguru_message(message)
+                    if log_data:
+                        # Send via WebSocket in a thread-safe way
+                        try:
+                            # Get the current event loop
+                            loop = asyncio.get_event_loop()
+                            if loop.is_running():
+                                # Use run_coroutine_threadsafe to safely call async function from thread
+                                future = asyncio.run_coroutine_threadsafe(
+                                    self._send_websocket_message(log_data), 
+                                    loop
+                                )
+                                # Don't wait for the result to avoid blocking
+                                future.add_done_callback(self._handle_websocket_result)
+                            else:
+                                # Fallback: just print the message if no running loop
+                                print(f"WebSocket log message: {log_data.get('message', 'Unknown')}")
+                        except RuntimeError:
+                            # No event loop available, just print the message
+                            print(f"WebSocket log message: {log_data.get('message', 'Unknown')}")
+            except queue.Empty:
+                continue
+            except Exception as e:
+                print(f"Error processing log message: {e}")
+    
+    def _handle_websocket_result(self, future):
+        """Handle the result of the WebSocket send operation."""
+        try:
+            future.result()  # This will raise any exception that occurred
+        except Exception as e:
+            print(f"Error in WebSocket send operation: {e}")
+    
+    def _parse_loguru_message(self, message: str) -> Optional[Dict[str, Any]]:
+        """Parse loguru message format and extract structured data."""
+        try:
+            # Remove ANSI color codes and parse timestamp
+            import re
+            # Remove color codes
+            message = re.sub(r'\x1b\[[0-9;]*m', '', message)
+            
+            # Try to parse timestamp and level from loguru format
+            # Expected format: "2024-01-01 12:00:00.123 | LEVEL | message"
+            parts = message.strip().split(' | ', 2)
+            if len(parts) >= 3:
+                timestamp_str, level, log_message = parts
+                return {
+                    "type": "log",
+                    "timestamp": timestamp_str,
+                    "level": level,
+                    "message": log_message,
+                    "workflow_id": self.workflow_id
+                }
+            else:
+                # Fallback for unformatted messages
+                return {
+                    "type": "log",
+                    "timestamp": None,
+                    "level": "INFO",
+                    "message": message.strip(),
+                    "workflow_id": self.workflow_id
+                }
+        except Exception as e:
+            print(f"Error parsing loguru message: {e}")
+            return None
+    
+    async def _send_websocket_message(self, log_data: Dict[str, Any]):
+        """Send message through WebSocket."""
+        try:
+            await self.websocket_send_func(json.dumps(log_data))
+        except Exception as e:
+            print(f"Error sending WebSocket message: {e}")
+    
+    def get_buffer_contents(self) -> Dict[str, Any]:
+        """Get current buffer contents for final reporting."""
+        return {
+            "stdout": self.stdout_buffer.getvalue(),
+            "stderr": self.stderr_buffer.getvalue(),
+            "stdout_size": len(self.stdout_buffer.getvalue()),
+            "stderr_size": len(self.stderr_buffer.getvalue())
+        }
+    
+    def stop(self):
+        """Stop the sink and cleanup."""
+        self.running = False
+        
+        # Restore original output streams
+        self._restore_output()
+        
+        # Wait for threads to finish
+        if self.processing_thread.is_alive():
+            self.processing_thread.join(timeout=2)
+        if self.update_thread.is_alive():
+            self.update_thread.join(timeout=2)
+
+class WorkflowExecutionProgress:
+    """
+    Tracks workflow execution progress and sends updates via WebSocket.
+    """
+    
+    def __init__(self, websocket_send_func: Callable, workflow_id: str):
+        self.websocket_send_func = websocket_send_func
+        self.workflow_id = workflow_id
+        self.current_phase = "initializing"
+        self.progress = 0.0
+        self.total_tasks = 0
+        self.completed_tasks = 0
+    
+    async def send_progress_update(self, phase: str, progress: float, message: str = None):
+        """Send progress update via WebSocket."""
+        self.current_phase = phase
+        self.progress = progress
+        
+        progress_data = {
+            "type": "progress",
+            "timestamp": datetime.now().isoformat(),
+            "phase": phase,
+            "progress": progress,
+            "message": message,
+            "workflow_id": self.workflow_id
+        }
+        
+        try:
+            await self.websocket_send_func(json.dumps(progress_data))
+        except Exception as e:
+            print(f"Error sending progress update: {e}")
+    
+    async def send_completion(self, result: Dict[str, Any]):
+        """Send completion message with final result."""
+        completion_data = {
+            "type": "complete",
+            "timestamp": datetime.now().isoformat(),
+            "result": result,
+            "workflow_id": self.workflow_id
+        }
+        
+        try:
+            await self.websocket_send_func(json.dumps(completion_data))
+        except Exception as e:
+            print(f"Error sending completion: {e}")
+    
+    async def send_error(self, error_message: str):
+        """Send error message."""
+        error_data = {
+            "type": "error",
+            "timestamp": datetime.now().isoformat(),
+            "error": error_message,
+            "workflow_id": self.workflow_id
+        }
+        
+        try:
+            await self.websocket_send_func(json.dumps(error_data))
+        except Exception as e:
+            print(f"Error sending error message: {e}")
+
+async def execute_workflow_with_websocket(
+    workflow_id: str, 
+    inputs: Dict[str, Any], 
+    websocket_send_func: Callable
+) -> Dict[str, Any]:
+    """
+    Execute workflow with WebSocket-based real-time progress updates.
+    
+    Args:
+        workflow_id: The workflow ID to execute
+        inputs: Input parameters for workflow execution
+        websocket_send_func: Function to send messages via WebSocket
+        
+    Returns:
+        Dict containing execution results
+    """
+    progress_tracker = WorkflowExecutionProgress(websocket_send_func, workflow_id)
+    websocket_sink = None
     
     try:
+        # Send initial progress
+        await progress_tracker.send_progress_update("initializing", 0.0, "Starting workflow execution...")
+        
+        # Check if workflow exists
+        workflow = await get_workflow(workflow_id)
+        if not workflow:
+            await progress_tracker.send_error(f"Workflow with ID {workflow_id} not found")
+            raise ValueError(f"Workflow with ID {workflow_id} not found")
+        
+        await progress_tracker.send_progress_update("validating", 0.1, "Validating workflow configuration...")
+        
+        # Check if workflow generation was completed
+        if workflow.get("workflow_graph") is None:
+            await progress_tracker.send_error(f"Workflow {workflow_id} has not completed generation phase")
+            raise ValueError(f"Workflow {workflow_id} has not completed generation phase")
+        
+        await progress_tracker.send_progress_update("preparing", 0.2, "Preparing workflow execution...")
+        
         # Update workflow status
-        await update_project_status(workflow_id, "running")
+        await update_workflow_status(workflow_id, "running")
         
-        # Get workflow graphs (now a list of workflows)
-        workflow_graphs = workflow["workflow_graph"]
+        # Get workflow graph and task info
+        workflow_graph = workflow["workflow_graph"]
+        task_info = workflow.get("task_info", {})
+        workflow_name = task_info.get("workflow_name", workflow_id)
         
-        if not isinstance(workflow_graphs, list):
-            raise ValueError(f"Workflow {workflow_id} has invalid workflow_graph format")
+        if workflow_graph is None:
+            await progress_tracker.send_error("No workflow graph available")
+            await update_workflow_status(workflow_id, "failed")
+            return {
+                "status": "failed",
+                "error": "No workflow graph available"
+            }
         
-        # Execute each workflow
-        execution_results = []
-        for i, workflow_data in enumerate(workflow_graphs):
-            workflow_name = workflow_data.get("workflow_name", f"workflow_{i}")
-            workflow_graph = workflow_data.get("workflow_graph")
-            
-            if workflow_graph is None:
-                print(f"⚠️ Skipping workflow {workflow_name} - no graph available")
-                continue
-            
-            print(f"🚀 Executing workflow: {workflow_name}")
-            
-            # Execute the workflow
+        await progress_tracker.send_progress_update("executing", 0.3, f"Executing workflow: {workflow_name}")
+        
+        # Get database information for dynamic MongoDB toolkit
+        database_information = task_info.get("database_information")
+        
+        # Setup WebSocket enhanced sink
+        websocket_sink = WebSocketEnhancedSink(websocket_send_func, workflow_id)
+        
+        # Add custom sink to loguru
+        sink_id = logger.add(websocket_sink.write, level="INFO", format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}")
+        
+        try:
+            # Execute the workflow with database information
             execution_result = await execute_workflow_from_config(
                 workflow_graph, 
                 default_llm_config, 
                 mcp_config={}, 
-                inputs=inputs
+                inputs=inputs,
+                database_information=database_information
             )
             
+            await progress_tracker.send_progress_update("finalizing", 0.9, "Finalizing execution results...")
+            
             if execution_result is None:
-                print(f"❌ Failed to execute workflow: {workflow_name}")
-                continue
+                await progress_tracker.send_error(f"Failed to execute workflow: {workflow_name}")
+                await update_workflow_status(workflow_id, "failed")
+                return {
+                    "status": "failed",
+                    "error": "Failed to execute workflow"
+                }
             
             # Process execution result
             if isinstance(execution_result, dict):
@@ -677,255 +1044,67 @@ async def execute_workflow_for_project(workflow_id: str, inputs: Dict[str, Any])
             else:
                 execution_result = execution_message
             
-            execution_results.append({
-                "workflow_name": workflow_name,
-                "result": execution_result
-            })
-        
-        if not execution_results:
-            await update_project_status(workflow_id, "failed")
-            return {
-                "status": "failed",
-                "error": "Failed to execute any workflows"
-            }
-        
-        # Update workflow storage with execution results
-        await update_project_status(
-            workflow_id, 
-            "completed",
-            execution_result=execution_results
-        )
-        
-        return {
-            "status": "completed",
-            "results": execution_results,
-            "total_workflows": len(execution_results)
-        }
-        
-    except Exception as e:
-        await update_project_status(workflow_id, "failed")
-        raise ValueError(f"Error executing workflow: {str(e)}")
-
-async def execute_workflow_for_project_stream(task_id: str, workflow_id: str, inputs: Dict[str, Any]):
-    """
-    Streaming version of execute_workflow_for_project.
-    Streams real command output during workflow execution.
-    """
-    output_capture = OutputCapture()
-    output_index = 0
-    
-    try:
-        # Initial setup message
-        update_stream_task(task_id, {
-            "timestamp": datetime.now().isoformat(),
-            "status": "starting",
-            "output_type": "setup",
-            "message": "Starting workflow execution...",
-            "command_output": "Initializing workflow execution stream...\n"
-        })
-        
-        # Validate workflow exists
-        workflow = await get_project(workflow_id)
-        if not workflow:
-            error_result = {
-                "status": "error",
-                "timestamp": datetime.now().isoformat(),
-                "output_type": "error",
-                "error": f"Workflow with ID {workflow_id} not found",
-                "command_output": f"ERROR: Workflow {workflow_id} not found\n"
-            }
-            update_stream_task(task_id, error_result)
-            complete_stream_task(task_id)
-            return
-
-        # Check if workflow generation was completed
-        if workflow.get("workflow_graph") is None:
-            error_result = {
-                "status": "error",
-                "timestamp": datetime.now().isoformat(),
-                "output_type": "error",
-                "error": f"Workflow {workflow_id} has not completed generation phase",
-                "command_output": f"ERROR: Workflow {workflow_id} not ready for execution\n"
-            }
-            update_stream_task(task_id, error_result)
-            complete_stream_task(task_id)
-            return
-
-        # Update workflow status
-        await update_project_status(workflow_id, "running")
-        
-        # Start output monitoring task
-        async def monitor_output():
-            nonlocal output_index
-            while True:
-                try:
-                    # Get new output every 1 second
-                    new_output = output_capture.get_new_output(output_index)
-                    
-                    if new_output:
-                        # Format the output for streaming
-                        command_output = ""
-                        for output_type, text, timestamp in new_output:
-                            command_output += text
-                            
-                        # Send update with new command output
-                        update_stream_task(task_id, {
-                            "timestamp": datetime.now().isoformat(),
-                            "status": "running",
-                            "output_type": "command",
-                            "command_output": command_output,
-                            "total_output_lines": len(output_capture.get_total_output())
-                        })
-                        
-                        output_index += len(new_output)
-                    
-                    await asyncio.sleep(1)  # Check every 1 second
-                    
-                except Exception as e:
-                    print(f"Error monitoring output: {e}")
-                    break
-        
-        # Start monitoring task
-        monitor_task = asyncio.create_task(monitor_output())
-        
-        try:
-            # Execute the workflows with output capture
-            workflow_graphs = workflow["workflow_graph"]
+            # Get captured output from the sink
+            captured_output = websocket_sink.get_buffer_contents() if websocket_sink else {}
             
-            if not isinstance(workflow_graphs, list):
-                error_result = {
-                    "status": "error",
-                    "timestamp": datetime.now().isoformat(),
-                    "output_type": "error",
-                    "error": f"Workflow {workflow_id} has invalid workflow_graph format",
-                    "command_output": f"ERROR: Invalid workflow_graph format\n"
-                }
-                update_stream_task(task_id, error_result)
-                complete_stream_task(task_id)
-                return
-            
-            execution_results = []
-            for i, workflow_data in enumerate(workflow_graphs):
-                workflow_name = workflow_data.get("workflow_name", f"workflow_{i}")
-                workflow_graph = workflow_data.get("workflow_graph")
-                
-                if workflow_graph is None:
-                    output_capture.write_stdout(f"⚠️ Skipping workflow {workflow_name} - no graph available\n")
-                    continue
-                
-                output_capture.write_stdout(f"🚀 Executing workflow: {workflow_name}\n")
-                
-                execution_result = await execute_workflow_from_config_with_capture(
-                    workflow_graph, 
-                    default_llm_config, 
-                    mcp_config={}, 
-                    inputs=inputs,
-                    output_capture=output_capture
-                )
-                
-                if execution_result is not None:
-                    execution_results.append({
-                        "workflow_name": workflow_name,
-                        "result": execution_result
-                    })
-            
-            # Cancel monitoring task
-            monitor_task.cancel()
-            
-            # Send any remaining output
-            remaining_output = output_capture.get_new_output(output_index)
-            if remaining_output:
-                command_output = ""
-                for output_type, text, timestamp in remaining_output:
-                    command_output += text
-                    
-                update_stream_task(task_id, {
-                    "timestamp": datetime.now().isoformat(),
-                    "status": "running",
-                    "output_type": "command",
-                    "command_output": command_output,
-                    "total_output_lines": len(output_capture.get_total_output())
-                })
-            
-            if not execution_results:
-                await update_project_status(workflow_id, "failed")
-                error_result = {
-                    "status": "error",
-                    "timestamp": datetime.now().isoformat(),
-                    "output_type": "error",
-                    "error": "Failed to execute any workflows",
-                    "command_output": "ERROR: Workflow execution failed\n"
-                }
-                update_stream_task(task_id, error_result)
-                complete_stream_task(task_id)
-                return
-
             # Update workflow storage with execution results
-            await update_project_status(
+            await update_workflow_status(
                 workflow_id, 
                 "completed",
-                execution_result=execution_results
+                execution_result=execution_result,
+                captured_output=captured_output
             )
             
-            # Final result with complete output
-            total_output = output_capture.get_total_output()
-            complete_command_output = ""
-            for output_type, text, timestamp in total_output:
-                complete_command_output += text
-                
             final_result = {
                 "status": "completed",
-                "timestamp": datetime.now().isoformat(),
-                "output_type": "completion",
-                "workflow_id": workflow_id,
-                "execution_result": execution_result,
-                "command_output": complete_command_output,
-                "total_output_lines": len(total_output),
-                "message": "Workflow execution completed successfully"
+                "workflow_name": workflow_name,
+                "result": execution_result,
+                "captured_output": captured_output
             }
             
-            update_stream_task(task_id, final_result)
-            complete_stream_task(task_id)
+            await progress_tracker.send_progress_update("completed", 1.0, "Workflow execution completed successfully")
+            await progress_tracker.send_completion(final_result)
             
-        except Exception as e:
-            # Cancel monitoring task
-            monitor_task.cancel()
-            raise e
+            return final_result
             
+        finally:
+            # Remove custom sink
+            logger.remove(sink_id)
+            if websocket_sink:
+                websocket_sink.stop()
+        
     except Exception as e:
-        # Handle errors
-        await update_project_status(workflow_id, "failed")
-        error_result = {
-            "status": "error",
-            "timestamp": datetime.now().isoformat(),
-            "output_type": "error",
-            "error": f"Error executing workflow: {str(e)}",
-            "workflow_id": workflow_id,
-            "command_output": f"ERROR: {str(e)}\n"
-        }
-        update_stream_task(task_id, error_result)
-        complete_stream_task(task_id)
+        error_message = f"Error executing workflow: {str(e)}"
+        await progress_tracker.send_error(error_message)
+        await update_workflow_status(workflow_id, "failed")
+        
+        # Cleanup
+        if websocket_sink:
+            websocket_sink.stop()
+        
+        raise ValueError(error_message)
 
-async def start_streaming_workflow_execution(workflow_id: str, inputs: Dict[str, Any]) -> Dict[str, Any]:
-    """Start a new streaming workflow execution task"""
-    task_id = str(uuid.uuid4())
-    
-    # Initialize the stream task
-    config = {
-        "task_type": "workflow_execution",
-        "workflow_id": workflow_id,
-        "inputs": inputs,
-        "timeout": 300  # 1 hour timeout by default
-    }
-    create_stream_task(task_id, config)
-    
-    # Start the streaming workflow execution
-    asyncio.create_task(execute_workflow_for_project_stream(task_id, workflow_id, inputs))
-    
-    return {
-        "task_id": task_id,
-        "status": "started",
-        "stream_url": f"/stream/{task_id}",
-        "task_type": "workflow_execution",
-        "workflow_id": workflow_id
-    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

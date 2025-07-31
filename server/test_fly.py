@@ -41,64 +41,9 @@ TEST_CONFIG = {
     # Test Data - Configure your test values here
     "workflow_id": "550e8400-e29b-41d4-a716-446655440001",  # Proper UUID format for traditional workflow testing
     
-    # New Setup Test Configuration
-    "detailed_requirements": """
-    # Pet Management System Requirements
-    
-    ## System Overview
-    Create a comprehensive pet management system with AI-powered disease analysis and treatment recommendations.
-    
-    ## AI Workflows Required
-    
-    ### 1. Disease Analysis Workflow
-    workflow_id: 550e8400-e29b-41d4-a716-446655440001
-    - **Purpose**: Analyze pet symptoms and medical history to identify potential diseases
-    - **Inputs**: 
-      - Pet symptoms (text)
-      - Pet medical history (text)
-      - Pet age and breed (text)
-    - **Outputs**:
-      - Disease analysis report (markdown)
-      - Confidence score (number)
-      - Recommended tests (list)
-    
-    ### 2. Treatment Recommendation Workflow
-    workflow_id: 550e8400-e29b-41d4-a716-446655440002
-    - **Purpose**: Generate treatment recommendations based on disease analysis
-    - **Inputs**:
-      - Disease analysis results (text)
-      - Pet age and weight (text)
-      - Available medications (text)
-    - **Outputs**:
-      - Treatment plan (markdown)
-      - Medication recommendations (list)
-      - Follow-up schedule (text)
-    
-    ## Database Entities
-    
-    ### Pets
-    - pet_id (string, required)
-    - name (string, required)
-    - species (string, required)
-    - breed (string, required)
-    - age (number, required)
-    - weight (number, required)
-    - owner_id (string, required)
-    
-    ### Medical Records
-    - record_id (string, required)
-    - pet_id (string, required)
-    - symptoms (text, required)
-    - diagnosis (text, required)
-    - treatment (text, required)
-    - date (date, required)
-    
-    ### Diseases
-    - disease_id (string, required)
-    - name (string, required)
-    - symptoms (text, required)
-    - treatments (text, required)
-    """,
+    # New Setup Test Configuration - Using project_id and requirement_id
+    "project_id": "zw7nnyv",  # Project identifier for requirement retrieval
+    "requirement_id": "t78kwdm",  # Requirement identifier for requirement retrieval
     
     # Expected workflow IDs for verification
     "expected_workflow_ids": [
@@ -123,19 +68,21 @@ HEADERS = {
 
 def test_new_setup_process(config):
     """
-    Test the new setup process with detailed requirements.
-    This uses the new setup approach that takes detailed requirements instead of workflow_id.
+    Test the new setup process with project_id and requirement_id.
+    This uses the new setup approach that retrieves requirements from storage.
     """
     print("\n🧪 NEW SETUP PROCESS TEST")
     print("=" * 40)
     
     setup_request = {
-        "detailed_requirements": config["detailed_requirements"]
+        "project_id": config["project_id"],
+        "requirement_id": config["requirement_id"]
     }
     
     try:
-        print(f"🚀 Setting up workflow with detailed requirements via fly.io API...")
-        print(f"   Using detailed requirements only")
+        print(f"🚀 Setting up workflow with project_id and requirement_id via fly.io API...")
+        print(f"   Project ID: {config['project_id']}")
+        print(f"   Requirement ID: {config['requirement_id']}")
         
         # Call setup API endpoint
         response = requests.post(

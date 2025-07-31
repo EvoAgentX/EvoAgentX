@@ -8,6 +8,7 @@ requests
 pyngrok
 supabase
 websocket-client
+websockets>=11.0
 python-dotenv>=1.0.0
 loguru>=0.7.3
 selenium

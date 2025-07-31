@@ -93,7 +93,6 @@ Here is an example of a workflow requirement. The data here is fake and should o
     ],
     "database_information": {{
         "database_name": "",
-        "database_connection_url": "",
         "database_entities": [
             {{
                 "name": "stock",

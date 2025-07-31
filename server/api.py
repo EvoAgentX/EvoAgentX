@@ -1,5 +1,4 @@
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Depends, Header
-from sse_starlette.sse import EventSourceResponse
+from fastapi import FastAPI, HTTPException, Depends, Header, WebSocket, WebSocketDisconnect
 from typing import Dict, Any, Optional, List
 import json
 import asyncio
@@ -14,12 +13,8 @@ from .models import (
     ProjectWorkflowExecutionRequest, ProjectWorkflowExecutionResponse
 )
 from .service import (
-    setup_project, get_project, list_projects, 
-    generate_workflow_for_project, execute_workflow_for_project, start_streaming_workflow_execution
-)
-from .db import initialize_database, close_database, seed_database
-from .task_manager import (
-    get_stream_task, get_stream_task_updates, is_stream_task_completed
+    setup_project, get_workflow, list_workflows, 
+    generate_workflow, execute_workflow, execute_workflow_with_websocket
 )
 
 load_dotenv('server/app.env', override = True)
@@ -49,53 +44,21 @@ async def verify_access_token(eax_access_token: Optional[str] = Header(None, ali
 app = FastAPI(title="Processing Server")
 
 
+### _____________________________________________
+### Workflow Management 
+### _____________________________________________
 
-# Updated workflow-based endpoints (using original project endpoints)
-@app.post("/project/setup", response_model=ProjectSetupResponse)
-async def setup_new_project(request: ProjectSetupRequest, token: str = Depends(verify_access_token)) -> ProjectSetupResponse:
-    """
-    Phase 1: Setup workflow with extraction AND generation.
-    This is the first phase of the workflow process.
-    """
-    try:
-        result = await setup_project(request.detailed_requirements)
-        return ProjectSetupResponse(
-            workflow_id=result["workflow_id"],
-            user_id=result["user_id"],
-            workflows=result["workflows"],
-            database_information=result["database_information"],
-            total_workflows=result["total_workflows"],
-            message="Project setup completed successfully with workflow generation"
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error setting up workflow: {str(e)}")
+@app.get("/health")
+async def health_check():
+    """Basic health check endpoint"""
+    return {"status": "healthy"}
 
-@app.post("/workflow/generate", response_model=ProjectWorkflowGenerationResponse)
-async def generate_workflow_for_project_api(request: ProjectWorkflowGenerationRequest, token: str = Depends(verify_access_token)) -> ProjectWorkflowGenerationResponse:
+@app.get("/workflows")
+async def get_all_workflows(token: str = Depends(verify_access_token)):
     """
-    Phase 2: Generate workflow graph based on task_info.
-    This is the second phase of the workflow process.
+    List all workflows in the system.
     """
-    try:
-        result = await generate_workflow_for_project(request.workflow_id)
-        return ProjectWorkflowGenerationResponse(
-            workflow_graph=result["workflow_graph"],
-            status=result["status"]
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error generating workflow: {str(e)}")
-
-@app.post("/workflow/execute", response_model=ProjectWorkflowExecutionResponse)
-async def execute_workflow_for_project_api(request: ProjectWorkflowExecutionRequest, token: str = Depends(verify_access_token)) -> ProjectWorkflowExecutionResponse:
-    """
-    Phase 3: Execute workflow with provided inputs.
-    This is the third phase of the workflow process.
-    """
-    try:
-        result = await execute_workflow_for_project(request.workflow_id, request.inputs)
-        return ProjectWorkflowExecutionResponse(execution_result=result)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error executing workflow: {str(e)}")
+    return await list_workflows() 
 
 # Workflow management endpoints
 @app.get("/workflow/{workflow_id}/status")
@@ -105,14 +68,13 @@ async def get_workflow_status(workflow_id: str, token: str = Depends(verify_acce
     Shows which phase the workflow is in and all stored data.
     """
     try:
-        workflow = await get_project(workflow_id)
+        workflow = await get_workflow(workflow_id)
         if not workflow:
             raise HTTPException(status_code=404, detail="Workflow not found")
         
         return {
             "workflow_id": workflow_id,
             "status": workflow.get("status", "unknown"),
-            "user_id": workflow.get("user_id"),
             "created_at": workflow.get("created_at"),
             "updated_at": workflow.get("updated_at"),
             "phases": {
@@ -127,197 +89,180 @@ async def get_workflow_status(workflow_id: str, token: str = Depends(verify_acce
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting workflow status: {str(e)}")
 
+### _____________________________________________
+### Workflow CRUD 
+### _____________________________________________
 
 
-async def event_generator(task_id: str, timeout: int = 30):
-    """Generate SSE events for a given task"""
-    start_time = datetime.now()
-    last_index = 0
-    
-    while True:
-        # Check timeout
-        if (datetime.now() - start_time).seconds > timeout:
-            yield {
-                "event": "error",
-                "data": json.dumps({"error": "Stream timeout"})
-            }
-            break
-            
-        # Check if task exists
-        if not get_stream_task(task_id):
-            yield {
-                "event": "error",
-                "data": json.dumps({"error": "Task not found"})
-            }
-            break
-            
-        # Get new updates
-        updates = get_stream_task_updates(task_id, last_index)
-        for update in updates:
-            yield {
-                "event": "update" if not is_stream_task_completed(task_id) else "complete",
-                "data": json.dumps(update)
-            }
-            last_index += 1
-            
-        # If task is completed, end stream
-        if is_stream_task_completed(task_id):
-            break
-            
-        # Wait before checking for new updates
-        await asyncio.sleep(0.5)
-
-async def client_event_generator(client_id: str, timeout: int = 3600):
-    """Generate SSE events for a client session"""
-    start_time = datetime.now()
-    last_index = 0
-    
-    while True:
-        # Check if client session is still active
-        if not is_client_session_active(client_id):
-            yield {
-                "event": "session_closed",
-                "data": json.dumps({"message": "Client session closed"})
-            }
-            break
-            
-        # Check timeout
-        if (datetime.now() - start_time).seconds > timeout:
-            yield {
-                "event": "session_timeout",
-                "data": json.dumps({"message": "Session timed out"})
-            }
-            break
-        
-        # Get new updates for this client
-        updates = get_client_updates(client_id, last_index)
-        for update in updates:
-            event_type = update.get("event_type", "update")
-            yield {
-                "event": event_type,
-                "data": json.dumps(update)
-            }
-            last_index += 1
-        
-        # Wait before checking for new updates
-        await asyncio.sleep(0.5)
-
-@app.get("/stream/{task_id}")
-async def stream_results(task_id: str, token: str = Depends(verify_access_token)):
+# Updated workflow-based endpoints (using original project endpoints)
+@app.post("/project/setup", response_model=ProjectSetupResponse)
+async def setup_new_project(request: ProjectSetupRequest, token: str = Depends(verify_access_token)) -> ProjectSetupResponse:
     """
-    Stream results for a given task ID using Server-Sent Events.
-    """
-    if not get_stream_task(task_id):
-        raise HTTPException(status_code=404, detail="Task not found")
-        
-    task_config = get_stream_task(task_id)["config"]
-    return EventSourceResponse(
-        event_generator(task_id, timeout=task_config["timeout"])
-    )
-
-@app.post("/workflow/execute_stream")
-async def execute_workflow_for_project_stream_api(request: ProjectWorkflowExecutionRequest, token: str = Depends(verify_access_token)):
-    """
-    Phase 3: Execute workflow with provided inputs (Streaming version).
-    Returns stream information to connect to the execution stream.
+    Phase 1: Setup workflow with extraction AND generation.
+    This is the first phase of the workflow process.
     """
     try:
-        result = await start_streaming_workflow_execution(request.workflow_id, request.inputs)
-        return {
-            "task_id": result["task_id"],
-            "status": result["status"],
-            "stream_url": result["stream_url"],
-            "workflow_id": result["workflow_id"],
-            "message": f"Workflow execution started. Connect to {result['stream_url']} to receive real-time updates."
-        }
+        workflow_graphs = await setup_project(request.project_id)
+        return ProjectSetupResponse(
+            workflow_graphs=workflow_graphs,
+            message="Project setup completed successfully with workflow generation"
+        )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error starting workflow execution stream: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error setting up workflow: {str(e)}")
 
-@app.websocket("/ws/workflow/{task_id}")
-async def websocket_endpoint(websocket: WebSocket, task_id: str):
+@app.post("/workflow/{workflow_id}/generate", response_model=ProjectWorkflowGenerationResponse)
+async def generate_workflow_with_workflow_id(workflow_id: str, token: str = Depends(verify_access_token)) -> ProjectWorkflowGenerationResponse:
     """
-    WebSocket endpoint for streaming workflow execution updates.
-    Note: WebSocket connections don't support headers in the same way, 
-    so we'll need to handle authentication differently for WebSocket.
+    Phase 2: Generate workflow graph based on task_info.
+    This is the second phase of the workflow process.
     """
-    await websocket.accept()
-    
     try:
-        # For WebSocket, we'll accept the connection but could add token validation
-        # in the message protocol if needed
-        start_time = datetime.now()
-        last_index = 0
+        result = await generate_workflow(workflow_id)
+        return ProjectWorkflowGenerationResponse(
+            workflow_graph=result["workflow_graph"],
+            status=result["status"]
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=f"Workflow generation failed: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Internal server error during workflow generation: {str(e)}")
+
+@app.post("/workflow/{workflow_id}/execute", response_model=ProjectWorkflowExecutionResponse)
+async def execute_workflow_with_workflow_id(workflow_id: str, request: ProjectWorkflowExecutionRequest, token: str = Depends(verify_access_token)) -> ProjectWorkflowExecutionResponse:
+    """
+    Phase 3: Execute workflow with provided inputs.
+    This is the third phase of the workflow process.
+    """
+    try:
+        result = await execute_workflow(workflow_id, request.inputs)
+        return ProjectWorkflowExecutionResponse(execution_result=result)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=f"Workflow execution failed: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Internal server error during workflow execution: {str(e)}")
+
+### _____________________________________________
+### WebSocket-based Workflow Execution
+### _____________________________________________
+
+@app.websocket("/workflow/{workflow_id}/execute_ws")
+async def execute_workflow_websocket(
+    websocket: WebSocket,
+    workflow_id: str,
+    token: str = Depends(verify_access_token)
+):
+    """
+    WebSocket endpoint for executing workflows with real-time progress updates.
+    
+    Expected message format:
+    {
+        "inputs": {
+            "key1": "value1",
+            "key2": "value2"
+        }
+    }
+    
+    Returns real-time progress updates and log messages via WebSocket.
+    """
+    try:
+        # Accept WebSocket connection
+        await websocket.accept()
         
-        while True:
-            # Check if task exists
-            if not get_stream_task(task_id):
-                await websocket.send_json({
-                    "event": "error",
-                    "data": {"error": "Task not found"}
-                })
-                break
-                
-            # Get new updates
-            updates = get_stream_task_updates(task_id, last_index)
-            for update in updates:
-                event_type = "update" if not is_stream_task_completed(task_id) else "complete"
-                await websocket.send_json({
-                    "event": event_type,
-                    "data": update
-                })
-                last_index += 1
-                
-            # If task is completed, end stream
-            if is_stream_task_completed(task_id):
-                break
-                
-            # Wait before checking for new updates
-            await asyncio.sleep(0.5)
+        # Send connection confirmation
+        await websocket.send_text(json.dumps({
+            "type": "connection",
+            "timestamp": datetime.now().isoformat(),
+            "message": "WebSocket connection established",
+            "workflow_id": workflow_id
+        }))
+        
+        # Wait for execution inputs
+        try:
+            data = await websocket.receive_text()
+            request_data = json.loads(data)
             
+            if "inputs" not in request_data:
+                await websocket.send_text(json.dumps({
+                    "type": "error",
+                    "timestamp": datetime.now().isoformat(),
+                    "error": "Missing 'inputs' field in request",
+                    "workflow_id": workflow_id
+                }))
+                return
+            
+            inputs = request_data["inputs"]
+            
+            # Send execution start confirmation
+            await websocket.send_text(json.dumps({
+                "type": "start",
+                "timestamp": datetime.now().isoformat(),
+                "message": "Workflow execution started",
+                "workflow_id": workflow_id,
+                "inputs": inputs
+            }))
+            
+            # Execute workflow with WebSocket progress updates
+            async def send_websocket_message(message: str):
+                """Helper function to send messages via WebSocket."""
+                try:
+                    await websocket.send_text(message)
+                except Exception as e:
+                    print(f"Error sending WebSocket message: {e}")
+            
+            # Execute the workflow
+            result = await execute_workflow_with_websocket(
+                workflow_id=workflow_id,
+                inputs=inputs,
+                websocket_send_func=send_websocket_message
+            )
+            
+            # Send final result
+            await websocket.send_text(json.dumps({
+                "type": "complete",
+                "timestamp": datetime.now().isoformat(),
+                "result": result,
+                "workflow_id": workflow_id
+            }))
+            
+        except json.JSONDecodeError:
+            await websocket.send_text(json.dumps({
+                "type": "error",
+                "timestamp": datetime.now().isoformat(),
+                "error": "Invalid JSON format in request",
+                "workflow_id": workflow_id
+            }))
+        except Exception as e:
+            await websocket.send_text(json.dumps({
+                "type": "error",
+                "timestamp": datetime.now().isoformat(),
+                "error": f"Execution error: {str(e)}",
+                "workflow_id": workflow_id
+            }))
+    
     except WebSocketDisconnect:
-        print(f"WebSocket client disconnected: {task_id}")
+        print(f"WebSocket disconnected for workflow {workflow_id}")
     except Exception as e:
+        print(f"WebSocket error for workflow {workflow_id}: {e}")
         try:
-            await websocket.send_json({
-                "event": "error",
-                "data": {"error": str(e)}
-            })
+            await websocket.send_text(json.dumps({
+                "type": "error",
+                "timestamp": datetime.now().isoformat(),
+                "error": f"WebSocket error: {str(e)}",
+                "workflow_id": workflow_id
+            }))
         except:
-            pass
-    finally:
-        try:
-            await websocket.close()
-        except:
-            pass
-
-@app.post("/workflow/execute_ws")
-async def execute_workflow_for_project_ws_api(request: ProjectWorkflowExecutionRequest, token: str = Depends(verify_access_token)):
-    """
-    Phase 3: Execute workflow with provided inputs (WebSocket version).
-    Returns WebSocket connection information.
-    """
-    try:
-        result = await start_streaming_workflow_execution(request.workflow_id, request.inputs)
-        return {
-            "task_id": result["task_id"],
-            "status": result["status"],
-            "ws_url": f"/ws/workflow/{result['task_id']}",  # WebSocket URL instead of SSE
-            "workflow_id": result["workflow_id"],
-            "message": f"Workflow execution started. Connect to WebSocket at /ws/workflow/{result['task_id']} for real-time updates."
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error starting workflow execution: {str(e)}")
-
-@app.get("/health")
-async def health_check():
-    """Basic health check endpoint"""
-    return {"status": "healthy"}
+            pass  # Connection might be closed 
 
 
 
-@app.get("/projects")
-async def get_all_projects(token: str = Depends(verify_access_token)):
-    """
-    List all projects in the system.
-    """
-    return await list_projects() 
+
+
+
+
+
+
+
+
+
+
+

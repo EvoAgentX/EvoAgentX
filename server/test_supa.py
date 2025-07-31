@@ -36,64 +36,9 @@ TEST_CONFIG = {
     # Test Data - Configure your test values here
     "workflow_id": "550e8400-e29b-41d4-a716-446655440001",  # Proper UUID format for traditional workflow testing
     
-    # New Setup Test Configuration
-    "detailed_requirements": """
-    # Pet Management System Requirements
-    
-    ## System Overview
-    Create a comprehensive pet management system with AI-powered disease analysis and treatment recommendations.
-    
-    ## AI Workflows Required
-    
-    ### 1. Disease Analysis Workflow
-    workflow_id: 550e8400-e29b-41d4-a716-446655440001
-    - **Purpose**: Analyze pet symptoms and medical history to identify potential diseases
-    - **Inputs**: 
-      - Pet symptoms (text)
-      - Pet medical history (text)
-      - Pet age and breed (text)
-    - **Outputs**:
-      - Disease analysis report (markdown)
-      - Confidence score (number)
-      - Recommended tests (list)
-    
-    ### 2. Treatment Recommendation Workflow
-    workflow_id: 550e8400-e29b-41d4-a716-446655440002
-    - **Purpose**: Generate treatment recommendations based on disease analysis
-    - **Inputs**:
-      - Disease analysis results (text)
-      - Pet age and weight (text)
-      - Available medications (text)
-    - **Outputs**:
-      - Treatment plan (markdown)
-      - Medication recommendations (list)
-      - Follow-up schedule (text)
-    
-    ## Database Entities
-    
-    ### Pets
-    - pet_id (string, required)
-    - name (string, required)
-    - species (string, required)
-    - breed (string, required)
-    - age (number, required)
-    - weight (number, required)
-    - owner_id (string, required)
-    
-    ### Medical Records
-    - record_id (string, required)
-    - pet_id (string, required)
-    - symptoms (text, required)
-    - diagnosis (text, required)
-    - treatment (text, required)
-    - date (date, required)
-    
-    ### Diseases
-    - disease_id (string, required)
-    - name (string, required)
-    - symptoms (text, required)
-    - treatments (text, required)
-    """,
+    # New Setup Test Configuration - Using project_id and requirement_id
+    "project_id": "zw7nnyv",  # Project identifier for requirement retrieval
+    "requirement_id": "t78kwdm",  # Requirement identifier for requirement retrieval
     
     # Expected workflow IDs for verification
     "expected_workflow_ids": [
@@ -118,19 +63,21 @@ HEADERS = {
 
 def test_new_setup_process(config):
     """
-    Test the new setup process with detailed requirements.
-    This uses the new setup approach that takes detailed requirements instead of workflow_id.
+    Test the new setup process with project_id and requirement_id.
+    This uses the new setup approach that retrieves requirements from storage.
     """
     print("\n🧪 NEW SETUP PROCESS TEST")
     print("=" * 40)
     
     setup_request = {
-        "detailed_requirements": config["detailed_requirements"]
+        "project_id": config["project_id"],
+        "requirement_id": config["requirement_id"]
     }
     
     try:
-        print(f"🚀 Setting up workflow with detailed requirements via API...")
-        print(f"   Using detailed requirements only")
+        print(f"🚀 Setting up workflow with project_id and requirement_id via API...")
+        print(f"   Project ID: {config['project_id']}")
+        print(f"   Requirement ID: {config['requirement_id']}")
         
         # Call setup API endpoint
         response = requests.post(
@@ -139,17 +86,17 @@ def test_new_setup_process(config):
             headers=HEADERS
         )
         
+        print(response.text)
+        
         if response.status_code == 200:
             result = response.json()
             print(f"✅ New setup completed successfully via API!")
-            print(f"   Workflow ID: {result.get('workflow_id', 'Unknown')}")
-            print(f"   User ID: {result.get('user_id', 'Unknown')}")
-            print(f"   Total workflows: {result.get('total_workflows', 0)}")
-            print(f"   Database information: {result.get('database_information') is not None}")
             print(f"   Message: {result.get('message', '')}")
             
             # Print workflow details and verify IDs
             workflows = result.get('workflows', [])
+            print(f"   Total workflows: {len(workflows)}")
+            
             expected_ids = config.get('expected_workflow_ids', [])
             
             print(f"\n📋 WORKFLOW ID VERIFICATION")
@@ -158,9 +105,13 @@ def test_new_setup_process(config):
             for i, workflow in enumerate(workflows, 1):
                 workflow_name = workflow.get('workflow_name', f'Workflow {i}')
                 workflow_id = workflow.get('workflow_id', 'Unknown')
+                project_id = workflow.get('project_id', 'Unknown')
+                requirement_id = workflow.get('requirement_id', 'Unknown')
                 
                 print(f"\n   Workflow {i}: {workflow_name}")
-                print(f"     - Extracted ID: {workflow_id}")
+                print(f"     - Workflow ID: {workflow_id}")
+                print(f"     - Project ID: {project_id}")
+                print(f"     - Requirement ID: {requirement_id}")
                 print(f"     - Inputs: {len(workflow.get('workflow_inputs', []))}")
                 print(f"     - Outputs: {len(workflow.get('workflow_outputs', []))}")
                 
@@ -174,8 +125,9 @@ def test_new_setup_process(config):
                 else:
                     print(f"     ⚠️  No expected ID for workflow {i}")
             
-            # Verify creation by checking status
-            workflow_id = result.get('workflow_id', 'Unknown')
+            # Verify creation by checking status of the first workflow
+            if workflows:
+                workflow_id = workflows[0].get('workflow_id', 'Unknown')
             status_response = requests.get(
                 f"{config['server_url']}/workflow/{workflow_id}/status", 
                 headers={"eax-access-token": ACCESS_TOKEN}
@@ -198,107 +150,6 @@ def test_new_setup_process(config):
         print(f"❌ New setup test failed: {e}")
         return False
 
-def test_phase_1_project_setup(config):
-    """
-    Phase 1: Project Setup
-    Creates initial workflow record with task_info for setup phase via API.
-    """
-    print("\n📋 PHASE 1: Project Setup")
-    print("=" * 40)
-    
-    setup_request = {
-        "workflow_id": config["workflow_id"],
-        "user_id": "550e8400-e29b-41d4-a716-446655440000",  # Proper UUID format
-        "requirement_id": "6ba7b810-9dad-11d1-80b4-00c04fd430c8"  # Proper UUID format
-    }
-    
-    try:
-        print(f"🚀 Setting up workflow via API...")
-        print(f"   Workflow ID: {config['workflow_id']}")
-        print(f"   User ID: {setup_request['user_id']}")
-        print(f"   Requirement ID: {setup_request['requirement_id']}")
-        
-        # Call setup API endpoint
-        response = requests.post(
-            f"{config['server_url']}/project/setup",
-            json=setup_request,
-            headers=HEADERS
-        )
-        
-        if response.status_code == 200:
-            result = response.json()
-            print(f"✅ Created workflow record via API")
-            print(f"   Response: Setup completed successfully")
-            print(f"   Task info generated: {result.get('task_info') is not None}")
-            
-            # Verify creation by checking status
-            status_response = requests.get(f"{config['server_url']}/workflow/{config['workflow_id']}/status", headers={"eax-access-token": ACCESS_TOKEN})
-            if status_response.status_code == 200:
-                workflow_status = status_response.json()
-                print(f"✅ Verification: Found workflow in database")
-                print(f"   Status: {workflow_status.get('status', 'unknown')}")
-                print(f"   Setup Complete: {workflow_status.get('phases', {}).get('setup_complete', False)}")
-                return True
-            else:
-                print("❌ Verification failed: Could not retrieve workflow status")
-                return False
-        else:
-            print(f"❌ Setup failed: {response.status_code}")
-            print(f"   Error: {response.text}")
-            return False
-            
-    except Exception as e:
-        print(f"❌ Phase 1 failed: {e}")
-        return False
-
-def test_phase_2_workflow_generation(config):
-    """
-    Phase 2: Workflow Generation
-    Generates workflow graph via API based on task_info from setup phase.
-    """
-    print("\n🏗️ PHASE 2: Workflow Generation")
-    print("=" * 40)
-    
-    generation_request = {
-        "workflow_id": config["workflow_id"]
-    }
-    
-    try:
-        print(f"🚀 Generating workflow via API...")
-        print(f"   Workflow ID: {config['workflow_id']}")
-        print(f"   Using task_info from setup phase")
-        
-        # Call generation API endpoint
-        response = requests.post(
-            f"{config['server_url']}/workflow/generate",
-            json=generation_request,
-            headers=HEADERS
-        )
-        
-        if response.status_code == 200:
-            result = response.json()
-            print(f"✅ Workflow generated via API")
-            print(f"   Status: {result.get('status', 'unknown')}")
-            print(f"   Workflow graph available: {result.get('workflow_graph') is not None}")
-            
-            # Verify generation by checking status
-            status_response = requests.get(f"{config['server_url']}/workflow/{config['workflow_id']}/status", headers={"eax-access-token": ACCESS_TOKEN})
-            if status_response.status_code == 200:
-                workflow_status = status_response.json()
-                print(f"✅ Verification: Workflow generation confirmed")
-                print(f"   Generation Complete: {workflow_status.get('phases', {}).get('generation_complete', False)}")
-                return True
-            else:
-                print("❌ Verification failed: Could not retrieve workflow status")
-                return False
-        else:
-            print(f"❌ Generation failed: {response.status_code}")
-            print(f"   Error: {response.text}")
-            return False
-            
-    except Exception as e:
-        print(f"❌ Phase 2 failed: {e}")
-        return False
 
 def test_phase_3_workflow_execution(config):
     """
@@ -308,19 +159,25 @@ def test_phase_3_workflow_execution(config):
     print("\n⚡ PHASE 3: Workflow Execution")
     print("=" * 40)
     
+    # For the new structure, use the first workflow ID and appropriate inputs for disease analysis
     execution_request = {
-        "workflow_id": config["workflow_id"],
+        "workflow_id": "550e8400-e29b-41d4-a716-446655440001",  # Use the first workflow ID
         "inputs": {
-            "goal": "Create a comprehensive stock analysis report for AAPL",
-            "analysis_type": "technical_and_fundamental",
-            "timeframe": "5_years"
+            "symptoms": "The pet is showing signs of lethargy, loss of appetite, and occasional vomiting",
+            "pet_info": {
+                "name": "Buddy",
+                "species": "dog",
+                "breed": "Golden Retriever",
+                "age": "5",
+                "weight": "65"
+            }
         }
     }
     
     try:
         print(f"🚀 Executing workflow via API...")
-        print(f"   Workflow ID: {config['workflow_id']}")
-        print(f"   Input goal: {execution_request['inputs']['goal']}")
+        print(f"   Workflow ID: {execution_request['workflow_id']}")
+        print(f"   Input symptoms: {execution_request['inputs']['symptoms']}")
         print(f"   Using workflow_graph from generation phase")
         
         # Call execution API endpoint
@@ -345,7 +202,7 @@ def test_phase_3_workflow_execution(config):
                     print(f"   Result preview: {exec_result[:100]}...")
             
             # Verify execution by checking status
-            status_response = requests.get(f"{config['server_url']}/workflow/{config['workflow_id']}/status", headers={"eax-access-token": ACCESS_TOKEN})
+            status_response = requests.get(f"{config['server_url']}/workflow/{execution_request['workflow_id']}/status", headers={"eax-access-token": ACCESS_TOKEN})
             if status_response.status_code == 200:
                 workflow_status = status_response.json()
                 print(f"✅ Verification: Workflow execution confirmed")
@@ -369,8 +226,9 @@ def display_final_workflow_state(config):
     print("=" * 40)
     
     try:
-        # Get workflow status via API
-        response = requests.get(f"{config['server_url']}/workflow/{config['workflow_id']}/status", headers={"eax-access-token": ACCESS_TOKEN})
+        # Get workflow status via API - use the first workflow ID from setup
+        workflow_id = "550e8400-e29b-41d4-a716-446655440001"
+        response = requests.get(f"{config['server_url']}/workflow/{workflow_id}/status", headers={"eax-access-token": ACCESS_TOKEN})
         
         if response.status_code != 200:
             print("❌ Workflow not found")
@@ -427,7 +285,7 @@ def cleanup_test_data(config):
     print("=" * 25)
     
     print("ℹ️ Cleanup not implemented for API test")
-    print(f"   Test workflow preserved: {config['workflow_id']}")
+    print(f"   Test workflow preserved: 550e8400-e29b-41d4-a716-446655440001")
     print(f"   You can manually delete from Supabase dashboard if needed")
 
 def test_server_health(config):
@@ -474,25 +332,9 @@ def run_workflow_lifecycle_test():
         if not new_setup_success:
             print("\n❌ New setup process failed. Proceeding with traditional workflow test...")
         
-        # Run all three phases
+        # Run Phase 3 (Execution) - Setup and Generation are handled by test_new_setup_process
         results = []
         
-        # Phase 1: Project Setup
-        result1 = test_phase_1_project_setup(TEST_CONFIG)
-        results.append(("Phase 1 - Setup", result1))
-        
-        if not result1:
-            print("❌ Phase 1 failed - stopping test")
-            return
-            
-        # Phase 2: Workflow Generation
-        result2 = test_phase_2_workflow_generation(TEST_CONFIG)
-        results.append(("Phase 2 - Generation", result2))
-        
-        if not result2:
-            print("❌ Phase 2 failed - stopping test")
-            return
-            
         # Phase 3: Workflow Execution
         result3 = test_phase_3_workflow_execution(TEST_CONFIG)
         results.append(("Phase 3 - Execution", result3))

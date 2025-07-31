@@ -6,20 +6,17 @@ from typing import Dict, Any, Optional, List
 # Updated workflow-based models (replacing project-based approach)
 class ProjectSetupRequest(BaseModel):
     """Request model for workflow setup - Phase 1"""
-    detailed_requirements: str  # Only input needed - system generates workflow_id and user_id
+    project_id: str  # Project identifier
 
 class ProjectSetupResponse(BaseModel):
     """Response model for workflow setup - Phase 1"""
-    workflow_id: str
-    user_id: str
-    workflows: List[Dict[str, Any]]
-    database_information: Dict[str, Any]
-    total_workflows: int
+    workflow_graphs: List[Dict[str, Any]]  # List of workflow graphs
     message: str
 
 class ProjectWorkflowGenerationRequest(BaseModel):
     """Request model for workflow generation - Phase 2"""
-    workflow_id: str
+    # No body required for generation endpoint - workflow_id comes from URL path
+    pass
 
 class ProjectWorkflowGenerationResponse(BaseModel):
     """Response model for workflow generation - Phase 2"""
@@ -28,7 +25,6 @@ class ProjectWorkflowGenerationResponse(BaseModel):
 
 class ProjectWorkflowExecutionRequest(BaseModel):
     """Request model for workflow execution - Phase 3"""
-    workflow_id: str
     inputs: Dict[str, Any]
 
 class ProjectWorkflowExecutionResponse(BaseModel):
@@ -45,8 +41,7 @@ workflow_execution_output = ProjectWorkflowExecutionResponse
 
 ## Database Schema for Workflow Storage:
 # workflow_id: str (Primary Key)
-# user_id: str
-# requirement_id: str
+# project_id: str  # Project identifier
 # task_info: Optional[Dict[str, Any]] = None       # saved after setup phase
 # workflow_graph: Optional[Dict[str, Any]] = None  # saved after generation phase
 # execution_result: Optional[Dict[str, Any]] = None # saved after execution phase
