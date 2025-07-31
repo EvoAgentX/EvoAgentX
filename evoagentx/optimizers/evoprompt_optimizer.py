@@ -159,7 +159,8 @@ class EvopromptOptimizer(BaseOptimizer):
     async def _perform_paraphrase(self, mega_prompt: str) -> str:
         """Paraphrases a random sub-prompt within the mega_prompt."""
         config = _split_mega_prompt_to_config(mega_prompt)
-        if not config: return mega_prompt
+        if not config:
+            return mega_prompt
                 
         async with self.semaphore:
             output = await asyncio.to_thread(
