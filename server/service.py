@@ -29,7 +29,7 @@ import time
 from contextlib import redirect_stdout, redirect_stderr
 
 load_dotenv(os.path.join(os.path.dirname(__file__), 'app.env'))
-MONGODB_URL = os.getenv("MONGODB_URL")
+MONGODB_URL = os.getenv("MONGODB_URL", None)
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 SUPABASE_BUCKET_REQUIREMENT = os.getenv("SUPABASE_BUCKET_REQUIREMENT")
@@ -110,12 +110,12 @@ def create_tools_with_database(database_information: Dict[str, Any] = None) -> l
     return tools
 
 
-async def retrieve_requirement_from_storage(short_project_id: str) -> str:
+async def retrieve_requirement_from_storage(project_short_id: str) -> str:
     """
-    Retrieve requirement document from Supabase storage using short_project_id.
+    Retrieve requirement document from Supabase storage using project_short_id.
     
     Args:
-        short_project_id: The project identifier
+        project_short_id: The project identifier
         
     Returns:
         str: The requirement document content as a string
@@ -131,7 +131,7 @@ async def retrieve_requirement_from_storage(short_project_id: str) -> str:
             raise Exception("Requirement database client not connected")
         
         # Construct file path
-        file_path = f"projects/{short_project_id}/requirement.md"
+        file_path = f"projects/{project_short_id}/requirement.md"
         
         # Download the requirement document using the existing client
         response = (
@@ -143,7 +143,7 @@ async def retrieve_requirement_from_storage(short_project_id: str) -> str:
         # Convert bytes to string
         requirement_content = response.decode("utf-8")
         
-        print(f"✅ Retrieved requirement document for project {short_project_id}")
+        print(f"✅ Retrieved requirement document for project {project_short_id}")
         return requirement_content
         
     except Exception as e:
@@ -352,14 +352,14 @@ async def execute_workflow_from_config(workflow: Dict[str, Any], llm_config_dict
 ### _____________________________________________
 ### Workflow CRUD 
 ### _____________________________________________
-async def setup_project(short_project_id: str) -> List[Dict[str, Any]]:
+async def setup_project(project_short_id: str) -> List[Dict[str, Any]]:
     """
     Phase 1: Setup workflow with extraction AND generation.
     Returns a list of workflow configurations.
     """
     # Retrieve requirement document from storage
-    print(f"📥 Retrieving requirement document for project {short_project_id}...")
-    detailed_requirements = await retrieve_requirement_from_storage(short_project_id)
+    print(f"📥 Retrieving requirement document for project {project_short_id}...")
+    detailed_requirements = await retrieve_requirement_from_storage(project_short_id)
     
     # Extract workflows and database info
     print(f"🔍 Extracting workflows from detailed requirements...")
@@ -432,7 +432,7 @@ async def setup_project(short_project_id: str) -> List[Dict[str, Any]]:
             "status": "pending",
             "task_info": task_info,
             "workflow_graph": workflow_data["workflow_graph"],
-            "short_project_id": short_project_id,
+            "project_short_id": project_short_id,
             "execution_result": None
         }
         

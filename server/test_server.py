@@ -137,7 +137,8 @@ from dotenv import load_dotenv
 load_dotenv('server/app.env')
 
 # Test configuration
-BASE_URL = "http://localhost:8001"
+BASE_URL = "https://evoagentx-server.fly.dev"
+# BASE_URL = "http://localhost:8001"
 ACCESS_TOKEN = os.getenv("EAX_ACCESS_TOKEN", "default_secret_token_change_me")
 HEADERS = {
     "eax-access-token": ACCESS_TOKEN,
@@ -675,36 +676,36 @@ def run_complete_test() -> Dict[str, Any]:
         print("❌ Health check failed, stopping test")
         return test_results
     
-    # # Phase 2: Project Setup
-    # setup_passed, setup_result, workflow_ids = test_project_setup(project_id)
-    # test_results["phases"]["setup"] = {
-    #     "passed": setup_passed,
-    #     "timestamp": datetime.now().isoformat(),
-    #     "workflow_ids": workflow_ids,
-    #     "result": setup_result
-    # }
+    # Phase 2: Project Setup
+    setup_passed, setup_result, workflow_ids = test_project_setup(project_id)
+    test_results["phases"]["setup"] = {
+        "passed": setup_passed,
+        "timestamp": datetime.now().isoformat(),
+        "workflow_ids": workflow_ids,
+        "result": setup_result
+    }
     
     # if not setup_passed:
     #     print("❌ Project setup failed, stopping test")
     #     return test_results
     workflow_ids = [test_workflow_id_1]
     
-    # # Phase 3: Workflow Generation
-    # generation_passed, generation_result = test_workflow_generation(workflow_ids)
-    # test_results["phases"]["generation"] = {
-    #     "passed": generation_passed,
-    #     "timestamp": datetime.now().isoformat(),
-    #     "result": generation_result
-    # }
+    # Phase 3: Workflow Generation
+    generation_passed, generation_result = test_workflow_generation(workflow_ids)
+    test_results["phases"]["generation"] = {
+        "passed": generation_passed,
+        "timestamp": datetime.now().isoformat(),
+        "result": generation_result
+    }
     
     
-    # # Phase 4: Workflow Execution
-    # execution_passed, execution_result = test_workflow_execution(workflow_ids)
-    # test_results["phases"]["execution"] = {
-    #     "passed": execution_passed,
-    #     "timestamp": datetime.now().isoformat(),
-    #     "result": execution_result
-    # }
+    # Phase 4: Workflow Execution
+    execution_passed, execution_result = test_workflow_execution(workflow_ids)
+    test_results["phases"]["execution"] = {
+        "passed": execution_passed,
+        "timestamp": datetime.now().isoformat(),
+        "result": execution_result
+    }
     
     # Phase 5: WebSocket Streaming Test
     streaming_passed, streaming_result = test_websocket_streaming(workflow_ids)
@@ -714,21 +715,21 @@ def run_complete_test() -> Dict[str, Any]:
         "result": streaming_result
     }
     
-    # # Phase 6: Status Check
-    # status_passed, status_result = test_workflow_status(workflow_ids)
-    # test_results["phases"]["status_check"] = {
-    #     "passed": status_passed,
-    #     "timestamp": datetime.now().isoformat(),
-    #     "result": status_result
-    # }
+    # Phase 6: Status Check
+    status_passed, status_result = test_workflow_status(workflow_ids)
+    test_results["phases"]["status_check"] = {
+        "passed": status_passed,
+        "timestamp": datetime.now().isoformat(),
+        "result": status_result
+    }
     
-    # # Phase 7: List Workflows
-    # list_passed, list_result = test_list_workflows()
-    # test_results["phases"]["list_workflows"] = {
-    #     "passed": list_passed,
-    #     "timestamp": datetime.now().isoformat(),
-    #     "result": list_result
-    # }
+    # Phase 7: List Workflows
+    list_passed, list_result = test_list_workflows()
+    test_results["phases"]["list_workflows"] = {
+        "passed": list_passed,
+        "timestamp": datetime.now().isoformat(),
+        "result": list_result
+    }
     
     test_results["test_end_time"] = datetime.now().isoformat()
     

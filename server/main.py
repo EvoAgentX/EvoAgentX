@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 
 load_dotenv(os.path.join(os.path.dirname(__file__), 'app.env'), override=True)
 target_port = 8001
-CREATE_PUBLIC_TUNNEL = True
+CREATE_PUBLIC_TUNNEL = False
 # TUNNEL_METHOD = "ngrok"
 TUNNEL_METHOD = "ssh"
 TUNNEL_INFO_PATH = "./server/tunnel_info.json"

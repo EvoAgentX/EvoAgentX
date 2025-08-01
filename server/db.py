@@ -571,10 +571,10 @@ global requirement_database
 requirement_database = create_database("supabase", url=os.environ.get("SUPABASE_URL_REQUIREMENT"), key=os.environ.get("SUPABASE_KEY_REQUIREMENT"))
 asyncio.run(requirement_database.connect())
 
-# # Global database instance
-# asyncio.run(initialize_database("supabase", url=os.environ.get("SUPABASE_URL"), key=os.environ.get("SUPABASE_KEY"), table_names={"workflows": "create_x_workflows", "requirements": "create_x_project_requirements"}))
+# Global database instance
+asyncio.run(initialize_database("supabase", url=os.environ.get("SUPABASE_URL"), key=os.environ.get("SUPABASE_KEY"), table_names={"workflows": "create_x_workflows", "requirements": "create_x_project_requirements"}))
 
-# In-memory database for testing
-database = create_database("memory", table_names={"workflows": "create_x_workflows", "requirements": "create_x_project_requirements"})
-print("🌱 Seeding database with initial data...")
-asyncio.run(seed_database(database))
+# # In-memory database for testing
+# database = create_database("memory", table_names={"workflows": "create_x_workflows", "requirements": "create_x_project_requirements"})
+# print("🌱 Seeding database with initial data...")
+# asyncio.run(seed_database(database))
