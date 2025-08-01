@@ -636,6 +636,10 @@ class WebSocketEnhancedSink:
         self.last_update_time = time.time()
         self.update_interval = 3.0  # Update every 3 seconds
         
+        # Rate limiting for output messages
+        self.last_output_time = {"stdout": 0, "stderr": 0}
+        self.output_rate_limit = 0.1  # Minimum 100ms between output messages
+        
         # Store original stdout/stderr
         self.original_stdout = sys.stdout
         self.original_stderr = sys.stderr
@@ -665,8 +669,8 @@ class WebSocketEnhancedSink:
                 # Flush to ensure immediate capture
                 self.buffer.flush()
                 
-                # Send stdout/stderr messages immediately
-                if text.strip():
+                # Only send stdout/stderr messages for substantial content to reduce spam
+                if text.strip() and len(text.strip()) > 5:
                     self.sink._send_output_message("stdout" if self.original_stream == sys.stdout else "stderr", text)
             
             def flush(self):
@@ -715,6 +719,13 @@ class WebSocketEnhancedSink:
         """Send stdout/stderr message via WebSocket."""
         if not content.strip():
             return
+        
+        # Rate limiting - only send if enough time has passed since last message of this type
+        current_time = time.time()
+        if current_time - self.last_output_time.get(output_type, 0) < self.output_rate_limit:
+            return
+        
+        self.last_output_time[output_type] = current_time
             
         output_data = {
             "type": "output",
@@ -733,8 +744,13 @@ class WebSocketEnhancedSink:
                     loop
                 )
         except RuntimeError:
-            # No event loop available, just print
-            print(f"Output message: {output_type} - {content.strip()}")
+            # No event loop available - only log significant stderr messages to avoid spam
+            if output_type == "stderr" and len(content.strip()) > 10:
+                print(f"Stderr output: {content.strip()}")
+            elif output_type == "stdout":
+                # Only log stdout if it's substantial content
+                if len(content.strip()) > 20:
+                    print(f"Stdout output: {content.strip()}")
     
     def write(self, message):
         """Write method called by loguru for each log message."""
@@ -939,6 +955,24 @@ class WorkflowExecutionProgress:
             await self.websocket_send_func(json.dumps(error_data))
         except Exception as e:
             print(f"Error sending error message: {e}")
+    
+    async def send_final_result(self, result: Dict[str, Any], workflow_name: str = None):
+        """Send detailed final result message."""
+        final_result_data = {
+            "type": "final_result",
+            "timestamp": datetime.now().isoformat(),
+            "workflow_id": self.workflow_id,
+            "workflow_name": workflow_name or self.workflow_id,
+            "status": "completed",
+            "execution_result": result.get("result", {}),
+            "captured_output": result.get("captured_output", {}),
+            "message": "Workflow execution completed successfully"
+        }
+        
+        try:
+            await self.websocket_send_func(json.dumps(final_result_data))
+        except Exception as e:
+            print(f"Error sending final result: {e}")
 
 async def execute_workflow_with_websocket(
     workflow_id: str, 
@@ -1048,12 +1082,17 @@ async def execute_workflow_with_websocket(
             captured_output = websocket_sink.get_buffer_contents() if websocket_sink else {}
             
             # Update workflow storage with execution results
-            await update_workflow_status(
-                workflow_id, 
-                "completed",
-                execution_result=execution_result,
-                captured_output=captured_output
-            )
+            try:
+                await update_workflow_status(
+                    workflow_id, 
+                    "completed",
+                    execution_result=execution_result,
+                    captured_output=captured_output
+                )
+                print(f"✅ Successfully saved execution result to database for workflow {workflow_id}")
+            except Exception as e:
+                print(f"❌ Error saving execution result to database: {e}")
+                # Continue execution even if database save fails
             
             final_result = {
                 "status": "completed",
@@ -1063,7 +1102,22 @@ async def execute_workflow_with_websocket(
             }
             
             await progress_tracker.send_progress_update("completed", 1.0, "Workflow execution completed successfully")
+            
+            # Send detailed final result message
+            await progress_tracker.send_final_result(final_result, workflow_name)
+            
+            # Also send the standard completion message
             await progress_tracker.send_completion(final_result)
+            
+            # Verify the result was saved by checking the database
+            try:
+                saved_workflow = await get_workflow(workflow_id)
+                if saved_workflow and saved_workflow.get("execution_result"):
+                    print(f"✅ Verified execution result saved in database for workflow {workflow_id}")
+                else:
+                    print(f"⚠️ Warning: Execution result not found in database for workflow {workflow_id}")
+            except Exception as e:
+                print(f"⚠️ Warning: Could not verify database save: {e}")
             
             return final_result
             

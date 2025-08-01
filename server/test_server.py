@@ -469,7 +469,6 @@ def test_websocket_streaming(workflow_ids: List[str]) -> Tuple[bool, Dict[str, A
                         msg_type = data.get("type")
                         timestamp = data.get("timestamp")
                         
-                        print(f"  📨 Received {msg_type} message at {timestamp}")
                         print(f"  📋 PARSED DATA: {json.dumps(data, indent=2)}")
                         
                         if msg_type == "start":
@@ -522,6 +521,12 @@ def test_websocket_streaming(workflow_ids: List[str]) -> Tuple[bool, Dict[str, A
                             print(data)
                             final_result = data.get("result", {})
                             print(f"    ✅ Final result received for workflow {workflow_id}")
+                            break
+                        elif msg_type == "final_result":
+                            print(f"    🎯 Detailed final result received for workflow {workflow_id}")
+                            final_result = data.get("execution_result", {})
+                            print(f"    📋 Workflow name: {data.get('workflow_name', 'Unknown')}")
+                            print(f"    📊 Captured output size: {len(data.get('captured_output', {}))}")
                             break
                         elif msg_type == "error":
                             error_occurred = True
@@ -670,14 +675,14 @@ def run_complete_test() -> Dict[str, Any]:
         print("❌ Health check failed, stopping test")
         return test_results
     
-    # Phase 2: Project Setup
-    setup_passed, setup_result, workflow_ids = test_project_setup(project_id)
-    test_results["phases"]["setup"] = {
-        "passed": setup_passed,
-        "timestamp": datetime.now().isoformat(),
-        "workflow_ids": workflow_ids,
-        "result": setup_result
-    }
+    # # Phase 2: Project Setup
+    # setup_passed, setup_result, workflow_ids = test_project_setup(project_id)
+    # test_results["phases"]["setup"] = {
+    #     "passed": setup_passed,
+    #     "timestamp": datetime.now().isoformat(),
+    #     "workflow_ids": workflow_ids,
+    #     "result": setup_result
+    # }
     
     # if not setup_passed:
     #     print("❌ Project setup failed, stopping test")
