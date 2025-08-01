@@ -10,6 +10,8 @@ RUN apt-get update && apt-get install -y \
     gnupg \
     unzip \
     curl \
+    python3-tk \
+    tk-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install Python dependencies

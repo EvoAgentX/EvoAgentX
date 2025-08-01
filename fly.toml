@@ -10,19 +10,19 @@ primary_region = 'sea'
   internal_port = 8001
   force_https = true
   auto_stop_machines = 'stop'
-  auto_start_machines = false
-  min_machines_running = 0
+  auto_start_machines = true
+  min_machines_running = 1
   processes = ['app']
 
-  [[http_service.checks]]
-    interval = '10m'
-    timeout = '10s'
-    grace_period = '60s'
-    method = 'GET'
-    path = '/health'
-    protocol = 'http'
+[[http_service.checks]]
+  interval = '600s'
+  timeout = '100s'
+  grace_period = '30s'
+  method = 'GET'
+  path = '/health'
+  protocol = 'http'
 
 [[vm]]
   memory = '1gb'
   cpu_kind = 'shared'
-  cpus = 1 
+  cpus = 1
