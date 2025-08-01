@@ -488,7 +488,10 @@ class CustomizeAction(Action):
             results = self._calling_tools(tool_call_args)
             
             logger.info("Tool call results:")
-            logger.info(json.dumps(results, indent=4))
+            try:
+                logger.info(json.dumps(results, indent=4))
+            except Exception:
+                logger.info(str(results))
             
             conversation.append({"role": "assistant", "content": TOOL_CALLING_HISTORY_PROMPT.format(
                 iteration_number=time_out,
