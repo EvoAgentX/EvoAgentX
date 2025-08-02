@@ -16,7 +16,7 @@ from .workflow_manager import WorkFlowManager, NextAction
 from .workflow_graph import WorkFlowNode, WorkFlowGraph
 from .action_graph import ActionGraph
 from ..hitl import HITLManager, HITLBaseAgent
-from ..utils.utils import generate_dynamic_class_name
+from ..utils.utils import generate_dynamic_class_name, get_unique_class_name
 from ..actions import ActionInput, ActionOutput
 
 class WorkFlow(BaseModule):
@@ -362,7 +362,7 @@ class WorkFlow(BaseModule):
                 else:
                     hitl_inputs_data_fields[param.name] = (Optional[str], Field(description=param.description))
         inputs_format = create_model(
-            agent._get_unique_class_name(
+            get_unique_class_name(
                 generate_dynamic_class_name(hitl_action.class_name+" action_input")
             ),
             **(hitl_inputs_data_fields or {}),
@@ -382,7 +382,7 @@ class WorkFlow(BaseModule):
                 else:
                     hitl_outputs_data_fields[param.name] = (Optional[str], Field(description=param.description))
         outputs_format = create_model(
-            agent._get_unique_class_name(
+            get_unique_class_name(
                 generate_dynamic_class_name(hitl_action.class_name+" action_output")
             ),
             **(hitl_outputs_data_fields or {}),

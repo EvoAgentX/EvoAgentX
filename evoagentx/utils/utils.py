@@ -7,6 +7,7 @@ from tqdm import tqdm
 from typing import Union, Any, List, Set
 
 from ..core.logging import logger
+from ..core.registry import MODULE_REGISTRY
 
 def make_parent_folder(path: str):
     """Checks if the parent folder of a given path exists, and creates it if not.
@@ -34,6 +35,24 @@ def generate_dynamic_class_name(base_name: str) -> str:
     class_name = ''.join(x.capitalize() for x in components)
 
     return class_name if class_name else 'DefaultClassName'
+
+
+def get_unique_class_name(candidate_name: str) -> str:
+    """
+    Get a unique class name by checking if it already exists in the registry.
+    If it does, append "Vx" to make it unique.
+    """
+    if not MODULE_REGISTRY.has_module(candidate_name):
+        return candidate_name 
+    
+    i = 1 
+    while True:
+        unique_name = f"{candidate_name}V{i}"
+        if not MODULE_REGISTRY.has_module(unique_name):
+            break
+        i += 1 
+    return unique_name 
+
 
 def normalize_text(s: str) -> str:
 

@@ -10,7 +10,6 @@ from ..core.message import Message
 from ..prompts.template import StringTemplate, ChatTemplate
 from ..prompts.tool_calling import OUTPUT_EXTRACTION_PROMPT, TOOL_CALLING_TEMPLATE, TOOL_CALLING_HISTORY_PROMPT
 from ..tools.tool import Toolkit
-from ..core.registry import MODULE_REGISTRY
 from ..models.base_model import LLMOutputParser
 from ..core.module_utils import parse_json_from_llm_output, parse_json_from_text
 
@@ -118,21 +117,6 @@ class CustomizeAction(Action):
         output_description = "\n\n".join(output_description_list)
         return OUTPUT_EXTRACTION_PROMPT.format(text=llm_output_content, output_description=output_description)
     
-    def _get_unique_class_name(self, candidate_name: str) -> str:
-        """
-        Get a unique class name by checking if it already exists in the registry.
-        If it does, append "Vx" to make it unique.
-        """
-        if not MODULE_REGISTRY.has_module(candidate_name):
-            return candidate_name 
-        
-        i = 1 
-        while True:
-            unique_name = f"{candidate_name}V{i}"
-            if not MODULE_REGISTRY.has_module(unique_name):
-                break
-            i += 1 
-        return unique_name 
     
     def add_tools(self, tools: Union[Toolkit, List[Toolkit]]):
         if not tools:
