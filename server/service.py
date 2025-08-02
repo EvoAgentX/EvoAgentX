@@ -1162,3 +1162,120 @@ async def execute_workflow_with_websocket(
 
 
 
+
+### _____________________________________________
+### User Query Router Service
+### _____________________________________________
+
+async def analyze_user_query(project_short_id: str, query: str) -> Dict[str, Any]:
+    """
+    Analyze user query using UserQueryRouter.
+    
+    This function:
+    1. Collects all workflows for the given project_short_id
+    2. Builds workflow context dictionary
+    3. Initializes UserQueryRouter and processes the query
+    4. Returns structured analysis result
+    
+    Args:
+        project_short_id: The project identifier
+        query: The user's query string to analyze
+        
+    Returns:
+        Dictionary containing the query analysis result
+        
+    Raises:
+        ValueError: If project not found or UserQueryRouter fails
+    """
+    try:
+        print(f"🔍 Analyzing user query for project {project_short_id}")
+        print(f"Query: {query[:100]}...")
+        
+        # Step 1: Collect all workflows for the project
+        workflows = await database.find_many("workflows", {"project_short_id": project_short_id})
+        
+        if not workflows:
+            print(f"⚠️ No workflows found for project {project_short_id}")
+            # Return empty result but don't fail
+            return {
+                "original_query": query,
+                "classified_operations": [],
+                "is_composite": False,
+                "workflow_context": {},
+                "total_operations": 0,
+                "has_frontend": False,
+                "has_backend": False
+            }
+        
+        print(f"📋 Found {len(workflows)} workflows for project {project_short_id}")
+        
+        # Step 2: Build workflow context dictionary
+        workflow_context = {}
+        for workflow in workflows:
+            workflow_id = workflow["id"]
+            workflow_context[workflow_id] = {
+                "workflow_graph": workflow.get("workflow_graph"),
+                "task_info": workflow.get("task_info"),
+                "status": workflow.get("status"),
+                "project_short_id": workflow.get("project_short_id")
+            }
+        
+        print(f"🏗️ Built workflow context with {len(workflow_context)} workflows")
+        
+        # Step 3: Initialize UserQueryRouter
+        from .components.user_query_router.user_query_router import UserQueryRouter
+        user_query_router = UserQueryRouter()
+        
+        # Step 4: Process the query
+        print("🤖 Processing query with UserQueryRouter...")
+        result = user_query_router.route_query(
+            user_query=query,
+            workflow_context=workflow_context
+        )
+        
+        # Step 5: Convert result to dictionary format
+        response_data = {
+            "original_query": result.original_query,
+            "classified_operations": result.classified_operations,
+            "is_composite": result.is_composite,
+            "total_operations": result.total_operations,
+            "has_frontend": result.has_frontend,
+            "has_backend": result.has_backend
+        }
+        
+        print(f"✅ Query analysis completed successfully")
+        print(f"   - Total operations: {result.total_operations}")
+        print(f"   - Composite query: {result.is_composite}")
+        print(f"   - Has frontend operations: {result.has_frontend}")
+        print(f"   - Has backend operations: {result.has_backend}")
+        
+        return response_data
+        
+    except Exception as e:
+        print(f"❌ Error analyzing user query: {str(e)}")
+        raise ValueError(f"Failed to analyze user query: {str(e)}")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

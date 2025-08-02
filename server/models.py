@@ -49,3 +49,16 @@ workflow_execution_output = ProjectWorkflowExecutionResponse
 # updated_at: datetime
 
 
+### _____________________________________________
+### User Query Router Models
+### _____________________________________________
+
+class UserQueryRequest(BaseModel):
+    """Request model for user query analysis"""
+    query: str  # The user's query string to analyze
+
+class UserQueryResponse(BaseModel):
+    """Response model for user query analysis"""
+    result: Dict[str, Any]  # Contains all analysis results in a single dict
+
+

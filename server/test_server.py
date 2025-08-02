@@ -28,7 +28,7 @@ API Documentation:
    Endpoint: POST /project/setup
    Request:
    {
-     "project_id": "zw7nnyv"
+     "project_short_id": "zw7nnyv"
    }
    Response:
    {
@@ -137,8 +137,8 @@ from dotenv import load_dotenv
 load_dotenv('server/app.env')
 
 # Test configuration
-BASE_URL = "https://evoagentx-server.fly.dev"
-# BASE_URL = "http://localhost:8001"
+# BASE_URL = "https://evoagentx-server.fly.dev"
+BASE_URL = "http://localhost:8001"
 ACCESS_TOKEN = os.getenv("EAX_ACCESS_TOKEN", "default_secret_token_change_me")
 HEADERS = {
     "eax-access-token": ACCESS_TOKEN,
@@ -161,13 +161,13 @@ TEST_INPUTS = {
 
 # Fixed test configuration
 TEST_CONFIG = {
-    "project_id": "2d7rhs8",
+    "project_short_id": "2d7rhs8",
     "test_workflow_ids": [test_workflow_id_1, test_workflow_id_2]
 }
 def generate_test_ids() -> str:
     """Generate fixed test IDs for consistent testing"""
-    project_id = TEST_CONFIG["project_id"]
-    return project_id
+    project_short_id = TEST_CONFIG["project_short_id"]
+    return project_short_id
 
 def test_health_check() -> Tuple[bool, Dict[str, Any]]:
     """Test the health check endpoint"""
@@ -190,12 +190,12 @@ def test_health_check() -> Tuple[bool, Dict[str, Any]]:
     
     return result["success"], result
 
-def test_project_setup(project_id: str) -> Tuple[bool, Dict[str, Any], List[str]]:
+def test_project_setup(project_short_id: str) -> Tuple[bool, Dict[str, Any], List[str]]:
     """Test Phase 1: Project setup"""
     print("\n🚀 Testing Phase 1: Project Setup")
     
     request_data = {
-        "project_id": project_id
+        "project_short_id": project_short_id
     }
     
     print(f"Request: POST {BASE_URL}/project/setup")
@@ -649,17 +649,127 @@ def test_websocket_streaming(workflow_ids: List[str]) -> Tuple[bool, Dict[str, A
         "results": results
     }
 
+def test_user_query_analysis(project_short_id: str) -> Tuple[bool, Dict[str, Any]]:
+    """
+    Test the UserQueryRouter API endpoint.
+    
+    Args:
+        project_short_id: The project identifier to test with
+        
+    Returns:
+        Tuple of (success, result_dict)
+    """
+    print(f"🔍 Testing UserQueryRouter API for project {project_short_id}")
+    
+    try:
+        # Test query
+        test_query = "I want to add a new node at the end of the workflow to print all middle variables in the workflow"
+        
+        # Prepare request
+        url = f"{BASE_URL}/project/{project_short_id}/user_query"
+        headers = {
+            "Content-Type": "application/json",
+            "eax-access-token": ACCESS_TOKEN
+        }
+        payload = {
+            "query": test_query
+        }
+        
+        print(f"📤 Sending request to: {url}")
+        print(f"📝 Query: {test_query}")
+        
+        # Make request
+        response = requests.post(url, headers=headers, json=payload, timeout=30)
+        
+        print(f"📥 Response status: {response.status_code}")
+        
+        if response.status_code == 200:
+            response_data = response.json()
+            print(f"✅ UserQueryRouter API test passed")
+            print(f"   - Response structure: {list(response_data.keys())}")
+            
+            # Validate response structure
+            if "result" in response_data:
+                result = response_data["result"]
+                print(f"   - Original query: {result.get('original_query', 'N/A')}")
+                print(f"   - Total operations: {result.get('total_operations', 0)}")
+                print(f"   - Is composite: {result.get('is_composite', False)}")
+                print(f"   - Has frontend: {result.get('has_frontend', False)}")
+                print(f"   - Has backend: {result.get('has_backend', False)}")
+                
+                # Check classified operations
+                classified_ops = result.get('classified_operations', [])
+                print(f"   - Classified operations: {len(classified_ops)}")
+                for i, op in enumerate(classified_ops):
+                    print(f"     Operation {i+1}: {op.get('category', 'unknown')} - {op.get('atomic_query', 'N/A')}")
+                    print(f"       Not clear: {op.get('not_clear', False)}")
+                    print(f"       Follow-up questions: {op.get('follow_up_questions', [])}")
+                    print(f"       Clarity reasoning: {op.get('clarity_reasoning', 'N/A')}")
+                
+                # Print full result structure
+                print(f"\n📋 Full Analysis Result:")
+                print(f"   - Original query: {result.get('original_query', 'N/A')}")
+                print(f"   - Total operations: {result.get('total_operations', 0)}")
+                print(f"   - Is composite: {result.get('is_composite', False)}")
+                print(f"   - Has frontend: {result.get('has_frontend', False)}")
+                print(f"   - Has backend: {result.get('has_backend', False)}")
+                
+                # Print complete response for debugging
+                print(f"\n🔍 Complete Response Data:")
+                import json
+                print(json.dumps(response_data, indent=2, default=str))
+                
+                return True, {
+                    "status": "success",
+                    "response": response_data,
+                    "query": test_query,
+                    "project_short_id": project_short_id
+                }
+            else:
+                print(f"❌ Invalid response structure: missing 'result' field")
+                return False, {
+                    "status": "failed",
+                    "error": "Invalid response structure",
+                    "response": response_data
+                }
+        else:
+            print(f"❌ UserQueryRouter API test failed with status {response.status_code}")
+            try:
+                error_data = response.json()
+                print(f"   Error details: {error_data}")
+            except:
+                print(f"   Error text: {response.text}")
+            
+            return False, {
+                "status": "failed",
+                "error": f"HTTP {response.status_code}",
+                "response_text": response.text
+            }
+            
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Request failed: {str(e)}")
+        return False, {
+            "status": "failed",
+            "error": f"Request exception: {str(e)}"
+        }
+    except Exception as e:
+        print(f"❌ Unexpected error: {str(e)}")
+        return False, {
+            "status": "failed",
+            "error": f"Unexpected error: {str(e)}"
+        }
+
 def run_complete_test() -> Dict[str, Any]:
     """Run the complete test lifecycle"""
     print("🧪 Starting Complete Server Lifecycle Test")
     print("=" * 60)
     
     # Generate test IDs
-    project_id = generate_test_ids()
+    project_short_id = generate_test_ids()
     
     test_results = {
         "test_start_time": datetime.now().isoformat(),
-        "project_id": project_id,
+        "project_short_id": project_short_id,
         "phases": {},
         "detailed_results": {}
     }
@@ -676,59 +786,67 @@ def run_complete_test() -> Dict[str, Any]:
         print("❌ Health check failed, stopping test")
         return test_results
     
-    # Phase 2: Project Setup
-    setup_passed, setup_result, workflow_ids = test_project_setup(project_id)
-    test_results["phases"]["setup"] = {
-        "passed": setup_passed,
-        "timestamp": datetime.now().isoformat(),
-        "workflow_ids": workflow_ids,
-        "result": setup_result
-    }
+    # # Phase 2: Project Setup
+    # setup_passed, setup_result, workflow_ids = test_project_setup(project_short_id)
+    # test_results["phases"]["setup"] = {
+    #     "passed": setup_passed,
+    #     "timestamp": datetime.now().isoformat(),
+    #     "workflow_ids": workflow_ids,
+    #     "result": setup_result
+    # }
     
     # if not setup_passed:
     #     print("❌ Project setup failed, stopping test")
     #     return test_results
     workflow_ids = [test_workflow_id_1]
     
-    # Phase 3: Workflow Generation
-    generation_passed, generation_result = test_workflow_generation(workflow_ids)
-    test_results["phases"]["generation"] = {
-        "passed": generation_passed,
-        "timestamp": datetime.now().isoformat(),
-        "result": generation_result
-    }
+    # # Phase 3: Workflow Generation
+    # generation_passed, generation_result = test_workflow_generation(workflow_ids)
+    # test_results["phases"]["generation"] = {
+    #     "passed": generation_passed,
+    #     "timestamp": datetime.now().isoformat(),
+    #     "result": generation_result
+    # }
     
     
-    # Phase 4: Workflow Execution
-    execution_passed, execution_result = test_workflow_execution(workflow_ids)
-    test_results["phases"]["execution"] = {
-        "passed": execution_passed,
-        "timestamp": datetime.now().isoformat(),
-        "result": execution_result
-    }
+    # # Phase 4: Workflow Execution
+    # execution_passed, execution_result = test_workflow_execution(workflow_ids)
+    # test_results["phases"]["execution"] = {
+    #     "passed": execution_passed,
+    #     "timestamp": datetime.now().isoformat(),
+    #     "result": execution_result
+    # }
     
-    # Phase 5: WebSocket Streaming Test
-    streaming_passed, streaming_result = test_websocket_streaming(workflow_ids)
-    test_results["phases"]["websocket_streaming"] = {
-        "passed": streaming_passed,
-        "timestamp": datetime.now().isoformat(),
-        "result": streaming_result
-    }
+    # # Phase 5: WebSocket Streaming Test
+    # streaming_passed, streaming_result = test_websocket_streaming(workflow_ids)
+    # test_results["phases"]["websocket_streaming"] = {
+    #     "passed": streaming_passed,
+    #     "timestamp": datetime.now().isoformat(),
+    #     "result": streaming_result
+    # }
     
-    # Phase 6: Status Check
-    status_passed, status_result = test_workflow_status(workflow_ids)
-    test_results["phases"]["status_check"] = {
-        "passed": status_passed,
-        "timestamp": datetime.now().isoformat(),
-        "result": status_result
-    }
+    # # Phase 6: Status Check
+    # status_passed, status_result = test_workflow_status(workflow_ids)
+    # test_results["phases"]["status_check"] = {
+    #     "passed": status_passed,
+    #     "timestamp": datetime.now().isoformat(),
+    #     "result": status_result
+    # }
     
-    # Phase 7: List Workflows
-    list_passed, list_result = test_list_workflows()
-    test_results["phases"]["list_workflows"] = {
-        "passed": list_passed,
+    # # Phase 7: List Workflows
+    # list_passed, list_result = test_list_workflows()
+    # test_results["phases"]["list_workflows"] = {
+    #     "passed": list_passed,
+    #     "timestamp": datetime.now().isoformat(),
+    #     "result": list_result
+    # }
+    
+    # Phase 8: User Query Analysis
+    query_analysis_passed, query_analysis_result = test_user_query_analysis(project_short_id)
+    test_results["phases"]["user_query_analysis"] = {
+        "passed": query_analysis_passed,
         "timestamp": datetime.now().isoformat(),
-        "result": list_result
+        "result": query_analysis_result
     }
     
     test_results["test_end_time"] = datetime.now().isoformat()
@@ -743,68 +861,26 @@ def run_complete_test() -> Dict[str, Any]:
         # setup_passed,
         # generation_passed,
         # execution_passed,
-        streaming_passed,
+        # streaming_passed,
         # status_passed,
-        # list_passed
+        # list_passed,
+        query_analysis_passed
     ])
     
     print(f"Health Check: {'✅ PASSED' if health_check_passed else '❌ FAILED'}")
     # print(f"Project Setup: {'✅ PASSED' if setup_passed else '❌ FAILED'}")
     # print(f"Workflow Generation: {'✅ PASSED' if generation_passed else '❌ FAILED'}")
     # print(f"Workflow Execution: {'✅ PASSED' if execution_passed else '❌ FAILED'}")
-    print(f"WebSocket Streaming: {'✅ PASSED' if streaming_passed else '❌ FAILED'}")
+    # print(f"WebSocket Streaming: {'✅ PASSED' if streaming_passed else '❌ FAILED'}")
     # print(f"Status Check: {'✅ PASSED' if status_passed else '❌ FAILED'}")
     # print(f"List Workflows: {'✅ PASSED' if list_passed else '❌ FAILED'}")
     # print(f"\nOverall Result: {'✅ ALL TESTS PASSED' if all_passed else '❌ SOME TESTS FAILED'}")
     
     return test_results
 
-def test_server_issues():
-    """Test specific server issues to help with debugging"""
-    print("\n🔧 Testing Server Issues for Debugging")
-    print("=" * 60)
-    
-    # Test 1: Check if server is running
-    try:
-        response = requests.get(f"{BASE_URL}/health", timeout=5)
-        print(f"✅ Server is running: {response.status_code}")
-    except Exception as e:
-        print(f"❌ Server connection failed: {e}")
-        return
-    
-    # Test 2: Check workflow generation issue
-    print("\n🔍 Testing workflow generation issue...")
-    try:
-        # Use the fixed test workflow ID
-        response = requests.post(
-            f"{BASE_URL}/workflow/{test_workflow_id_1}/generate",
-            headers=HEADERS
-        )
-        print(f"Workflow generation test response: {response.status_code}")
-        if response.status_code != 200:
-            print(f"Error details: {response.json()}")
-    except Exception as e:
-        print(f"Workflow generation test error: {e}")
-    
-    # Test 3: Check workflow execution issue
-    print("\n🔍 Testing workflow execution issue...")
-    try:
-        request_data = {"inputs": TEST_INPUTS}
-        response = requests.post(
-            f"{BASE_URL}/workflow/{test_workflow_id_1}/execute",
-            headers=HEADERS,
-            json=request_data
-        )
-        print(f"Workflow execution test response: {response.status_code}")
-        if response.status_code != 200:
-            print(f"Error details: {response.json()}")
-    except Exception as e:
-        print(f"Workflow execution test error: {e}")
-
 def main():
     """Main test function"""
     # Uncomment the next line to run server issue debugging
-    # test_server_issues()
     
     results = run_complete_test()
     

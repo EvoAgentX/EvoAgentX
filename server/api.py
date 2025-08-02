@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 
 from .models import (
     ProjectSetupRequest, ProjectSetupResponse, ProjectWorkflowGenerationRequest, ProjectWorkflowGenerationResponse,
-    ProjectWorkflowExecutionRequest, ProjectWorkflowExecutionResponse
+    ProjectWorkflowExecutionRequest, ProjectWorkflowExecutionResponse, UserQueryRequest, UserQueryResponse
 )
 from .service import (
     setup_project, get_workflow, list_workflows, 
@@ -102,7 +102,7 @@ async def setup_new_project(request: ProjectSetupRequest, token: str = Depends(v
     This is the first phase of the workflow process.
     """
     try:
-        workflow_graphs = await setup_project(request.project_id)
+        workflow_graphs = await setup_project(request.project_short_id)
         return ProjectSetupResponse(
             workflow_graphs=workflow_graphs,
             message="Project setup completed successfully with workflow generation"
@@ -252,6 +252,54 @@ async def execute_workflow_websocket(
             }))
         except:
             pass  # Connection might be closed 
+
+### _____________________________________________
+### User Query Router API
+### _____________________________________________
+
+@app.post("/project/{project_short_id}/user_query", response_model=UserQueryResponse)
+async def analyze_user_query_endpoint(
+    project_short_id: str,
+    request: UserQueryRequest,
+    token: str = Depends(verify_access_token)
+) -> UserQueryResponse:
+    """
+    Analyze user query using UserQueryRouter.
+    
+    This endpoint:
+    1. Takes a project_short_id and user query
+    2. Collects all workflows for the project
+    3. Uses UserQueryRouter to analyze the query
+    4. Returns structured analysis result
+    
+    Args:
+        project_short_id: The project identifier (from URL path)
+        request: UserQueryRequest containing the query string
+        token: Access token for authentication
+        
+    Returns:
+        UserQueryResponse containing the analysis result
+        
+    Raises:
+        HTTPException: If project not found or analysis fails
+    """
+    try:
+        from .service import analyze_user_query
+        
+        # Call the service function
+        result = await analyze_user_query(project_short_id, request.query)
+        
+        # Return result as a single dict
+        response = UserQueryResponse(result=result)
+        
+        return response
+        
+    except ValueError as e:
+        # Handle service-level errors (project not found, etc.)
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        # Handle unexpected errors
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}") 
 
 
 
