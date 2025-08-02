@@ -1,11 +1,13 @@
+import json
+from typing import Dict, List, Optional
+
 from pydantic import Field
-from typing import Optional, List
 
 from ..core.logging import logger
 from ..models.base_model import BaseLLM
-from .action import Action, ActionInput, ActionOutput
-from ..prompts.task_planner import TASK_PLANNING_ACTION
+from ..prompts.task_planner import TASK_PLANNING_ACTION, TASK_PLANNING_EXAMPLES
 from ..workflow.workflow_graph import WorkFlowNode
+from .action import Action, ActionInput, ActionOutput
 
 
 class TaskPlanningInput(ActionInput):
@@ -15,6 +17,7 @@ class TaskPlanningInput(ActionInput):
     goal: str = Field(description="A clear and detailed description of the user's goal, specifying what needs to be achieved.")
     history: Optional[str] = Field(default=None, description="Optional field containing previously generated task plan.")
     suggestion: Optional[str] = Field(default=None, description="Optional suggestions or ideas to guide the planning process.")
+    examples: Optional[List[Dict]] = Field(default=None, description="Task planning examples")
 
 
 class TaskPlanningOutput(ActionOutput):
@@ -63,9 +66,23 @@ class TaskPlanning(Action):
         if not inputs:
             logger.error("TaskPlanning action received invalid `inputs`: None or empty.")
             raise ValueError('The `inputs` to TaskPlanning action is None or empty.')
+        
+        prompt_params_names = self.inputs_format.get_attrs()
 
-        prompt_params_names = ["goal", "history", "suggestion"]
-        prompt_params_values = {param: inputs.get(param, "") for param in prompt_params_names}
+        prompt_params_values = dict()
+        for param in prompt_params_names:
+            if param in inputs and inputs[param] is not None:
+                prompt_params_values[param] = inputs[param]
+            else:
+                prompt_params_values[param] = ""
+        
+        if isinstance(prompt_params_values["examples"], list) and len(prompt_params_values["examples"]) > 0:
+            prompt_params_values["examples"] = self.format_task_planning_examples(
+                prompt_params_values["examples"]
+            )
+        else:
+            prompt_params_values["examples"] = TASK_PLANNING_EXAMPLES
+
         prompt = self.prompt.format(**prompt_params_values)
         task_plan = llm.generate(
             prompt = prompt, 
@@ -78,3 +95,45 @@ class TaskPlanning(Action):
             return task_plan, prompt
         
         return task_plan
+
+    @staticmethod
+    def format_task_planning_examples(examples: List[Dict]) -> str:
+        """
+        Returns a formatted string containing all the examples that can be used in a prompt.
+
+        Args:
+            exmaples (List[Dict]): A list of dictionaries where each dictionary is
+                an example and must contain `goal` and `sub_tasks` keys.
+
+        Returns: A string with the following format
+            Example 1:
+            ### User's goal:
+            {goal}
+            ### Generated Workflow:
+            ```json
+            {{
+                "sub_tasks": [
+                    {{
+                        ...
+                    }},
+                    ...
+                ]
+            }}
+            ```
+            
+            Example 2:
+            ...
+        """
+        if len(examples) == 0:
+            return ""
+
+        prompt = []
+
+        for i, example in enumerate(examples):
+            goal = example.pop("goal")
+            tasks_str = json.dumps(example, indent=4)
+            tasks_str = tasks_str.replace("{", "{{").replace("}", "}}")
+            example_prompt = f"Example {i+1}:\n### User's goal:\n{goal}\n### Generated Workflow: \n```json\n{tasks_str}\n```\n"
+            prompt.append(example_prompt)
+
+        return "\n".join(prompt) 

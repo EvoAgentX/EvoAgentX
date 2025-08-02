@@ -195,6 +195,10 @@ TASK_PLANNING_ACTION_DEMOS = """
 ### Examples: 
 Below are some generated workflows that follow the given instructions:
 
+{examples}
+"""
+
+TASK_PLANNING_EXAMPLES = """
 Example 1: 
 ### User's goal: 
 Create a Python function that takes two numbers as input and returns their sum.
