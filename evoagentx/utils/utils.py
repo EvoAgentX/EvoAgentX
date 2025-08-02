@@ -121,3 +121,25 @@ def download_file(url: str, save_file: str, max_retries=3, timeout=10):
         error_message = "Exceeded maximum retries. Download failed."
         logger.error(error_message)
         raise RuntimeError(error_message)
+
+
+def recursive_remove(data: Any, keys: List[str]) -> Any:
+    """
+    Recursively removes specified keys from dictionaries and their nested structures within a
+    dictionary or list, if an object is not a list or dictionary return as is.
+
+    Args:
+        data (Any): Specified keys will be removed from `data` if it is a dictionary or a list containing dictionaries.
+        keys (List[str]): A list of string keys to be removed.
+    """
+    if isinstance(data, dict):
+        new_dict = {}
+        for k, v in data.items():
+            if k not in keys:
+                new_dict[k] = recursive_remove(v, keys)
+        return new_dict
+    elif isinstance(data, list):
+        new_list = [recursive_remove(item, keys) for item in data]
+        return new_list
+    else:
+        return data
