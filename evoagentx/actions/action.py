@@ -4,9 +4,7 @@ from pydantic_core import PydanticUndefined
 from typing import Optional, Type, Tuple, Union, List, Any
 
 from ..core.module import BaseModule
-from ..core.module_utils import get_type_name
 from ..core.registry import MODULE_REGISTRY
-# from ..core.base_config import Parameter
 from ..core.parser import Parser
 from ..core.message import Message
 from ..models.base_model import BaseLLM, LLMOutputParser
@@ -29,46 +27,6 @@ class ActionInput(LLMOutputParser):
         Remember to add `default=None` for optional parameters.
     """
 
-    @classmethod
-    def get_input_specification(cls, ignore_fields: List[str] = []) -> str:
-        """Generate a JSON specification of the input requirements.
-        
-        Examines the class fields and produces a structured specification of
-        the input parameters, including their types, descriptions, and whether
-        they are required.
-        
-        Args:
-            ignore_fields (List[str]): List of field names to exclude from the specification.
-            
-        Returns:
-            A JSON string containing the input specification, or an empty string
-            if no fields are defined or all are ignored.
-        """
-        fields_info = {}
-        attrs = cls.get_attrs()
-        for field_name, field_info in cls.model_fields.items():
-            if field_name in ignore_fields:
-                continue
-            if field_name not in attrs:
-                continue
-            field_type = get_type_name(field_info.annotation)
-            field_desc = field_info.description if field_info.description is not None else None
-            # field_required = field_info.is_required()
-            field_default = str(field_info.default) if field_info.default is not PydanticUndefined else None
-            field_required = True if field_default is None else False
-            description = field_type + ", "
-            if field_desc is not None:
-                description += (field_desc.strip() + ", ") 
-            description += ("required" if field_required else "optional")
-            if field_default is not None:
-                description += (", Default value: " + field_default)
-            fields_info[field_name] = description
-        
-        if len(fields_info) == 0:
-            return "" 
-        fields_info_str = json.dumps(fields_info, indent=4)
-        return fields_info_str
-        
     @classmethod
     def get_required_input_names(cls) -> List[str]:
         """Get a list of all required input parameter names.
@@ -233,7 +191,7 @@ class ContextExtraction(Action):
             # the action does not require inputs
             return None
         
-        action_inputs_desc = action_inputs_cls.get_input_specification()
+        action_inputs_desc = action_inputs_cls.get_specification()
         str_context = self.get_context_from_messages(messages=context)
 
         if not action_inputs_desc or not str_context:

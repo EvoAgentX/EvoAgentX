@@ -4,6 +4,8 @@ import asyncio
 from abc import ABC, abstractmethod
 from pydantic import Field
 from typing import Union, Optional, Type, Callable, List
+from pydantic_core import PydanticUndefined
+import json
 
 from ..core.parser import Parser
 from .model_configs import LLMConfig
@@ -68,6 +70,44 @@ class LLMOutputParser(Parser):
             field_desc = field_info.description if field_info.description is not None else "None"
             results[field_name] = field_desc
         return results
+
+    @classmethod
+    def get_specification(cls, ignore_fields: List[str] = []) -> str:
+        """Examines the class fields and produces a structured specification of
+        the parameters, including their types, descriptions, and whether
+        they are required.
+        
+        Args:
+            ignore_fields (List[str]): List of field names to exclude from the specification.
+            
+        Returns:
+            A JSON string containing the specification, or an empty string
+            if no fields are defined or all are ignored.
+        """
+        fields_info = {}
+        attrs = cls.get_attrs()
+        for field_name, field_info in cls.model_fields.items():
+            if field_name in ignore_fields:
+                continue
+            if field_name not in attrs:
+                continue
+            field_type = get_type_name(field_info.annotation)
+            field_desc = field_info.description if field_info.description is not None else None
+            # field_required = field_info.is_required()
+            field_default = str(field_info.default) if field_info.default is not PydanticUndefined else None
+            field_required = True if field_default is None else False
+            description = field_type + ", "
+            if field_desc is not None:
+                description += (field_desc.strip() + ", ") 
+            description += ("required" if field_required else "optional")
+            if field_default is not None:
+                description += (", Default value: " + field_default)
+            fields_info[field_name] = description
+        
+        if len(fields_info) == 0:
+            return "" 
+        fields_info_str = json.dumps(fields_info, indent=4)
+        return fields_info_str
 
     @classmethod
     def get_content_data(cls, content: str, parse_mode: str = "json", parse_func: Optional[Callable] = None, **kwargs) -> dict:
