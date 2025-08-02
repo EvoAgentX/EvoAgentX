@@ -5,7 +5,7 @@ from llama_index.core.postprocessor import SimilarityPostprocessor, KeywordNodeP
 
 from .base import BasePostprocessor
 from evoagentx.rag.schema import Query, RagResult, Corpus, Chunk
-
+from evoagentx.core.logging import logger
 
 class SimpleReranker(BasePostprocessor):
     """Post-processor for reranking retrieval results."""
@@ -46,8 +46,8 @@ class SimpleReranker(BasePostprocessor):
                 scores=scores,
                 metadata={"query": query.query_str, "postprocessor": "reranker"}
             )
-            self.logger.info(f"Reranked to {len(corpus.chunks)} chunks")
+            logger.info(f"Reranked to {len(corpus.chunks)} chunks")
             return result
         except Exception as e:
-            self.logger.error(f"Reranking failed: {str(e)}")
+            logger.error(f"Reranking failed: {str(e)}")
             raise
