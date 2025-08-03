@@ -1,13 +1,15 @@
-import os 
-import re 
+import os
+import re
 import time
+from typing import Any, List, Set, Union
+
 import regex
 import requests
 from tqdm import tqdm
-from typing import Union, Any, List, Set
 
 from ..core.logging import logger
 from ..core.registry import MODULE_REGISTRY
+
 
 def make_parent_folder(path: str):
     """Checks if the parent folder of a given path exists, and creates it if not.
@@ -143,3 +145,13 @@ def recursive_remove(data: Any, keys: List[str]) -> Any:
         return new_list
     else:
         return data
+
+
+json_to_python_type = {
+    "string": str,
+    "integer": int,
+    "number": float,
+    "boolean": bool,
+    "object": dict,
+    "array": list,
+}
