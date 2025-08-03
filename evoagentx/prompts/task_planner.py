@@ -65,7 +65,7 @@ Each sub-task should follow the structure below:
 - Provide clear and concise names for the sub-tasks, inputs, and outputs. 
 - Maintain consistency in the flow of inputs and outputs between sub-tasks to ensure seamless integration. 
 - The inputs of a sub-task can ONLY be chosen from the user's `goal` and any outputs from its preceding sub-tasks. 
-- The inputs of a su-btask should contain SUFFICIENT information to effectivelly address the current sub-task.
+- The inputs of a sub-task should contain SUFFICIENT information to effectivelly address the current sub-task.
 - The inputs of a sub-task MUST include the user's input `goal`. 
 - The first sub-task must have only one `input_name` "goal" with the following structure:
 ```json
@@ -175,7 +175,7 @@ Each sub-task should follow the structure below:
 - Provide clear and concise names for the sub-tasks, inputs, and outputs. 
 - Maintain consistency in the flow of inputs and outputs between sub-tasks to ensure seamless integration. 
 - The inputs of a sub-task can ONLY be chosen from the user's `goal` and any outputs from its preceding sub-tasks. 
-- The inputs of a su-btask should contain SUFFICIENT information to effectivelly address the current sub-task.
+- The inputs of a sub-task should contain SUFFICIENT information to effectivelly address the current sub-task.
 - The inputs of a sub-task MUST include the user's input `goal`. 
 - The first sub-task must have only one `input_name` "goal" with the following structure:
 ```json

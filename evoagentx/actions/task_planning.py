@@ -111,14 +111,14 @@ class TaskPlanning(Action):
             {goal}
             ### Generated Workflow:
             ```json
-            {{
+            {
                 "sub_tasks": [
-                    {{
+                    {
                         ...
-                    }},
+                    },
                     ...
                 ]
-            }}
+            }
             ```
             
             Example 2:
@@ -132,7 +132,6 @@ class TaskPlanning(Action):
         for i, example in enumerate(examples):
             goal = example.pop("goal")
             tasks_str = json.dumps(example, indent=4)
-            tasks_str = tasks_str.replace("{", "{{").replace("}", "}}")
             example_prompt = f"Example {i+1}:\n### User's goal:\n{goal}\n### Generated Workflow: \n```json\n{tasks_str}\n```\n"
             prompt.append(example_prompt)
 
