@@ -1,22 +1,24 @@
-import os 
-import yaml
-import json 
 import copy
+import json
 import logging
-from typing import Callable, Any, Dict, List
+import os
+from typing import Any, Callable, Dict, List
+
+import yaml
 from pydantic import BaseModel, ValidationError
 from pydantic._internal._model_construction import ModelMetaclass
 
-from .logging import logger
 from .callbacks import callback_manager, exception_buffer
+from .logging import logger
 from .module_utils import (
-    save_json,
     custom_serializer,
-    parse_json_from_text, 
+    get_base_module_init_error_message,
     get_error_message,
-    get_base_module_init_error_message
+    parse_json_from_text,
+    save_json,
+    recursive_to_dict,
 )
-from .registry import register_module, MODULE_REGISTRY
+from .registry import MODULE_REGISTRY, register_module
 
 
 class MetaModule(ModelMetaclass):
@@ -358,29 +360,7 @@ class BaseModule(BaseModel, metaclass=MetaModule):
         Returns:
             dict: Dictionary containing the object data
         """
-        data = {}
-        for field_name, _ in type(self).model_fields.items():
-            if field_name in ignore:
-                continue
-            field_value = getattr(self, field_name, None)
-            if exclude_none and field_value is None:
-                continue
-            if isinstance(field_value, BaseModule):
-                data[field_name] = field_value.to_dict(exclude_none=exclude_none, ignore=ignore)
-            elif isinstance(field_value, list):
-                data[field_name] = [
-                    item.to_dict(exclude_none=exclude_none, ignore=ignore) if isinstance(item, BaseModule) else item
-                    for item in field_value
-                ]
-            elif isinstance(field_value, dict):
-                data[field_name] = {
-                    key: value.to_dict(exclude_none=exclude_none, ignore=ignore) if isinstance(value, BaseModule) else value
-                    for key, value in field_value.items()
-                }
-            else:
-                data[field_name] = field_value
-        
-        return data
+        return recursive_to_dict(self, exclude_none=exclude_none, ignore=ignore)
     
     def to_json(self, use_indent: bool=False, ignore: List[str] = [], **kwargs) -> str:
         """
