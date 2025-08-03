@@ -16,6 +16,7 @@ from ..utils.utils import generate_dynamic_class_name, make_parent_folder, get_u
 from ..actions.customize_action import CustomizeAction
 from ..actions.action import ActionInput
 from ..tools.tool import Toolkit, Tool
+from ..utils.utils import json_to_python_type
 
 
 class CustomizeAgent(Agent):
@@ -317,10 +318,11 @@ class CustomizeAgent(Agent):
         action_input_fields = {}
         for field in inputs:
             required = field.get("required", True)
-            if required:
-                action_input_fields[field["name"]] = (str, Field(description=field["description"]))
+            field_type = json_to_python_type[field["type"]]
+            if required:                
+                action_input_fields[field["name"]] = (field_type, Field(description=field["description"]))
             else:
-                action_input_fields[field["name"]] = (Optional[str], Field(default=None, description=field["description"]))
+                action_input_fields[field["name"]] = (Optional[field_type], Field(default=None, description=field["description"]))
 
         action_input_type = create_model(
             get_unique_class_name(
@@ -336,10 +338,11 @@ class CustomizeAgent(Agent):
         action_output_fields = {}
         for field in outputs:
             required = field.get("required", True)
+            field_type = json_to_python_type[field["type"]]
             if required:
-                action_output_fields[field["name"]] = (Any, Field(description=field["description"]))
+                action_output_fields[field["name"]] = (field_type, Field(description=field["description"]))
             else:
-                action_output_fields[field["name"]] = (Optional[Any], Field(default=None, description=field["description"]))
+                action_output_fields[field["name"]] = (Optional[field_type], Field(default=None, description=field["description"]))
         action_output_type = create_model(
             get_unique_class_name(
                 generate_dynamic_class_name(action_name+" action_output")
