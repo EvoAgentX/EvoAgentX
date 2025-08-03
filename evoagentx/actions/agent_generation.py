@@ -156,10 +156,10 @@ class AgentGeneration(Action):
 
         **Output**:
         ```json
-        {{
+        {
             "selected_agents": [...],
             "generated_agents": [...]
-        }}
+        }
         ```
         """
         if len(examples) == 0:
@@ -169,14 +169,12 @@ class AgentGeneration(Action):
 
         for i, example in enumerate(examples):
             subtask = json.dumps(example["subtask"], indent=4)
-            subtask = subtask.replace("{", "{{").replace("}", "}}")
 
             output = {
                 "selected_agents": [],
                 "generated_agents": example["agents"]
             }
             output = json.dumps(output, indent=4)
-            output = output.replace("{", "{{").replace("}", "}}")
             
             prompt.append(f"Example {i+1}:\n**Sub-Task**:\n```json\n{subtask}\n```\n\n**Output**:\n```json\n{output}\n```\n\n")
 
