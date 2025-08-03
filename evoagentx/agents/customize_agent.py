@@ -12,7 +12,7 @@ from ..models.base_model import PARSER_VALID_MODE
 from ..prompts.utils import DEFAULT_SYSTEM_PROMPT
 from ..prompts.template import PromptTemplate
 from ..actions.action import Action, ActionOutput
-from ..utils.utils import generate_dynamic_class_name, make_parent_folder
+from ..utils.utils import generate_dynamic_class_name, make_parent_folder, get_unique_class_name
 from ..actions.customize_action import CustomizeAction
 from ..actions.action import ActionInput
 from ..tools.tool import Toolkit, Tool
@@ -241,8 +241,8 @@ class CustomizeAgent(Agent):
             if r'{title}' not in title_format:
                 raise ValueError(r"`title_format` must contain the placeholder `{title}`.")
             
+    @staticmethod
     def create_customize_action(
-        self, 
         name: str, 
         desc: str, 
         prompt: str, 
@@ -282,46 +282,10 @@ class CustomizeAgent(Agent):
         """
         assert prompt is not None or prompt_template is not None, "must provide `prompt` or `prompt_template` when creating CustomizeAgent"
 
-        # create the action input type
-        action_input_fields = {}
-        for field in inputs:
-            required = field.get("required", True)
-            if required:
-                action_input_fields[field["name"]] = (str, Field(description=field["description"]))
-            else:
-                action_input_fields[field["name"]] = (Optional[str], Field(default=None, description=field["description"]))
+        action_input_type = CustomizeAgent.create_action_input(inputs, name)
+        action_output_type = CustomizeAgent.create_action_output(outputs, name)
 
-        action_input_type = create_model(
-            self._get_unique_class_name(
-                generate_dynamic_class_name(name+" action_input")
-            ),
-            **action_input_fields, 
-            __base__=ActionInput
-        )
-        
-        # create the action output type
-        if output_parser is None:
-            action_output_fields = {}
-            for field in outputs:
-                required = field.get("required", True)
-                if required:
-                    action_output_fields[field["name"]] = (Any, Field(description=field["description"]))
-                else:
-                    action_output_fields[field["name"]] = (Optional[Any], Field(default=None, description=field["description"]))
-            action_output_type = create_model(
-                self._get_unique_class_name(
-                    generate_dynamic_class_name(name+" action_output")
-                ),
-                **action_output_fields, 
-                __base__=ActionOutput,
-                # get_content_data=customize_get_content_data,
-                # to_str=customize_to_str
-            )
-        else:
-            # self._check_output_parser(outputs, output_parser)
-            action_output_type = output_parser
-        
-        action_cls_name = self._get_unique_class_name(
+        action_cls_name = get_unique_class_name(
             generate_dynamic_class_name(name+" action")
         )
 
@@ -330,7 +294,7 @@ class CustomizeAgent(Agent):
             action_cls_name,
             __base__=CustomizeAction
         )
-
+        
         customize_action = customize_action_cls(
             name=action_cls_name,
             description=desc, 
@@ -347,6 +311,45 @@ class CustomizeAgent(Agent):
         )
 
         return customize_action
+
+    @staticmethod
+    def create_action_input(inputs: List[Dict], action_name: str) -> ActionInput:
+        action_input_fields = {}
+        for field in inputs:
+            required = field.get("required", True)
+            if required:
+                action_input_fields[field["name"]] = (str, Field(description=field["description"]))
+            else:
+                action_input_fields[field["name"]] = (Optional[str], Field(default=None, description=field["description"]))
+
+        action_input_type = create_model(
+            get_unique_class_name(
+                generate_dynamic_class_name(action_name+" action_input")
+            ),
+            **action_input_fields, 
+            __base__=ActionInput
+        )
+        return action_input_type
+
+    @staticmethod
+    def create_action_output(outputs: List[Dict], action_name: str) -> ActionOutput:
+        action_output_fields = {}
+        for field in outputs:
+            required = field.get("required", True)
+            if required:
+                action_output_fields[field["name"]] = (Any, Field(description=field["description"]))
+            else:
+                action_output_fields[field["name"]] = (Optional[Any], Field(default=None, description=field["description"]))
+        action_output_type = create_model(
+            get_unique_class_name(
+                generate_dynamic_class_name(action_name+" action_output")
+            ),
+            **action_output_fields, 
+            __base__=ActionOutput,
+            # get_content_data=customize_get_content_data,
+            # to_str=customize_to_str
+        )
+        return action_output_type
     
     def _check_output_parser(self, outputs: List[dict], output_parser: Type[ActionOutput]):
 
@@ -489,21 +492,6 @@ class CustomizeAgent(Agent):
 
         return path
     
-    def _get_unique_class_name(self, candidate_name: str) -> str:
-        """
-        Get a unique class name by checking if it already exists in the registry.
-        If it does, append "Vx" to make it unique.
-        """
-        if not MODULE_REGISTRY.has_module(candidate_name):
-            return candidate_name 
-        
-        i = 1 
-        while True:
-            unique_name = f"{candidate_name}V{i}"
-            if not MODULE_REGISTRY.has_module(unique_name):
-                break
-            i += 1 
-        return unique_name 
     
     def get_config(self) -> dict:
         """
@@ -515,8 +503,5 @@ class CustomizeAgent(Agent):
         """
         config = self.get_customize_agent_info()
         config["llm_config"] = self.llm_config.to_dict()
-        tool_names = config.pop("tool_names", None)
-        if tool_names:
-            config["tools"] = [self._raw_tool_map[name] for name in tool_names]
         return config
     
