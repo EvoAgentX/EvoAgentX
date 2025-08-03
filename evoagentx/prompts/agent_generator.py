@@ -138,9 +138,10 @@ Restate the objectives and requirements of the sub-task.
 ```json
 {{
     "selected_agents": [
-
-        "name": "the name of the selected agent", 
-        ... (other selected agent fields)
+        {{
+            "name": "the name of the selected agent", 
+            ... (other selected agent fields)
+        }}
     ],
     "generated_agents": [
         {{
