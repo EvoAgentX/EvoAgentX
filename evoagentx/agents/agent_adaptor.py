@@ -7,7 +7,11 @@ from ..agents import Agent, CustomizeAgent
 from ..core.registry import MODEL_REGISTRY
 from ..models import BaseLLM, LLMConfig, OpenAILLMConfig
 from ..tools import Tool, Toolkit
-from ..utils.utils import get_unique_class_name
+from ..utils.utils import (
+    add_llm_config_to_agent_dict,
+    get_unique_class_name,
+    tool_names_to_tools,
+)
 
 
 class AgentAdaptor(Agent):
@@ -194,37 +198,15 @@ class AgentAdaptor(Agent):
             Dict: The processed dictionary containing the agent adaptor's configuration
         """
 
-        adaptor_llm_config = data.get("llm_config", None)
-        agent_llm_config = data["agent"].get("llm_config", None)
+        data["agent"] = add_llm_config_to_agent_dict(data["agent"], llm_config)
 
-        if llm_config is not None:
-            data["agent"]["llm_config"] = llm_config
-        else:
-            if agent_llm_config is None:
-                raise ValueError("Must provide `llm_config` for agent")
-        
-        if agent_adaptor_llm_config is None and adaptor_llm_config is None:
-            data["llm_config"] = OpenAILLMConfig(model="gpt-4o-mini")
+        if agent_adaptor_llm_config is None:
+            agent_adaptor_llm_config = OpenAILLMConfig(model="gpt-4o-mini")
+
+        data = add_llm_config_to_agent_dict(data, agent_adaptor_llm_config)
 
         agent_tool_names = data["agent"].pop("tool_names", None)
-
-        if agent_tool_names is not None:
-            if len(agent_tool_names) == 0:
-                return data
-
-            if tools is None:
-                raise ValueError(f"Must provide the following `tools` for agent: {agent_tool_names}")
-
-            tool_map = {tool.name: tool for tool in tools}
-            agent_tools = []
-
-            for tool_name in agent_tool_names:
-                if tool_name not in tool_map:
-                    raise ValueError(f"'{tool_name}' not found in provided tools")
-                agent_tools.append(tool_map[tool_name])
-
-            data["agent"]["tools"] = agent_tools
-
+        data["agent"]["tools"] = tool_names_to_tools(agent_tool_names, tools)
         return data
 
 
