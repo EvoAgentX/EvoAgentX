@@ -1,7 +1,7 @@
 import asyncio
 import inspect 
 from pydantic import Field
-from typing import Type, Optional, Union, Tuple, List, Any, Coroutine
+from typing import Type, Optional, Union, Tuple, List, Any, Coroutine, Dict
 
 from ..core.module import BaseModule
 from ..core.module_utils import generate_id
@@ -499,7 +499,7 @@ class Agent(BaseModule):
         super().save_module(path=path, ignore=ignore_fields, **kwargs)
 
     @classmethod
-    def load_module(cls, path: str, llm_config: LLMConfig = None, **kwargs) -> "Agent":
+    def load_module(cls, path: str, llm_config: Optional[LLMConfig] = None, **kwargs) -> Dict:
         """
         load the agent from local storage. Must provide `llm_config` when loading the agent from local storage. 
 
@@ -508,14 +508,18 @@ class Agent(BaseModule):
             llm_config: The LLMConfig instance
         
         Returns:
-            Agent: The loaded agent instance
+            Dict: The dictionary containing all necessary configuration to recreate this agent.
         """
-        assert llm_config is not None, "must provide `llm_config` when using `load_module` or `from_file` to load the agent from local storage"
         agent = super().load_module(path=path, **kwargs)
-        agent["llm_config"] = llm_config.to_dict()
+        
+        if llm_config is not None:
+            agent["llm_config"] = llm_config.to_dict()
+        else:
+            if agent.get("llm_config", None) is None:
+                raise ValueError("`llm_config` is not provided when loading the agent from local storage and `llm_config` is not found in the agent configuration")
         return agent 
     
-    def get_config(self) -> dict:
+    def get_config(self) -> Dict:
         """
         Get a dictionary containing all necessary configuration to recreate this agent.
         
