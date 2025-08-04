@@ -169,6 +169,7 @@ class AgentAdaptor(Agent):
         data = cls._process_dict(data, llm_config, agent_adaptor_llm_config, tools)
         agent = CustomizeAgent.from_dict(data["agent"])
         data["agent"] = agent
+        data["llm_config"] = LLMConfig.from_dict(data["llm_config"])
         return cls(**data)
 
     
@@ -212,7 +213,7 @@ class AgentAdaptor(Agent):
                 return data
 
             if tools is None:
-                raise ValueError("Must provide `tools` for agent")
+                raise ValueError(f"Must provide the following `tools` for agent: {agent_tool_names}")
 
             tool_map = {tool.name: tool for tool in tools}
             agent_tools = []
