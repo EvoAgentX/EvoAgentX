@@ -448,7 +448,13 @@ class CustomizeAgent(Agent):
         return config
     
     @classmethod
-    def load_module(cls, path: str, llm_config: LLMConfig = None, tools: List[Union[Toolkit, Tool]] = None, **kwargs) -> "CustomizeAgent":
+    def load_module(
+        cls, 
+        path: str, 
+        llm_config: Optional[LLMConfig] = None, 
+        tools: Optional[List[Union[Toolkit, Tool]]] = None, 
+        **kwargs
+    ) -> Dict:
         """
         load the agent from local storage. Must provide `llm_config` when loading the agent from local storage. 
             If tools is provided, tool_names must also be provided. 
