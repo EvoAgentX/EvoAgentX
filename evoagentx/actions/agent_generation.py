@@ -123,9 +123,11 @@ class AgentGeneration(Action):
                 prompt_params_values["prebuilt_agents"]
             )
 
-        if self.tools:
+        if isinstance(self.tools, list) and len(self.tools) > 0:
             tool_description = self.format_tools(self.tools)
             prompt_params_values["tools"] = AGENT_GENERATION_TOOLS_PROMPT.format(tools_description=tool_description)
+        else:
+            prompt_params_values["tools"] = ""
         
         prompt = self.prompt.format(**prompt_params_values)
         agents = llm.generate(

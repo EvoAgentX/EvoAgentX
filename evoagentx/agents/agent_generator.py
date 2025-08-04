@@ -1,6 +1,6 @@
-from .agent import Agent
-from ..actions.agent_generation import AgentGeneration 
+from ..actions.agent_generation import AgentGeneration
 from ..prompts.agent_generator import AGENT_GENERATOR
+from .agent import Agent
 
 
 class AgentGenerator(Agent):
@@ -14,7 +14,8 @@ class AgentGenerator(Agent):
         name = kwargs.pop("name") if "name" in kwargs else AGENT_GENERATOR["name"]
         description = kwargs.pop("description") if "description" in kwargs else AGENT_GENERATOR["description"]
         system_prompt = kwargs.pop("system_prompt") if "system_prompt" in kwargs else AGENT_GENERATOR["system_prompt"]
-        actions = kwargs.pop("actions") if "actions" in kwargs else [AgentGeneration(tools=kwargs.pop("tools", []))]
+        tools = kwargs.pop("tools", None)
+        actions = kwargs.pop("actions") if "actions" in kwargs else [AgentGeneration(tools=tools)]
         super().__init__(name=name, description=description, system_prompt=system_prompt, actions=actions, **kwargs)
     
     @property
