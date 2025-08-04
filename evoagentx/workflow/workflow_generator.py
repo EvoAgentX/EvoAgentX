@@ -459,6 +459,11 @@ class WorkFlowGenerator(BaseModule):
             self.rag_engine.load()
             return
 
+        if not os.path.exists(self.workflow_folder):
+            logger.warning(f"Cannot find workflow folder at '{self.workflow_folder}'. RAG will not be used.")
+            self.rag_engine = None
+            return
+
         workflow_count = 0
         for file in os.listdir(self.workflow_folder):
             if file.endswith(".json"):
@@ -478,7 +483,7 @@ class WorkFlowGenerator(BaseModule):
                 workflow_count += 1
         
         if workflow_count == 0:
-            logger.warning("No workflow json files found in the workflow folder.")
+            logger.warning("No workflow json files found in the workflow folder. RAG will not be used.")
             self.rag_engine = None
         else:
             logger.info(f"Successfully added {workflow_count} workflows to the RAG engine.")
