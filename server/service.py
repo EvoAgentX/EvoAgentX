@@ -6,6 +6,7 @@ import queue
 import sys
 import threading
 import time
+import re
 from datetime import datetime
 from typing import Dict, Any, List, Optional, Callable
 from io import StringIO
@@ -30,6 +31,106 @@ from contextlib import redirect_stdout, redirect_stderr
 
 load_dotenv(os.path.join(os.path.dirname(__file__), 'app.env'))
 MONGODB_URL = os.getenv("MONGODB_URL", None)
+
+def parse_workflow_output(output: str) -> Dict[str, Any]:
+    """
+    Parse workflow execution output to extract JSON and clean up markdown formatting.
+    
+    This function handles various output formats:
+    1. Pure JSON: {"key": "value"}
+    2. Markdown with JSON: ```json\n{"key": "value"}\n```
+    3. Markdown with other content: ```markdown\ncontent\n```
+    4. Mixed content with JSON blocks
+    
+    Args:
+        output: The raw output string from workflow execution
+        
+    Returns:
+        Dict containing parsed result with keys:
+        - "parsed_json": Extracted JSON object (if found)
+        - "cleaned_text": Text with markdown formatting removed
+        - "original": Original output
+        - "has_json": Boolean indicating if JSON was found
+    """
+    if not isinstance(output, str):
+        return {
+            "parsed_json": None,
+            "cleaned_text": str(output),
+            "original": output,
+            "has_json": False
+        }
+    
+    result = {
+        "parsed_json": None,
+        "cleaned_text": output,
+        "original": output,
+        "has_json": False
+    }
+    
+    # Try to extract JSON from markdown code blocks
+    json_patterns = [
+        r'```json\s*\n(.*?)\n```',  # ```json\n...\n```
+        r'```\s*\n(.*?)\n```',      # ```\n...\n``` (generic code block)
+        r'`(.*?)`',                  # `...` (inline code)
+    ]
+    
+    extracted_json = None
+    
+    for pattern in json_patterns:
+        matches = re.findall(pattern, output, re.DOTALL)
+        for match in matches:
+            try:
+                # Try to parse as JSON
+                parsed = json.loads(match.strip())
+                if isinstance(parsed, dict):
+                    extracted_json = parsed
+                    result["has_json"] = True
+                    break
+            except (json.JSONDecodeError, ValueError):
+                continue
+        
+        if extracted_json:
+            break
+    
+    # If no JSON found in code blocks, try to find JSON in the entire text
+    if not extracted_json:
+        # Look for JSON-like patterns in the text
+        json_candidates = re.findall(r'\{[^{}]*"[^"]*"[^{}]*\}', output)
+        for candidate in json_candidates:
+            try:
+                parsed = json.loads(candidate)
+                if isinstance(parsed, dict):
+                    extracted_json = parsed
+                    result["has_json"] = True
+                    break
+            except (json.JSONDecodeError, ValueError):
+                continue
+    
+    # Clean up markdown formatting
+    cleaned_text = output
+    
+    # Remove markdown code blocks
+    cleaned_text = re.sub(r'```[a-zA-Z]*\s*\n.*?\n```', '', cleaned_text, flags=re.DOTALL)
+    
+    # Remove inline code blocks
+    cleaned_text = re.sub(r'`[^`]*`', '', cleaned_text)
+    
+    # Remove markdown headers
+    cleaned_text = re.sub(r'^#{1,6}\s+.*$', '', cleaned_text, flags=re.MULTILINE)
+    
+    # Remove markdown formatting
+    cleaned_text = re.sub(r'\*\*(.*?)\*\*', r'\1', cleaned_text)  # Bold
+    cleaned_text = re.sub(r'\*(.*?)\*', r'\1', cleaned_text)      # Italic
+    cleaned_text = re.sub(r'~~(.*?)~~', r'\1', cleaned_text)      # Strikethrough
+    
+    # Clean up extra whitespace
+    cleaned_text = re.sub(r'\n\s*\n', '\n', cleaned_text)  # Multiple newlines
+    cleaned_text = cleaned_text.strip()
+    
+    result["parsed_json"] = extracted_json
+    result["cleaned_text"] = cleaned_text
+    
+    return result
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 SUPABASE_BUCKET_REQUIREMENT = os.getenv("SUPABASE_BUCKET_REQUIREMENT")
@@ -554,18 +655,22 @@ async def execute_workflow(workflow_id: str, inputs: Dict[str, Any]) -> Dict[str
         else:
             execution_message = str(execution_result)
             
-        # Clean up markdown formatting from the message
-        if isinstance(execution_message, str):
-            if execution_message.startswith("```markdown"):
-                execution_message = execution_message[11:]
-            if execution_message.endswith("```"):
-                execution_message = execution_message[:-3]
+        # Parse and clean the execution output
+        parsed_output = parse_workflow_output(execution_message)
         
-        # Update execution_result with cleaned message
+        # Update execution_result with parsed output
         if isinstance(execution_result, dict):
-            execution_result["message"] = execution_message
+            execution_result["message"] = parsed_output["cleaned_text"]
+            execution_result["parsed_json"] = parsed_output["parsed_json"]
+            execution_result["has_json"] = parsed_output["has_json"]
+            execution_result["original_output"] = parsed_output["original"]
         else:
-            execution_result = execution_message
+            execution_result = {
+                "message": parsed_output["cleaned_text"],
+                "parsed_json": parsed_output["parsed_json"],
+                "has_json": parsed_output["has_json"],
+                "original_output": parsed_output["original"]
+            }
         
         # Update workflow storage with execution results
         await update_workflow_status(
@@ -1065,18 +1170,22 @@ async def execute_workflow_with_websocket(
             else:
                 execution_message = str(execution_result)
                 
-            # Clean up markdown formatting from the message
-            if isinstance(execution_message, str):
-                if execution_message.startswith("```markdown"):
-                    execution_message = execution_message[11:]
-                if execution_message.endswith("```"):
-                    execution_message = execution_message[:-3]
+            # Parse and clean the execution output
+            parsed_output = parse_workflow_output(execution_message)
             
-            # Update execution_result with cleaned message
+            # Update execution_result with parsed output
             if isinstance(execution_result, dict):
-                execution_result["message"] = execution_message
+                execution_result["message"] = parsed_output["cleaned_text"]
+                execution_result["parsed_json"] = parsed_output["parsed_json"]
+                execution_result["has_json"] = parsed_output["has_json"]
+                execution_result["original_output"] = parsed_output["original"]
             else:
-                execution_result = execution_message
+                execution_result = {
+                    "message": parsed_output["cleaned_text"],
+                    "parsed_json": parsed_output["parsed_json"],
+                    "has_json": parsed_output["has_json"],
+                    "original_output": parsed_output["original"]
+                }
             
             # Get captured output from the sink
             captured_output = websocket_sink.get_buffer_contents() if websocket_sink else {}

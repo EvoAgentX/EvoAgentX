@@ -6,7 +6,7 @@ from typing import Dict, Any, Optional, List
 # Updated workflow-based models (replacing project-based approach)
 class ProjectSetupRequest(BaseModel):
     """Request model for workflow setup - Phase 1"""
-    project_id: str  # Project identifier
+    project_short_id: str  # Project identifier
 
 class ProjectSetupResponse(BaseModel):
     """Response model for workflow setup - Phase 1"""
@@ -31,6 +31,10 @@ class ProjectWorkflowExecutionResponse(BaseModel):
     """Response model for workflow execution - Phase 3"""
     execution_result: Optional[Dict[str, Any]] = None  # running result / status
 
+class WorkflowGraphResponse(BaseModel):
+    """Response model for workflow graph retrieval"""
+    workflow_graph: Optional[Dict[str, Any]] = None
+
 # Legacy aliases for backward compatibility
 setup_input = ProjectSetupRequest
 setup_output = ProjectSetupResponse
@@ -41,7 +45,7 @@ workflow_execution_output = ProjectWorkflowExecutionResponse
 
 ## Database Schema for Workflow Storage:
 # workflow_id: str (Primary Key)
-# project_id: str  # Project identifier
+# project_short_id: str  # Project identifier
 # task_info: Optional[Dict[str, Any]] = None       # saved after setup phase
 # workflow_graph: Optional[Dict[str, Any]] = None  # saved after generation phase
 # execution_result: Optional[Dict[str, Any]] = None # saved after execution phase

@@ -139,6 +139,8 @@ load_dotenv('server/app.env')
 # Test configuration
 # BASE_URL = "https://evoagentx-server.fly.dev"
 BASE_URL = "http://localhost:8001"
+# WebSocket URL - derived from BASE_URL
+WS_BASE_URL = BASE_URL.replace("http://", "ws://").replace("https://", "wss://")
 ACCESS_TOKEN = os.getenv("EAX_ACCESS_TOKEN", "default_secret_token_change_me")
 HEADERS = {
     "eax-access-token": ACCESS_TOKEN,
@@ -148,15 +150,9 @@ HEADERS = {
 test_workflow_id_1 = "550e8400-e29b-41d4-a716-446655440001"
 test_workflow_id_2 = "550e8400-e29b-41d4-a716-446655440002"
 
-# Fixed test inputs for consistent results
+# Fixed test inputs for consistent results - Updated for treatment recommendation workflow
 TEST_INPUTS = {
-    "symptoms": "Pet is lethargic, not eating, and has a fever of 103°F. The pet is also vomiting occasionally.",
-    "pet_info": {
-        "breed": "Golden Retriever",
-        "age": 5,
-        "weight": 65,
-        "health_history": "No previous major health issues"
-    }
+    "diagnosis": "Acute gastroenteritis with mild dehydration"
 }
 
 # Fixed test configuration
@@ -408,6 +404,52 @@ def test_list_workflows() -> Tuple[bool, Dict[str, Any]]:
     
     return result["success"], result
 
+def test_workflow_graph(workflow_ids: List[str]) -> Tuple[bool, Dict[str, Any]]:
+    """Test workflow graph endpoint"""
+    print("\n📊 Testing Workflow Graph Retrieval")
+    
+    if not workflow_ids:
+        print("❌ No workflow IDs available")
+        return False, {"error": "No workflow IDs available"}
+    
+    result = {"success": False, "responses": {}, "errors": {}}
+    success_count = 0
+    
+    for workflow_id in workflow_ids:
+        print(f"\nRetrieving graph for workflow: {workflow_id}")
+        
+        print(f"Request: GET {BASE_URL}/workflow/{workflow_id}/get_graph")
+        
+        try:
+            response = requests.get(
+                f"{BASE_URL}/workflow/{workflow_id}/get_graph",
+                headers=HEADERS
+            )
+            
+            print(f"Response Status: {response.status_code}")
+            response_data = response.json()
+            print(f"Response Body: {json.dumps(response_data, indent=2)}")
+            
+            assert response.status_code == 200
+            assert "workflow_graph" in response_data
+            
+            # Check if workflow_graph is present (could be None if not generated yet)
+            if response_data["workflow_graph"] is not None:
+                print(f"✅ Workflow graph retrieved for {workflow_id}")
+            else:
+                print(f"⚠️  Workflow graph is None for {workflow_id} (not generated yet)")
+            
+            result["responses"][workflow_id] = response_data
+            success_count += 1
+            
+        except Exception as e:
+            error_msg = str(e)
+            result["errors"][workflow_id] = error_msg
+            print(f"❌ Workflow graph retrieval failed for {workflow_id}: {error_msg}")
+    
+    result["success"] = success_count > 0
+    return result["success"], result
+
 def test_websocket_streaming(workflow_ids: List[str]) -> Tuple[bool, Dict[str, Any]]:
     """Test WebSocket streaming functionality for workflow execution"""
     print(f"\n🔌 Testing WebSocket Streaming for {len(workflow_ids)} workflow(s)")
@@ -419,7 +461,7 @@ def test_websocket_streaming(workflow_ids: List[str]) -> Tuple[bool, Dict[str, A
     
     async def test_websocket_connection(workflow_id: str) -> Dict[str, Any]:
         """Test WebSocket connection for a single workflow"""
-        uri = f"ws://localhost:8001/workflow/{workflow_id}/execute_ws"
+        uri = f"{WS_BASE_URL}/workflow/{workflow_id}/execute_ws"
         headers = {"eax-access-token": ACCESS_TOKEN}
         
         try:
@@ -798,7 +840,7 @@ def run_complete_test() -> Dict[str, Any]:
     # if not setup_passed:
     #     print("❌ Project setup failed, stopping test")
     #     return test_results
-    workflow_ids = [test_workflow_id_1]
+    workflow_ids = [test_workflow_id_2]  # Use the treatment recommendation workflow
     
     # # Phase 3: Workflow Generation
     # generation_passed, generation_result = test_workflow_generation(workflow_ids)
@@ -809,13 +851,21 @@ def run_complete_test() -> Dict[str, Any]:
     # }
     
     
-    # # Phase 4: Workflow Execution
-    # execution_passed, execution_result = test_workflow_execution(workflow_ids)
-    # test_results["phases"]["execution"] = {
-    #     "passed": execution_passed,
-    #     "timestamp": datetime.now().isoformat(),
-    #     "result": execution_result
-    # }
+    # Phase 4: Workflow Execution
+    execution_passed, execution_result = test_workflow_execution(workflow_ids)
+    test_results["phases"]["execution"] = {
+        "passed": execution_passed,
+        "timestamp": datetime.now().isoformat(),
+        "result": execution_result
+    }
+    
+    # Phase 5: Status Check
+    status_passed, status_result = test_workflow_status(workflow_ids)
+    test_results["phases"]["status_check"] = {
+        "passed": status_passed,
+        "timestamp": datetime.now().isoformat(),
+        "result": status_result
+    }
     
     # # Phase 5: WebSocket Streaming Test
     # streaming_passed, streaming_result = test_websocket_streaming(workflow_ids)
@@ -841,13 +891,21 @@ def run_complete_test() -> Dict[str, Any]:
     #     "result": list_result
     # }
     
-    # Phase 8: User Query Analysis
-    query_analysis_passed, query_analysis_result = test_user_query_analysis(project_short_id)
-    test_results["phases"]["user_query_analysis"] = {
-        "passed": query_analysis_passed,
-        "timestamp": datetime.now().isoformat(),
-        "result": query_analysis_result
-    }
+    # # Phase 8: User Query Analysis
+    # query_analysis_passed, query_analysis_result = test_user_query_analysis(project_short_id)
+    # test_results["phases"]["user_query_analysis"] = {
+    #     "passed": query_analysis_passed,
+    #     "timestamp": datetime.now().isoformat(),
+    #     "result": query_analysis_result
+    # }
+    
+    # # Phase 9: Workflow Graph Test
+    # graph_passed, graph_result = test_workflow_graph(workflow_ids)
+    # test_results["phases"]["workflow_graph"] = {
+    #     "passed": graph_passed,
+    #     "timestamp": datetime.now().isoformat(),
+    #     "result": graph_result
+    # }
     
     test_results["test_end_time"] = datetime.now().isoformat()
     
@@ -860,21 +918,24 @@ def run_complete_test() -> Dict[str, Any]:
         health_check_passed,
         # setup_passed,
         # generation_passed,
-        # execution_passed,
+        execution_passed,
         # streaming_passed,
-        # status_passed,
+        status_passed,
         # list_passed,
-        query_analysis_passed
+        # query_analysis_passed,
+        # graph_passed
     ])
     
     print(f"Health Check: {'✅ PASSED' if health_check_passed else '❌ FAILED'}")
     # print(f"Project Setup: {'✅ PASSED' if setup_passed else '❌ FAILED'}")
     # print(f"Workflow Generation: {'✅ PASSED' if generation_passed else '❌ FAILED'}")
-    # print(f"Workflow Execution: {'✅ PASSED' if execution_passed else '❌ FAILED'}")
+    print(f"Workflow Execution: {'✅ PASSED' if execution_passed else '❌ FAILED'}")
     # print(f"WebSocket Streaming: {'✅ PASSED' if streaming_passed else '❌ FAILED'}")
-    # print(f"Status Check: {'✅ PASSED' if status_passed else '❌ FAILED'}")
+    print(f"Status Check: {'✅ PASSED' if status_passed else '❌ FAILED'}")
     # print(f"List Workflows: {'✅ PASSED' if list_passed else '❌ FAILED'}")
-    # print(f"\nOverall Result: {'✅ ALL TESTS PASSED' if all_passed else '❌ SOME TESTS FAILED'}")
+    # print(f"User Query Analysis: {'✅ PASSED' if query_analysis_passed else '❌ FAILED'}")
+    # print(f"Workflow Graph: {'✅ PASSED' if graph_passed else '❌ FAILED'}")
+    print(f"\nOverall Result: {'✅ ALL TESTS PASSED' if all_passed else '❌ SOME TESTS FAILED'}")
     
     return test_results
 

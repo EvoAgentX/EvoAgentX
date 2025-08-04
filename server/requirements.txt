@@ -1,5 +1,6 @@
 fastapi>=0.115.11
 uvicorn>=0.34.0
+fastapi-cors>=0.0.6
 sse-starlette
 pydantic>=2.9.0,<=2.10.6
 aiohttp

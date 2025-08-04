@@ -205,7 +205,7 @@ CONNECTION_INSTRUCTION_PROMPT = """
 Call Alex to complete the following tasks with the following instruction. The final result should be in Markdown format.
 
 ## Project Information
-- **Project ID**: {project_id}
+- **Project ID**: {project_short_id}
 - **Server URL**: {public_url}
 
 ## API Endpoints
@@ -217,7 +217,7 @@ Run the workflow with your specific input:
 curl -X POST {public_url}/workflow/execute \\
   -H "Content-Type: application/json" \\
   -d '{{
-    "project_id": "{project_id}",
+    "project_short_id": "{project_short_id}",
     "inputs": {{
       "goal": "Analyze the price and trend for company Apple"
     }}
@@ -240,7 +240,7 @@ curl -X POST {public_url}/workflow/execute \\
 Monitor your project status:
 
 ```bash
-curl -X GET {public_url}/project/{project_id}/status
+curl -X GET {public_url}/project/{project_short_id}/status
 ```
 
 ## Quick Start Example
@@ -249,7 +249,7 @@ curl -X GET {public_url}/project/{project_id}/status
    ```bash
    curl -X POST {public_url}/workflow/generate \\
      -H "Content-Type: application/json" \\
-     -d '{{"project_id": "{project_id}"}}'
+     -d '{{"project_short_id": "{project_short_id}"}}'
    ```
 
 2. **Execute Analysis**:
@@ -257,7 +257,7 @@ curl -X GET {public_url}/project/{project_id}/status
    curl -X POST {public_url}/workflow/execute \\
      -H "Content-Type: application/json" \\
      -d '{{
-       "project_id": "{project_id}",
+       "project_short_id": "{project_short_id}",
        "inputs": {{"goal": "Analyze Tesla stock performance"}}
      }}'
    ```

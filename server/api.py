@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException, Depends, Header, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, Any, Optional, List
 import json
 import asyncio
@@ -10,12 +11,14 @@ from contextlib import asynccontextmanager
 
 from .models import (
     ProjectSetupRequest, ProjectSetupResponse, ProjectWorkflowGenerationRequest, ProjectWorkflowGenerationResponse,
-    ProjectWorkflowExecutionRequest, ProjectWorkflowExecutionResponse, UserQueryRequest, UserQueryResponse
+    ProjectWorkflowExecutionRequest, ProjectWorkflowExecutionResponse, UserQueryRequest, UserQueryResponse,
+    WorkflowGraphResponse
 )
 from .service import (
     setup_project, get_workflow, list_workflows, 
     generate_workflow, execute_workflow, execute_workflow_with_websocket
 )
+from .cors_config import get_cors_config
 
 load_dotenv('server/app.env', override = True)
 
@@ -43,6 +46,12 @@ async def verify_access_token(eax_access_token: Optional[str] = Header(None, ali
 
 app = FastAPI(title="Processing Server")
 
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    **get_cors_config()
+)
+
 
 ### _____________________________________________
 ### Workflow Management 
@@ -52,6 +61,27 @@ app = FastAPI(title="Processing Server")
 async def health_check():
     """Basic health check endpoint"""
     return {"status": "healthy"}
+
+# CORS Management endpoints
+@app.get("/cors/origins")
+async def get_cors_origins(token: str = Depends(verify_access_token)):
+    """Get the list of allowed CORS origins"""
+    from .cors_config import get_allowed_origins
+    return {"allowed_origins": get_allowed_origins()}
+
+@app.post("/cors/origins")
+async def add_cors_origin(origin: str, token: str = Depends(verify_access_token)):
+    """Add a new allowed CORS origin"""
+    from .cors_config import add_allowed_origin
+    add_allowed_origin(origin)
+    return {"message": f"Origin '{origin}' added successfully", "allowed_origins": get_allowed_origins()}
+
+@app.delete("/cors/origins")
+async def remove_cors_origin(origin: str, token: str = Depends(verify_access_token)):
+    """Remove an allowed CORS origin"""
+    from .cors_config import remove_allowed_origin, get_allowed_origins
+    remove_allowed_origin(origin)
+    return {"message": f"Origin '{origin}' removed successfully", "allowed_origins": get_allowed_origins()}
 
 @app.get("/workflows")
 async def get_all_workflows(token: str = Depends(verify_access_token)):
@@ -88,6 +118,33 @@ async def get_workflow_status(workflow_id: str, token: str = Depends(verify_acce
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting workflow status: {str(e)}")
+
+@app.get("/workflow/{workflow_id}/get_graph", response_model=WorkflowGraphResponse)
+async def get_workflow_graph_endpoint(workflow_id: str, token: str = Depends(verify_access_token)) -> WorkflowGraphResponse:
+    """
+    Get the workflow graph for a specific workflow ID.
+    
+    Args:
+        workflow_id: The unique identifier of the workflow
+        token: Access token for authentication
+        
+    Returns:
+        WorkflowGraphResponse containing the workflow graph
+        
+    Raises:
+        HTTPException: 404 if workflow not found, 500 for server errors
+    """
+    try:
+        workflow = await get_workflow(workflow_id)
+        if not workflow:
+            raise HTTPException(status_code=404, detail=f"Workflow with ID '{workflow_id}' not found")
+        
+        return WorkflowGraphResponse(workflow_graph=workflow.get("workflow_graph"))
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrieving workflow graph: {str(e)}")
 
 ### _____________________________________________
 ### Workflow CRUD 
