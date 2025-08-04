@@ -1,7 +1,7 @@
 import os
 import re
 import time
-from typing import Any, List, Set, Union
+from typing import Any, Dict, List, Optional, Set, Union
 
 import regex
 import requests
@@ -9,6 +9,7 @@ from tqdm import tqdm
 
 from ..core.logging import logger
 from ..core.registry import MODULE_REGISTRY
+from ..models import LLMConfig
 
 
 def make_parent_folder(path: str):
@@ -145,6 +146,45 @@ def recursive_remove(data: Any, keys: List[str]) -> Any:
         return new_list
     else:
         return data
+
+
+def tool_names_to_tools(
+    tool_names: Optional[List[str]] = None, 
+    tools: Optional[List] = None,
+    tool_map: Optional[Dict] = None
+) -> Optional[List]:
+
+    if tool_names is None:
+        return None
+
+    if len(tool_names) == 0:
+        return None
+
+    if tools is None and tool_map is None:
+        raise ValueError(f"Must provide the following tools: {tool_names}")
+
+    if tool_map is None:
+        tool_map = {tool.name: tool for tool in tools}
+    
+    tool_list = []
+    for tool_name in tool_names:
+        if tool_name not in tool_map:
+            raise ValueError(f"'{tool_name}' not found in provided tools")
+        tool_list.append(tool_map[tool_name])
+    return tool_list
+
+
+def add_llm_config_to_agent_dict(agent_dict: Dict, llm_config: Optional[LLMConfig] = None) -> Dict:
+    """Add llm_config to agent_dict if it is not present."""
+
+    data_llm_config = agent_dict.get("llm_config", None)
+
+    if data_llm_config is None:
+        if llm_config is None:
+            raise ValueError("Must provide `llm_config` for agent")
+        agent_dict["llm_config"] = llm_config
+    
+    return agent_dict
 
 
 json_to_python_type = {
