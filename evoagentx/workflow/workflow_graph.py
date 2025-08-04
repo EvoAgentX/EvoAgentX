@@ -1,24 +1,29 @@
-import json
 import inspect
+import json
 import threading
-from enum import Enum
-import networkx as nx 
-from copy import deepcopy
-from networkx import MultiDiGraph
 from collections import defaultdict
-from pydantic import Field, field_validator, model_validator
-from typing import Union, Optional, Tuple, Callable, Dict, List
+from collections.abc import Callable
+from copy import deepcopy
+from enum import Enum
 from functools import wraps
+from typing import Dict, List, Optional, Tuple, Union
 
+import networkx as nx
+from networkx import MultiDiGraph
+from pydantic import Field, field_validator, model_validator
+
+from evoagentx.core.module import BaseModule
+
+from ..agents.agent import Agent
+from ..core.base_config import Parameter
 from ..core.logging import logger
 from ..core.module import BaseModule
-from ..core.base_config import Parameter
-from .action_graph import ActionGraph
-from ..agents.agent import Agent 
-from ..utils.utils import generate_dynamic_class_name, make_parent_folder
-from ..prompts.workflow.sew_workflow import SEW_WORKFLOW
+from ..models import LLMConfig
 from ..prompts.utils import DEFAULT_SYSTEM_PROMPT
-# from ..tools.tool import Toolkit, Tool
+from ..prompts.workflow.sew_workflow import SEW_WORKFLOW
+from ..tools.tool import Tool, Toolkit
+from ..utils.utils import generate_dynamic_class_name, make_parent_folder, add_llm_config_to_agent_dict, tool_names_to_tools
+from .action_graph import ActionGraph
 
 
 class WorkFlowNodeState(str, Enum):
@@ -1072,6 +1077,26 @@ class WorkFlowGraph(BaseModule):
         config = self.to_dict() 
         config.pop("graph", None)
         return config
+
+    @classmethod
+    def from_file(cls, path: str, llm_config: Optional[LLMConfig], tools: Optional[Union[Tool, Toolkit]]) -> 'WorkFlowGraph':
+        config = cls.load_module(path)
+        tool_map = None
+        if tools is not None:
+            tool_map = {tool.name: tool for tool in tools}
+
+        for node in config["nodes"]:
+            for agent in node["agents"]:
+                agent = add_llm_config_to_agent_dict(agent, llm_config)
+                agent_tool_names = agent.pop("tool_names", None)
+                agent["tools"] = tool_names_to_tools(agent_tool_names, tool_map=tool_map)
+
+                if agent.get("class_name", "") == "AgentAdaptor":
+                    agent["agent"] = add_llm_config_to_agent_dict(agent["agent"], llm_config)
+                    inner_agent_tool_names = agent["agent"].pop("tool_names", None)
+                    agent["agent"]["tools"] = tool_names_to_tools(inner_agent_tool_names, tool_map=tool_map)
+
+        return cls.from_dict(config)
 
 
 class SequentialWorkFlowGraph(WorkFlowGraph):
