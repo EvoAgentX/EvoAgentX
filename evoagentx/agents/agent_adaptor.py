@@ -7,7 +7,7 @@ from ..agents import Agent, CustomizeAgent
 from ..core.registry import MODEL_REGISTRY
 from ..models import BaseLLM, LLMConfig, OpenAILLMConfig
 from ..tools import Tool, Toolkit
-from ..utils.utils import get_unique_class_name, make_parent_folder
+from ..utils.utils import get_unique_class_name
 
 
 class AgentAdaptor(Agent):
@@ -103,27 +103,6 @@ class AgentAdaptor(Agent):
         }
 
         return config
-
-
-    def save_module(self, path: str, ignore: List[str] = [], **kwargs) -> str:
-        """Save the agent adaptor's configuration to a JSON file.
-        
-        Args:
-            path: File path where the configuration should be saved
-            ignore: List of keys to exclude from the saved configuration
-            **kwargs (Any): Additional parameters for the save operation
-            
-        Returns:
-            The path where the configuration was saved
-        """
-
-        config = self.to_json(ignore=ignore, **kwargs)
-
-        make_parent_folder(path)
-        with open(path, 'w', encoding='utf-8') as f:
-            json.dump(config, f, indent=4, **kwargs)
-
-        return path
 
 
     def to_dict(self, exclude_none: bool = True, ignore: List[str] = [], **kwargs) -> dict:
