@@ -1,4 +1,5 @@
-from fastapi import FastAPI, HTTPException, Depends, Header, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Depends, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, Any, Optional, List
 import json
 import asyncio
@@ -17,32 +18,23 @@ from .service import (
     setup_project, get_workflow, list_workflows, 
     generate_workflow, execute_workflow, execute_workflow_with_websocket
 )
+from .cors_config import get_cors_config
 
 load_dotenv('server/app.env', override = True)
 
-# Access control dependency
-async def verify_access_token(eax_access_token: Optional[str] = Header(None, alias="eax-access-token")):
-    """
-    Verify the access token from the header.
-    Returns the token if valid, raises HTTPException if invalid.
-    """
-    expected_token = os.getenv("EAX_ACCESS_TOKEN", "default_secret_token_change_me")
-    
-    if not eax_access_token:
-        raise HTTPException(
-            status_code=401, 
-            detail="Access token required. Please provide 'eax-access-token' in the header."
-        )
-    
-    if eax_access_token != expected_token:
-        raise HTTPException(
-            status_code=403, 
-            detail="Invalid access token. Access denied."
-        )
-    
-    return eax_access_token
+
 
 app = FastAPI(title="Processing Server")
+
+# Add CORS middleware using structured configuration
+cors_config = get_cors_config()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_config["allow_origins"],
+    allow_credentials=cors_config["allow_credentials"],
+    allow_methods=cors_config["allow_methods"],
+    allow_headers=cors_config["allow_headers"],
+)
 
 
 ### _____________________________________________
@@ -56,7 +48,7 @@ async def health_check():
 
 # Workflow management endpoints
 @app.get("/workflow/{workflow_id}/status")
-async def get_workflow_status(workflow_id: str, token: str = Depends(verify_access_token)):
+async def get_workflow_status(workflow_id: str):
     """
     Get the current status and details of a workflow.
     Shows which phase the workflow is in and all stored data.
@@ -84,7 +76,7 @@ async def get_workflow_status(workflow_id: str, token: str = Depends(verify_acce
         raise HTTPException(status_code=500, detail=f"Error getting workflow status: {str(e)}")
 
 @app.get("/workflow/{workflow_id}/get_graph", response_model=WorkflowGraphResponse)
-async def get_workflow_graph_endpoint(workflow_id: str, token: str = Depends(verify_access_token)) -> WorkflowGraphResponse:
+async def get_workflow_graph_endpoint(workflow_id: str) -> WorkflowGraphResponse:
     """
     Get the workflow graph for a specific workflow ID.
     
@@ -117,7 +109,7 @@ async def get_workflow_graph_endpoint(workflow_id: str, token: str = Depends(ver
 
 # Updated workflow-based endpoints (using original project endpoints)
 @app.post("/project/setup", response_model=ProjectSetupResponse)
-async def setup_new_project(request: ProjectSetupRequest, token: str = Depends(verify_access_token)) -> ProjectSetupResponse:
+async def setup_new_project(request: ProjectSetupRequest) -> ProjectSetupResponse:
     """
     Phase 1: Setup workflow with extraction AND generation.
     This is the first phase of the workflow process.
@@ -132,7 +124,7 @@ async def setup_new_project(request: ProjectSetupRequest, token: str = Depends(v
         raise HTTPException(status_code=500, detail=f"Error setting up workflow: {str(e)}")
 
 @app.post("/workflow/{workflow_id}/generate", response_model=ProjectWorkflowGenerationResponse)
-async def generate_workflow_with_workflow_id(workflow_id: str, token: str = Depends(verify_access_token)) -> ProjectWorkflowGenerationResponse:
+async def generate_workflow_with_workflow_id(workflow_id: str) -> ProjectWorkflowGenerationResponse:
     """
     Phase 2: Generate workflow graph based on task_info.
     This is the second phase of the workflow process.
@@ -149,7 +141,7 @@ async def generate_workflow_with_workflow_id(workflow_id: str, token: str = Depe
         raise HTTPException(status_code=500, detail=f"Internal server error during workflow generation: {str(e)}")
 
 @app.post("/workflow/{workflow_id}/execute", response_model=ProjectWorkflowExecutionResponse)
-async def execute_workflow_with_workflow_id(workflow_id: str, request: ProjectWorkflowExecutionRequest, token: str = Depends(verify_access_token)) -> ProjectWorkflowExecutionResponse:
+async def execute_workflow_with_workflow_id(workflow_id: str, request: ProjectWorkflowExecutionRequest) -> ProjectWorkflowExecutionResponse:
     """
     Phase 3: Execute workflow with provided inputs.
     This is the third phase of the workflow process.
@@ -169,8 +161,7 @@ async def execute_workflow_with_workflow_id(workflow_id: str, request: ProjectWo
 @app.websocket("/workflow/{workflow_id}/execute_ws")
 async def execute_workflow_websocket(
     websocket: WebSocket,
-    workflow_id: str,
-    token: str = Depends(verify_access_token)
+    workflow_id: str
 ):
     """
     WebSocket endpoint for executing workflows with real-time progress updates.
@@ -281,8 +272,7 @@ async def execute_workflow_websocket(
 @app.post("/project/{project_short_id}/user_query", response_model=UserQueryResponse)
 async def analyze_user_query_endpoint(
     project_short_id: str,
-    request: UserQueryRequest,
-    token: str = Depends(verify_access_token)
+    request: UserQueryRequest
 ) -> UserQueryResponse:
     """
     Analyze user query using UserQueryRouter.
