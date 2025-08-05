@@ -10,7 +10,7 @@ CORS_CONFIG = {
     "allow_origins": ALLOWED_ORIGINS,
     "allow_credentials": True,
     "allow_methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    "allow_headers": ["*"],
+    "allow_headers": ["*", "eax_access_token"]
 }
 
 def get_cors_config():

@@ -1,5 +1,4 @@
 from fastapi import FastAPI, HTTPException, Depends, Header, WebSocket, WebSocketDisconnect
-from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, Any, Optional, List
 import json
 import asyncio
@@ -18,7 +17,6 @@ from .service import (
     setup_project, get_workflow, list_workflows, 
     generate_workflow, execute_workflow, execute_workflow_with_websocket
 )
-from .cors_config import get_cors_config
 
 load_dotenv('server/app.env', override = True)
 
@@ -46,12 +44,6 @@ async def verify_access_token(eax_access_token: Optional[str] = Header(None, ali
 
 app = FastAPI(title="Processing Server")
 
-# Configure CORS
-app.add_middleware(
-    CORSMiddleware,
-    **get_cors_config()
-)
-
 
 ### _____________________________________________
 ### Workflow Management 
@@ -61,34 +53,6 @@ app.add_middleware(
 async def health_check():
     """Basic health check endpoint"""
     return {"status": "healthy"}
-
-# CORS Management endpoints
-@app.get("/cors/origins")
-async def get_cors_origins(token: str = Depends(verify_access_token)):
-    """Get the list of allowed CORS origins"""
-    from .cors_config import get_allowed_origins
-    return {"allowed_origins": get_allowed_origins()}
-
-@app.post("/cors/origins")
-async def add_cors_origin(origin: str, token: str = Depends(verify_access_token)):
-    """Add a new allowed CORS origin"""
-    from .cors_config import add_allowed_origin
-    add_allowed_origin(origin)
-    return {"message": f"Origin '{origin}' added successfully", "allowed_origins": get_allowed_origins()}
-
-@app.delete("/cors/origins")
-async def remove_cors_origin(origin: str, token: str = Depends(verify_access_token)):
-    """Remove an allowed CORS origin"""
-    from .cors_config import remove_allowed_origin, get_allowed_origins
-    remove_allowed_origin(origin)
-    return {"message": f"Origin '{origin}' removed successfully", "allowed_origins": get_allowed_origins()}
-
-@app.get("/workflows")
-async def get_all_workflows(token: str = Depends(verify_access_token)):
-    """
-    List all workflows in the system.
-    """
-    return await list_workflows() 
 
 # Workflow management endpoints
 @app.get("/workflow/{workflow_id}/status")
