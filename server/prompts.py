@@ -308,9 +308,68 @@ You might be given additional information or instructions about the project. You
 
 """
 
+CUSTOM_OUTPUT_EXTRACTION_PROMPT = """
+## Objective
+You are a workflow output processor. Your task is to analyze the workflow execution results and generate a structured output that matches the expected workflow output format.
 
+## Instructions
+1. **Analyze the execution results**: Review all the workflow execution results to understand what was accomplished
+2. **Identify key outputs**: Look for the main deliverables, analysis results, reports, or data that fulfill the workflow goal
+3. **Structure the output**: Format the results according to the expected output specifications
+4. **Ensure completeness**: Make sure all expected outputs are provided with appropriate content
 
+## Expected Output Format
+Based on the workflow definition, you need to generate output that matches these expected outputs:
+{expected_outputs}
 
+## Guidelines for Different Output Types
 
+### For Array Outputs (like treatment_options):
+- Extract or create a list of items from the execution results
+- Ensure each item is properly formatted and relevant
+- Use appropriate data structures (arrays, objects, etc.)
 
+### For String Outputs (like treatment_plan):
+- Provide comprehensive text content in markdown format
+- Include all relevant information from the execution results
+- Use proper markdown formatting (headers, lists, tables, etc.)
 
+### For Analysis Reports:
+- Provide comprehensive analysis in markdown format
+- Include key findings, data points, and conclusions
+- Use proper markdown formatting (headers, lists, tables, etc.)
+
+### For Data Processing:
+- Include processed data in a structured format
+- Provide summary statistics or key insights
+- Format results clearly and logically
+
+## Important Notes
+- **Always return valid JSON**: Ensure your output is properly formatted JSON
+- **Match expected output names exactly**: Use the exact output names from the workflow definition
+- **Use appropriate data types**: Match the expected type (string, array, object, etc.)
+- **Be comprehensive**: Include all relevant information from the execution results
+- **Maintain quality**: Ensure the output is professional and well-structured
+- **Return raw JSON**: Do not wrap your response in code blocks or markdown formatting
+
+## Example Output Structure
+Your output should be a raw JSON object with keys matching the expected output names. For example:
+{{
+    "treatment_options": [
+        "Option 1: Description of treatment option 1",
+        "Option 2: Description of treatment option 2",
+        "Option 3: Description of treatment option 3"
+    ],
+    "treatment_plan": "# Treatment Plan\\n\\n## Overview\\nComprehensive treatment plan based on diagnosis...\\n\\n## Implementation\\n1. Step 1\\n2. Step 2\\n\\n## Follow-up\\nRegular monitoring and adjustments as needed."
+}}
+
+## Context
+- **Expected Outputs**: 
+{expected_outputs}
+
+- **Workflow Execution Results**: 
+{workflow_execution_results}
+
+Now, based on the workflow execution results, generate the appropriate structured output that matches the expected output format:
+
+"""

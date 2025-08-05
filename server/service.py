@@ -20,7 +20,7 @@ from evoagentx.agents.agent_manager import AgentManager
 from evoagentx.core.module_utils import parse_json_from_text
 from evoagentx.tools import MCPToolkit
 
-from .prompts import WORKFLOW_GENERATION_PROMPT, WORKFLOW_GENERATION_GOAL_PROMPT, WORKFLOW_REQUIREMENT_PROMPT, TASK_INFO_PROMPT_SUDO, CONNECTION_INSTRUCTION_PROMPT
+from .prompts import WORKFLOW_GENERATION_PROMPT, WORKFLOW_GENERATION_GOAL_PROMPT, WORKFLOW_REQUIREMENT_PROMPT, TASK_INFO_PROMPT_SUDO, CONNECTION_INSTRUCTION_PROMPT, CUSTOM_OUTPUT_EXTRACTION_PROMPT
 from .db import database, requirement_database
 
 import sys
@@ -34,10 +34,10 @@ MONGODB_URL = os.getenv("MONGODB_URL", None)
 
 def parse_workflow_output(output: str) -> Dict[str, Any]:
     """
-    Parse workflow execution output using EvoAgentX JSON parsing.
+    Parse workflow execution output using enhanced JSON parsing.
     
-    This function uses the EvoAgentX LLMOutputParser with JSON parse mode
-    to extract structured data from workflow outputs.
+    This function attempts to extract structured data from workflow outputs
+    using multiple parsing strategies.
     
     Args:
         output: The raw output string from workflow execution
@@ -58,21 +58,49 @@ def parse_workflow_output(output: str) -> Dict[str, Any]:
         "parsed_json": None
     }
     
-    # Import EvoAgentX parsing utilities
+    # Strategy 1: Try EvoAgentX parsing utilities
     try:
         from evoagentx.models.base_model import LLMOutputParser
-    except ImportError:
-        # If EvoAgentX is not available, return basic result
-        return result
-    
-    # Use JSON parsing mode since output will always be in JSON format
-    try:
         parser = LLMOutputParser.parse(output, parse_mode="json")
         structured_data = parser.get_structured_data()
         if structured_data and len(structured_data) > 0:
             result["parsed_json"] = structured_data
+            return result
     except Exception:
-        # If JSON parsing fails, return the original message without parsed data
+        pass
+    
+    # Strategy 2: Try direct JSON parsing
+    try:
+        import json
+        # Look for JSON patterns in the output
+        import re
+        json_pattern = r'\{[^{}]*\}'
+        matches = re.findall(json_pattern, output)
+        if matches:
+            # Try to parse the first JSON match
+            parsed = json.loads(matches[0])
+            result["parsed_json"] = parsed
+            return result
+    except Exception:
+        pass
+    
+    # Strategy 3: Try to extract JSON from code blocks
+    try:
+        import re
+        code_block_pattern = r'```(?:json)?\s*\n(.*?)\n\s*```'
+        matches = re.findall(code_block_pattern, output, re.DOTALL)
+        if matches:
+            import json
+            parsed = json.loads(matches[0].strip())
+            result["parsed_json"] = parsed
+            return result
+    except Exception:
+        pass
+    
+    # Strategy 4: If all else fails, create a simple structure
+    try:
+        result["parsed_json"] = {"workflow_output": output}
+    except Exception:
         pass
     
     return result
@@ -368,24 +396,68 @@ async def execute_workflow_from_config(workflow: Dict[str, Any], llm_config_dict
         workflow.init_module()
         output = await workflow.async_execute(inputs=inputs)
         
-        # Extract structured data from the workflow environment
-        execution_data = workflow.environment.get_all_execution_data()
-        
-        # Get the expected output names from task_info
-        expected_outputs = []
+        # Use custom prompt to process the output and generate structured results
         if task_info and "workflow_outputs" in task_info:
+            # Get expected outputs for the prompt
+            
+            # Get workflow goal
+            goal = workflow_graph.goal if hasattr(workflow_graph, 'goal') else "Process the workflow execution results"
+            
+            # Format expected outputs for the prompt
+            expected_outputs_formatted = []
             for output_param in task_info["workflow_outputs"]:
-                expected_outputs.append(output_param["name"])
-        
-        # Filter execution data to only include expected outputs
-        filtered_data = {}
-        for output_name in expected_outputs:
-            if output_name in execution_data:
-                filtered_data[output_name] = execution_data[output_name]
+                expected_outputs_formatted.append({
+                    "name": output_param["name"],
+                    "type": output_param["type"],
+                    "description": output_param["description"]
+                })
+            
+            # Use custom prompt to generate structured output
+            custom_prompt = CUSTOM_OUTPUT_EXTRACTION_PROMPT.format(
+                expected_outputs=json.dumps(expected_outputs_formatted, indent=2),
+                workflow_execution_results=output
+            )
+            
+            # Generate structured output using the custom prompt
+            try:
+                structured_output = await llm.async_generate(prompt=custom_prompt)
+                parsed_json = None
+                
+                if hasattr(structured_output, 'content'):
+                    output_content = structured_output.content
+                else:
+                    output_content = str(structured_output)
+                
+                # Try to parse the structured output as JSON
+                try:
+                    # First, try to extract JSON from code blocks if present
+                    import re
+                    code_block_pattern = r'```(?:json)?\s*\n(.*?)\n\s*```'
+                    matches = re.findall(code_block_pattern, output_content, re.DOTALL)
+                    
+                    if matches:
+                        # Use the first code block match
+                        json_content = matches[0].strip()
+                        parsed_json = json.loads(json_content)
+                    else:
+                        # Try to parse the entire content as JSON
+                        parsed_json = json.loads(output_content)
+                        
+                except json.JSONDecodeError as e:
+                    print(f"Warning: Failed to parse JSON from structured output: {e}")
+                    print(f"Raw output content: {output_content}")
+                    # If JSON parsing fails, create a simple structure
+                    parsed_json = {"workflow_output": output_content}
+                    
+            except Exception as e:
+                print(f"Warning: Failed to generate structured output: {e}")
+                parsed_json = None
+        else:
+            parsed_json = None
         
         return {
             "original_message": output,
-            "parsed_json": filtered_data if filtered_data else None
+            "parsed_json": parsed_json
         }
         
     except Exception as e:
