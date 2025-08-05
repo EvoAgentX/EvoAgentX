@@ -175,7 +175,12 @@ def tool_names_to_tools(
 
 
 def add_llm_config_to_agent_dict(agent_dict: Dict, llm_config: Optional[LLMConfig] = None) -> Dict:
-    """Add llm_config to agent_dict if it is not present."""
+    """Add llm_config to agent_dict if it is not present and converts llm_config dict to LLMConfig
+    If `is_human` is True, llm_config will not be added.
+    """
+
+    if agent_dict.get("is_human", False):
+        return agent_dict
 
     data_llm_config = agent_dict.get("llm_config", None)
 
@@ -183,6 +188,9 @@ def add_llm_config_to_agent_dict(agent_dict: Dict, llm_config: Optional[LLMConfi
         if llm_config is None:
             raise ValueError("Must provide `llm_config` for agent")
         agent_dict["llm_config"] = llm_config
+    else:
+        if isinstance(data_llm_config, dict):
+            agent_dict["llm_config"] = LLMConfig.from_dict(data_llm_config)
     
     return agent_dict
 
