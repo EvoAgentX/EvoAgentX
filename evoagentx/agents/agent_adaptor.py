@@ -173,7 +173,6 @@ class AgentAdaptor(Agent):
         data = cls._process_dict(data, llm_config, agent_adaptor_llm_config, tools)
         agent = CustomizeAgent.from_dict(data["agent"])
         data["agent"] = agent
-        data["llm_config"] = LLMConfig.from_dict(data["llm_config"])
         return cls(**data)
 
     
