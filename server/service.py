@@ -8,7 +8,7 @@ import threading
 import time
 import re
 from datetime import datetime
-from typing import Dict, Any, List, Optional, Callable
+from typing import Dict, Any, List, Optional, Callable, Type
 from io import StringIO
 from dotenv import load_dotenv
 
@@ -34,103 +34,50 @@ MONGODB_URL = os.getenv("MONGODB_URL", None)
 
 def parse_workflow_output(output: str) -> Dict[str, Any]:
     """
-    Parse workflow execution output to extract JSON and clean up markdown formatting.
+    Parse workflow execution output using EvoAgentX JSON parsing.
     
-    This function handles various output formats:
-    1. Pure JSON: {"key": "value"}
-    2. Markdown with JSON: ```json\n{"key": "value"}\n```
-    3. Markdown with other content: ```markdown\ncontent\n```
-    4. Mixed content with JSON blocks
+    This function uses the EvoAgentX LLMOutputParser with JSON parse mode
+    to extract structured data from workflow outputs.
     
     Args:
         output: The raw output string from workflow execution
         
     Returns:
         Dict containing parsed result with keys:
-        - "parsed_json": Extracted JSON object (if found)
-        - "cleaned_text": Text with markdown formatting removed
-        - "original": Original output
-        - "has_json": Boolean indicating if JSON was found
+        - "original_message": Original output message
+        - "parsed_json": Extracted structured data (dict)
     """
     if not isinstance(output, str):
         return {
-            "parsed_json": None,
-            "cleaned_text": str(output),
-            "original": output,
-            "has_json": False
+            "original_message": str(output),
+            "parsed_json": None
         }
     
     result = {
-        "parsed_json": None,
-        "cleaned_text": output,
-        "original": output,
-        "has_json": False
+        "original_message": output,
+        "parsed_json": None
     }
     
-    # Try to extract JSON from markdown code blocks
-    json_patterns = [
-        r'```json\s*\n(.*?)\n```',  # ```json\n...\n```
-        r'```\s*\n(.*?)\n```',      # ```\n...\n``` (generic code block)
-        r'`(.*?)`',                  # `...` (inline code)
-    ]
+    # Import EvoAgentX parsing utilities
+    try:
+        from evoagentx.models.base_model import LLMOutputParser
+    except ImportError:
+        # If EvoAgentX is not available, return basic result
+        return result
     
-    extracted_json = None
-    
-    for pattern in json_patterns:
-        matches = re.findall(pattern, output, re.DOTALL)
-        for match in matches:
-            try:
-                # Try to parse as JSON
-                parsed = json.loads(match.strip())
-                if isinstance(parsed, dict):
-                    extracted_json = parsed
-                    result["has_json"] = True
-                    break
-            except (json.JSONDecodeError, ValueError):
-                continue
-        
-        if extracted_json:
-            break
-    
-    # If no JSON found in code blocks, try to find JSON in the entire text
-    if not extracted_json:
-        # Look for JSON-like patterns in the text
-        json_candidates = re.findall(r'\{[^{}]*"[^"]*"[^{}]*\}', output)
-        for candidate in json_candidates:
-            try:
-                parsed = json.loads(candidate)
-                if isinstance(parsed, dict):
-                    extracted_json = parsed
-                    result["has_json"] = True
-                    break
-            except (json.JSONDecodeError, ValueError):
-                continue
-    
-    # Clean up markdown formatting
-    cleaned_text = output
-    
-    # Remove markdown code blocks
-    cleaned_text = re.sub(r'```[a-zA-Z]*\s*\n.*?\n```', '', cleaned_text, flags=re.DOTALL)
-    
-    # Remove inline code blocks
-    cleaned_text = re.sub(r'`[^`]*`', '', cleaned_text)
-    
-    # Remove markdown headers
-    cleaned_text = re.sub(r'^#{1,6}\s+.*$', '', cleaned_text, flags=re.MULTILINE)
-    
-    # Remove markdown formatting
-    cleaned_text = re.sub(r'\*\*(.*?)\*\*', r'\1', cleaned_text)  # Bold
-    cleaned_text = re.sub(r'\*(.*?)\*', r'\1', cleaned_text)      # Italic
-    cleaned_text = re.sub(r'~~(.*?)~~', r'\1', cleaned_text)      # Strikethrough
-    
-    # Clean up extra whitespace
-    cleaned_text = re.sub(r'\n\s*\n', '\n', cleaned_text)  # Multiple newlines
-    cleaned_text = cleaned_text.strip()
-    
-    result["parsed_json"] = extracted_json
-    result["cleaned_text"] = cleaned_text
+    # Use JSON parsing mode since output will always be in JSON format
+    try:
+        parser = LLMOutputParser.parse(output, parse_mode="json")
+        structured_data = parser.get_structured_data()
+        if structured_data and len(structured_data) > 0:
+            result["parsed_json"] = structured_data
+    except Exception:
+        # If JSON parsing fails, return the original message without parsed data
+        pass
     
     return result
+
+
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 SUPABASE_BUCKET_REQUIREMENT = os.getenv("SUPABASE_BUCKET_REQUIREMENT")
@@ -371,7 +318,7 @@ async def generate_workflow_from_goal(goal: str, llm_config_dict: Dict[str, Any]
     workflow_graph: WorkFlowGraph = workflow_generator.generate_workflow(goal=goal)
     return workflow_graph
 
-async def execute_workflow_from_config(workflow: Dict[str, Any], llm_config_dict: Dict[str, Any], mcp_config: dict = None, inputs: Dict[str, Any] = None, database_information: Dict[str, Any] = None) -> Dict[str, Any]:
+async def execute_workflow_from_config(workflow: Dict[str, Any], llm_config_dict: Dict[str, Any], mcp_config: dict = None, inputs: Dict[str, Any] = None, database_information: Dict[str, Any] = None, task_info: Dict[str, Any] = None) -> Dict[str, Any]:
     """
     Execute a workflow with the given configuration.
     
@@ -383,18 +330,18 @@ async def execute_workflow_from_config(workflow: Dict[str, Any], llm_config_dict
         database_information: Optional database information for dynamic MongoDB toolkit creation
         
     Returns:
-        Dict containing execution results and status
-        
+        Dict containing only the essential execution results:
+        - original_message: The raw output from workflow execution
+        - parsed_json: Extracted JSON from the output (if found)
     """
     try:
         if sudo_execution_result:
+            # Parse the sudo execution result to extract only essential data
+            parsed_output = parse_workflow_output(sudo_execution_result)
             return {
-            "status": "completed",
-            "message": sudo_execution_result,
-            "workflow_received": bool(workflow),
-            "llm_config_received": bool(llm_config_dict),
-            "mcp_config_received": bool(mcp_config)
-        }
+                "original_message": parsed_output["original_message"],
+                "parsed_json": parsed_output["parsed_json"]
+            }
         
         
         llm_config = create_llm_config(llm_config_dict)
@@ -421,21 +368,32 @@ async def execute_workflow_from_config(workflow: Dict[str, Any], llm_config_dict
         workflow.init_module()
         output = await workflow.async_execute(inputs=inputs)
         
+        # Extract structured data from the workflow environment
+        execution_data = workflow.environment.get_all_execution_data()
+        
+        # Get the expected output names from task_info
+        expected_outputs = []
+        if task_info and "workflow_outputs" in task_info:
+            for output_param in task_info["workflow_outputs"]:
+                expected_outputs.append(output_param["name"])
+        
+        # Filter execution data to only include expected outputs
+        filtered_data = {}
+        for output_name in expected_outputs:
+            if output_name in execution_data:
+                filtered_data[output_name] = execution_data[output_name]
+        
         return {
-            "status": "completed",
-            "message": output,
-            "workflow_received": bool(workflow),
-            "llm_config_received": bool(llm_config_dict),
-            "mcp_config_received": bool(mcp_config)
+            "original_message": output,
+            "parsed_json": filtered_data if filtered_data else None
         }
         
     except Exception as e:
+        # Return error in the same format
+        error_message = f"In the execution process, got error:\n{e}"
         return {
-            "status": "error",
-            "message": f"In the execution process, got error:\n{e}",
-            "workflow_received": bool(workflow),
-            "llm_config_received": bool(llm_config_dict),
-            "mcp_config_received": bool(mcp_config)
+            "original_message": error_message,
+            "parsed_json": None
         }
 
 
@@ -600,6 +558,7 @@ async def execute_workflow(workflow_id: str, inputs: Dict[str, Any]) -> Dict[str
     """
     Phase 3: Execute workflow with provided inputs.
     Updated to work with individual workflow records and correct database schema.
+    Returns only essential execution data.
     """
     try:
         # Check if workflow exists
@@ -623,8 +582,8 @@ async def execute_workflow(workflow_id: str, inputs: Dict[str, Any]) -> Dict[str
             print(f"⚠️ No workflow graph available for {workflow_name}")
             await update_workflow_status(workflow_id, "failed")
             return {
-                "status": "failed",
-                "error": "No workflow graph available"
+                "original_message": "No workflow graph available",
+                "parsed_json": None
             }
         
         print(f"🚀 Executing workflow: {workflow_name}")
@@ -638,38 +597,16 @@ async def execute_workflow(workflow_id: str, inputs: Dict[str, Any]) -> Dict[str
             default_llm_config, 
             mcp_config={}, 
             inputs=inputs,
-            database_information=database_information
+            database_information=database_information,
+            task_info=task_info
         )
         
         if execution_result is None:
             print(f"❌ Failed to execute workflow: {workflow_name}")
             await update_workflow_status(workflow_id, "failed")
             return {
-                "status": "failed",
-                "error": "Failed to execute workflow"
-            }
-        
-        # Process execution result
-        if isinstance(execution_result, dict):
-            execution_message = execution_result.get("message", "")
-        else:
-            execution_message = str(execution_result)
-            
-        # Parse and clean the execution output
-        parsed_output = parse_workflow_output(execution_message)
-        
-        # Update execution_result with parsed output
-        if isinstance(execution_result, dict):
-            execution_result["message"] = parsed_output["cleaned_text"]
-            execution_result["parsed_json"] = parsed_output["parsed_json"]
-            execution_result["has_json"] = parsed_output["has_json"]
-            execution_result["original_output"] = parsed_output["original"]
-        else:
-            execution_result = {
-                "message": parsed_output["cleaned_text"],
-                "parsed_json": parsed_output["parsed_json"],
-                "has_json": parsed_output["has_json"],
-                "original_output": parsed_output["original"]
+                "original_message": "Failed to execute workflow",
+                "parsed_json": None
             }
         
         # Update workflow storage with execution results
@@ -679,15 +616,15 @@ async def execute_workflow(workflow_id: str, inputs: Dict[str, Any]) -> Dict[str
             execution_result=execution_result
         )
         
-        return {
-            "status": "completed",
-            "workflow_name": workflow_name,
-            "result": execution_result
-        }
+        # Return only the essential data
+        return execution_result
         
     except Exception as e:
         await update_workflow_status(workflow_id, "failed")
-        raise ValueError(f"Failed to execute workflow: {str(e)}")
+        return {
+            "original_message": f"Failed to execute workflow: {str(e)}",
+            "parsed_json": None
+        }
 
 
 
@@ -1151,7 +1088,8 @@ async def execute_workflow_with_websocket(
                 default_llm_config, 
                 mcp_config={}, 
                 inputs=inputs,
-                database_information=database_information
+                database_information=database_information,
+                task_info=task_info
             )
             
             await progress_tracker.send_progress_update("finalizing", 0.9, "Finalizing execution results...")
@@ -1160,32 +1098,12 @@ async def execute_workflow_with_websocket(
                 await progress_tracker.send_error(f"Failed to execute workflow: {workflow_name}")
                 await update_workflow_status(workflow_id, "failed")
                 return {
-                    "status": "failed",
-                    "error": "Failed to execute workflow"
+                    "original_message": "Failed to execute workflow",
+                    "parsed_json": None
                 }
             
-            # Process execution result
-            if isinstance(execution_result, dict):
-                execution_message = execution_result.get("message", "")
-            else:
-                execution_message = str(execution_result)
-                
-            # Parse and clean the execution output
-            parsed_output = parse_workflow_output(execution_message)
-            
-            # Update execution_result with parsed output
-            if isinstance(execution_result, dict):
-                execution_result["message"] = parsed_output["cleaned_text"]
-                execution_result["parsed_json"] = parsed_output["parsed_json"]
-                execution_result["has_json"] = parsed_output["has_json"]
-                execution_result["original_output"] = parsed_output["original"]
-            else:
-                execution_result = {
-                    "message": parsed_output["cleaned_text"],
-                    "parsed_json": parsed_output["parsed_json"],
-                    "has_json": parsed_output["has_json"],
-                    "original_output": parsed_output["original"]
-                }
+            # execution_result now already contains the parsed format from execute_workflow_from_config
+            # No need to parse again since it already returns {"original_message": "...", "parsed_json": ...}
             
             # Get captured output from the sink
             captured_output = websocket_sink.get_buffer_contents() if websocket_sink else {}
@@ -1203,11 +1121,10 @@ async def execute_workflow_with_websocket(
                 print(f"❌ Error saving execution result to database: {e}")
                 # Continue execution even if database save fails
             
+            # Return only the essential data for WebSocket clients
             final_result = {
-                "status": "completed",
-                "workflow_name": workflow_name,
-                "result": execution_result,
-                "captured_output": captured_output
+                "original_message": execution_result.get("original_message", ""),
+                "parsed_json": execution_result.get("parsed_json", None)
             }
             
             await progress_tracker.send_progress_update("completed", 1.0, "Workflow execution completed successfully")
@@ -1363,6 +1280,7 @@ async def analyze_user_query(project_short_id: str, query: str) -> Dict[str, Any
     except Exception as e:
         print(f"❌ Error analyzing user query: {str(e)}")
         raise ValueError(f"Failed to analyze user query: {str(e)}")
+
 
 
 

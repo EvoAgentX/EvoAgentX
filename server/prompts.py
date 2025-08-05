@@ -145,7 +145,8 @@ You are an experienced workflow designer. You are given a workflow requirement a
 Please carefully analyze the following requirement documentation and generate a workflow with given inputs and outputs formats.
 
 ## Key things to notice:
-- You should generate a workflow with given inputs and outputs formats.
+- You must strictly follow the inputs formats
+- You must strictly follow the outputs formats
 
 ## Requirement documentation:
 {requirement}

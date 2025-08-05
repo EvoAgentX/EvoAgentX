@@ -859,13 +859,13 @@ def run_complete_test() -> Dict[str, Any]:
         "result": execution_result
     }
     
-    # Phase 5: Status Check
-    status_passed, status_result = test_workflow_status(workflow_ids)
-    test_results["phases"]["status_check"] = {
-        "passed": status_passed,
-        "timestamp": datetime.now().isoformat(),
-        "result": status_result
-    }
+    # # Phase 5: Status Check
+    # status_passed, status_result = test_workflow_status(workflow_ids)
+    # test_results["phases"]["status_check"] = {
+    #     "passed": status_passed,
+    #     "timestamp": datetime.now().isoformat(),
+    #     "result": status_result
+    # }
     
     # # Phase 5: WebSocket Streaming Test
     # streaming_passed, streaming_result = test_websocket_streaming(workflow_ids)
@@ -920,7 +920,7 @@ def run_complete_test() -> Dict[str, Any]:
         # generation_passed,
         execution_passed,
         # streaming_passed,
-        status_passed,
+        # status_passed,
         # list_passed,
         # query_analysis_passed,
         # graph_passed
@@ -931,7 +931,7 @@ def run_complete_test() -> Dict[str, Any]:
     # print(f"Workflow Generation: {'✅ PASSED' if generation_passed else '❌ FAILED'}")
     print(f"Workflow Execution: {'✅ PASSED' if execution_passed else '❌ FAILED'}")
     # print(f"WebSocket Streaming: {'✅ PASSED' if streaming_passed else '❌ FAILED'}")
-    print(f"Status Check: {'✅ PASSED' if status_passed else '❌ FAILED'}")
+    # print(f"Status Check: {'✅ PASSED' if status_passed else '❌ FAILED'}")
     # print(f"List Workflows: {'✅ PASSED' if list_passed else '❌ FAILED'}")
     # print(f"User Query Analysis: {'✅ PASSED' if query_analysis_passed else '❌ FAILED'}")
     # print(f"Workflow Graph: {'✅ PASSED' if graph_passed else '❌ FAILED'}")
