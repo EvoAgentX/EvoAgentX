@@ -1,22 +1,30 @@
-import json
 import inspect
-from pydantic import create_model, Field
-from typing import Optional, Callable, Type, List, Any, Union, Dict
+import json
+from collections.abc import Callable
+from typing import Any, Dict, List, Optional, Type, Union
 
-from .agent import Agent
-from ..core.logging import logger
-from ..core.registry import MODULE_REGISTRY, PARSE_FUNCTION_REGISTRY
-from ..core.message import Message, MessageType
-from ..models.model_configs import LLMConfig 
-from ..models.base_model import PARSER_VALID_MODE
-from ..prompts.utils import DEFAULT_SYSTEM_PROMPT
-from ..prompts.template import PromptTemplate
-from ..actions.action import Action, ActionOutput
-from ..utils.utils import generate_dynamic_class_name, make_parent_folder, get_unique_class_name
+from pydantic import Field, create_model
+from pydantic.types import T
+
+from ..actions.action import Action, ActionInput, ActionOutput
 from ..actions.customize_action import CustomizeAction
-from ..actions.action import ActionInput
-from ..tools.tool import Toolkit, Tool
-from ..utils.utils import json_to_python_type
+from ..core.logging import logger
+from ..core.message import Message, MessageType
+from ..core.registry import MODULE_REGISTRY, PARSE_FUNCTION_REGISTRY
+from ..models.base_model import PARSER_VALID_MODE
+from ..models.model_configs import LLMConfig
+from ..prompts.template import PromptTemplate
+from ..prompts.utils import DEFAULT_SYSTEM_PROMPT
+from ..tools.tool import Tool, Toolkit
+from ..utils.utils import (
+    add_llm_config_to_agent_dict,
+    generate_dynamic_class_name,
+    get_unique_class_name,
+    json_to_python_type,
+    make_parent_folder,
+    tool_names_to_tools,
+)
+from .agent import Agent
 
 
 class CustomizeAgent(Agent):
@@ -513,4 +521,20 @@ class CustomizeAgent(Agent):
         config = self.get_customize_agent_info()
         config["llm_config"] = self.llm_config.to_dict()
         return config
+
     
+    @classmethod
+    def from_dict(
+        cls, 
+        data: Dict[str, Any], 
+        llm_config: Optional[LLMConfig] = None, 
+        tools: Optional[List[Union[Toolkit, Tool]]] = None, 
+        **kwargs
+    ) -> 'CustomizeAgent':
+
+        data.pop("class_name", None)
+        data = add_llm_config_to_agent_dict(data, llm_config)
+        tool_names = data.pop("tool_names", None)
+        data["tools"] = tool_names_to_tools(tool_names, tools)
+        return cls(**data)
+
