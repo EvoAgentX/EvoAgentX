@@ -1,0 +1,221 @@
+{
+    "class_name": "WorkFlowGraph",
+    "goal": "generate a response for the user, based on the character profile and the chat history",
+    "nodes": [
+        {
+            "class_name": "WorkFlowNode",
+            "name": "collect_character_info_node",
+            "description": "collect character info from the Internet, or create a new character profile based on user's inputs",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "character_name",
+                    "type": "string",
+                    "description": "The name of the character to search for or to generate.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "character_description",
+                    "type": "string",
+                    "description": "The description of the character to search for or to generate.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "chat_history",
+                    "type": "list",
+                    "description": "The chat history between the user and the character.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "original_character",
+                    "type": "bool",
+                    "description": "Whether the character is original or not.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "character_profile",
+                    "type": "string",
+                    "description": "The profile information of the character.",
+                    "required": true
+                }
+            ],
+            "agents": [
+                {
+                    "class_name": "CustomizeAgent",
+                    "name": "search_character_agent",
+                    "description": "An agent to search for a character on the Internet.",
+                    "prompt": null,
+                    "prompt_template": {
+                        "class_name": "StringTemplate",
+                        "instruction": "You will be given a character name and a character description, and you need to search for the character on the Internet and return the profile information of the character.",
+                        "context": "The character name is {character_name} and the character description is {character_description}."
+                    },
+                    "inputs": [
+                        {
+                            "name": "character_name",
+                            "type": "string",
+                            "description": "The name of the character to search for.",
+                            "required": true
+                        },
+                        {
+                            "name": "character_description",
+                            "type": "string",
+                            "description": "The description of the character to search for.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "character_profile",
+                            "type": "string",
+                            "description": "The profile information of the character.",
+                            "required": true
+                        }
+                    ],
+                    "system_prompt": "You are a helpful assistant that can search for a character on the Internet.",
+                    "output_parser": null,
+                    "parse_mode": "title",
+                    "parse_func": null,
+                    "title_format": "## {title}",
+                    "tool_names": [
+                        "GoogleFreeSearchToolkit",
+                        "WikipediaSearchToolkit"
+                    ],
+                    "max_tool_calls": 5,
+                    "custom_output_format": null
+                },
+                {
+                    "class_name": "CustomizeAgent",
+                    "name": "generate_character_response_agent",
+                    "description": "An agent to generate a response for the user, based on the character profile and the chat history.",
+                    "prompt": null,
+                    "prompt_template": {
+                        "class_name": "ChatTemplate",
+                        "instruction": "You will be given a character profile and a chat history, and you need to generate a response for the user.",
+                        "context": "The character profile is {character_profile} and the chat history is {chat_history}."
+                    },
+                    "inputs": [
+                        {
+                            "name": "character_profile",
+                            "type": "string",
+                            "description": "The profile information of the character.",
+                            "required": true
+                        },
+                        {
+                            "name": "chat_history",
+                            "type": "list",
+                            "description": "The chat history between the user and the character.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "character_response",
+                            "type": "string",
+                            "description": "The response for the user.",
+                            "required": true
+                        }
+                    ],
+                    "system_prompt": "You are a helpful assistant that can generate a response for the user.",
+                    "output_parser": null,
+                    "parse_mode": "title",
+                    "parse_func": null,
+                    "title_format": "## {title}",
+                    "tool_names": [],
+                    "max_tool_calls": 5,
+                    "custom_output_format": null
+                }
+            ],
+            "status": "pending"
+        },
+        {
+            "class_name": "WorkFlowNode",
+            "name": "generate_character_response_node",
+            "description": "generate a response for the user, based on the character profile and the chat history",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "character_profile",
+                    "type": "string",
+                    "description": "The profile information of the character.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "chat_history",
+                    "type": "list",
+                    "description": "The chat history between the user and the character.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "character_response",
+                    "type": "string",
+                    "description": "The response for the user.",
+                    "required": true
+                }
+            ],
+            "agents": [
+                {
+                    "class_name": "CustomizeAgent",
+                    "name": "generate_character_response_agent",
+                    "description": "An agent to generate a response for the user, based on the character profile and the chat history.",
+                    "prompt": null,
+                    "prompt_template": {
+                        "class_name": "ChatTemplate",
+                        "instruction": "You will be given a character profile and a chat history, and you need to generate a response for the user.",
+                        "context": "The character profile is {character_profile} and the chat history is {chat_history}."
+                    },
+                    "inputs": [
+                        {
+                            "name": "character_profile",
+                            "type": "string",
+                            "description": "The profile information of the character.",
+                            "required": true
+                        },
+                        {
+                            "name": "chat_history",
+                            "type": "list",
+                            "description": "The chat history between the user and the character.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "character_response",
+                            "type": "string",
+                            "description": "The response for the user.",
+                            "required": true
+                        }
+                    ],
+                    "system_prompt": "You are a helpful assistant that can generate a response for the user.",
+                    "output_parser": null,
+                    "parse_mode": "title",
+                    "parse_func": null,
+                    "title_format": "## {title}",
+                    "tool_names": [],
+                    "max_tool_calls": 5,
+                    "custom_output_format": null
+                }
+            ],
+            "status": "pending"
+        }
+    ],
+    "edges": [
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "collect_character_info_node",
+            "target": "generate_character_response_node",
+            "priority": 0
+        }
+    ],
+    "graph": null
+}

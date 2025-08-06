@@ -1,0 +1,139 @@
+{
+    "class_name": "WorkFlowGraph",
+    "goal": "Firstly insert the document into the vector database and then answer the user's question based on the vector database",
+    "nodes": [
+        {
+            "class_name": "WorkFlowNode",
+            "name": "insert_node",
+            "description": "insert the document into the vector database",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "file_path",
+                    "type": "string",
+                    "description": "The file path to the document to be indexed.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "insert_result",
+                    "type": "boolean",
+                    "description": "The result of the document insertion.",
+                    "required": true
+                }
+            ],
+            "agents": [
+                {
+                    "class_name": "CustomizeAgent",
+                    "name": "rag_agent_insert",
+                    "description": "An agent to insert documents into the vector database.",
+                    "prompt": null,
+                    "prompt_template": {
+                        "class_name": "StringTemplate",
+                        "instruction": "You are a helpful assistant that can insert documents into the vector database. Based on the file path, you should insert the document into the vector database by using the tool that I provide"
+                    },
+                    "inputs": [
+                        {
+                            "name": "file_path",
+                            "type": "string",
+                            "description": "The file path to the document to be indexed.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "insert_result",
+                            "type": "boolean",
+                            "description": "The result of the document insertion.",
+                            "required": true
+                        }
+                    ],
+                    "system_prompt": "You are a helpful and highly intelligent assistant.",
+                    "output_parser": null,
+                    "parse_mode": "str",
+                    "parse_func": null,
+                    "title_format": null,
+                    "tool_names": [
+                        "FaissToolkit"
+                    ],
+                    "max_tool_calls": 5,
+                    "custom_output_format": null
+                }
+            ],
+            "status": "pending"
+        },
+        {
+            "class_name": "WorkFlowNode",
+            "name": "query_node",
+            "description": "query the vector database",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "query",
+                    "type": "string",
+                    "description": "The query to the vector database.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "query_result",
+                    "type": "string",
+                    "description": "The result of the query.",
+                    "required": true
+                }
+            ],
+            "agents": [
+                {
+                    "class_name": "CustomizeAgent",
+                    "name": "rag_agent_query",
+                    "description": "An agent to query the vector database.",
+                    "prompt": null,
+                    "prompt_template": {
+                        "class_name": "StringTemplate",
+                        "instruction": "You are a helpful assistant that can query the vector database. You should query the vector database by using the tool that I provide."
+                    },
+                    "inputs": [
+                        {
+                            "name": "query",
+                            "type": "string",
+                            "description": "The query to the vector database.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "query_result",
+                            "type": "string",
+                            "description": "The result of the query.",
+                            "required": true
+                        }
+                    ],
+                    "system_prompt": "You are a helpful and highly intelligent assistant.",
+                    "output_parser": null,
+                    "parse_mode": "str",
+                    "parse_func": null,
+                    "title_format": null,
+                    "tool_names": [
+                        "FaissToolkit"
+                    ],
+                    "max_tool_calls": 5,
+                    "custom_output_format": null
+                }
+            ],
+            "status": "pending"
+        }
+    ],
+    "edges": [
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "insert_node",
+            "target": "query_node",
+            "priority": 0
+        }
+    ],
+    "graph": null
+}
