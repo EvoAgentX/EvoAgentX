@@ -292,8 +292,12 @@ class CustomizeAgent(Agent):
         assert prompt is not None or prompt_template is not None, "must provide `prompt` or `prompt_template` when creating CustomizeAgent"
 
         action_input_type = CustomizeAgent.create_action_input(inputs, name)
-        action_output_type = CustomizeAgent.create_action_output(outputs, name)
-
+        
+        if output_parser is None:
+            action_output_type = CustomizeAgent.create_action_output(outputs, name)
+        else:
+            action_output_type = output_parser
+        
         action_cls_name = get_unique_class_name(
             generate_dynamic_class_name(name+" action")
         )
@@ -454,37 +458,7 @@ class CustomizeAgent(Agent):
             "custom_output_format": self.custom_output_format
         }
         return config
-    
-    @classmethod
-    def load_module(
-        cls, 
-        path: str, 
-        llm_config: Optional[LLMConfig] = None, 
-        tools: Optional[List[Union[Toolkit, Tool]]] = None, 
-        **kwargs
-    ) -> Dict:
-        """
-        load the agent from local storage. Must provide `llm_config` when loading the agent from local storage. 
-            If tools is provided, tool_names must also be provided. 
 
-        Args:
-            path: The path of the file
-            llm_config: The LLMConfig instance
-            tool_names: List of tool names to be used by the agent. If provided,
-            tool_dict: Dictionary mapping tool names to Tool instances. Required when tool_names is provided.
-
-        Returns:
-            CustomizeAgent: The loaded agent instance
-        """
-        match_dict = {}
-        agent = super().load_module(path=path, llm_config=llm_config, **kwargs)
-        if tools:
-            match_dict = {tool.name:tool for tool in tools}
-        if agent.get("tool_names", None):
-            assert tools is not None, "must provide `tools: List[Union[Toolkit, Tool]]` when using `load_module` or `from_file` to load the agent from local storage and `tool_names` is not None or empty"
-            added_tools = [match_dict[tool_name] for tool_name in agent["tool_names"]]
-            agent["tools"] = [tool if isinstance(tool, Toolkit) else Toolkit(name=tool.name, tools=[tool]) for tool in added_tools]
-        return agent 
     
     def save_module(self, path: str, ignore: List[str] = [], **kwargs)-> str:
         """Save the customize agent's configuration to a JSON file.
