@@ -843,10 +843,11 @@ class WebSocketEnhancedSink:
             
         output_data = {
             "type": "output",
-            "timestamp": datetime.now().isoformat(),
-            "output_type": output_type,  # "stdout" or "stderr"
-            "content": content.strip(),
-            "workflow_id": self.workflow_id
+            "data": {
+                "output_type": output_type,
+                "content": content.strip(),
+                "timestamp": datetime.now().isoformat()
+            }
         }
         
         # Send immediately in a thread-safe way
@@ -884,16 +885,17 @@ class WebSocketEnhancedSink:
                     # Send periodic update with comprehensive information
                     update_data = {
                         "type": "periodic_update",
-                        "timestamp": datetime.now().isoformat(),
-                        "workflow_id": self.workflow_id,
-                        "stdout_buffer": stdout_content[-1000:],  # Last 1000 chars
-                        "stderr_buffer": stderr_content[-1000:],  # Last 1000 chars
-                        "buffer_sizes": {
-                            "stdout": len(stdout_content),
-                            "stderr": len(stderr_content)
+                        "data": {
+                            "stdout_buffer": stdout_content,
+                            "stderr_buffer": stderr_content,
+                            "buffer_sizes": {
+                                "stdout": len(stdout_content),
+                                "stderr": len(stderr_content)
+                            },
+                            "status": "running",
+                            "message": f"Workflow execution in progress. Captured {len(stdout_content)} stdout chars, {len(stderr_content)} stderr chars"
                         },
-                        "status": "running",
-                        "message": f"Workflow execution in progress. Captured {len(stdout_content)} stdout chars, {len(stderr_content)} stderr chars"
+                        "timestamp": datetime.now().isoformat()
                     }
                     
                     try:
@@ -932,64 +934,79 @@ class WebSocketEnhancedSink:
                                 future.add_done_callback(self._handle_websocket_result)
                             else:
                                 # Fallback: just print the message if no running loop
-                                print(f"WebSocket log message: {log_data.get('message', 'Unknown')}")
+                                print(f"WebSocket log message: {log_data.get('content', 'Unknown')}")
                         except RuntimeError:
                             # No event loop available, just print the message
-                            print(f"WebSocket log message: {log_data.get('message', 'Unknown')}")
+                            print(f"WebSocket log message: {log_data.get('content', 'Unknown')}")
             except queue.Empty:
                 continue
             except Exception as e:
                 print(f"Error processing log message: {e}")
     
     def _handle_websocket_result(self, future):
-        """Handle the result of the WebSocket send operation."""
+        """Handle WebSocket send result."""
         try:
-            future.result()  # This will raise any exception that occurred
+            future.result()
         except Exception as e:
-            print(f"Error in WebSocket send operation: {e}")
+            print(f"Error in WebSocket send: {e}")
     
     def _parse_loguru_message(self, message: str) -> Optional[Dict[str, Any]]:
-        """Parse loguru message format and extract structured data."""
+        """Parse loguru message format and convert to WebSocket message."""
         try:
-            # Remove ANSI color codes and parse timestamp
-            import re
-            # Remove color codes
-            message = re.sub(r'\x1b\[[0-9;]*m', '', message)
-            
-            # Try to parse timestamp and level from loguru format
-            # Expected format: "2024-01-01 12:00:00.123 | LEVEL | message"
-            parts = message.strip().split(' | ', 2)
+            # Parse loguru message format: "YYYY-MM-DD HH:mm:ss | LEVEL | MESSAGE"
+            parts = message.strip().split(" | ", 2)
             if len(parts) >= 3:
-                timestamp_str, level, log_message = parts
+                timestamp_str, level, content = parts
+                
+                # Parse timestamp
+                try:
+                    timestamp = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
+                    timestamp_iso = timestamp.isoformat()
+                except ValueError:
+                    timestamp_iso = datetime.now().isoformat()
+                
+                # Determine log level
+                level_upper = level.upper()
+                if level_upper in ["ERROR", "CRITICAL"]:
+                    message_type = "error"
+                elif level_upper in ["WARNING"]:
+                    message_type = "warning"
+                elif level_upper in ["INFO"]:
+                    message_type = "info"
+                else:
+                    message_type = "debug"
+                
                 return {
                     "type": "log",
-                    "timestamp": timestamp_str,
-                    "level": level,
-                    "message": log_message,
-                    "workflow_id": self.workflow_id
+                    "data": {
+                        "level": level_upper,
+                        "message": content,
+                        "timestamp": timestamp_iso
+                    }
                 }
             else:
-                # Fallback for unformatted messages
+                # Fallback for malformed messages
                 return {
                     "type": "log",
-                    "timestamp": None,
-                    "level": "INFO",
-                    "message": message.strip(),
-                    "workflow_id": self.workflow_id
+                    "data": {
+                        "level": "INFO",
+                        "message": message.strip(),
+                        "timestamp": datetime.now().isoformat()
+                    }
                 }
         except Exception as e:
             print(f"Error parsing loguru message: {e}")
             return None
     
     async def _send_websocket_message(self, log_data: Dict[str, Any]):
-        """Send message through WebSocket."""
+        """Send log message via WebSocket."""
         try:
             await self.websocket_send_func(json.dumps(log_data))
         except Exception as e:
             print(f"Error sending WebSocket message: {e}")
     
     def get_buffer_contents(self) -> Dict[str, Any]:
-        """Get current buffer contents for final reporting."""
+        """Get current buffer contents."""
         return {
             "stdout": self.stdout_buffer.getvalue(),
             "stderr": self.stderr_buffer.getvalue(),
@@ -1000,19 +1017,18 @@ class WebSocketEnhancedSink:
     def stop(self):
         """Stop the sink and cleanup."""
         self.running = False
-        
-        # Restore original output streams
         self._restore_output()
         
-        # Wait for threads to finish
-        if self.processing_thread.is_alive():
-            self.processing_thread.join(timeout=2)
-        if self.update_thread.is_alive():
-            self.update_thread.join(timeout=2)
+        # Stop background threads
+        if hasattr(self, '_periodic_thread') and self._periodic_thread:
+            self._periodic_thread.join(timeout=1)
+        if hasattr(self, '_process_thread') and self._process_thread:
+            self._process_thread.join(timeout=1)
 
 class WorkflowExecutionProgress:
     """
     Tracks workflow execution progress and sends updates via WebSocket.
+    Enhanced to support all message types from the system diagram.
     """
     
     def __init__(self, websocket_send_func: Callable, workflow_id: str):
@@ -1022,19 +1038,238 @@ class WorkflowExecutionProgress:
         self.progress = 0.0
         self.total_tasks = 0
         self.completed_tasks = 0
+        self.execution_id = None
+        self.workflow_name = None
+    
+    async def send_connection_confirmation(self):
+        """Send WebSocket connection confirmation."""
+        connection_data = {
+            "type": "connection",
+            "message": "WebSocket connected successfully",
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        try:
+            await self.websocket_send_func(json.dumps(connection_data))
+        except Exception as e:
+            print(f"Error sending connection confirmation: {e}")
+    
+    async def send_heartbeat_response(self):
+        """Send heartbeat response."""
+        heartbeat_data = {
+            "type": "pong",
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        try:
+            await self.websocket_send_func(json.dumps(heartbeat_data))
+        except Exception as e:
+            print(f"Error sending heartbeat response: {e}")
+    
+    async def send_setup_progress(self, step: str, progress: float, message: str = None):
+        """Send setup progress update."""
+        setup_data = {
+            "type": "setup-progress",
+            "data": {
+                "step": step,
+                "progress": progress,
+                "message": message or f"Setup step: {step}"
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        try:
+            await self.websocket_send_func(json.dumps(setup_data))
+        except Exception as e:
+            print(f"Error sending setup progress: {e}")
+    
+    async def send_setup_finished(self, status: str, workflow_id: str = None, workflow_graph: dict = None, error: dict = None):
+        """Send setup completion message."""
+        setup_finished_data = {
+            "type": "setup-finished",
+            "data": {
+                "status": status,
+                "workflowId": workflow_id or self.workflow_id,
+                "workflowGraph": workflow_graph,
+                "error": error
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        try:
+            await self.websocket_send_func(json.dumps(setup_finished_data))
+        except Exception as e:
+            print(f"Error sending setup finished: {e}")
+    
+    async def send_execute_started(self, execution_id: str, workflow_name: str = None):
+        """Send execution start message."""
+        self.execution_id = execution_id
+        self.workflow_name = workflow_name
+        
+        execute_started_data = {
+            "type": "execute-started",
+            "data": {
+                "executionId": execution_id,
+                "startedAt": int(datetime.now().timestamp() * 1000),
+                "workflowId": self.workflow_id,
+                "workflowName": workflow_name
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        try:
+            await self.websocket_send_func(json.dumps(execute_started_data))
+        except Exception as e:
+            print(f"Error sending execute started: {e}")
+    
+    async def send_status_update(self, status: str, progress: float = None, current_node: str = None):
+        """Send status update message."""
+        status_data = {
+            "type": "status",
+            "data": {
+                "executionId": self.execution_id,
+                "status": status,
+                "progress": progress,
+                "currentNode": current_node,
+                "workflowId": self.workflow_id
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        try:
+            await self.websocket_send_func(json.dumps(status_data))
+        except Exception as e:
+            print(f"Error sending status update: {e}")
+    
+    async def send_node_progress(self, node_id: str, status: str, progress: float = None, message: str = None):
+        """Send node progress update."""
+        node_progress_data = {
+            "type": "node-progress",
+            "data": {
+                "nodeId": node_id,
+                "status": status,
+                "progress": progress,
+                "message": message,
+                "executionId": self.execution_id
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        try:
+            await self.websocket_send_func(json.dumps(node_progress_data))
+        except Exception as e:
+            print(f"Error sending node progress: {e}")
+    
+    async def send_run_detail(self, node_id: str, status: str, outputs: dict = None, execution_time: float = None):
+        """Send detailed node execution result."""
+        run_detail_data = {
+            "type": "run-detail",
+            "data": {
+                "nodeId": node_id,
+                "status": status,
+                "outputs": outputs or {},
+                "executionTime": execution_time,
+                "executionId": self.execution_id
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        try:
+            await self.websocket_send_func(json.dumps(run_detail_data))
+        except Exception as e:
+            print(f"Error sending run detail: {e}")
+    
+    async def send_execute_finished(self, status: str, results: dict = None, error: dict = None, total_execution_time: float = None):
+        """Send execution completion message."""
+        execute_finished_data = {
+            "type": "execute-finished",
+            "data": {
+                "status": status,
+                "executionId": self.execution_id,
+                "results": results,
+                "error": error,
+                "totalExecutionTime": total_execution_time,
+                "workflowId": self.workflow_id,
+                "workflowName": self.workflow_name
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        try:
+            await self.websocket_send_func(json.dumps(execute_finished_data))
+        except Exception as e:
+            print(f"Error sending execute finished: {e}")
+    
+    async def send_control_response(self, control_type: str, status: str, message: str = None):
+        """Send control operation response (pause/resume/cancel)."""
+        control_data = {
+            "type": "status",
+            "data": {
+                "status": status,
+                "executionId": self.execution_id,
+                "controlType": control_type,
+                "message": message or f"Execution {control_type}d"
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        try:
+            await self.websocket_send_func(json.dumps(control_data))
+        except Exception as e:
+            print(f"Error sending control response: {e}")
+    
+    async def send_connection_error(self, error_code: str, message: str, reconnect: bool = True):
+        """Send connection error message."""
+        error_data = {
+            "type": "error",
+            "data": {
+                "code": error_code,
+                "message": message,
+                "reconnect": reconnect
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        try:
+            await self.websocket_send_func(json.dumps(error_data))
+        except Exception as e:
+            print(f"Error sending connection error: {e}")
+    
+    async def send_execution_error(self, error_code: str, message: str, node_id: str = None):
+        """Send execution error message."""
+        error_data = {
+            "type": "error",
+            "data": {
+                "code": error_code,
+                "message": message,
+                "nodeId": node_id,
+                "executionId": self.execution_id,
+                "workflowId": self.workflow_id
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        try:
+            await self.websocket_send_func(json.dumps(error_data))
+        except Exception as e:
+            print(f"Error sending execution error: {e}")
     
     async def send_progress_update(self, phase: str, progress: float, message: str = None):
-        """Send progress update via WebSocket."""
+        """Send progress update via WebSocket (legacy method for backward compatibility)."""
         self.current_phase = phase
         self.progress = progress
         
+        # Format content with progress information
+        if message:
+            content = f"{message} ({int(progress * 100)}% complete)"
+        else:
+            content = f"Phase: {phase} ({int(progress * 100)}% complete)"
+        
         progress_data = {
             "type": "progress",
-            "timestamp": datetime.now().isoformat(),
-            "phase": phase,
-            "progress": progress,
-            "message": message,
-            "workflow_id": self.workflow_id
+            "content": content,
+            "result": None,
+            "timestamp": datetime.now().isoformat()
         }
         
         try:
@@ -1043,12 +1278,12 @@ class WorkflowExecutionProgress:
             print(f"Error sending progress update: {e}")
     
     async def send_completion(self, result: Dict[str, Any]):
-        """Send completion message with final result."""
+        """Send completion message with final result (legacy method for backward compatibility)."""
         completion_data = {
             "type": "complete",
-            "timestamp": datetime.now().isoformat(),
+            "content": "Workflow execution completed successfully",
             "result": result,
-            "workflow_id": self.workflow_id
+            "timestamp": datetime.now().isoformat()
         }
         
         try:
@@ -1057,12 +1292,12 @@ class WorkflowExecutionProgress:
             print(f"Error sending completion: {e}")
     
     async def send_error(self, error_message: str):
-        """Send error message."""
+        """Send error message (legacy method for backward compatibility)."""
         error_data = {
             "type": "error",
-            "timestamp": datetime.now().isoformat(),
-            "error": error_message,
-            "workflow_id": self.workflow_id
+            "content": error_message,
+            "result": None,
+            "timestamp": datetime.now().isoformat()
         }
         
         try:
@@ -1071,16 +1306,13 @@ class WorkflowExecutionProgress:
             print(f"Error sending error message: {e}")
     
     async def send_final_result(self, result: Dict[str, Any], workflow_name: str = None):
-        """Send detailed final result message."""
+        """Send detailed final result message (legacy method for backward compatibility)."""
+        workflow_display_name = workflow_name or self.workflow_id
         final_result_data = {
-            "type": "final_result",
-            "timestamp": datetime.now().isoformat(),
-            "workflow_id": self.workflow_id,
-            "workflow_name": workflow_name or self.workflow_id,
-            "status": "completed",
-            "execution_result": result.get("result", {}),
-            "captured_output": result.get("captured_output", {}),
-            "message": "Workflow execution completed successfully"
+            "type": "complete",
+            "content": f"Workflow '{workflow_display_name}' execution completed successfully",
+            "result": result,
+            "timestamp": datetime.now().isoformat()
         }
         
         try:
@@ -1095,6 +1327,7 @@ async def execute_workflow_with_websocket(
 ) -> Dict[str, Any]:
     """
     Execute workflow with WebSocket-based real-time progress updates.
+    Enhanced to support all message types from the system diagram.
     
     Args:
         workflow_id: The workflow ID to execute
@@ -1106,22 +1339,26 @@ async def execute_workflow_with_websocket(
     """
     progress_tracker = WorkflowExecutionProgress(websocket_send_func, workflow_id)
     websocket_sink = None
+    execution_start_time = time.time()
     
     try:
+        # Send connection confirmation
+        await progress_tracker.send_connection_confirmation()
+        
         # Send initial progress
         await progress_tracker.send_progress_update("initializing", 0.0, "Starting workflow execution...")
         
         # Check if workflow exists
         workflow = await get_workflow(workflow_id)
         if not workflow:
-            await progress_tracker.send_error(f"Workflow with ID {workflow_id} not found")
+            await progress_tracker.send_execution_error("WORKFLOW_NOT_FOUND", f"Workflow with ID {workflow_id} not found")
             raise ValueError(f"Workflow with ID {workflow_id} not found")
         
         await progress_tracker.send_progress_update("validating", 0.1, "Validating workflow configuration...")
         
         # Check if workflow generation was completed
         if workflow.get("workflow_graph") is None:
-            await progress_tracker.send_error(f"Workflow {workflow_id} has not completed generation phase")
+            await progress_tracker.send_execution_error("WORKFLOW_NOT_GENERATED", f"Workflow {workflow_id} has not completed generation phase")
             raise ValueError(f"Workflow {workflow_id} has not completed generation phase")
         
         await progress_tracker.send_progress_update("preparing", 0.2, "Preparing workflow execution...")
@@ -1135,14 +1372,21 @@ async def execute_workflow_with_websocket(
         workflow_name = task_info.get("workflow_name", workflow_id)
         
         if workflow_graph is None:
-            await progress_tracker.send_error("No workflow graph available")
+            await progress_tracker.send_execution_error("NO_WORKFLOW_GRAPH", "No workflow graph available")
             await update_workflow_status(workflow_id, "failed")
             return {
                 "status": "failed",
                 "error": "No workflow graph available"
             }
         
+        # Generate execution ID
+        execution_id = f"exec_{workflow_id}_{int(time.time())}"
+        
+        # Send execution started message
+        await progress_tracker.send_execute_started(execution_id, workflow_name)
+        
         await progress_tracker.send_progress_update("executing", 0.3, f"Executing workflow: {workflow_name}")
+        await progress_tracker.send_status_update("running", 0.3, "initializing")
         
         # Get database information for dynamic MongoDB toolkit
         database_information = task_info.get("database_information")
@@ -1154,6 +1398,9 @@ async def execute_workflow_with_websocket(
         sink_id = logger.add(websocket_sink.write, level="INFO", format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}")
         
         try:
+            # Send node progress for workflow initialization
+            await progress_tracker.send_node_progress("workflow_init", "running", 0.5, "Initializing workflow components...")
+            
             # Execute the workflow with database information
             execution_result = await execute_workflow_from_config(
                 workflow_graph, 
@@ -1164,10 +1411,15 @@ async def execute_workflow_with_websocket(
                 task_info=task_info
             )
             
+            # Send node completion for workflow execution
+            await progress_tracker.send_run_detail("workflow_execution", "completed", 
+                                                {"status": "success"}, time.time() - execution_start_time)
+            
             await progress_tracker.send_progress_update("finalizing", 0.9, "Finalizing execution results...")
+            await progress_tracker.send_status_update("finalizing", 0.9, "finalizing")
             
             if execution_result is None:
-                await progress_tracker.send_error(f"Failed to execute workflow: {workflow_name}")
+                await progress_tracker.send_execution_error("EXECUTION_FAILED", f"Failed to execute workflow: {workflow_name}")
                 await update_workflow_status(workflow_id, "failed")
                 return {
                     "original_message": "Failed to execute workflow",
@@ -1193,6 +1445,9 @@ async def execute_workflow_with_websocket(
                 print(f"❌ Error saving execution result to database: {e}")
                 # Continue execution even if database save fails
             
+            # Calculate total execution time
+            total_execution_time = time.time() - execution_start_time
+            
             # Return only the essential data for WebSocket clients
             final_result = {
                 "original_message": execution_result.get("original_message", ""),
@@ -1200,41 +1455,40 @@ async def execute_workflow_with_websocket(
             }
             
             await progress_tracker.send_progress_update("completed", 1.0, "Workflow execution completed successfully")
+            await progress_tracker.send_status_update("completed", 1.0, "completed")
             
             # Send detailed final result message
             await progress_tracker.send_final_result(final_result, workflow_name)
             
-            # Also send the standard completion message
-            await progress_tracker.send_completion(final_result)
+            # Send execution finished message
+            await progress_tracker.send_execute_finished("completed", final_result, None, total_execution_time)
             
-            # Verify the result was saved by checking the database
-            try:
-                saved_workflow = await get_workflow(workflow_id)
-                if saved_workflow and saved_workflow.get("execution_result"):
-                    print(f"✅ Verified execution result saved in database for workflow {workflow_id}")
-                else:
-                    print(f"⚠️ Warning: Execution result not found in database for workflow {workflow_id}")
-            except Exception as e:
-                print(f"⚠️ Warning: Could not verify database save: {e}")
+            # Also send the standard completion message for backward compatibility
+            await progress_tracker.send_completion(final_result)
             
             return final_result
             
+        except Exception as e:
+            # Send execution error
+            await progress_tracker.send_execution_error("EXECUTION_ERROR", f"Workflow execution failed: {str(e)}")
+            await update_workflow_status(workflow_id, "failed")
+            raise e
+            
         finally:
-            # Remove custom sink
-            logger.remove(sink_id)
+            # Cleanup
             if websocket_sink:
                 websocket_sink.stop()
-        
+            if sink_id:
+                logger.remove(sink_id)
+    
     except Exception as e:
-        error_message = f"Error executing workflow: {str(e)}"
-        await progress_tracker.send_error(error_message)
+        # Send connection error for unexpected failures
+        await progress_tracker.send_connection_error("EXECUTION_ERROR", f"Unexpected error: {str(e)}", False)
         await update_workflow_status(workflow_id, "failed")
-        
-        # Cleanup
-        if websocket_sink:
-            websocket_sink.stop()
-        
-        raise ValueError(error_message)
+        return {
+            "original_message": f"Failed to execute workflow: {str(e)}",
+            "parsed_json": None
+        }
 
 
 

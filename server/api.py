@@ -183,9 +183,8 @@ async def execute_workflow_websocket(
         # Send connection confirmation
         await websocket.send_text(json.dumps({
             "type": "connection",
-            "timestamp": datetime.now().isoformat(),
-            "message": "WebSocket connection established",
-            "workflow_id": workflow_id
+            "content": "WebSocket connection established",
+            "result": None
         }))
         
         # Wait for execution inputs
@@ -196,9 +195,8 @@ async def execute_workflow_websocket(
             if "inputs" not in request_data:
                 await websocket.send_text(json.dumps({
                     "type": "error",
-                    "timestamp": datetime.now().isoformat(),
-                    "error": "Missing 'inputs' field in request",
-                    "workflow_id": workflow_id
+                    "content": "Missing 'inputs' field in request",
+                    "result": None
                 }))
                 return
             
@@ -207,10 +205,8 @@ async def execute_workflow_websocket(
             # Send execution start confirmation
             await websocket.send_text(json.dumps({
                 "type": "start",
-                "timestamp": datetime.now().isoformat(),
-                "message": "Workflow execution started",
-                "workflow_id": workflow_id,
-                "inputs": inputs
+                "content": "Workflow execution started",
+                "result": None
             }))
             
             # Execute workflow with WebSocket progress updates
@@ -231,24 +227,21 @@ async def execute_workflow_websocket(
             # Send final result
             await websocket.send_text(json.dumps({
                 "type": "complete",
-                "timestamp": datetime.now().isoformat(),
-                "result": result,
-                "workflow_id": workflow_id
+                "content": "Workflow execution completed successfully",
+                "result": result
             }))
             
         except json.JSONDecodeError:
             await websocket.send_text(json.dumps({
                 "type": "error",
-                "timestamp": datetime.now().isoformat(),
-                "error": "Invalid JSON format in request",
-                "workflow_id": workflow_id
+                "content": "Invalid JSON format in request",
+                "result": None
             }))
         except Exception as e:
             await websocket.send_text(json.dumps({
                 "type": "error",
-                "timestamp": datetime.now().isoformat(),
-                "error": f"Execution error: {str(e)}",
-                "workflow_id": workflow_id
+                "content": f"Execution error: {str(e)}",
+                "result": None
             }))
     
     except WebSocketDisconnect:
@@ -258,12 +251,11 @@ async def execute_workflow_websocket(
         try:
             await websocket.send_text(json.dumps({
                 "type": "error",
-                "timestamp": datetime.now().isoformat(),
-                "error": f"WebSocket error: {str(e)}",
-                "workflow_id": workflow_id
+                "content": f"WebSocket error: {str(e)}",
+                "result": None
             }))
         except:
-            pass  # Connection might be closed 
+            pass  # Connection might be closed
 
 ### _____________________________________________
 ### User Query Router API

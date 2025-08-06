@@ -147,6 +147,7 @@ Please carefully analyze the following requirement documentation and generate a 
 ## Key things to notice:
 - You must strictly follow the inputs formats
 - You must strictly follow the outputs formats
+- You should come up with detailed inputs/outputs, for example, instead of "content", you should call it "tale_content"
 
 ## Requirement documentation:
 {requirement}

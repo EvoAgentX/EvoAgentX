@@ -21,107 +21,94 @@ WEBSOCKET STREAMING TEST:
 - Includes timeout handling and error reporting
 - Supports multiple workflow testing in sequence
 
-API Documentation:
+WEBSOCKET API DOCUMENTATION:
 ==================
 
-1. PROJECT SETUP (Phase 1)
-   Endpoint: POST /project/setup
-   Request:
-   {
-     "project_short_id": "zw7nnyv"
-   }
-   Response:
-   {
-     "workflow_graphs": [{"workflow_id": "...", "workflow_name": "...", "workflow_inputs": {...}, "workflow_outputs": {...}, "workflow_graph": {...}}],
-     "message": "Project setup completed successfully with workflow generation"
-   }
+test_websocket_connection Function
+=================================
 
-2. WORKFLOW GENERATION (Phase 2)
-   Endpoint: POST /workflow/{workflow_id}/generate
-   Request: No body required
-   Response:
-   {
-     "workflow_graph": {"nodes": [...], "edges": [...], ...},
-     "status": "success"
-   }
+Purpose:
+--------
+Tests real-time WebSocket streaming for workflow execution, providing live progress updates,
+log messages, and execution results.
 
-3. WORKFLOW EXECUTION (Phase 3)
-   Endpoint: POST /workflow/{workflow_id}/execute
-   Request:
-   {
-     "inputs": {
-       "symptoms": "Pet is lethargic, not eating, and has a fever of 103°F. The pet is also vomiting occasionally.",
-       "pet_info": {
-         "breed": "Golden Retriever",
-         "age": 5,
-         "weight": 65,
-         "health_history": "No previous major health issues"
-       }
-     }
-   }
-   Response:
-   {
-     "execution_result": {
-       "status": "completed",
-       "workflow_name": "...",
-       "result": {...}
-     }
-   }
+Function Signature:
+------------------
+async def test_websocket_connection(workflow_id: str) -> Dict[str, Any]
 
-4. WORKFLOW STATUS
-   Endpoint: GET /workflow/{workflow_id}/status
-   Request: No body required
-   Response:
-   {
-     "workflow_id": "...",
-     "status": "completed",
-     "phases": {
-       "setup_complete": true,
-       "execution_complete": true
-     },
-     "workflows": [...],
-     "execution_result": {...}
-   }
+Inputs:
+-------
+- workflow_id (str): The unique identifier of the workflow to execute via WebSocket
 
-5. LIST ALL WORKFLOWS
-   Endpoint: GET /workflows
-   Request: No body required
-   Response:
-   {
-     "workflows": [
-       {
-         "workflow_id": "...",
-         "status": "...",
-         "created_at": "...",
-         "updated_at": "..."
-       }
-     ]
-   }
+Outputs:
+--------
+Returns a dictionary with the following structure:
 
-6. WEBSOCKET STREAMING EXECUTION
-   Endpoint: WS /workflow/{workflow_id}/execute_ws
-   Request: WebSocket connection with header "eax-access-token"
-   Initial Message:
-   {
-     "inputs": {
-       "symptoms": "Pet is lethargic, not eating, and has a fever",
-       "pet_info": {
-         "breed": "Golden Retriever",
-         "age": 5,
-         "weight": 65,
-         "health_history": "No previous major health issues"
-       }
-     }
-   }
-   Response: Real-time streaming messages
-   - Connection confirmation: {"type": "connection", "message": "WebSocket connected successfully", "timestamp": "..."}
-   - Progress updates: {"type": "progress", "phase": "initializing|validating|preparing|executing|completed", "progress": 0.0-1.0, "message": "...", "workflow_id": "..."}
-   - Log messages: {"type": "log", "level": "INFO|WARNING|ERROR", "message": "...", "timestamp": "..."}
-   - Output messages: {"type": "output", "output_type": "stdout|stderr", "content": "...", "timestamp": "..."}
-   - Input messages: {"type": "input", "input_type": "stdin", "content": "...", "timestamp": "..."}
-   - Periodic updates: {"type": "periodic_update", "stdout_buffer": "...", "stderr_buffer": "...", "buffer_sizes": {...}, "status": "...", "message": "...", "timestamp": "..."}
-   - Completion: {"type": "complete", "result": {...}, "workflow_id": "..."}
-   - Errors: {"type": "error", "error": "...", "workflow_id": "..."}
+Success Case:
+{
+    "success": True,
+    "workflow_id": "550e8400-e29b-41d4-a716-446655440001",
+    "total_messages": 15,
+    "progress_updates": 5,
+    "log_messages": 8,
+    "output_messages": 2,
+    "input_messages": 0,
+    "periodic_updates": 3,
+    "final_result": {
+        "original_message": "...",
+        "parsed_json": {...}
+    },
+    "messages": [
+        {"type": "connection", "content": "WebSocket connection established", "result": null},
+        {"type": "start", "content": "Workflow execution started", "result": null},
+        {"type": "progress", "content": "Executing workflow: name (75% complete)", "result": null},
+        {"type": "log", "content": "INFO: Starting workflow execution", "result": null},
+        {"type": "output", "content": "Processing user data...", "result": null},
+        {"type": "complete", "content": "Workflow execution completed successfully", "result": {...}}
+    ]
+}
+
+Error Cases:
+{
+    "success": False,
+    "error": "WebSocket connection failed: Connection refused",
+    "workflow_id": "550e8400-e29b-41d4-a716-446655440001"
+}
+
+{
+    "success": False,
+    "error": "WebSocket connection timed out after 2 minutes",
+    "workflow_id": "550e8400-e29b-41d4-a716-446655440001"
+}
+
+{
+    "success": False,
+    "error": "No final result received",
+    "messages": [...]
+}
+
+WebSocket Message Types:
+-----------------------
+1. connection: Initial connection confirmation
+   {"type": "connection", "content": "WebSocket connection established", "result": null}
+
+2. start: Execution start notification
+   {"type": "start", "content": "Workflow execution started", "result": null}
+
+3. progress: Real-time progress updates
+   {"type": "progress", "content": "Executing workflow: name (75% complete)", "result": null}
+
+4. log: Log messages from workflow execution
+   {"type": "log", "content": "INFO: Database connection established", "result": null}
+
+5. output: Execution output messages
+   {"type": "output", "content": "Processing user data...", "result": null}
+
+6. complete: Final execution result
+   {"type": "complete", "content": "Workflow execution completed successfully", "result": {...}}
+
+7. error: Error messages
+   {"type": "error", "content": "Failed to connect to database", "result": null}
 """
 
 import asyncio
@@ -148,16 +135,23 @@ HEADERS = {
 }
 # Fixed test data for consistent testing
 test_workflow_id_1 = "550e8400-e29b-41d4-a716-446655440001"
-test_workflow_id_2 = "550e8400-e29b-41d4-a716-446655440002"
+test_workflow_id_2 = "7f8a9a6a-35b1-4891-8a4c-5715a5c5478f"
 
 # Fixed test inputs for consistent results - Updated for treatment recommendation workflow
 TEST_INPUTS = {
-    "diagnosis": "Acute gastroenteritis with mild dehydration"
+    "character_name": "Alice",
+    "character_type": "human",
+    "setting": "a magical forest",
+    "genre": "fantasy",
+    "target_age": "8-12",
+    "moral_lesson": "friendship and courage",
+    "story_length": "medium",
+    "language": "English"
 }
 
 # Fixed test configuration
 TEST_CONFIG = {
-    "project_short_id": "2d7rhs8",
+    "project_short_id": "nw7czqj",
     "test_workflow_ids": [test_workflow_id_1, test_workflow_id_2]
 }
 def generate_test_ids() -> str:
@@ -510,73 +504,41 @@ def test_websocket_streaming(workflow_ids: List[str]) -> Tuple[bool, Dict[str, A
                         messages.append(data)
                         
                         msg_type = data.get("type")
-                        timestamp = data.get("timestamp")
+                        content = data.get("content", "")
+                        result = data.get("result")
                         
                         print(f"  📋 PARSED DATA: {json.dumps(data, indent=2)}")
                         
                         if msg_type == "start":
                             print(f"    🚀 Execution started for workflow {workflow_id}")
                         elif msg_type == "progress":
-                            progress = data.get("progress", 0)
-                            phase = data.get("phase", "unknown")
                             progress_updates.append({
-                                "phase": phase,
-                                "progress": progress,
-                                "message": data.get("message", "")
+                                "content": content
                             })
-                            print(f"    📊 Progress: {phase} - {progress:.1%}")
+                            print(f"    📊 Progress: {content}")
                         elif msg_type == "log":
                             log_messages.append({
-                                "level": data.get("level", "INFO"),
-                                "message": data.get("message", ""),
-                                "timestamp": timestamp
+                                "content": content
                             })
-                            print(f"    📝 Log: {data.get('level', 'INFO')} - {data.get('message', '')}")
+                            print(f"    📝 Log: {content}")
                         elif msg_type == "output":
-                            output_type = data.get("output_type", "unknown")
-                            content = data.get("content", "")
                             output_messages.append({
-                                "output_type": output_type,
-                                "content": content,
-                                "timestamp": timestamp
+                                "content": content
                             })
-                            print(f"    📤 Output ({output_type}): {content[:100]}{'...' if len(content) > 100 else ''}")
+                            print(f"    📤 Output: {content[:100]}{'...' if len(content) > 100 else ''}")
                         elif msg_type == "input":
-                            input_type = data.get("input_type", "unknown")
-                            content = data.get("content", "")
                             input_messages.append({
-                                "input_type": input_type,
-                                "content": content,
-                                "timestamp": timestamp
+                                "content": content
                             })
-                            print(f"    📥 Input ({input_type}): {content[:100]}{'...' if len(content) > 100 else ''}")
-                        elif msg_type == "periodic_update":
-                            periodic_updates.append({
-                                "stdout_buffer": data.get("stdout_buffer", ""),
-                                "stderr_buffer": data.get("stderr_buffer", ""),
-                                "buffer_sizes": data.get("buffer_sizes", {}),
-                                "status": data.get("status", ""),
-                                "message": data.get("message", ""),
-                                "timestamp": timestamp
-                            })
-                            print(f"    🔄 Periodic Update: {data.get('message', '')}")
+                            print(f"    📥 Input: {content[:100]}{'...' if len(content) > 100 else ''}")
                         elif msg_type == "complete":
                             print(data)
-                            final_result = data.get("result", {})
+                            final_result = result
                             print(f"    ✅ Final result received for workflow {workflow_id}")
-                            break
-                        elif msg_type == "final_result":
-                            print(f"    🎯 Detailed final result received for workflow {workflow_id}")
-                            final_result = data.get("execution_result", {})
-                            print(f"    📋 Workflow name: {data.get('workflow_name', 'Unknown')}")
-                            print(f"    📊 Captured output size: {len(data.get('captured_output', {}))}")
                             break
                         elif msg_type == "error":
                             error_occurred = True
-                            print(f"    ❌ Error received: {data.get('error', 'Unknown error')}")
-                            break
-                        elif msg_type == "completion":
-                            print(f"    🎉 Completion message received for workflow {workflow_id}")
+                            print(f"    ❌ Error received: {content}")
                             break
                         else:
                             print(f"    📋 Unknown message type: {msg_type}")
@@ -851,13 +813,13 @@ def run_complete_test() -> Dict[str, Any]:
     # }
     
     
-    # Phase 4: Workflow Execution
-    execution_passed, execution_result = test_workflow_execution(workflow_ids)
-    test_results["phases"]["execution"] = {
-        "passed": execution_passed,
-        "timestamp": datetime.now().isoformat(),
-        "result": execution_result
-    }
+    # # Phase 4: Workflow Execution
+    # execution_passed, execution_result = test_workflow_execution(workflow_ids)
+    # test_results["phases"]["execution"] = {
+    #     "passed": execution_passed,
+    #     "timestamp": datetime.now().isoformat(),
+    #     "result": execution_result
+    # }
     
     # # Phase 5: Status Check
     # status_passed, status_result = test_workflow_status(workflow_ids)
@@ -867,13 +829,13 @@ def run_complete_test() -> Dict[str, Any]:
     #     "result": status_result
     # }
     
-    # # Phase 5: WebSocket Streaming Test
-    # streaming_passed, streaming_result = test_websocket_streaming(workflow_ids)
-    # test_results["phases"]["websocket_streaming"] = {
-    #     "passed": streaming_passed,
-    #     "timestamp": datetime.now().isoformat(),
-    #     "result": streaming_result
-    # }
+    # Phase 5: WebSocket Streaming Test
+    streaming_passed, streaming_result = test_websocket_streaming(workflow_ids)
+    test_results["phases"]["websocket_streaming"] = {
+        "passed": streaming_passed,
+        "timestamp": datetime.now().isoformat(),
+        "result": streaming_result
+    }
     
     # # Phase 6: Status Check
     # status_passed, status_result = test_workflow_status(workflow_ids)
@@ -918,7 +880,7 @@ def run_complete_test() -> Dict[str, Any]:
         health_check_passed,
         # setup_passed,
         # generation_passed,
-        execution_passed,
+        # execution_passed,
         # streaming_passed,
         # status_passed,
         # list_passed,
@@ -929,7 +891,7 @@ def run_complete_test() -> Dict[str, Any]:
     print(f"Health Check: {'✅ PASSED' if health_check_passed else '❌ FAILED'}")
     # print(f"Project Setup: {'✅ PASSED' if setup_passed else '❌ FAILED'}")
     # print(f"Workflow Generation: {'✅ PASSED' if generation_passed else '❌ FAILED'}")
-    print(f"Workflow Execution: {'✅ PASSED' if execution_passed else '❌ FAILED'}")
+    # print(f"Workflow Execution: {'✅ PASSED' if execution_passed else '❌ FAILED'}")
     # print(f"WebSocket Streaming: {'✅ PASSED' if streaming_passed else '❌ FAILED'}")
     # print(f"Status Check: {'✅ PASSED' if status_passed else '❌ FAILED'}")
     # print(f"List Workflows: {'✅ PASSED' if list_passed else '❌ FAILED'}")
