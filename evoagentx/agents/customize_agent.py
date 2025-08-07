@@ -330,7 +330,12 @@ class CustomizeAgent(Agent):
         action_input_fields = {}
         for field in inputs:
             required = field.get("required", True)
-            field_type = json_to_python_type[field["type"]]
+            
+            try:
+                field_type = json_to_python_type[field["type"]]
+            except KeyError:
+                field_type = Any
+
             if required:                
                 action_input_fields[field["name"]] = (field_type, Field(description=field["description"]))
             else:
@@ -506,9 +511,15 @@ class CustomizeAgent(Agent):
         **kwargs
     ) -> 'CustomizeAgent':
 
-        data.pop("class_name", None)
+        class_name = data.pop("class_name", None)
+        if class_name is not None and class_name != "CustomizeAgent":
+            raise ValueError(f"Expected class name 'CustomizeAgent', but got '{class_name}'")
+
         data = add_llm_config_to_agent_dict(data, llm_config)
         tool_names = data.pop("tool_names", None)
-        data["tools"] = tool_names_to_tools(tool_names, tools)
+        
+        if tool_names is not None:
+            data["tools"] = tool_names_to_tools(tool_names, tools)
+            
         return cls(**data)
 
