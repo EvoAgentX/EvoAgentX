@@ -1255,7 +1255,7 @@ class SequentialWorkFlowGraph(WorkFlowGraph):
 
     @classmethod
     def from_dict(cls, data: Dict, **kwargs) -> 'SequentialWorkFlowGraph':
-        return BaseModule.from_dict(data)
+        return cls._create_instance(data)
     
 
 class SEWWorkFlowGraph(SequentialWorkFlowGraph):
