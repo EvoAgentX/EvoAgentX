@@ -338,7 +338,7 @@ class BaseModule(BaseModel, metaclass=MetaModule):
         
         function = load_function or cls.load_module
         content = function(path, **kwargs)
-        module = cls.from_dict(content, log=use_logger)
+        module = cls.from_dict(content, log=use_logger, **kwargs)
 
         return module
     
