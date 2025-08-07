@@ -4,7 +4,6 @@ from collections.abc import Callable
 from typing import Any, Dict, List, Optional, Type, Union
 
 from pydantic import Field, create_model
-from pydantic.types import T
 
 from ..actions.action import Action, ActionInput, ActionOutput
 from ..actions.customize_action import CustomizeAction
