@@ -12,9 +12,7 @@ import networkx as nx
 from networkx import MultiDiGraph
 from pydantic import Field, field_validator, model_validator
 
-from evoagentx.core.module import BaseModule
-
-from ..agents.agent import Agent
+from ..agents import Agent
 from ..core.base_config import Parameter
 from ..core.logging import logger
 from ..core.module import BaseModule
@@ -22,7 +20,11 @@ from ..models import LLMConfig
 from ..prompts.utils import DEFAULT_SYSTEM_PROMPT
 from ..prompts.workflow.sew_workflow import SEW_WORKFLOW
 from ..tools.tool import Tool, Toolkit
-from ..utils.utils import generate_dynamic_class_name, make_parent_folder, add_llm_config_to_agent_dict, tool_names_to_tools
+from ..utils.utils import (
+    create_agent_from_dict,
+    generate_dynamic_class_name,
+    make_parent_folder,
+)
 from .action_graph import ActionGraph
 
 
@@ -66,13 +68,13 @@ class WorkFlowNode(BaseModule):
     inputs: List[Parameter] # inputs for the task
     outputs: List[Parameter] # outputs of the task
     reason: Optional[str] = None
-    agents: Optional[List[Union[str, dict]]] = None
+    agents: Optional[List] = None
     action_graph: Optional[ActionGraph] = None
     status: Optional[WorkFlowNodeState] = WorkFlowNodeState.PENDING
 
     @field_validator('agents', mode="before")
     @classmethod
-    def check_agent_format(cls, agents: List[Union[str, dict, Agent]]):
+    def check_agent_format(cls, agents: List[Union[str, Dict, Agent]]):
         if agents is None:
             return None
 
@@ -81,11 +83,13 @@ class WorkFlowNode(BaseModule):
             if isinstance(agent, str):
                 validated_agents.append(agent)
             elif isinstance(agent, Agent):
-                validated_agents.append(agent.get_config())
+                validated_agents.append(agent)
             elif isinstance(agent, dict):
                 assert "name" in agent and "description" in agent, \
                     "must provide the name and description of an agent when specifying an agent with a dict."
                 validated_agents.append(agent)
+            else:
+                raise TypeError(f"'{type(agent)}' is an unknown agent type!")
         return validated_agents
 
     @model_validator(mode="after")
@@ -184,11 +188,13 @@ class WorkFlowNode(BaseModule):
                 agent_names.append(agent)
             elif isinstance(agent, dict):
                 agent_names.append(agent["name"])
+            elif isinstance(agent, Agent):
+                agent_names.append(agent.name)
             else:
                 raise TypeError(f"{type(agent)} is an unknown agent type!")
         return agent_names
     
-    def set_agents(self, agents: List[Union[str, dict]]):
+    def set_agents(self, agents: List[Union[str, Dict, Agent]]):
         self.agents = agents
 
     def get_status(self) -> WorkFlowNodeState:
