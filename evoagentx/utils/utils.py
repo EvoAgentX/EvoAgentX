@@ -151,7 +151,6 @@ def recursive_remove(data: Any, keys: List[str]) -> Any:
 def tool_names_to_tools(
     tool_names: Optional[List[str]] = None, 
     tools: Optional[List] = None,
-    tool_map: Optional[Dict] = None
 ) -> Optional[List]:
 
     if tool_names is None:
@@ -160,11 +159,10 @@ def tool_names_to_tools(
     if len(tool_names) == 0:
         return None
 
-    if tools is None and tool_map is None:
+    if tools is None:
         raise ValueError(f"Must provide the following tools: {tool_names}")
 
-    if tool_map is None:
-        tool_map = {tool.name: tool for tool in tools}
+    tool_map = {tool.name: tool for tool in tools}
     
     tool_list = []
     for tool_name in tool_names:
@@ -193,6 +191,23 @@ def add_llm_config_to_agent_dict(agent_dict: Dict, llm_config: Optional[LLMConfi
             agent_dict["llm_config"] = LLMConfig.from_dict(data_llm_config)
     
     return agent_dict
+
+
+def create_agent_from_dict(
+    agent_dict: Dict, 
+    llm_config: Optional[LLMConfig] = None,
+    tools: Optional[List] = None,
+    agents: Optional[List] = None,
+) -> 'Agent':
+
+    agent_class_name = agent_dict.get("class_name", None)
+
+    if agent_class_name is None:
+        agent_class_name = "CustomizeAgent"
+    
+    cls = MODULE_REGISTRY.get_module(agent_class_name)
+    agent = cls.from_dict(data=agent_dict, llm_config=llm_config, tools=tools, agents=agents)
+    return agent
 
 
 json_to_python_type = {
