@@ -1,17 +1,12 @@
-import json
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional
 
 from ..actions.action import Action
 from ..actions.agent_adaptor import AgentAdaptorAction
 from ..agents import Agent, CustomizeAgent
+from ..core.base_config import Parameter
 from ..core.registry import MODEL_REGISTRY
 from ..models import BaseLLM, LLMConfig, OpenAILLMConfig
-from ..tools import Tool, Toolkit
-from ..utils.utils import (
-    add_llm_config_to_agent_dict,
-    get_unique_class_name,
-    tool_names_to_tools,
-)
+from ..utils.utils import add_llm_config_to_agent_dict
 
 
 class AgentAdaptor(Agent):
@@ -19,20 +14,22 @@ class AgentAdaptor(Agent):
     AgentAdaptor is a wrapper for an agent, which can transform the inputs and outputs of the agent to the specified formats.
 
     Args:
+        name (str): Unique identifier for the agent adaptor.
         agent (Agent): The agent to be wrapped.
-        inputs (List[Dict]): List of input specifications, where each dict 
-            (e.g., `{"name": str, "type": str, "description": str, ["required": bool]}`) contains:
+        inputs (List[Parameter]): List of input specifications, must contain:
             - name (str): Name of the input parameter
             - type (str): Type of the input
             - description (str): Description of what the input represents
             - required (bool, optional): Whether this input is required (default: True)
-        outputs (List[Dict]): Same format as `inputs`.
+        outputs (List[Parameter]): Same format as `inputs`.
+        llm_config (Optional[LLMConfig]): The LLMConfig to be used for the agent adaptor. Default: OpenAILLMConfig(model="gpt-4o-mini").
     """
     def __init__(
         self, 
+        name: str,
         agent: Agent, 
-        inputs: List[Dict], 
-        outputs: List[Dict],
+        inputs: List[Parameter], 
+        outputs: List[Parameter],
         llm_config: Optional[LLMConfig] = None,
         **kwargs
     ):
@@ -52,8 +49,7 @@ class AgentAdaptor(Agent):
             raise ValueError(f"AgentAdaptor currently only supports agents with a single action. {agent.name} has {len(non_ContextExtraction_actions)} actions.")
 
         agent_adaptor_action = self.create_agent_adaptor_action(agent, inputs, outputs, llm)
-        
-        name = get_unique_class_name(agent.name)
+
         super().__init__(
             name=name, 
             description=agent.description, 
@@ -69,13 +65,16 @@ class AgentAdaptor(Agent):
     @staticmethod
     def create_agent_adaptor_action(
         agent: Agent, 
-        inputs: List[Dict],
-        outputs: List[Dict],
+        inputs: List[Parameter],
+        outputs: List[Parameter],
         llm: BaseLLM
     ) -> Action:
 
-        action_input_type = CustomizeAgent.create_action_input(inputs, "input transformation")
-        action_output_type = CustomizeAgent.create_action_output(outputs, "output transformation")
+        inputs_dict = [input.to_dict(ignore=["class_name"]) for input in inputs]
+        outputs_dict = [output.to_dict(ignore=["class_name"]) for output in outputs]
+
+        action_input_type = CustomizeAgent.create_action_input(inputs_dict, "input transformation")
+        action_output_type = CustomizeAgent.create_action_output(outputs_dict, "output transformation")
         
         agent_adaptor_action = AgentAdaptorAction(
             agent=agent, 
@@ -102,60 +101,28 @@ class AgentAdaptor(Agent):
             "description": self.description,
             "inputs": self.inputs,
             "outputs": self.outputs,
-            "agent": self.agent.get_config(),
+            "agent": self.agent.name,
             "llm_config": self.llm_config
         }
 
         return config
 
 
-    def to_dict(self, exclude_none: bool = True, ignore: List[str] = [], **kwargs) -> dict:
+    def to_dict(self, exclude_none: bool = True, ignore: List[str] = [], **kwargs) -> Dict:
         config = self.get_config()
 
         for ignore_key in ignore:
             config.pop(ignore_key, None)
-            config["agent"].pop(ignore_key, None)
-
-        tools = config["agent"].pop("tools", None)
-        if tools is not None and len(tools) > 0:
-            config["agent"]["tool_names"] = [tool.name for tool in tools]
 
         return config
-
-
-    @classmethod
-    def load_module(
-        cls, 
-        path: str, 
-        llm_config: Optional[LLMConfig] = None, 
-        agent_adaptor_llm_config: Optional[LLMConfig] = None,
-        tools: Optional[List[Union[Toolkit, Tool]]] = None,
-        **kwargs
-    ) -> Dict:
-        """
-        Load the agent adaptor from a JSON file.
-
-        Args:
-            path (str): The path of the JSON file.
-            llm_config (Optional[LLMConfig]): The LLMConfig to be used for the agent that the agent adaptor is based on.
-            agent_adaptor_llm_config (Optional[LLMConfig]): The LLMConfig to be used for the agent adaptor. Default: OpenAILLMConfig(model="gpt-4o-mini")
-            tools (Optional[List[Union[Toolkit, Tool]]]): The tools to be used by the agent.
-
-        Returns:
-            A dictionary containing all necessary configuration to recreate this agent adaptor.
-        """
-        data = json.load(open(path, "r"))
-        agent_adaptor_dict = cls._process_dict(data, llm_config, agent_adaptor_llm_config, tools)
-        return agent_adaptor_dict
 
 
     @classmethod
     def from_dict(
         cls, 
         data: Dict, 
-        llm_config: Optional[LLMConfig] = None, 
-        agent_adaptor_llm_config: Optional[LLMConfig] = None,
-        tools: Optional[List[Union[Toolkit, Tool]]] = None,
+        agents: List[Agent],
+        llm_config: Optional[LLMConfig] = None,
         **kwargs
     ) -> "AgentAdaptor":
         """
@@ -163,49 +130,23 @@ class AgentAdaptor(Agent):
         
         Args:
             data (Dict): Dictionary containing agent adaptor configurations.
+            agents (List[Agent]): The list of agents containing the agent that the agent adaptor is based on.
             llm_config (Optional[LLMConfig]): The LLMConfig to be used for the agent that the agent adaptor is based on.
-            agent_adaptor_llm_config (Optional[LLMConfig]): The LLMConfig to be used for the agent adaptor. Default: OpenAILLMConfig(model="gpt-4o-mini")
-            tools (Optional[List[Union[Toolkit, Tool]]]): The tools to be used by the agent.
             
         Returns:
             AgentAdaptor: The created agent adaptor instance
         """
-        data = cls._process_dict(data, llm_config, agent_adaptor_llm_config, tools)
-        agent = CustomizeAgent.from_dict(data["agent"])
+        if llm_config is None:
+            llm_config = OpenAILLMConfig(model="gpt-4o-mini")
+
+        data = add_llm_config_to_agent_dict(data, llm_config)
+        agent_map = {agent.name: agent for agent in agents}
+        agent = agent_map.get(data["agent"], None)
+
+        if agent is None:
+            raise ValueError(f"'{data['agent']}' not found in the provided list of agents.")    
+
         data["agent"] = agent
+
         return cls(**data)
-
-    
-    @staticmethod
-    def _process_dict( 
-        data: Dict, 
-        llm_config: Optional[LLMConfig] = None, 
-        agent_adaptor_llm_config: Optional[LLMConfig] = None,
-        tools: Optional[List[Union[Toolkit, Tool]]] = None,
-    ) -> Dict:
-        """
-        Checks if agent adaptor and the agent it's based on have `llm_config` in the dictionary.
-        Converts `tool_names` to tools.
-
-        Args:
-            data (Dict): The dictionary containing the agent adaptor's configuration.
-            llm_config (Optional[LLMConfig]): The LLMConfig to be used for the agent adaptor.
-            agent_adaptor_llm_config (Optional[LLMConfig]): The LLMConfig to be used for the agent adaptor. Default: OpenAILLMConfig(model="gpt-4o-mini")
-            tools (Optional[List[Union[Toolkit, Tool]]]): The tools to be used by the agent.
-
-        Returns:
-            Dict: The processed dictionary containing the agent adaptor's configuration
-        """
-
-        data["agent"] = add_llm_config_to_agent_dict(data["agent"], llm_config)
-
-        if agent_adaptor_llm_config is None:
-            agent_adaptor_llm_config = OpenAILLMConfig(model="gpt-4o-mini")
-
-        data = add_llm_config_to_agent_dict(data, agent_adaptor_llm_config)
-
-        agent_tool_names = data["agent"].pop("tool_names", None)
-        data["agent"]["tools"] = tool_names_to_tools(agent_tool_names, tools)
-        return data
-
 
