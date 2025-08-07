@@ -1084,25 +1084,31 @@ class WorkFlowGraph(BaseModule):
         config.pop("graph", None)
         return config
 
+
     @classmethod
-    def from_file(cls, path: str, llm_config: Optional[LLMConfig], tools: Optional[Union[Tool, Toolkit]]) -> 'WorkFlowGraph':
-        config = cls.load_module(path)
-        tool_map = None
-        if tools is not None:
-            tool_map = {tool.name: tool for tool in tools}
+    def from_dict(
+        cls, 
+        data: Dict, 
+        llm_config: Optional[LLMConfig] = None, 
+        tools: Optional[Union[Tool, Toolkit]] = None, 
+        agents: Optional[List[Agent]] = None,
+        **kwargs
+    ) -> 'WorkFlowGraph':
 
-        for node in config["nodes"]:
-            for agent in node["agents"]:
-                agent = add_llm_config_to_agent_dict(agent, llm_config)
-                agent_tool_names = agent.pop("tool_names", None)
-                agent["tools"] = tool_names_to_tools(agent_tool_names, tool_map=tool_map)
+        for node in data["nodes"]:
+            node_agents = []
 
-                if agent.get("class_name", "") == "AgentAdaptor":
-                    agent["agent"] = add_llm_config_to_agent_dict(agent["agent"], llm_config)
-                    inner_agent_tool_names = agent["agent"].pop("tool_names", None)
-                    agent["agent"]["tools"] = tool_names_to_tools(inner_agent_tool_names, tool_map=tool_map)
-
-        return cls.from_dict(config)
+            for agent_dict in node["agents"]:
+                agent = create_agent_from_dict(
+                    agent_dict=agent_dict, 
+                    llm_config=llm_config, 
+                    tools=tools, 
+                    agents=agents
+                )
+                node_agents.append(agent)
+            node["agents"] = node_agents
+                
+        return cls._create_instance(data)
 
 
 class SequentialWorkFlowGraph(WorkFlowGraph):
@@ -1246,6 +1252,10 @@ class SequentialWorkFlowGraph(WorkFlowGraph):
             with the same properties as this one.
         """
         return self.get_graph_info()
+
+    @classmethod
+    def from_dict(cls, data: Dict, **kwargs) -> 'SequentialWorkFlowGraph':
+        return BaseModule.from_dict(data)
     
 
 class SEWWorkFlowGraph(SequentialWorkFlowGraph):
