@@ -1,8 +1,124 @@
 """
-Test Server - Complete Lifecycle Test
+EvoAgentX API Tutorial - Complete Workflow Lifecycle
 
 This test demonstrates the complete lifecycle of the EvoAgentX project setup and workflow execution.
 It covers all phases: setup, generation, execution, and WebSocket streaming.
+
+================================================================================
+API ENDPOINTS OVERVIEW
+================================================================================
+
+1. HEALTH CHECK
+   GET /health
+   - Input: None
+   - Output: {"status": "healthy"}
+
+2. PROJECT SETUP (Phase 1)
+   POST /project/setup
+   - Input: {"project_short_id": "string"}
+   - Output: {"workflow_graphs": [...], "message": "string"}
+
+3. WORKFLOW GENERATION (Phase 2)
+   POST /workflow/{workflow_id}/generate
+   - Input: None (workflow_id in URL)
+   - Output: {"workflow_graph": {...}, "status": "success|failed"}
+
+4. WORKFLOW EXECUTION (Phase 3) - HTTP
+   POST /workflow/{workflow_id}/execute
+   - Input: {"inputs": {"key1": "value1", "key2": "value2"}}
+   - Output: {"execution_result": {...}}
+
+5. WORKFLOW EXECUTION (Phase 3) - WebSocket ⭐
+   WebSocket /workflow/{workflow_id}/execute_ws
+   - Input: {"inputs": {"key1": "value1", "key2": "value2"}}
+   - Output: Real-time streaming messages
+
+6. WORKFLOW STATUS
+   GET /workflow/{workflow_id}/status
+   - Input: None (workflow_id in URL)
+   - Output: Complete workflow state and data
+
+7. WORKFLOW GRAPH
+   GET /workflow/{workflow_id}/get_graph
+   - Input: None (workflow_id in URL)
+   - Output: {"workflow_graph": {...}}
+
+8. USER QUERY ANALYSIS
+   POST /project/{project_short_id}/user_query
+   - Input: {"query": "string"}
+   - Output: {"result": {...}}
+
+================================================================================
+WEBSOCKET EXECUTION API - DETAILED DOCUMENTATION
+================================================================================
+
+The WebSocket execution endpoint is the most powerful feature, providing real-time progress
+updates during workflow execution.
+
+ENDPOINT: WebSocket /workflow/{workflow_id}/execute_ws
+
+CONNECTION:
+- URL: ws://localhost:8001/workflow/{workflow_id}/execute_ws
+- Authentication: Include 'eax-access-token' header in initial connection
+
+INPUT MESSAGE FORMAT:
+{
+    "inputs": {
+        "character_name": "Alice",
+        "character_type": "human", 
+        "setting": "a magical forest",
+        "genre": "fantasy",
+        "target_age": "8-12",
+        "moral_lesson": "friendship and courage",
+        "story_length": "medium",
+        "language": "English"
+    }
+}
+
+OUTPUT MESSAGE TYPES:
+====================
+
+1. CONNECTION CONFIRMATION
+   {"type": "connection", "content": "WebSocket connection established", "result": null}
+
+2. EXECUTION START
+   {"type": "start", "content": "Workflow execution started", "result": null}
+
+3. PROGRESS UPDATES
+   {"type": "progress", "content": "Executing workflow: story_generation (75% complete)", "result": null}
+
+4. LOG MESSAGES
+   {"type": "log", "content": "INFO: Starting workflow execution", "result": null}
+
+5. OUTPUT MESSAGES
+   {"type": "output", "content": "Processing user data...", "result": null}
+
+6. COMPLETION
+   {"type": "complete", "content": "Workflow execution completed successfully", "result": {...}}
+
+7. ERROR MESSAGES
+   {"type": "error", "content": "Failed to connect to database", "result": null}
+
+EXAMPLE COMPLETE WORKFLOW:
+==========================
+
+1. Setup Project:
+   POST /project/setup
+   {"project_short_id": "nw7czqj"}
+
+2. Generate Workflow:
+   POST /workflow/550e8400-e29b-41d4-a716-446655440001/generate
+
+3. Execute via WebSocket:
+   WebSocket: ws://localhost:8001/workflow/550e8400-e29b-41d4-a716-446655440001/execute_ws
+   Send: {"inputs": {"character_name": "Alice", "character_type": "human", ...}}
+
+4. Receive Real-time Updates:
+   - Connection confirmation
+   - Execution start
+   - Progress updates (0% to 100%)
+   - Log messages
+   - Final result
 
 KNOWN ISSUES:
 - Workflow generation may fail due to 'workflow_inputs' key error in service.py
@@ -11,9 +127,9 @@ KNOWN ISSUES:
 These issues are handled gracefully in the test with proper error reporting.
 
 FIXED TEST DATA:
-- Project ID: "zw7nnyv"
-- Workflow IDs: ["550e8400-e29b-41d4-a716-446655440001", "550e8400-e29b-41d4-a716-446655440002"]
-- Test inputs: Fixed pet symptoms and pet info for consistent results
+- Project ID: "nw7czqj"
+- Workflow IDs: ["550e8400-e29b-41d4-a716-446655440001", "7f8a9a6a-35b1-4891-8a4c-5715a5c5478f"]
+- Test inputs: Fixed story generation inputs for consistent results
 
 WEBSOCKET STREAMING TEST:
 - Tests real-time progress updates via WebSocket connections
