@@ -89,6 +89,8 @@ class WorkFlowGenerator(BaseModule):
             self.prebuilt_agents_map = {agent.name: agent for agent in self.prebuilt_agents}
         self.agents_rag_engine = None
 
+        self.agent_adaptor_names = []
+
 
     def _execute_with_retry(
         self, 
@@ -438,7 +440,21 @@ class WorkFlowGenerator(BaseModule):
     def selected_agents_to_agents(self, agent: SelectedAgent) -> Agent:
         """Converts `SelectedAgent` to `AgentAdaptor`"""
         prebuilt_agent = self.prebuilt_agents_map[agent.name]
-        agent_adaptor = AgentAdaptor(agent=prebuilt_agent, inputs=agent.inputs, outputs=agent.outputs)
+
+        # Creates unique agent adaptor name
+        agent_adaptor_name = agent.name
+        i = 1
+        while agent_adaptor_name in self.agent_adaptor_names:
+            agent_adaptor_name = f"{agent.name}V{i}"
+            i += 1
+        self.agent_adaptor_names.append(agent_adaptor_name)
+
+        agent_adaptor = AgentAdaptor(
+            name=agent_adaptor_name,
+            agent=prebuilt_agent,
+            inputs=agent.inputs,
+            outputs=agent.outputs
+        )
         return agent_adaptor
     
 
