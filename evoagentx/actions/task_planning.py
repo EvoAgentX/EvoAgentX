@@ -4,8 +4,9 @@ from typing import Dict, List, Optional
 from pydantic import Field
 
 from ..core.logging import logger
+from ..core.base_config import Parameter
 from ..models.base_model import BaseLLM
-from ..prompts.task_planner import TASK_PLANNING_ACTION, TASK_PLANNING_EXAMPLES
+from ..prompts.task_planner import TASK_PLANNING_ACTION, TASK_PLANNING_EXAMPLES, TASK_PLANNING_EXAMPLE_TEMPLATE
 from ..workflow.workflow_graph import WorkFlowNode
 from .action import Action, ActionInput, ActionOutput
 
@@ -15,6 +16,8 @@ class TaskPlanningInput(ActionInput):
     Input specification for the task planning action.
     """
     goal: str = Field(description="A clear and detailed description of the user's goal, specifying what needs to be achieved.")
+    workflow_inputs: List[Parameter] = Field(description="Inputs of the workflow")
+    workflow_outputs: List[Parameter] = Field(description="Outputs of the workflow")
     history: Optional[str] = Field(default=None, description="Optional field containing previously generated task plan.")
     suggestion: Optional[str] = Field(default=None, description="Optional suggestions or ideas to guide the planning process.")
     examples: Optional[List[Dict]] = Field(default=None, description="Task planning examples")
@@ -83,7 +86,17 @@ class TaskPlanning(Action):
         else:
             prompt_params_values["examples"] = TASK_PLANNING_EXAMPLES
 
+
+        workflow_inputs_dict = [workflow_input.to_dict(ignore=["class_name"]) for workflow_input in prompt_params_values["workflow_inputs"]]
+        workflow_inputs_json = json.dumps(workflow_inputs_dict, indent=4)
+        prompt_params_values["workflow_inputs"] = workflow_inputs_json
+
+        workflow_outputs_dict = [workflow_output.to_dict(ignore=["class_name"]) for workflow_output in prompt_params_values["workflow_outputs"]]
+        workflow_outputs_json = json.dumps(workflow_outputs_dict, indent=4)
+        prompt_params_values["workflow_outputs"] = workflow_outputs_json
+
         prompt = self.prompt.format(**prompt_params_values)
+
         task_plan = llm.generate(
             prompt = prompt, 
             system_message = sys_msg, 
@@ -109,6 +122,13 @@ class TaskPlanning(Action):
             Example 1:
             ### User's goal:
             {goal}
+            
+            ### Workflow Inputs:
+            {workflow_inputs}
+
+            ### Workflow Outputs:
+            {workflow_outputs}
+
             ### Generated Workflow:
             ```json
             {
@@ -131,8 +151,16 @@ class TaskPlanning(Action):
 
         for i, example in enumerate(examples):
             goal = example.pop("goal")
+            workflow_inputs = json.dumps(example["sub_tasks"][0]["inputs"], indent=4)
+            workflow_outputs = json.dumps(example["sub_tasks"][-1]["outputs"], indent=4)
             tasks_str = json.dumps(example, indent=4)
-            example_prompt = f"Example {i+1}:\n### User's goal:\n{goal}\n### Generated Workflow: \n```json\n{tasks_str}\n```\n"
+            example_prompt = TASK_PLANNING_EXAMPLE_TEMPLATE.format(
+                example_id=i+1,
+                goal=goal,
+                workflow_inputs=workflow_inputs,
+                workflow_outputs=workflow_outputs,
+                workflow_plan=tasks_str
+            )
             prompt.append(example_prompt)
 
         return "\n".join(prompt) 

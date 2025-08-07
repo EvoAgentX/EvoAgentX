@@ -30,6 +30,7 @@ from ..storages.storages_config import DBConfig, StoreConfig, VectorStoreConfig
 from ..tools.tool import Tool, Toolkit
 from ..utils.utils import recursive_remove
 from ..workflow.workflow_graph import WorkFlowEdge, WorkFlowGraph, WorkFlowNode
+from ..core.base_config import Parameter
 
 
 class WorkFlowGenerator(BaseModule):
@@ -126,7 +127,28 @@ class WorkFlowGenerator(BaseModule):
                 cur_retries += 1
 
 
-    def generate_workflow(self, goal: str, retry: int = 1, **kwargs) -> WorkFlowGraph:
+    def generate_workflow(
+        self, 
+        goal: str, 
+        workflow_inputs: List[Parameter] = [Parameter(name="workflow_input", type="string", description="workflow input")], 
+        workflow_outputs: List[Parameter] = [Parameter(name="workflow_output", type="string", description="workflow output")], 
+        retry: int = 1, 
+        **kwargs
+    ) -> WorkFlowGraph:
+        """
+        Generate a workflow that can be used to achieve the given goal.
+
+        Args:
+            goal (str): The goal to generate a workflow for
+            workflow_inputs (List[Parameter]): List of workflow inputs
+            workflow_outputs (List[Parameter]): List of workflow outputs
+            retry (int): Number of retry attempts
+            **kwargs: Additional arguments to pass to the operation
+
+        Returns:
+            WorkFlowGraph: The generated workflow graph
+        """
+
         # Validate input
         if not goal or len(goal.strip()) < 10:
             raise ValueError("Goal must be at least 10 characters and descriptive")
@@ -145,9 +167,11 @@ class WorkFlowGenerator(BaseModule):
             operation=self.generate_plan,
             retries_left=retry,
             goal=goal,
+            workflow_inputs=workflow_inputs,
+            workflow_outputs=workflow_outputs,
             history=plan_history,
             suggestion=plan_suggestion,
-            examples=task_examples
+            examples=task_examples,
         )
         cur_retries += added_retries
 
@@ -193,6 +217,8 @@ class WorkFlowGenerator(BaseModule):
     def generate_plan(
         self, 
         goal: str, 
+        workflow_inputs: List[Parameter] = [Parameter(name="workflow_input", type="string", description="workflow input")], 
+        workflow_outputs: List[Parameter] = [Parameter(name="workflow_output", type="string", description="workflow output")],
         history: Optional[str] = None, 
         suggestion: Optional[str] = None, 
         examples: Optional[List[Dict]] = None
@@ -201,6 +227,8 @@ class WorkFlowGenerator(BaseModule):
         task_planner: TaskPlanner = self.task_planner
         task_planning_action_data = {
             "goal": goal, 
+            "workflow_inputs": workflow_inputs,
+            "workflow_outputs": workflow_outputs,
             "history": history, 
             "suggestion": suggestion, 
             "examples": examples
@@ -238,9 +266,8 @@ class WorkFlowGenerator(BaseModule):
                 agent_examples = None
 
             subtask_fields = ["name", "description", "inputs", "outputs"]
-            subtask_data = {key: value for key, value in subtask.to_dict().items() if key in subtask_fields}
-            subtask_data["inputs"] = recursive_remove(subtask_data["inputs"], ["class_name"])
-            subtask_data["outputs"] = recursive_remove(subtask_data["outputs"], ["class_name"])
+            subtask_dict = subtask.to_dict(ignore=["class_name"])
+            subtask_data = {key: value for key, value in subtask_dict.items() if key in subtask_fields}
             subtask_desc = json.dumps(subtask_data, indent=4)
             agent_generation_action_data = {
                 "goal": goal, 
@@ -385,16 +412,17 @@ class WorkFlowGenerator(BaseModule):
         self.agents_rag_engine.add(index_type="vector", nodes=Corpus(chunks=chunks))
 
 
-    def _process_agent_generator_output(self, output: AgentGenerationOutput) -> List[Dict]:
-        """Converts `AgentGenerationOutput` to list of dict.
-        Each dict in the list can be used to construct a `CustomizeAgent` or `AgentAdaptor`.
+    def _process_agent_generator_output(self, output: AgentGenerationOutput) -> List[Union[Dict, AgentAdaptor]]:
+        """Converts `AgentGenerationOutput` to list of dict or `AgentAdaptor`.
+        The dicts can be used to construct a `CustomizeAgent`. The `AgentAdaptor`
+        instances correspond to the selected prebuilt agents.
         """
         selected_agents = self._processs_selected_agents(output.selected_agents)
         generated_agents = self._process_generated_agents(output.generated_agents)
         return [*selected_agents, *generated_agents]
 
 
-    def _processs_selected_agents(self, agents: List[SelectedAgent]) -> List[Dict]:
+    def _processs_selected_agents(self, agents: List[SelectedAgent]) -> List[Agent]:
         """Converts a list of `SelectedAgent` to `AgentAdaptor` and returns their dict representation"""
         selected_agents = []
 
@@ -403,17 +431,14 @@ class WorkFlowGenerator(BaseModule):
         
         for agent in agents:
             agent = self.selected_agents_to_agents(agent)
-            agent_dict = agent.to_dict()
-            selected_agents.append(agent_dict)
+            selected_agents.append(agent)
         return selected_agents
 
 
     def selected_agents_to_agents(self, agent: SelectedAgent) -> Agent:
         """Converts `SelectedAgent` to `AgentAdaptor`"""
         prebuilt_agent = self.prebuilt_agents_map[agent.name]
-        inputs = [input.to_dict(ignore=["class_name"]) for input in agent.inputs]
-        outputs = [output.to_dict(ignore=["class_name"]) for output in agent.outputs]
-        agent_adaptor = AgentAdaptor(prebuilt_agent, inputs, outputs)
+        agent_adaptor = AgentAdaptor(agent=prebuilt_agent, inputs=agent.inputs, outputs=agent.outputs)
         return agent_adaptor
     
 
@@ -426,8 +451,6 @@ class WorkFlowGenerator(BaseModule):
         for agent in agents:
             agent_dict = agent.to_dict()
             agent_dict.pop("class_name")
-            agent_dict["inputs"] = recursive_remove(agent_dict["inputs"], ["class_name"])
-            agent_dict["outputs"] = recursive_remove(agent_dict["outputs"], ["class_name"])
             generated_agents.append(agent_dict)
         return generated_agents
 
@@ -464,7 +487,7 @@ class WorkFlowGenerator(BaseModule):
             self.rag_engine = None
             return
 
-        workflow_count = 0
+        chunks = []
         for file in os.listdir(self.workflow_folder):
             if file.endswith(".json"):
                 workflow_dict = json.load(open(os.path.join(self.workflow_folder, file)))
@@ -479,13 +502,13 @@ class WorkFlowGenerator(BaseModule):
                     text=workflow_dict["goal"],
                     metadata=metadata
                 )
-                self.rag_engine.add(index_type="vector", nodes=Corpus(chunks=[chunk]))
-                workflow_count += 1
+                chunks.append(chunk)
         
-        if workflow_count == 0:
+        self.rag_engine.add(index_type="vector", nodes=Corpus(chunks=chunks))
+        if len(chunks) == 0:
             logger.warning("No workflow json files found in the workflow folder. RAG will not be used.")
             self.rag_engine = None
         else:
-            logger.info(f"Successfully added {workflow_count} workflows to the RAG engine.")
+            logger.info(f"Successfully added {len(chunks)} workflows to the RAG engine.")
             self.rag_engine.save()
 

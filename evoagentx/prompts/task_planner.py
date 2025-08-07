@@ -12,113 +12,6 @@ TASK_PLANNER = {
 
 TASK_PLANNING_ACTION_DESC = "This action analyzes a given task, breaks it down into manageable sub-tasks, and organizes them in the optimal order to help achieve the user's goal efficiently."
 
-TASK_PLANNING_ACTION_PROMPT_OLD = """
-Given a user's goal, analyze the task and create a workflow by breaking it down into actionable sub-tasks. Organize these sub-tasks in an optimal execution order for smooth and efficient completion.
-
-### Instructions:
-1. **Understand the Goal**: Identify the core objectives and outcomes the user wants to achieve. 
-2. **Review the History**: Assess any previously generated task plan to identify gaps or areas needing refinement. 
-3. **Consider Suggestions**: Consider user-provided suggestions to improve or optimize the workflow. 
-
-4. **Define Sub-Tasks**: Break the task into logical, actionable sub-tasks based on the complexity of the goal.
-
-4.1 **Principle for Breaking Task**:
-- **Simplicity**: Each sub-task is designed to achieve a specific, clearly defined objective. Avoid overloading sub-tasks with multiple objectives. 
-- **Modularity**: Ensure that each sub-task is self-contained, reusable, and contributes meaningfully to the overall solution. 
-- **Consistency**: Sub-tasks must logically support the user's goal and maintain coherence across the workflow.
-- **Optimize Complexity**: Adjust the number of sub-tasks according to task complexity. Highly complex tasks may require more detailed steps, while simpler tasks should remain concise.
-- **Avoid Redundancy**: Ensure that there are no overlapping or unnecessary sub-tasks. 
-
-4.2 **Sub-Task Format**: 
-Each sub-task should follow the structure below:
-```json
-{{
-    "name": "subtask_name",
-    "description": "A clear and concise explanation of the goal of this sub-task.",
-    "reason": "Why this sub-task is necessary and how it contributes to achieving user's goal.",
-    "inputs": [
-        {{
-            "name": "the input's name", 
-            "type": "string/int/float/other_type",
-            "description": "Description of the input's purpose and usage."
-        }},
-        ...
-    ], 
-    "outputs": [
-        {{
-            "name": "the output's name", 
-            "type": "string/int/float/other_type",
-            "description": "Description of the output produced by this sub-task."
-        }},
-        ...
-    ]
-}}
-```
-
-### Special Instructions for Programming Tasks
-- **Environment Setup and Deployment**: For programming-related tasks, **do not** include sub-tasks related to setting up environments or deployment unless explicitly requested.
-- Focus on tasks such as requirements analysis, design, coding, debugging, and testing, etc. 
-- Ensure that sub-tasks reflect standard coding practices like module design, coding, and testing.
-
-
-### Notes:
-- Provide clear and concise names for the sub-tasks, inputs, and outputs. 
-- Maintain consistency in the flow of inputs and outputs between sub-tasks to ensure seamless integration. 
-- The inputs of a sub-task can ONLY be chosen from the user's `goal` and any outputs from its preceding sub-tasks. 
-- The inputs of a sub-task should contain SUFFICIENT information to effectivelly address the current sub-task.
-- The inputs of a sub-task MUST include the user's input `goal`. 
-- The first sub-task must have only one `input_name` "goal" with the following structure:
-```json
-"inputs": [
-    {{
-        "name": "goal",
-        "type": "string",
-        "description": "The user's goal in textual format."
-    }}
-]
-```
-
-### Output Format
-Your final output should ALWAYS in the following format:
-
-## Thought 
-Provide a brief explanation of your reasoning for breaking down the task and the chosen task structure.  
-
-## Goal
-Restate the user's goal clearly and concisely.
-
-## Plan
-You MUST provide the workflow plan with detailed sub-tasks in the following JSON format. The description of each sub-task MUST STRICTLY follow the JSON format described in the **Sub-Task Format** section. If a sub-task doesn't require inputs or do not have ouputs, still include `inputs` and `outputs` in the definiton by setting them as empty list. 
-```json
-{{
-    "sub_tasks": [
-        {{
-            "name": "subtask_name", 
-            ...
-        }}, 
-        {{
-            "name": "another_subtask_name", 
-            ...
-        }},
-        ...
-    ]
-}}
-```
-
------
-Let's begin. 
-
-### History (previously generated task plan):
-{history}
-
-### Suggestions (idea of how to design the workflow or suggestions to refine the history plan):
-{suggestion}
-
-### User's Goal:
-{goal}
-
-Output:
-"""
 
 TASK_PLANNING_ACTION_INST = """
 Your Task: Given a user's goal, break it down into clear, manageable sub-tasks that are easy to follow and efficient to execute. 
@@ -176,19 +69,8 @@ Each sub-task should follow the structure below:
 - Maintain consistency in the flow of inputs and outputs between sub-tasks to ensure seamless integration. 
 - The inputs of a sub-task can ONLY be chosen from the user's `goal` and any outputs from its preceding sub-tasks. 
 - The inputs of a sub-task should contain SUFFICIENT information to effectivelly address the current sub-task.
-- The inputs of a sub-task MUST include the user's input `goal`. 
-- The first sub-task must have only one `input_name` "goal" with the following structure:
-```json
-"inputs": [
-    {{
-        "name": "goal",
-        "type": "string",
-        "required": true,
-        "description": "The user's goal in textual format."
-    }}
-]
-```
 - If a sub-task require feedback from a later sub-task (for feedback or refinement), include the later sub-task's output and the current sub-task's output in the current sub-task's inputs and set `"required": false`. 
+- You will be provided with the inputs and outputs requirements of the workflow in the "### Workflow Inputs" and "### Workflow Outputs" sections. The first sub-task should only include the workflow inputs as its inputs. The final sub-task should only include the workflow outputs as its outputs.
 """
 
 TASK_PLANNING_ACTION_DEMOS = """
@@ -199,97 +81,130 @@ Below are some generated workflows that follow the given instructions:
 """
 
 TASK_PLANNING_EXAMPLES = """
-Example 1: 
-### User's goal: 
-Create a Python function that takes two numbers as input and returns their sum.
-### Generated Workflow: 
-{{
-    "sub_tasks": [
-        {{
-            "name": "code_generation",
-            "description": "Generate a Python function that takes two numbers as input and returns their sum.", 
-            "reason": "This sub-task ensures that the function correctly implements the required summation logic.", 
-            "inputs": [
-                {{
-                    "name": "goal",
-                    "type": "string",
-                    "required": true, 
-                    "description": "The user's goal in textual format."
-                }}
-            ],
-            "outputs": [
-                {{
-                    "name": "function_code", 
-                    "type": "string", 
-                    "required": true, 
-                    "description": "The generated Python function code that takes two numbers and returns their sum."
-                }}
-            ]
-        }}
-    ]
-}}
+Example 1:
+### User's goal:
+Given the name of a popular movie, return the 3 most recent reviews for that movie from trusted review sites (like Rotten Tomatoes, IMDb, or Metacritic). The reviews should include the review title, author, and a short summary.
 
+For instance:
+Input: movie_name = "The Dark Knight"
+Output:
+```json
+[
+    {
+        "review_title": "A Dark Masterpiece",
+        "author": "John Doe",
+        "summary": "Christopher Nolan's direction and Heath Ledger's performance make 'The Dark Knight' a must-watch."
+    },
+    {
+        "review_title": "A Cinematic Triumph",
+        "author": "Jane Smith",
+        "summary": "A captivating sequel that pushes the boundaries of superhero cinema."
+    },
+    {
+        "review_title": "A Grim Tale of Justice and Vengeance",
+        "author": "Samantha Green",
+        "summary": "*The Dark Knight* perfectly balances action and philosophy, with Christian Bale and Heath Ledger giving powerhouse performances that elevate the film to iconic status."
+    }
+]
+```
 
-Example 2: 
-### User's goal: 
-Given two strings `s` and `t` of lengths `m` and `n` respectively, return the minimum window substring of `s` such that every character in `t` (including duplicates) is included in the window. If there is no such substring, return the empty string "".
-Input: s = "ADOBECODEBANC", t = "ABC"
-Output: "BANC"
-Explanation: The minimum window substring "BANC" includes 'A', 'B', and 'C' from string t.
+### Workflow Inputs:
+```json
+[
+    {
+        "name": "movie_name",
+        "type": "string",
+        "required": true,
+        "description": "The name of the movie for which the 3 most recent reviews are needed."
+    }
+]
+```
+
+### Workflow Outputs:
+```json
+[
+    {
+        "name": "movie_reviews",
+        "type": "array",
+        "required": true,
+        "description": "An array of the 3 most recent reviews for the given movie, including the review title, author, and summary."
+    }
+]
+```
+
 ### Generated Workflow:
-{{
+```json
+{
     "sub_tasks": [
-        {{
-            "name": "task_parsing", 
-            "description": "Analyze the problem statement and extract key requirements.", 
-            "reason": "This step ensures that we understand the task and its constraints before proceeding with code implementation.", 
+        {
+            "name": "task_search",
+            "description": "Perform a web search for recent reviews of the specified movie on trusted review sites like Rotten Tomatoes, IMDb, and Metacritic.",
+            "reason": "The task gathers the most relevant and up-to-date reviews from reputable sources.",
             "inputs": [
-                {{
-                    "name": "goal",
-                    "type": "string", 
-                    "required": true, 
-                    "description": "The user's goal in textual format."
-                }}
-            ],
-            "outputs": [
-                {{
-                    "name": "problem_analysis",
+                {
+                    "name": "movie_name",
                     "type": "string",
                     "required": true,
-                    "description": "A clear and detailed analysis of the problem, including input/output format and constraints."
-                }}
-            ]
-        }}, 
-        {{
-            "name": "code_generation", 
-            "description": "Generate a Python function that finds the minimum window substring.", 
-            "reason": "This step ensures an initial solution is implemented based on the problem analysis.", 
-            "inputs": [
-                {{
-                    "name": "goal",
-                    "type": "string", 
-                    "required": true, 
-                    "description": "The original full programming task requirements."
-                }},
-                {{
-                    "name": "problem_analysis",
-                    "type": "string", 
-                    "required": true, 
-                    "description": "The clear and detailed analysis of the problem."
-                }}
+                    "description": "The name of the movie to search for."
+                }
             ],
             "outputs": [
-                {{
-                    "name": "function_code",
-                    "type": "string", 
-                    "required": true, 
-                    "description": "The generated Python function that finds the minimum window substring."
-                }}
+                {
+                    "name": "search_results",
+                    "type": "array",
+                    "required": true,
+                    "description": "A list of search results that includes recent reviews from trusted sources."
+                }
             ]
-        }}
+        },
+        {
+            "name": "task_extract_reviews",
+            "description": "Extract the 3 most recent reviews from the search results, focusing on the review title, author, and summary.",
+            "reason": "This task processes the search results to format them according to the user's needs.",
+            "inputs": [
+                {
+                    "name": "search_results",
+                    "type": "array",
+                    "required": true,
+                    "description": "The search results containing relevant movie reviews."
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "movie_reviews",
+                    "type": "array",
+                    "required": true,
+                    "description": "The 3 most recent reviews for the movie, including the review title, author, and summary."
+                }
+            ]
+        }
     ]
-}}
+}
+```
 """
+
+TASK_PLANNING_EXAMPLE_TEMPLATE = """
+Example {example_id}:
+### User's Goal:
+{goal}
+
+### Workflow Inputs:
+```json
+{workflow_inputs}
+```
+
+### Workflow Outputs:
+```json
+{workflow_outputs}
+```
+
+### Generated Workflow:
+```json
+{workflow_plan}
+```
+
+"""
+
 
 TASK_PLANNING_OUTPUT_FORMAT = """
 ### Output Format
@@ -330,6 +245,12 @@ Let's begin.
 
 ### User's Goal:
 {goal}
+
+### Workflow Inputs:
+{workflow_inputs}
+
+### Workflow Outputs:
+{workflow_outputs}
 
 Output:
 """
