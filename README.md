@@ -55,7 +55,7 @@
   - [API Key Configuration](#api-key-configuration)
   - [Configure and Use the LLM](#configure-and-use-the-llm)
 - [Automatic WorkFlow Generation](#automatic-workflow-generation)
-- [Tool-Enabled Workflows Generation](#Tool-Enabled-Workflows-Generation)
+- [Tool-Enabled Workflows Generation:](#tool-enabled-workflows-generation)
 - [Demo Video](#demo-video)
   - [✨ Final Results](#-final-results)
 - [Evolution Algorithms](#evolution-algorithms)
@@ -65,9 +65,11 @@
 - [🎯 Roadmap](#-roadmap)
 - [🙋 Support](#-support)
   - [Join the Community](#join-the-community)
+  - [Add the meeting to your calendar](#add-the-meeting-to-your-calendar)
   - [Contact Information](#contact-information)
-  - [Watch past Community Call](#Community-call)
+  - [Community Call](#community-call)
 - [🙌 Contributing to EvoAgentX](#-contributing-to-evoagentx)
+- [📖 Citation](#-citation)
 - [📚 Acknowledgements](#-acknowledgements)
 - [📄 License](#-license)
 
@@ -325,6 +327,7 @@ Explore how to effectively use EvoAgentX with the following resources:
 | **[Benchmark and Evaluation Tutorial](./docs/tutorial/benchmark_and_evaluation.md)** | **[Benchmark and Evaluation Tutorial](./docs/ColabNotebook/tutorial_notebooks/benchmark_and_evaluation.ipynb)** | Evaluate agent performance using benchmark datasets. |
 | **[TextGrad Optimizer Tutorial](./docs/tutorial/textgrad_optimizer.md)** | **[TextGrad Optimizer Tutorial](./docs/ColabNotebook/tutorial_notebooks/textgrad_optimizer.ipynb)** | Automatically optimise the prompts within multi-agent workflow with TextGrad. |
 | **[AFlow Optimizer Tutorial](./docs/tutorial/aflow_optimizer.md)** | **[AFlow Optimizer Tutorial](./docs/ColabNotebook/tutorial_notebooks/aflow_optimizer.ipynb)** | Automatically optimise both the prompts and structure of multi-agent workflow with AFlow. |
+| **[Human-In-The-Loop support](./docs/tutorial/hitl.md)** | | Enable HITL functionalities in your WorkFlow.
 <!-- | **[SEW Optimizer Tutorial](./docs/tutorial/sew_optimizer.md)** | Create SEW (Self-Evolving Workflows) to enhance agent systems. | -->
 
 🛠️ Follow the tutorials to build and optimize your EvoAgentX workflows.
