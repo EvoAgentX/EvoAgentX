@@ -70,6 +70,10 @@ dependencies = [
     "docx2txt",
     "python-pptx",
     "Pillow",
+    "PyPDF2",
+    "selenium",
+    "html2text",
+    "fastmcp",
 ]
 
 [project.optional-dependencies]

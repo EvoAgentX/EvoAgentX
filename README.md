@@ -55,6 +55,7 @@
   - [API Key Configuration](#api-key-configuration)
   - [Configure and Use the LLM](#configure-and-use-the-llm)
 - [Automatic WorkFlow Generation](#automatic-workflow-generation)
+- [Tool-Enabled Workflows Generation](#Tool-Enabled-Workflows-Generation)
 - [Demo Video](#demo-video)
   - [✨ Final Results](#-final-results)
 - [Evolution Algorithms](#evolution-algorithms)
@@ -208,6 +209,32 @@ You can also:
 
 > 📂 For a complete working example, check out the [`workflow_demo.py`](https://github.com/EvoAgentX/EvoAgentX/blob/main/examples/workflow_demo.py)
 
+## Tool-Enabled Workflows Generation:
+
+In more advanced scenarios, your workflow agents may need to use external tools. EvoAgentX allows Automatic tool integration: Provide a list of toolkits to WorkFlowGenerator. The generator will consider these and include them in the agents if appropriate.
+
+For instance, to enable an Arxiv toolkit:
+```python
+from evoagentx.tools import ArxivToolkit
+
+# Initialize a command-line toolkit for file operations
+arxiv_toolkit = ArxivToolkit()
+
+# Generate a workflow with the toolkit available to agents
+wf_generator = WorkFlowGenerator(llm=llm, tools=[arxiv_toolkit])
+workflow_graph = wf_generator.generate_workflow(goal="Find and summarize the latest research on AI in the field of finance on arXiv")
+
+# Instantiate agents with access to the toolkit
+agent_manager = AgentManager(tools=[arxiv_toolkit])
+agent_manager.add_agents_from_workflow(workflow_graph, llm_config=openai_config)
+
+workflow = WorkFlow(graph=workflow_graph, agent_manager=agent_manager, llm=llm)
+output = workflow.execute()
+print(output)
+```
+
+In this setup, the workflow generator may assign the CMDToolkit to relevant agents, enabling them to execute shell commands as part of the workflow (e.g. creating directories and files)
+
 
 ## Demo Video
 
@@ -289,15 +316,15 @@ We apply EvoAgentX to optimize their prompts. The performance of the optimized a
 
 Explore how to effectively use EvoAgentX with the following resources:
 
-| Cookbook | Description |
-|:---|:---|
-| **[Build Your First Agent](./docs/tutorial/first_agent.md)** | Quickly create and manage agents with multi-action capabilities. |
-| **[Build Your First Workflow](./docs/tutorial/first_workflow.md)** | Learn to build collaborative workflows with multiple agents. |
-| **[Working with Tools](./docs/tutorial/tools.md)** | Master EvoAgentX's powerful tool ecosystem for agent interactions |
-| **[Automatic Workflow Generation](./docs/quickstart.md#automatic-workflow-generation-and-execution)** | Automatically generate workflows from natural language goals. |
-| **[Benchmark and Evaluation Tutorial](./docs/tutorial/benchmark_and_evaluation.md)** | Evaluate agent performance using benchmark datasets. |
-| **[TextGrad Optimizer Tutorial](./docs/tutorial/textgrad_optimizer.md)** | Automatically optimise the prompts within multi-agent workflow with TextGrad. |
-| **[AFlow Optimizer Tutorial](./docs/tutorial/aflow_optimizer.md)** | Automatically optimise both the prompts and structure of multi-agent workflow with AFlow. |
+| Cookbook | Colab Notebook | Description |
+|:---|:---|:---|
+| **[Build Your First Agent](./docs/tutorial/first_agent.md)** | **[Build Your First Agent](./docs/ColabNotebook/tutorial_notebooks/first_agent.ipynb)** | Quickly create and manage agents with multi-action capabilities. |
+| **[Build Your First Workflow](./docs/tutorial/first_workflow.md)** | **[Build Your First Workflow](./docs/ColabNotebook/tutorial_notebooks/first_workflow.ipynb)** | Learn to build collaborative workflows with multiple agents. |
+| **[Working with Tools](./docs/tutorial/tools.md)** | **[Working with Tools](./docs/ColabNotebook/tutorial_notebooks/tools.ipynb)** | Master EvoAgentX's powerful tool ecosystem for agent interactions |
+| **[Automatic Workflow Generation](./docs/quickstart.md#automatic-workflow-generation-and-execution)** | **[Automatic Workflow Generation](./docs/ColabNotebook/tutorial_notebooks/quickstart.ipynb)** | Automatically generate workflows from natural language goals. |
+| **[Benchmark and Evaluation Tutorial](./docs/tutorial/benchmark_and_evaluation.md)** | **[Benchmark and Evaluation Tutorial](./docs/ColabNotebook/tutorial_notebooks/benchmark_and_evaluation.ipynb)** | Evaluate agent performance using benchmark datasets. |
+| **[TextGrad Optimizer Tutorial](./docs/tutorial/textgrad_optimizer.md)** | **[TextGrad Optimizer Tutorial](./docs/ColabNotebook/tutorial_notebooks/textgrad_optimizer.ipynb)** | Automatically optimise the prompts within multi-agent workflow with TextGrad. |
+| **[AFlow Optimizer Tutorial](./docs/tutorial/aflow_optimizer.md)** | **[AFlow Optimizer Tutorial](./docs/ColabNotebook/tutorial_notebooks/aflow_optimizer.ipynb)** | Automatically optimise both the prompts and structure of multi-agent workflow with AFlow. |
 <!-- | **[SEW Optimizer Tutorial](./docs/tutorial/sew_optimizer.md)** | Create SEW (Self-Evolving Workflows) to enhance agent systems. | -->
 
 🛠️ Follow the tutorials to build and optimize your EvoAgentX workflows.

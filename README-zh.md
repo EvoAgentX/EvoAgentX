@@ -285,15 +285,15 @@ print(output)
 
 通过以下资源了解如何有效使用EvoAgentX：
 
-| 指南 | 描述 |
-|:---|:---|
-| **[构建您的第一个智能体](./docs/zh/tutorial/first_agent.md)** | 快速创建和管理具有多动作能力的智能体。 |
-| **[构建您的第一个工作流](./docs/zh/tutorial/first_workflow.md)** | 学习如何使用多个智能体构建协作工作流。 |
-| **[使用工具](./docs/zh/tutorial/tools.md)** | 掌握 EvoAgentX 强大的工具生态系统，实现智能体交互。 |
-| **[自动工作流生成](./docs/zh/quickstart.md#automatic-workflow-generation-and-execution)** | 从自然语言目标自动生成工作流。 |
-| **[基准测试与评估教程](./docs/zh/tutorial/benchmark_and_evaluation.md)** | 使用基准数据集评估智能体性能。 |
-| **[TextGrad优化器教程](./docs/zh/tutorial/textgrad_optimizer.md)** | 使用TextGrad自动优化多智能体工作流中的提示词。 |
-| **[AFlow优化器教程](./docs/zh/tutorial/aflow_optimizer.md)** | 使用AFlow自动优化多智能体工作流的提示词和结构。 |
+| 指南 | Colab 笔记本 | 描述 |
+|:---|:---|:---|
+| **[构建您的第一个智能体](./docs/zh/tutorial/first_agent.md)** | **[构建您的第一个智能体](./docs/ColabNotebook/tutorial_notebooks_zh/first_agent.ipynb)** | 快速创建和管理具有多动作能力的智能体。 |
+| **[构建您的第一个工作流](./docs/zh/tutorial/first_workflow.md)** | **[构建您的第一个工作流](./docs/ColabNotebook/tutorial_notebooks_zh/first_workflow.ipynb)** | 学习如何使用多个智能体构建协作工作流。 |
+| **[使用工具](./docs/zh/tutorial/tools.md)** | **[使用工具](./docs/ColabNotebook/tutorial_notebooks_zh/tools.ipynb)** | 掌握 EvoAgentX 强大的工具生态系统，实现智能体交互。 |
+| **[自动工作流生成](./docs/zh/quickstart.md#automatic-workflow-generation-and-execution)** | **[自动工作流生成](./docs/ColabNotebook/tutorial_notebooks_zh/quickstart.ipynb)** | 从自然语言目标自动生成工作流。 |
+| **[基准测试与评估教程](./docs/zh/tutorial/benchmark_and_evaluation.md)** | **[基准测试与评估教程](./docs/ColabNotebook/tutorial_notebooks_zh/benchmark_and_evaluation.ipynb)** | 使用基准数据集评估智能体性能。 |
+| **[TextGrad优化器教程](./docs/zh/tutorial/textgrad_optimizer.md)** | **[TextGrad优化器教程](./docs/ColabNotebook/tutorial_notebooks_zh/textgrad_optimizer.ipynb)** | 使用TextGrad自动优化多智能体工作流中的提示词。 |
+| **[AFlow优化器教程](./docs/zh/tutorial/aflow_optimizer.md)** | **[AFlow优化器教程](./docs/ColabNotebook/tutorial_notebooks_zh/aflow_optimizer.ipynb)** | 使用AFlow自动优化多智能体工作流的提示词和结构。 |
 <!-- | **[SEW优化器教程](./docs/zh/tutorial/sew_optimizer.md)** | 创建SEW（自进化工作流）来增强智能体系统。 | -->
 
 🛠️ 通过这些教程构建和优化您的EvoAgentX工作流。
