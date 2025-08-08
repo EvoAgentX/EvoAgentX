@@ -240,8 +240,8 @@ from dotenv import load_dotenv
 load_dotenv('server/app.env')
 
 # Test configuration
-# BASE_URL = "https://evoagentx-server.fly.dev"
-BASE_URL = "http://localhost:8001"
+BASE_URL = "https://evoagentx-server.fly.dev"
+# BASE_URL = "http://localhost:8001"
 # WebSocket URL - derived from BASE_URL
 WS_BASE_URL = BASE_URL.replace("http://", "ws://").replace("https://", "wss://")
 ACCESS_TOKEN = os.getenv("EAX_ACCESS_TOKEN", "default_secret_token_change_me")

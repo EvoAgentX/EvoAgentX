@@ -19,6 +19,7 @@ from .service import (
     generate_workflow, execute_workflow, execute_workflow_with_websocket
 )
 from .cors_config import get_cors_config
+from evoagentx.core.logging import logger
 
 load_dotenv('server/app.env', override = True)
 
@@ -72,7 +73,11 @@ async def get_workflow_status(workflow_id: str):
             "workflow_graph": workflow.get("workflow_graph"),
             "execution_result": workflow.get("execution_result")
         }
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
     except Exception as e:
+        logger.error(f"Error getting workflow status for workflow_id {workflow_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error getting workflow status: {str(e)}")
 
 @app.get("/workflow/{workflow_id}/get_graph", response_model=WorkflowGraphResponse)
@@ -100,6 +105,7 @@ async def get_workflow_graph_endpoint(workflow_id: str) -> WorkflowGraphResponse
         # Re-raise HTTP exceptions as-is
         raise
     except Exception as e:
+        logger.error(f"Error retrieving workflow graph for workflow_id {workflow_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error retrieving workflow graph: {str(e)}")
 
 ### _____________________________________________
@@ -121,6 +127,7 @@ async def setup_new_project(request: ProjectSetupRequest) -> ProjectSetupRespons
             message="Project setup completed successfully with workflow generation"
         )
     except Exception as e:
+        logger.error(f"Error setting up project for project_short_id {request.project_short_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error setting up workflow: {str(e)}")
 
 @app.post("/workflow/{workflow_id}/generate", response_model=ProjectWorkflowGenerationResponse)
@@ -136,8 +143,10 @@ async def generate_workflow_with_workflow_id(workflow_id: str) -> ProjectWorkflo
             status=result["status"]
         )
     except ValueError as e:
+        logger.error(f"Workflow generation failed for workflow_id {workflow_id}: {str(e)}")
         raise HTTPException(status_code=422, detail=f"Workflow generation failed: {str(e)}")
     except Exception as e:
+        logger.error(f"Internal server error during workflow generation for workflow_id {workflow_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Internal server error during workflow generation: {str(e)}")
 
 @app.post("/workflow/{workflow_id}/execute", response_model=ProjectWorkflowExecutionResponse)
@@ -150,8 +159,10 @@ async def execute_workflow_with_workflow_id(workflow_id: str, request: ProjectWo
         result = await execute_workflow(workflow_id, request.inputs)
         return ProjectWorkflowExecutionResponse(execution_result=result)
     except ValueError as e:
+        logger.error(f"Workflow execution failed for workflow_id {workflow_id}: {str(e)}")
         raise HTTPException(status_code=422, detail=f"Workflow execution failed: {str(e)}")
     except Exception as e:
+        logger.error(f"Internal server error during workflow execution for workflow_id {workflow_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Internal server error during workflow execution: {str(e)}")
 
 ### _____________________________________________
@@ -218,18 +229,26 @@ async def execute_workflow_websocket(
                     print(f"Error sending WebSocket message: {e}")
             
             # Execute the workflow
-            result = await execute_workflow_with_websocket(
-                workflow_id=workflow_id,
-                inputs=inputs,
-                websocket_send_func=send_websocket_message
-            )
-            
-            # Send final result
-            await websocket.send_text(json.dumps({
-                "type": "complete",
-                "content": "Workflow execution completed successfully",
-                "result": result
-            }))
+            try:
+                result = await execute_workflow_with_websocket(
+                    workflow_id=workflow_id,
+                    inputs=inputs,
+                    websocket_send_func=send_websocket_message
+                )
+                
+                # Send final result
+                await websocket.send_text(json.dumps({
+                    "type": "complete",
+                    "content": "Workflow execution completed successfully",
+                    "result": result
+                }))
+            except Exception as e:
+                logger.error(f"Error during WebSocket workflow execution for workflow_id {workflow_id}: {str(e)}")
+                await websocket.send_text(json.dumps({
+                    "type": "error",
+                    "content": f"Workflow execution error: {str(e)}",
+                    "result": None
+                }))
             
         except json.JSONDecodeError:
             await websocket.send_text(json.dumps({
@@ -299,9 +318,11 @@ async def analyze_user_query_endpoint(
         
     except ValueError as e:
         # Handle service-level errors (project not found, etc.)
+        logger.error(f"User query analysis failed for project_short_id {project_short_id}: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         # Handle unexpected errors
+        logger.error(f"Internal server error during user query analysis for project_short_id {project_short_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}") 
 
 

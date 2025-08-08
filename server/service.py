@@ -110,14 +110,14 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 SUPABASE_BUCKET_REQUIREMENT = os.getenv("SUPABASE_BUCKET_REQUIREMENT")
 default_llm_config = {
-    "model": "gpt-4o-mini",
+    "model": "gpt-4o",
     "openai_key": OPENAI_API_KEY,
     # "stream": True,
     "output_response": True,
     "max_tokens": 16000
 }
 # default_llm_config = {
-#     "model": "openai/gpt-4o-mini",
+#     "model": "openai/gpt-5-mini",
 #     "openrouter_key": OPENROUTER_API_KEY,
 #     # "stream": True,
 #     "output_response": True,
