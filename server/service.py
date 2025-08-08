@@ -174,14 +174,16 @@ def create_tools_with_database(database_information: Dict[str, Any] = None) -> l
     
     # Add dynamic MongoDB toolkit if database information is available
     if database_information and database_information.get("database_name"):
-        database_name = database_information["database_name"]
-        mongodb_toolkit = create_dynamic_mongodb_toolkit(database_name)
-        tools.append(mongodb_toolkit)
-        print(f"🔧 Added dynamic MongoDB toolkit for database: {database_name}")
+        # database_name = database_information["database_name"]
+        # mongodb_toolkit = create_dynamic_mongodb_toolkit(database_name)
+        # tools.append(mongodb_toolkit)
+        # print(f"🔧 Added dynamic MongoDB toolkit for database: {database_name}")
+        print("🔧 MongoDB toolkit disabled")
     else:
-        # Add default MongoDB toolkit if no specific database info
-        tools.append(MongoDBToolkit())
-        print("🔧 Added default MongoDB toolkit")
+        # # Add default MongoDB toolkit if no specific database info
+        # tools.append(MongoDBToolkit())
+        # print("🔧 Added default MongoDB toolkit")
+        print("🔧 MongoDB toolkit disabled")
     
     return tools
 
@@ -1437,8 +1439,7 @@ async def execute_workflow_with_websocket(
                 await update_workflow_status(
                     workflow_id, 
                     "completed",
-                    execution_result=execution_result,
-                    captured_output=captured_output
+                    execution_result=execution_result
                 )
                 print(f"✅ Successfully saved execution result to database for workflow {workflow_id}")
             except Exception as e:

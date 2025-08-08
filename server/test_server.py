@@ -929,13 +929,13 @@ def run_complete_test() -> Dict[str, Any]:
     # }
     
     
-    # # Phase 4: Workflow Execution
-    # execution_passed, execution_result = test_workflow_execution(workflow_ids)
-    # test_results["phases"]["execution"] = {
-    #     "passed": execution_passed,
-    #     "timestamp": datetime.now().isoformat(),
-    #     "result": execution_result
-    # }
+    # Phase 4: Workflow Execution
+    execution_passed, execution_result = test_workflow_execution(workflow_ids)
+    test_results["phases"]["execution"] = {
+        "passed": execution_passed,
+        "timestamp": datetime.now().isoformat(),
+        "result": execution_result
+    }
     
     # # Phase 5: Status Check
     # status_passed, status_result = test_workflow_status(workflow_ids)
@@ -945,13 +945,13 @@ def run_complete_test() -> Dict[str, Any]:
     #     "result": status_result
     # }
     
-    # Phase 5: WebSocket Streaming Test
-    streaming_passed, streaming_result = test_websocket_streaming(workflow_ids)
-    test_results["phases"]["websocket_streaming"] = {
-        "passed": streaming_passed,
-        "timestamp": datetime.now().isoformat(),
-        "result": streaming_result
-    }
+    # # Phase 5: WebSocket Streaming Test
+    # streaming_passed, streaming_result = test_websocket_streaming(workflow_ids)
+    # test_results["phases"]["websocket_streaming"] = {
+    #     "passed": streaming_passed,
+    #     "timestamp": datetime.now().isoformat(),
+    #     "result": streaming_result
+    # }
     
     # # Phase 6: Status Check
     # status_passed, status_result = test_workflow_status(workflow_ids)
