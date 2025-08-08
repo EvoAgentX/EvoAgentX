@@ -6,7 +6,6 @@ from typing import Optional, List, Dict
 
 from evoagentx.agents import Agent
 from evoagentx.rag import RAGConfig
-from evoagentx.rag.schema import Query
 from evoagentx.storages.base import StorageHandler
 from evoagentx.models import BaseLLM, OpenRouterConfig, OpenRouterLLM
 from evoagentx.core.message import Message, MessageType
@@ -120,7 +119,7 @@ class DeleteMemories(Action):
             raise ValueError("LongTermMemory instance required")
         action_input_attrs = self.inputs_format.get_attrs()
         action_input_data = {attr: inputs.get(attr, []) for attr in action_input_attrs}
-        successes = memory.delete(action_input_data["memory_ids"], delete_from_db=True)
+        successes = memory.delete(action_input_data["memory_ids"])
         output = DeleteMemoriesOutput(successes=successes)
         if return_prompt:
             prompt = self.prompt.format(memory_ids=action_input_data["memory_ids"])
@@ -252,36 +251,35 @@ class SearchMemories(Action):
         return output
 
 def main():
-    OPEN_ROUNTER_API_KEY = os.environ.get("OPEN_ROUNTER_API_KEY")
-    if not OPEN_ROUNTER_API_KEY:
-        raise ValueError("OPEN_ROUNTER_API_KEY not set in environment")
-
+    OPEN_ROUNTER_API_KEY = os.environ["OPEN_ROUNTER_API_KEY"]
     config = OpenRouterConfig(
         openrouter_key=OPEN_ROUNTER_API_KEY,
         temperature=0.3,
-        model="google/gemini-2.5-pro-exp-03-25",
+        model="google/gemini-2.5-flash-lite-preview-06-17",
     )
     llm = OpenRouterLLM(config=config)
 
+    # Initialize StorageHandler
     store_config = StoreConfig(
         dbConfig=DBConfig(
             db_name="sqlite",
-            path="./debug/data/hotpotqa/cache/test_hotpotqa.sql"
+            path="./debug/data/hotpotqa/cache/test_hotpotQA.sql"
         ),
         vectorConfig=VectorStoreConfig(
             vector_name="faiss",
-            dimensions=384,  # bge-small-en-v1.5
+            dimensions=768,    # 1536: text-embedding-ada-002, 384: bge-small-en-v1.5, 768: nomic-embed-text
             index_type="flat_l2",
         ),
         graphConfig=None,
+        # graphConfig=None,
         path="./debug/data/hotpotqa/cache/indexing"
     )
     storage_handler = StorageHandler(storageConfig=store_config)
 
-    embedding = EmbeddingConfig(
-        provider="huggingface",
-        model_name=r"debug/weights/bge-small-en-v1.5",
-        device="cpu"
+    embedding=EmbeddingConfig(
+            provider="huggingface",
+            model_name=r"debug/bge-small-en-v1.5",
+            device="cpu"
     )
 
     rag_config = RAGConfig(
@@ -302,7 +300,7 @@ def main():
         retrieval=RetrievalConfig(
             retrivel_type="vector",
             postprocessor_type="simple",
-            top_k=2,
+            top_k=2,  # Retrieve top-10 contexts
             similarity_cutoff=0.3,
             keyword_filters=None,
             metadata_filters=None
@@ -312,11 +310,9 @@ def main():
     memory = LongTermMemory(
         storage_handler=storage_handler,
         rag_config=rag_config,
-        llm=llm,
-        use_llm_management=False
     )
-    memory.init_module()
 
+    # Define the agent
     memory_agent = Agent(
         name="MemoryAgent",
         description="An agent that manages long-term memory operations",
@@ -329,11 +325,11 @@ def main():
         llm_config=config
     )
 
+    actions = memory_agent.get_all_actions()
     print(f"Available actions of agent {memory_agent.name}:")
-    for action in memory_agent.get_all_actions():
+    for action in actions:
         print(f"- {action.name}: {action.description}")
 
-    # Test 1: Add memories
     messages = [
         {
             "content": "Schedule a meeting with Alice on Monday",
@@ -361,46 +357,27 @@ def main():
         action_input_data={"messages": messages},
         memory=memory
     )
-    print("\nTest 1: Added memories")
+    print("\nAdded memories:")
     print(f"Memory IDs: {add_result.content.memory_ids}")
 
-    # Test 2: Search memories with string query
+    # Search memories
     search_result = memory_agent.execute(
         action_name="SearchMemories",
         action_input_data={
             "query": "meeting",
-            "top_k": 1,
+            "top_k": 2,
             "metadata_filters": {"agent": "user"}
         },
         memory=memory
     )
-    print("\nTest 2: Search results (string query)")
+    print("\nSearch results:")
     for result in search_result.content.results:
-        print(f"- Memory ID: {result['memory_id']}, Content: {result['message'].content}")
+        print(f"- Memory ID: {result['memory_id']}, Message: {result['message'].content}")
 
-    # Test 3: Search memories with Query object
-    query = Query(
-        query_str="report",
-        top_k=1,
-        metadata_filters={"msg_type": MessageType.REQUEST.value}
-    )
-    search_result_query = memory_agent.execute(
-        action_name="SearchMemories",
-        action_input_data={
-            "query": query.query_str,
-            "top_k": query.top_k,
-            "metadata_filters": query.metadata_filters
-        },
-        memory=memory
-    )
-    print("\nTest 3: Search results (Query object)")
-    for result in search_result_query.content.results:
-        print(f"- Memory ID: {result['memory_id']}, Content: {result['message'].content}")
-
-    # Test 4: Update memories
+    # Update memories
     updates = [
         {
-            "memory_id": add_result.content.memory_ids[0] if add_result.content.memory_ids else "",
+            "memory_id": add_result.content.memory_ids[0],
             "content": "Reschedule meeting with Alice to Tuesday",
             "action": "reschedule",
             "wf_goal": "plan_meeting",
@@ -416,46 +393,31 @@ def main():
         action_input_data={"updates": updates},
         memory=memory
     )
-    print("\nTest 4: Update results")
+    print("\nUpdate results:")
     print(f"Successes: {update_result.content.successes}")
 
-    # Test 5: Save memories
-    memory.save()
-    print("\nTest 5: Saved memories to database")
-
-    # Test 6: Clear memories (in-memory only)
-    memory.clear()
-    search_after_clear = memory_agent.execute(
-        action_name="SearchMemories",
-        action_input_data={"query": "meeting", "top_k": 1},
-        memory=memory
-    )
-    print("\nTest 6: Search after clear (in-memory)")
-    print(f"Results: {len(search_after_clear.content.results)} memories found")
-
-    # Test 7: Load memories
-    loaded_ids = memory.load()
-    print("\nTest 7: Loaded memories")
-    print(f"Loaded {len(loaded_ids)} memory IDs: {loaded_ids}")
-
-    # Test 8: Delete memories
+    # Delete memories
     delete_result = memory_agent.execute(
         action_name="DeleteMemories",
         action_input_data={"memory_ids": add_result.content.memory_ids},
         memory=memory
     )
-    print("\nTest 8: Delete results")
+    print("\nDelete results:")
     print(f"Successes: {delete_result.content.successes}")
 
-    # Test 9: Clear all (including database)
-    memory.clear()
-    search_after_full_clear = memory_agent.execute(
+    # Verify the delete operation
+    new_search_result = memory_agent.execute(
         action_name="SearchMemories",
-        action_input_data={"query": "meeting", "top_k": 1},
+        action_input_data={
+            "query": "meeting",
+            "top_k": 2,
+            "metadata_filters": {"agent": "user"}
+        },
         memory=memory
     )
-    print("\nTest 9: Search after full clear")
-    print(f"Results: {len(search_after_full_clear.content.results)} memories found")
+    print("\nSearch results:")
+    for result in new_search_result.content.results:
+        print(f"- Memory ID: {result['memory_id']}, Message: {result['message'].content}")
 
 if __name__ == "__main__":
     main()
