@@ -111,7 +111,7 @@ class AgentGeneration(Action):
             if param in inputs and inputs[param] is not None:
                 prompt_params_values[param] = inputs[param]
             else:
-                prompt_params_values[param] = ""
+                prompt_params_values[param] = "None"
 
         if isinstance(prompt_params_values["examples"], list):
             prompt_params_values["examples"] = self.format_agent_examples(
@@ -127,7 +127,7 @@ class AgentGeneration(Action):
             tool_description = self.format_tools(self.tools)
             prompt_params_values["tools"] = AGENT_GENERATION_TOOLS_PROMPT.format(tools_description=tool_description)
         else:
-            prompt_params_values["tools"] = ""
+            prompt_params_values["tools"] = "None"
         
         prompt = self.prompt.format(**prompt_params_values)
         agents = llm.generate(
