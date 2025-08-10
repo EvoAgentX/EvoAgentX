@@ -4,6 +4,7 @@ from ..actions.action import Action
 from ..actions.agent_adaptor import AgentAdaptorAction
 from ..agents import Agent, CustomizeAgent
 from ..core.base_config import Parameter
+from ..core.module_utils import recursive_to_dict
 from ..core.registry import MODEL_REGISTRY
 from ..models import BaseLLM, LLMConfig, OpenAILLMConfig
 from ..utils.utils import add_llm_config_to_agent_dict
@@ -104,16 +105,13 @@ class AgentAdaptor(Agent):
             "agent": self.agent.name,
             "llm_config": self.llm_config
         }
-
         return config
 
 
     def to_dict(self, exclude_none: bool = True, ignore: List[str] = [], **kwargs) -> Dict:
         config = self.get_config()
-
-        for ignore_key in ignore:
-            config.pop(ignore_key, None)
-
+        config.pop("llm_config")
+        config = recursive_to_dict(config, exclude_none, ignore)
         return config
 
 
