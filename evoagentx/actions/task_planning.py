@@ -3,10 +3,14 @@ from typing import Dict, List, Optional
 
 from pydantic import Field
 
-from ..core.logging import logger
 from ..core.base_config import Parameter
+from ..core.logging import logger
 from ..models.base_model import BaseLLM
-from ..prompts.task_planner import TASK_PLANNING_ACTION, TASK_PLANNING_EXAMPLES, TASK_PLANNING_EXAMPLE_TEMPLATE
+from ..prompts.task_planner import (
+    TASK_PLANNING_ACTION,
+    TASK_PLANNING_EXAMPLE_TEMPLATE,
+    TASK_PLANNING_EXAMPLES,
+)
 from ..workflow.workflow_graph import WorkFlowNode
 from .action import Action, ActionInput, ActionOutput
 
@@ -77,7 +81,7 @@ class TaskPlanning(Action):
             if param in inputs and inputs[param] is not None:
                 prompt_params_values[param] = inputs[param]
             else:
-                prompt_params_values[param] = ""
+                prompt_params_values[param] = "None"
         
         if isinstance(prompt_params_values["examples"], list) and len(prompt_params_values["examples"]) > 0:
             prompt_params_values["examples"] = self.format_task_planning_examples(
