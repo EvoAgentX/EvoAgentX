@@ -1,5 +1,0 @@
-Algorithm,Best Prompt,Test Accuracy
-DE,"<prompt>Before we solve this issue like a detective step by step to ensure we have the right solution,</prompt>",0.6250
-GA,"<composite_prompt>
-  Let's collaboratively deconstruct and analyze this issue meticulously. Together, we will systematically untangle this challenge.
-</composite_prompt>",0.6875
