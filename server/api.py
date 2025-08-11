@@ -14,14 +14,14 @@ from .models import (
     ProjectWorkflowExecutionRequest, ProjectWorkflowExecutionResponse, UserQueryRequest, UserQueryResponse,
     WorkflowGraphResponse
 )
-from .service import (
-    setup_project, get_workflow, list_workflows, 
-    generate_workflow, execute_workflow, execute_workflow_with_websocket
+from .core import (
+    setup_project, generate_workflow, execute_workflow, execute_workflow_with_websocket,
+    get_workflow, list_workflows
 )
-from .cors_config import get_cors_config
+from .config.cors_config import get_cors_config
 from evoagentx.core.logging import logger
 
-load_dotenv('server/app.env', override = True)
+load_dotenv('config/app.env', override = True)
 
 
 

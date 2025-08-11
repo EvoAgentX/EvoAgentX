@@ -10,7 +10,7 @@ import re
 from datetime import datetime
 from typing import Dict, Any, List, Optional, Callable, Type
 from io import StringIO
-from dotenv import load_dotenv
+# Environment variables are loaded in main.py from config/app.env
 
 from evoagentx.workflow import WorkFlowGenerator, WorkFlowGraph, WorkFlow
 from evoagentx.models import LLMConfig
@@ -29,81 +29,9 @@ import threading
 import time
 from contextlib import redirect_stdout, redirect_stderr
 
-load_dotenv(os.path.join(os.path.dirname(__file__), 'app.env'))
-MONGODB_URL = os.getenv("MONGODB_URL", None)
+# Environment variables are loaded in main.py from config/app.env
 
-def parse_workflow_output(output: str) -> Dict[str, Any]:
-    """
-    Parse workflow execution output using enhanced JSON parsing.
-    
-    This function attempts to extract structured data from workflow outputs
-    using multiple parsing strategies.
-    
-    Args:
-        output: The raw output string from workflow execution
-        
-    Returns:
-        Dict containing parsed result with keys:
-        - "original_message": Original output message
-        - "parsed_json": Extracted structured data (dict)
-    """
-    if not isinstance(output, str):
-        return {
-            "original_message": str(output),
-            "parsed_json": None
-        }
-    
-    result = {
-        "original_message": output,
-        "parsed_json": None
-    }
-    
-    # Strategy 1: Try EvoAgentX parsing utilities
-    try:
-        from evoagentx.models.base_model import LLMOutputParser
-        parser = LLMOutputParser.parse(output, parse_mode="json")
-        structured_data = parser.get_structured_data()
-        if structured_data and len(structured_data) > 0:
-            result["parsed_json"] = structured_data
-            return result
-    except Exception:
-        pass
-    
-    # Strategy 2: Try direct JSON parsing
-    try:
-        import json
-        # Look for JSON patterns in the output
-        import re
-        json_pattern = r'\{[^{}]*\}'
-        matches = re.findall(json_pattern, output)
-        if matches:
-            # Try to parse the first JSON match
-            parsed = json.loads(matches[0])
-            result["parsed_json"] = parsed
-            return result
-    except Exception:
-        pass
-    
-    # Strategy 3: Try to extract JSON from code blocks
-    try:
-        import re
-        code_block_pattern = r'```(?:json)?\s*\n(.*?)\n\s*```'
-        matches = re.findall(code_block_pattern, output, re.DOTALL)
-        if matches:
-            import json
-            parsed = json.loads(matches[0].strip())
-            result["parsed_json"] = parsed
-            return result
-    except Exception:
-        pass
-    
-    # Strategy 4: If all else fails, create a simple structure
-    try:
-        result["parsed_json"] = {"workflow_output": output}
-    except Exception:
-        pass
-    
-    return result
+from .utils.output_parser import parse_workflow_output
 
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -137,55 +65,21 @@ sudo_execution_result = None
 
 # default_tools = MCPToolkit(config_path=MCP_CONFIG_PATH).get_tools()
 # default_tools += [FileTool()]
-from evoagentx.tools import GoogleFreeSearchToolkit, DDGSSearchToolkit, WikipediaSearchToolkit, ArxivToolkit, MongoDBToolkit, StorageToolkit, CMDToolkit, RSSToolkit
-default_tools = [GoogleFreeSearchToolkit(), DDGSSearchToolkit(), WikipediaSearchToolkit(), ArxivToolkit(), MongoDBToolkit(), StorageToolkit(), CMDToolkit(), RSSToolkit()]
-
-def create_dynamic_mongodb_toolkit(database_name: str = None) -> MongoDBToolkit:
-    """
-    Create a MongoDB toolkit dynamically using the extracted database name.
-    
-    Args:
-        database_name: The database name extracted from requirements
-        
-    Returns:
-        MongoDBToolkit instance configured with the database
-    """
-    if not database_name:
-        # If no database name provided, create a default toolkit
-        return MongoDBToolkit()
-    
-    # Create toolkit with the specific database name
-    return MongoDBToolkit(
-        connection_string=MONGODB_URL,
-        database_name=database_name
-    )
+from evoagentx.tools import GoogleFreeSearchToolkit, DDGSSearchToolkit, WikipediaSearchToolkit, ArxivToolkit, StorageToolkit, CMDToolkit, RSSToolkit
+default_tools = [GoogleFreeSearchToolkit(), DDGSSearchToolkit(), WikipediaSearchToolkit(), ArxivToolkit(), StorageToolkit(), CMDToolkit(), RSSToolkit()]
 
 def create_tools_with_database(database_information: Dict[str, Any] = None) -> list:
     """
-    Create tools list with dynamic MongoDB toolkit based on database information.
+    Create tools list (database tools disabled).
     
     Args:
-        database_information: Database information extracted from requirements
+        database_information: Database information (ignored)
         
     Returns:
-        List of tools including dynamic MongoDB toolkit
+        List of tools without database toolkit
     """
-    tools = [GoogleFreeSearchToolkit(), DDGSSearchToolkit(), WikipediaSearchToolkit(), ArxivToolkit(), StorageToolkit(), CMDToolkit(), RSSToolkit()]
-    
-    # Add dynamic MongoDB toolkit if database information is available
-    if database_information and database_information.get("database_name"):
-        # database_name = database_information["database_name"]
-        # mongodb_toolkit = create_dynamic_mongodb_toolkit(database_name)
-        # tools.append(mongodb_toolkit)
-        # print(f"🔧 Added dynamic MongoDB toolkit for database: {database_name}")
-        print("🔧 MongoDB toolkit disabled")
-    else:
-        # # Add default MongoDB toolkit if no specific database info
-        # tools.append(MongoDBToolkit())
-        # print("🔧 Added default MongoDB toolkit")
-        print("🔧 MongoDB toolkit disabled")
-    
-    return tools
+    print("🔧 Database tools disabled")
+    return []
 
 
 async def retrieve_requirement_from_storage(project_short_id: str) -> str:
@@ -357,7 +251,7 @@ async def execute_workflow_from_config(workflow: Dict[str, Any], llm_config_dict
         llm_config_dict: LLM configuration dictionary
         mcp_config: Optional MCP configuration dictionary
         inputs: Optional inputs dictionary to pass to async_execute
-        database_information: Optional database information for dynamic MongoDB toolkit creation
+        database_information: Optional database information (currently ignored - database tools disabled)
         
     Returns:
         Dict containing only the essential execution results:
@@ -383,7 +277,7 @@ async def execute_workflow_from_config(workflow: Dict[str, Any], llm_config_dict
         else:
             workflow_graph: WorkFlowGraph = WorkFlowGraph.from_dict(workflow)
         
-        # Create tools with dynamic MongoDB toolkit
+        # Create tools (database tools disabled)
         tools = []
         if mcp_config:
             mcp_toolkit = MCPToolkit(config=mcp_config)
@@ -662,10 +556,10 @@ async def execute_workflow(workflow_id: str, inputs: Dict[str, Any]) -> Dict[str
         
         print(f"🚀 Executing workflow: {workflow_name}")
         
-        # Get database information for dynamic MongoDB toolkit
+        # Get database information (currently ignored - database tools disabled)
         database_information = task_info.get("database_information")
         
-        # Execute the workflow with database information
+        # Execute the workflow (database tools disabled)
         execution_result = await execute_workflow_from_config(
             workflow_graph, 
             default_llm_config, 
@@ -1390,7 +1284,7 @@ async def execute_workflow_with_websocket(
         await progress_tracker.send_progress_update("executing", 0.3, f"Executing workflow: {workflow_name}")
         await progress_tracker.send_status_update("running", 0.3, "initializing")
         
-        # Get database information for dynamic MongoDB toolkit
+        # Get database information (currently ignored - database tools disabled)
         database_information = task_info.get("database_information")
         
         # Setup WebSocket enhanced sink
@@ -1403,7 +1297,7 @@ async def execute_workflow_with_websocket(
             # Send node progress for workflow initialization
             await progress_tracker.send_node_progress("workflow_init", "running", 0.5, "Initializing workflow components...")
             
-            # Execute the workflow with database information
+            # Execute the workflow (database tools disabled)
             execution_result = await execute_workflow_from_config(
                 workflow_graph, 
                 default_llm_config, 

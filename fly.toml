@@ -22,9 +22,7 @@ primary_region = 'sea'
   path = '/health'
   protocol = 'http'
 
-
-
 [[vm]]
-  memory = '1gb'
+  memory = '2gb'
   cpu_kind = 'shared'
   cpus = 1

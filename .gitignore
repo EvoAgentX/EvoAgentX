@@ -125,3 +125,5 @@ evoagentx/app/app.env
 server/tunnel_info.json
 server/mcp.config
 server/app.env
+server/config/app.env
+server/config/mcp.config

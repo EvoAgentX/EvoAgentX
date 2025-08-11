@@ -9,7 +9,7 @@ from datetime import datetime
 from .api import app
 from dotenv import load_dotenv
 
-load_dotenv(os.path.join(os.path.dirname(__file__), 'app.env'), override=True)
+load_dotenv(os.path.join(os.path.dirname(__file__), 'config/app.env'), override=True)
 target_port = 8001
 CREATE_PUBLIC_TUNNEL = False
 # TUNNEL_METHOD = "ngrok"

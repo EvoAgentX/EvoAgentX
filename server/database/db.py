@@ -12,7 +12,7 @@ import uuid
 # Setup logger
 logger = logging.getLogger(__name__)
 from dotenv import load_dotenv
-load_dotenv(os.path.join(os.path.dirname(__file__), 'config/app.env'), override=True)
+load_dotenv(os.path.join(os.path.dirname(__file__), '../config/app.env'), override=True)
 
 # Abstract Database Interface
 class Database(ABC):
