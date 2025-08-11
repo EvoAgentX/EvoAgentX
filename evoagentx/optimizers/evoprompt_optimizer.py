@@ -341,8 +341,6 @@ Please provide the paraphrased version in the following format:
     
     async def _log_evaluation_details(self, benchmark: BIGBenchHard, dataset: List[Dict], 
                                         predictions: List[str], scores: List[float], eval_mode: str,
-                                        # --- [修改] ---
-                                        # 接收总结性分数的参数
                                         accuracy: float, correct_count: int, total_count: int):
             if not self.enable_logging:
                 return
@@ -356,15 +354,13 @@ Please provide the paraphrased version in the following format:
             with open(filepath, 'w', newline='', encoding='utf-8') as f:
                 writer = csv.writer(f)
                 
-                # --- [新增] ---
-                # 在文件顶部写入总结信息
                 writer.writerow(['Metric', 'Value'])
                 writer.writerow(['Overall_Accuracy', f"{accuracy:.6f}"])
                 writer.writerow(['Correct_Count', correct_count])
                 writer.writerow(['Total_Count', total_count])
-                writer.writerow([]) # 添加一个空行以作分隔
+                writer.writerow([])
 
-                # 写入原来的详细数据表头
+                # Write detailed data header
                 writer.writerow(['example_id', 'input_text', 'prediction', 'ground_truth', 'score'])
                 
                 for i, example in enumerate(dataset):
@@ -379,16 +375,14 @@ Please provide the paraphrased version in the following format:
                         label,
                         scores[i]
                     ])
-    # 在 EvopromptOptimizer 基类中
 
     def _log_generation(self, generation: int, combos_with_scores: List[tuple]):
         """
-        记录基于“组合”的进化过程中的每一代日志。
+        Log generation data for combination-based evolution.
         """
         if not self.enable_logging:
             return
         
-        # 文件名已经修改，不再包含 "de_"
         filename = f"combo_generation_{generation:02d}_log.csv"
         filepath = os.path.join(self.log_dir, filename)
         
@@ -398,11 +392,10 @@ Please provide the paraphrased version in the following format:
             writer.writerow(header)
             timestamp = datetime.now().isoformat()
             
-            # 按分数从高到低排序以供日志记录
             sorted_combos = sorted(combos_with_scores, key=lambda x: x[1], reverse=True)
             
             for combo_rank, (combination, avg_score) in enumerate(sorted_combos):
-                combo_id = f"combo_rank_{combo_rank + 1}" # ID从1开始
+                combo_id = f"combo_rank_{combo_rank + 1}"
                 for node_name, prompt_text in combination.items():
                     writer.writerow([
                         combo_id,
@@ -576,8 +569,6 @@ Please provide the paraphrased version in the following format:
                 raise TypeError(f"Unsupported type for tracked parameter '{node_name}': {type(initial_value)}. Must be str or list.")
             self.node_populations[node_name] = node_population
             self.node_scores[node_name] = [0.0] * self.population_size
-    
-    # 在 EvopromptOptimizer 类中
 
     async def evaluate(self, benchmark: BIGBenchHard, eval_mode: str = "test") -> Dict[str, float]:
         """
@@ -615,8 +606,6 @@ Please provide the paraphrased version in the following format:
         logger.info(f"{eval_mode.capitalize()} Set Accuracy: {accuracy:.4f} ({int(correct_count)}/{total_count})")
         
         if self.enable_logging:
-            # --- [修改] ---
-            # 将总结性分数传递给日志记录函数
             await self._log_evaluation_details(
                 benchmark, dataset, predictions, scores, eval_mode, 
                 accuracy, int(correct_count), total_count
@@ -678,20 +667,16 @@ Now process the given prompts and provide your output in the following format:
         )
 
     async def _perform_node_evolution(self, node_name: str, node_population: List[str],
-                                      # 注意：在新的组合进化模式下，我们不再依赖个体分数进行选择，所以node_scores是可选的
                                       node_scores: List[float] = None, 
                                       evolution_agent: Callable = None) -> List[str]:
-        # 如果没有提供分数，则采用随机选择
         probabilities = None
         if node_scores:
             total_fitness = sum(node_scores)
             if total_fitness > 0:
                 probabilities = [s / total_fitness for s in node_scores]
 
-        # 如果没有提供进化智能体，则使用默认的
         agent = evolution_agent or self.ga_agent
         
-        # 在新的组合模式下，每个节点的种群大小可能不等于population_size，我们繁衍等量的子代
         num_children_to_create = len(node_population)
         evolution_tasks = []
         for _ in range(num_children_to_create):
@@ -715,14 +700,12 @@ Now process the given prompts and provide your output in the following format:
         self._best_score_so_far = -float('inf')
         self._generations_without_improvement = 0
 
-        # --- full_evaluation=True 保持原样，进行基于节点的进化 ---
         if self.full_evaluation:
             logger.info("--- Starting Node-Based Evolution with Makeup Evaluation (full_evaluation=True) ---")
             
-            # 初始评估 (Generation 0)
             print("--- Step 1: Initial evaluation of node combinations... ---")
             combinations = self._generate_combinations(self.node_populations)
-            combination_scores = await self._evaluate_combinations_and_update_node_scores(combinations, benchmark, dev_set, assign_zero_for_unsampled=False) # 初始评估不惩罚
+            combination_scores = await self._evaluate_combinations_and_update_node_scores(combinations, benchmark, dev_set)
             
             self._log_generation_summary(0, "Initial")
             self._log_detailed_evaluation(0, combinations, combination_scores)
@@ -737,12 +720,10 @@ Now process the given prompts and provide your output in the following format:
                 self.avg_combo_scores_per_gen["Gen_0"] = np.mean(combination_scores)
                 logger.info(f"Early stopping baseline set to initial best combination score: {self._best_score_so_far:.4f}")
 
-            # --- [开始进化循环] ---
             for t in range(self.iterations):
                 generation_start_time = time.time()
                 print(f"\n--- Generation {t + 1}/{self.iterations} ---")
 
-                # 1. 进化: 从当前父代生成子代
                 children_populations = {}
                 for node_name in self.node_populations.keys():
                     children = await self._perform_node_evolution(
@@ -750,19 +731,16 @@ Now process the given prompts and provide your output in the following format:
                     )
                     children_populations[node_name] = children
                 
-                # 2. 种群合并: 将父代和子代合并为大的候选池
                 current_populations = {
                     name: self.node_populations[name] + children_populations[name]
                     for name in self.node_populations.keys()
                 }
                 self.node_populations = current_populations
 
-                # 3. 主评估: 对大候选池进行组合评估，暂时给未采样个体赋0分
                 print(f"Performing main evaluation for {len(list(current_populations.values())[0])} individuals in each node...")
                 combinations = self._generate_combinations(self.node_populations)
-                combination_scores = await self._evaluate_combinations_and_update_node_scores(combinations, benchmark, dev_set, assign_zero_for_unsampled=True)
+                combination_scores = await self._evaluate_combinations_and_update_node_scores(combinations, benchmark, dev_set)
                 
-                # 4. 补充评估: 识别并为未被采样的“遗珠”进行补考
                 prompts_needing_makeup = []
                 for node_name, scores in self.node_scores.items():
                     for idx, score in enumerate(scores):
@@ -775,20 +753,17 @@ Now process the given prompts and provide your output in the following format:
                 if prompts_needing_makeup:
                     print(f"--- Performing makeup evaluation for {len(prompts_needing_makeup)} unsampled individuals... ---")
                     makeup_combinations = []
-                    # 为每个遗珠创建1个补充组合
                     for node_name, idx, prompt in prompts_needing_makeup:
                         makeup_combo = {name: random.choice(pop) for name, pop in self.node_populations.items()}
-                        makeup_combo[node_name] = prompt # 确保该遗珠在组合中
+                        makeup_combo[node_name] = prompt
                         makeup_combinations.append(makeup_combo)
                     
                     makeup_scores = await self._evaluate_combination_list(makeup_combinations, benchmark, dev_set)
 
-                    # 用补考成绩更新遗珠的分数
                     for i, (node_name, idx, prompt) in enumerate(prompts_needing_makeup):
                         self.node_scores[node_name][idx] = makeup_scores[i]
                         logger.info(f"Updated score for '{prompt[:30]}...' to {makeup_scores[i]:.4f} after makeup eval.")
 
-                # 5. 选择: 所有个体都有了真实分数，现在进行选择
                 print("--- Selecting survivors for the next generation... ---")
                 survivor_populations = {}
                 survivor_scores = {}
@@ -806,11 +781,9 @@ Now process the given prompts and provide your output in the following format:
                         survivor_scores[node_name], survivor_populations[node_name] = [], []
                     print(f"Node {node_name}: Selected top {len(survivor_populations[node_name])} from {len(population)} individuals")
                 
-                # 更新到下一代的种群
                 self.node_populations = survivor_populations
                 self.node_scores = survivor_scores
 
-                # 6. 日志与早停检查
                 generation_time = time.time() - generation_start_time
                 print(f"Generation {t + 1} completed in {generation_time:.2f}s")
                 self._log_generation_summary(t + 1, "Evolution")
@@ -838,21 +811,16 @@ Now process the given prompts and provide your output in the following format:
                         logger.warning(f"\n--- EARLY STOPPING TRIGGERED at generation {t + 1} ---")
                         break
 
-        # --- [全新逻辑] full_evaluation=False，执行您设计的基于组合的进化 ---
         else:
             logger.info("--- Starting Combo-Based Evolution (full_evaluation=False) ---")
             
-            # 1. 创建并评估初始的“组合种群”
             print("--- Step 1: Creating and evaluating initial combination population... ---")
-            # 注意：这里的 population_size 现在指代“组合”的数量
             initial_combinations = self._generate_combinations(self.node_populations)
             initial_scores = await self._evaluate_combination_list(initial_combinations, benchmark, dev_set)
             
-            # 将组合和分数打包，并根据分数排序，保留最好的 N 个 (N=population_size)
             combo_population_with_scores = sorted(zip(initial_combinations, initial_scores), key=lambda x: x[1], reverse=True)
             combo_population_with_scores = combo_population_with_scores[:self.population_size]
             
-            # 记录第0代分数
             gen_0_scores = [score for _, score in combo_population_with_scores]
             if gen_0_scores:
                 best_gen_score = max(gen_0_scores)
@@ -863,39 +831,31 @@ Now process the given prompts and provide your output in the following format:
                 print(f"Generation 0 complete. Best score: {best_gen_score:.4f}, Avg score: {avg_gen_score:.4f}")
                 logger.info(f"Early stopping baseline set to: {self._best_score_so_far:.4f}")
             
-            self._log_generation(0, combo_population_with_scores) # 复用DE的日志函数来记录组合
+            self._log_generation(0, combo_population_with_scores)
 
-            # 开始进化循环
             for t in range(self.iterations):
                 print(f"\n--- Generation {t + 1}/{self.iterations} (Combo Evolution) ---")
                 
-                # 2. 从当前存活的父代组合中，提取出所有“个体Prompt”作为基因池
                 parent_prompts_for_node = {name: [] for name in initial_config.keys()}
                 for combo, _ in combo_population_with_scores:
                     for node_name, prompt in combo.items():
                         parent_prompts_for_node[node_name].append(prompt)
 
-                # 3. 使用这些基因池进化出“子代Prompt”
                 children_populations = {}
                 for node_name, prompts in parent_prompts_for_node.items():
-                    # 在此模式下，个体没有独立分数，所以随机交叉变异
                     children_populations[node_name] = await self._perform_node_evolution(node_name, prompts)
 
-                # 4. 用子代Prompt创建“子代组合”并评估
                 print("Evaluating new child combinations...")
                 child_combinations = self._generate_combinations(children_populations)
                 child_scores = await self._evaluate_combination_list(child_combinations, benchmark, dev_set)
                 child_combos_with_scores = list(zip(child_combinations, child_scores))
 
-                # 5. 选择：合并父代和子代组合，选出最优的 N 个
                 print("Selecting best combinations from parents and children...")
                 combined_population = combo_population_with_scores + child_combos_with_scores
                 
-                # 按分数排序并选择
                 sorted_combos = sorted(combined_population, key=lambda x: x[1], reverse=True)
-                combo_population_with_scores = sorted_combos[:self.population_size] # 保留最优的 N 个
+                combo_population_with_scores = sorted_combos[:self.population_size]
 
-                # 记录和日志
                 self._log_generation(t + 1, combo_population_with_scores)
                 current_scores = [score for _, score in combo_population_with_scores]
                 best_gen_score = max(current_scores) if current_scores else 0
@@ -906,7 +866,6 @@ Now process the given prompts and provide your output in the following format:
                 self.avg_combo_scores_per_gen[gen_name] = avg_gen_score
                 print(f"Generation {t + 1} complete. Best score: {best_gen_score:.4f}, Avg score: {avg_gen_score:.4f}")
 
-                # 早停检查
                 if self.enable_early_stopping:
                     if best_gen_score > self._best_score_so_far + 1e-6:
                         self._best_score_so_far = best_gen_score
@@ -920,7 +879,6 @@ Now process the given prompts and provide your output in the following format:
                         logger.warning(f"\n--- EARLY STOPPING TRIGGERED at generation {t + 1} ---")
                         break
         
-        # --- 优化结束，返回最优结果 ---
         print("\n--- Evolution complete ---")
         if self.full_evaluation:
              best_config = {
@@ -928,14 +886,12 @@ Now process the given prompts and provide your output in the following format:
                 for name in self.node_populations.keys() if self.node_populations.get(name) and self.node_scores.get(name)
             }
         else:
-            # 在组合进化模式下，最优配置是得分最高的那个组合
             best_config, _ = max(combo_population_with_scores, key=lambda x: x[1]) if combo_population_with_scores else ({}, 0)
 
         self._log_optimization_summary("GA", best_config)
         self.apply_cfg(best_config)
         logger.info("Optimization finished! The best configuration has been applied to the program.")
         
-        # 返回主分数和节点分数（在组合模式下，节点分数是空的）
         return best_config, self.best_combo_scores_per_gen, self.avg_scores_per_gen
 
 
@@ -1058,7 +1014,6 @@ Please provide the final evolved prompt in the following format:
         if not dev_set:
             raise ValueError("Benchmark has no development set.")
         
-        # 重置早停计数器
         self._best_score_so_far = -float('inf')
         self._generations_without_improvement = 0
         
@@ -1074,7 +1029,6 @@ Please provide the final evolved prompt in the following format:
         self.avg_combo_scores_per_gen["Gen_0"] = initial_avg
         print(f"Initial population - Best score: {initial_best:.4f}, Avg score: {initial_avg:.4f}")
 
-        # 更新初始最佳分数用于早停判断
         if initial_scores:
             self._best_score_so_far = initial_best
         
@@ -1103,9 +1057,7 @@ Please provide the final evolved prompt in the following format:
             self.avg_combo_scores_per_gen[gen_name] = avg_gen_score
             print(f"Generation {t + 1} complete. Best score: {best_gen_score:.4f}, Avg score: {avg_gen_score:.4f}")
 
-            # --- 早停逻辑 ---
             if self.enable_early_stopping:
-                # 使用一个小的容差(epsilon)来比较浮点数
                 if best_gen_score > self._best_score_so_far + 1e-6:
                     self._best_score_so_far = best_gen_score
                     self._generations_without_improvement = 0
@@ -1117,13 +1069,12 @@ Please provide the final evolved prompt in the following format:
                 if self._generations_without_improvement >= self.early_stopping_patience:
                     logger.warning(f"\n--- EARLY STOPPING TRIGGERED at generation {t + 1} ---")
                     logger.warning(f"No improvement in best score for {self.early_stopping_patience} consecutive generations.")
-                    break # 退出优化循环
+                    break
 
         print("\n--- Combination-Level Evolution complete ---")
         best_combination, best_score = max(combo_pop_with_scores, key=lambda x: x[1]) if combo_pop_with_scores else ({}, 0)
         logger.info(f"Optimization finished! Best combination found with score {best_score:.4f}.")
         
-        # 使用"DE"作为算法名称记录日志
         self._log_optimization_summary("DE", best_combination)
         self.apply_cfg(best_combination)
         return best_combination, self.best_combo_scores_per_gen, self.avg_combo_scores_per_gen
