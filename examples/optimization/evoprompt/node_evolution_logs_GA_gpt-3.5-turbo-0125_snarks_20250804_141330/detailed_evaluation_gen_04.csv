@@ -1,0 +1,13 @@
+Combination_ID,Average_Score,cot_prefix_node_Prompt_Preview,Generation,Timestamp
+combo_0,0.580000,"<step><logical>Before we dive into the answer, let...",4,2025-08-04T14:16:06.615924
+combo_1,0.640000,Let's methodically think together and break this p...,4,2025-08-04T14:16:06.615924
+combo_2,0.660000,"<composite_prompt>
+  We'll methodically break this...",4,2025-08-04T14:16:06.615924
+combo_3,0.640000,<compound><simple>The answer is after the proof.</...,4,2025-08-04T14:16:06.615924
+combo_4,0.680000,<compound><step><logical>Before we dive into the a...,4,2025-08-04T14:16:06.615924
+combo_5,0.580000,"Before we dive into the answer,",4,2025-08-04T14:16:06.615924
+combo_6,0.680000,"<composite_prompt>
+  We'll methodically break this...",4,2025-08-04T14:16:06.615924
+combo_7,0.580000,Let's break this problem down step by step.,4,2025-08-04T14:16:06.615924
+combo_8,0.580000,<step><logical>Let’s think about this in a step by...,4,2025-08-04T14:16:06.615924
+combo_9,0.620000,"<Before we dive into the answer, Let's think step ...",4,2025-08-04T14:16:06.615924

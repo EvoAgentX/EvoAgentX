@@ -1,0 +1,15 @@
+Node_Name,Individual_ID,Prompt_Text,Fitness_Score,Status,Rank_in_Node,Generation,Timestamp
+cot_prefix_node,cot_prefix_node_0,"<composite_prompt>
+  We'll methodically break this problem down step by step together.
+</composite_prompt>",0.680000,Best,1,4,2025-08-04T14:16:06.615512
+cot_prefix_node,cot_prefix_node_1,"<compound><step><logical>Before we dive into the answer, let’s think about this in a step by step way to be sure we have the right answer logically.</logical></step><simple>The answer is after the pro...",0.680000,Survivor,2,4,2025-08-04T14:16:06.615512
+cot_prefix_node,cot_prefix_node_2,"<composite_prompt>
+  We'll methodically break this problem down step by step together. Let's collaborate and dissect this issue thoroughly.
+</composite_prompt>",0.660000,Survivor,3,4,2025-08-04T14:16:06.615512
+cot_prefix_node,cot_prefix_node_3,Let's methodically think together and break this problem down step by step.,0.640000,Survivor,4,4,2025-08-04T14:16:06.615512
+cot_prefix_node,cot_prefix_node_4,<compound><simple>The answer is after the proof.</simple><simple>We'll methodically break this problem down step by step together.</simple></compound>,0.640000,Survivor,5,4,2025-08-04T14:16:06.615512
+cot_prefix_node,cot_prefix_node_5,"<Before we dive into the answer, Let's think step by step. We'll methodically work through this problem together.> Let's break this problem down step by step.",0.620000,Survivor,6,4,2025-08-04T14:16:06.615512
+cot_prefix_node,cot_prefix_node_6,"Before we dive into the answer,",0.580000,Survivor,7,4,2025-08-04T14:16:06.615512
+cot_prefix_node,cot_prefix_node_7,Let's break this problem down step by step.,0.580000,Survivor,8,4,2025-08-04T14:16:06.615512
+cot_prefix_node,cot_prefix_node_8,<step><logical>Let’s think about this in a step by step way to be sure we have the right answer logically.</logical></step>,0.580000,Survivor,9,4,2025-08-04T14:16:06.615512
+cot_prefix_node,cot_prefix_node_9,<step><logical>Let’s think about this in a step by step way to be sure we have the right answer logically.</logical></step>,0.580000,Survivor,10,4,2025-08-04T14:16:06.615512

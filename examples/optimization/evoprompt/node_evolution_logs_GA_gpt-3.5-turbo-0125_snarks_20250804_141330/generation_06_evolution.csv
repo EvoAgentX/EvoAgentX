@@ -1,0 +1,20 @@
+Node_Name,Individual_ID,Prompt_Text,Fitness_Score,Status,Rank_in_Node,Generation,Timestamp
+cot_prefix_node,cot_prefix_node_0,"<composite_prompt>
+  We'll methodically break this problem down step by step together. Let's collaborate and dissect this issue thoroughly. We'll work together to unravel this challenge in a systemati...",0.700000,Best,1,6,2025-08-04T14:17:11.033103
+cot_prefix_node,cot_prefix_node_1,"<composite_prompt>
+  We'll methodically break this problem down step by step together. Let's collaborate and dissect this issue thoroughly. We'll work together to unravel this challenge in a systemati...",0.700000,Survivor,2,6,2025-08-04T14:17:11.033103
+cot_prefix_node,cot_prefix_node_2,"<composite_prompt>
+  We'll methodically break this problem down step by step together. Let's collaborate and dissect this issue thoroughly. We'll work together to unravel this challenge in a systemati...",0.700000,Survivor,3,6,2025-08-04T14:17:11.033103
+cot_prefix_node,cot_prefix_node_3,"<composite_prompt>
+  We'll methodically break this problem down step by step together.
+</composite_prompt>",0.680000,Survivor,4,6,2025-08-04T14:17:11.033103
+cot_prefix_node,cot_prefix_node_4,"<compound><step><logical>Before we dive into the answer, let’s think about this in a step by step way to be sure we have the right answer logically.</logical></step><simple>The answer is after the pro...",0.680000,Survivor,5,6,2025-08-04T14:17:11.033103
+cot_prefix_node,cot_prefix_node_5,"<composite_prompt>
+  We'll methodically break this problem down step by step together. Let’s think about this in a step by step way to be sure we have the right answer logically. Let's collaborate and...",0.680000,Survivor,6,6,2025-08-04T14:17:11.033103
+cot_prefix_node,cot_prefix_node_6,"<composite_prompt>
+  We'll methodically break this problem down step by step together.
+</composite_prompt>",0.680000,Survivor,7,6,2025-08-04T14:17:11.033103
+cot_prefix_node,cot_prefix_node_7,"<compound><step><logical>Before we dive into the answer, let’s think about this in a step by step way to be sure we have the right answer logically.</logical></step><simple>The answer is after the pro...",0.680000,Survivor,8,6,2025-08-04T14:17:11.033103
+cot_prefix_node,cot_prefix_node_8,"<composite_prompt>
+  We'll methodically break this problem down step by step together. Let's think about this in a logical way to ensure we have the right answer. Let’s collaborate and dissect this is...",0.660000,Survivor,9,6,2025-08-04T14:17:11.033103
+cot_prefix_node,cot_prefix_node_9,"<compound><simple>The answer is after the proof.</simple><simple>We'll methodically break this problem down step by step together.</simple><logical>Before we dive into the answer, let’s think about th...",0.660000,Survivor,10,6,2025-08-04T14:17:11.033103

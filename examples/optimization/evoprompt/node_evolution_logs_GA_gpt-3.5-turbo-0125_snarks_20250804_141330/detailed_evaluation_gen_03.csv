@@ -1,0 +1,12 @@
+Combination_ID,Average_Score,cot_prefix_node_Prompt_Preview,Generation,Timestamp
+combo_0,0.560000,"<Before we dive into the answer, Let's think step ...",3,2025-08-04T14:15:55.579495
+combo_1,0.580000,Let's break this problem down step by step.,3,2025-08-04T14:15:55.579495
+combo_2,0.640000,Let's methodically think together and break this p...,3,2025-08-04T14:15:55.579495
+combo_3,0.620000,"<Before we dive into the answer, Let's methodicall...",3,2025-08-04T14:15:55.579495
+combo_4,0.580000,"Before we dive into the answer,",3,2025-08-04T14:15:55.579495
+combo_5,0.580000,"<step><logical>Before we dive into the answer, let...",3,2025-08-04T14:15:55.579495
+combo_6,0.620000,"<Before we dive into the answer, Let's think step ...",3,2025-08-04T14:15:55.579495
+combo_7,0.580000,<step><logical>Let’s think about this in a step by...,3,2025-08-04T14:15:55.579495
+combo_8,0.640000,<compound><simple>The answer is after the proof.</...,3,2025-08-04T14:15:55.579495
+combo_9,0.680000,"<composite_prompt>
+  We'll methodically break this...",3,2025-08-04T14:15:55.579495

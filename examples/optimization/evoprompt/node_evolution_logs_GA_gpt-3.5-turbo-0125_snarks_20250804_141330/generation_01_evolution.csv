@@ -1,0 +1,11 @@
+Node_Name,Individual_ID,Prompt_Text,Fitness_Score,Status,Rank_in_Node,Generation,Timestamp
+cot_prefix_node,cot_prefix_node_0,Let's think step by step.,0.680000,Best,1,1,2025-08-04T14:15:06.050732
+cot_prefix_node,cot_prefix_node_1,Let’s think about this logically.,0.660000,Survivor,2,1,2025-08-04T14:15:06.050732
+cot_prefix_node,cot_prefix_node_2,We'll methodically work through this problem together.,0.640000,Survivor,3,1,2025-08-04T14:15:06.050732
+cot_prefix_node,cot_prefix_node_3,"Before we dive into the answer,",0.580000,Survivor,4,1,2025-08-04T14:15:06.050732
+cot_prefix_node,cot_prefix_node_4,Let's break this problem down step by step.,0.580000,Survivor,5,1,2025-08-04T14:15:06.050732
+cot_prefix_node,cot_prefix_node_5,Let’s think,0.580000,Survivor,6,1,2025-08-04T14:15:06.050732
+cot_prefix_node,cot_prefix_node_6,<compound><simple>The answer is after the proof.</simple><simple>Let’s think</simple></compound>,0.580000,Survivor,7,1,2025-08-04T14:15:06.050732
+cot_prefix_node,cot_prefix_node_7,<step><logical>Let’s think about this in a step by step way to be sure we have the right answer logically.</logical></step>,0.580000,Survivor,8,1,2025-08-04T14:15:06.050732
+cot_prefix_node,cot_prefix_node_8,"<Before we dive into the answer, Let's think step by step.>",0.560000,Survivor,9,1,2025-08-04T14:15:06.050732
+cot_prefix_node,cot_prefix_node_9,Let’s solve this problem by splitting it into steps.,0.460000,Survivor,10,1,2025-08-04T14:15:06.050732

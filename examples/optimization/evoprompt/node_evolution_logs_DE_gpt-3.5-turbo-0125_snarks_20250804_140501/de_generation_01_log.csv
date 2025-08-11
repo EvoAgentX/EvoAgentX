@@ -1,0 +1,11 @@
+Combination_ID,Combination_Score,Node_Name,Prompt_Text,Generation,Timestamp
+combo_rank_0,0.680000,cot_prefix_node,Let's think step by step.,1,2025-08-04T14:06:55.072366
+combo_rank_1,0.660000,cot_prefix_node,Let’s think,1,2025-08-04T14:06:55.072366
+combo_rank_2,0.660000,cot_prefix_node,<prompt>Let’s solve this problem by diving into the answer systematically.</prompt>,1,2025-08-04T14:06:55.072366
+combo_rank_3,0.640000,cot_prefix_node,We'll tackle this math task one piece at a time.,1,2025-08-04T14:06:55.072366
+combo_rank_4,0.640000,cot_prefix_node,Let’s tackle this task like a detective one piece at a time.,1,2025-08-04T14:06:55.072366
+combo_rank_5,0.640000,cot_prefix_node,"Let's approach this logically, step by step.",1,2025-08-04T14:06:55.072366
+combo_rank_6,0.640000,cot_prefix_node,"First,",1,2025-08-04T14:06:55.072366
+combo_rank_7,0.620000,cot_prefix_node,"Before we systematically work out this math task to ensure we have the right answer,",1,2025-08-04T14:06:55.072366
+combo_rank_8,0.600000,cot_prefix_node,Let's systematically work this out before we dive into the answer to ensure we have the right solution.,1,2025-08-04T14:06:55.072366
+combo_rank_9,0.560000,cot_prefix_node,Let's tackle this problem one piece at a time by splitting it into steps.,1,2025-08-04T14:06:55.072366

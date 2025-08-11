@@ -1,0 +1,13 @@
+Node_Name,Individual_ID,Prompt_Text,Fitness_Score,Status,Rank_in_Node,Generation,Timestamp
+cot_prefix_node,cot_prefix_node_0,Let's think step by step.,0.680000,Best,1,2,2025-08-04T14:15:22.994071
+cot_prefix_node,cot_prefix_node_1,"<composite_prompt>
+  We'll methodically break this problem down step by step together.
+</composite_prompt>",0.680000,Survivor,2,2,2025-08-04T14:15:22.994071
+cot_prefix_node,cot_prefix_node_2,We'll methodically work through this problem together.,0.640000,Survivor,3,2,2025-08-04T14:15:22.994071
+cot_prefix_node,cot_prefix_node_3,"<Before we dive into the answer, Let's think step by step. We'll methodically work through this problem together.>",0.600000,Survivor,4,2,2025-08-04T14:15:22.994071
+cot_prefix_node,cot_prefix_node_4,"Before we dive into the answer,",0.580000,Survivor,5,2,2025-08-04T14:15:22.994071
+cot_prefix_node,cot_prefix_node_5,Let's break this problem down step by step.,0.580000,Survivor,6,2,2025-08-04T14:15:22.994071
+cot_prefix_node,cot_prefix_node_6,<step><logical>Let’s think about this in a step by step way to be sure we have the right answer logically.</logical></step>,0.580000,Survivor,7,2,2025-08-04T14:15:22.994071
+cot_prefix_node,cot_prefix_node_7,"<Before we dive into the answer, Let's think step by step.>",0.560000,Survivor,8,2,2025-08-04T14:15:22.994071
+cot_prefix_node,cot_prefix_node_8,"<Before we dive into the answer, Let's think step by step.>",0.560000,Survivor,9,2,2025-08-04T14:15:22.994071
+cot_prefix_node,cot_prefix_node_9,<compound><simple>The answer is after the proof.</simple><simple>Let's break this problem down step by step.</simple></compound>,0.560000,Survivor,10,2,2025-08-04T14:15:22.994071

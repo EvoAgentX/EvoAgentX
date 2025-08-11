@@ -1,0 +1,17 @@
+Combination_ID,Average_Score,cot_prefix_node_Prompt_Preview,Generation,Timestamp
+combo_0,0.680000,<compound><step><logical>Before we dive into the a...,8,2025-08-04T14:18:28.029035
+combo_1,0.700000,"<composite_prompt>
+  We'll methodically break this...",8,2025-08-04T14:18:28.029035
+combo_2,0.700000,"<composite_prompt>
+  Let's meticulously and method...",8,2025-08-04T14:18:28.029035
+combo_3,0.760000,"<composite_prompt>
+  Let's methodically break this...",8,2025-08-04T14:18:28.029035
+combo_4,0.700000,"<composite_prompt>
+  Let's meticulously deconstruc...",8,2025-08-04T14:18:28.029035
+combo_5,0.620000,<compound><step><logical>Before we dive into the a...,8,2025-08-04T14:18:28.029035
+combo_6,0.700000,<compound><step><logical>Before we dive into the a...,8,2025-08-04T14:18:28.029035
+combo_7,0.680000,"<composite_prompt>
+  We'll methodically break this...",8,2025-08-04T14:18:28.029035
+combo_8,0.700000,"<composite_prompt>
+  Let's methodically break this...",8,2025-08-04T14:18:28.029035
+combo_9,0.620000,<compound><logical>We'll methodically break this p...,8,2025-08-04T14:18:28.029035

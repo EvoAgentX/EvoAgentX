@@ -1,0 +1,15 @@
+Combination_ID,Combination_Score,Node_Name,Prompt_Text,Generation,Timestamp
+combo_rank_0,0.880000,direct_prompt_node,"From the two sentences provided, (A) and (B), identify which one contains sarcasm. Respond by indicating your final selection in the format: FINAL_ANSWER((A)).",4,2025-08-03T22:21:31.507648
+combo_rank_0,0.880000,expert_prompt_node,"<Prompt>
+As a specialist in both language and humor, examine the two sentences labeled (A) and (B), ascertain the sarcastic nature of, and present your conclusion enclosed in FINAL_REPLY{{...}} syntax...",4,2025-08-03T22:21:31.507648
+combo_rank_0,0.880000,cot_prompt_node,"Analyze the context and possible double entendres in sentences (A) and (B). Identify which of the sentences employs sarcasm through careful reasoning, and finally, output your answer as: FINAL_ANSWER(...",4,2025-08-03T22:21:31.507648
+combo_rank_1,0.840000,direct_prompt_node,"Given the two sentences labeled (A) and (B), identify which one contains sarcasm. Respond by indicating your final selection in the format: FINAL_ANSWER((A)).",4,2025-08-03T22:21:31.507648
+combo_rank_1,0.840000,expert_prompt_node,"<Prompt>
+As a specialist in both language and humor, examine the two sentences labeled (A) and (B), assess whether the sentences are sarcastic, and present your conclusion enclosed in FINAL_RESPONSE{{...",4,2025-08-03T22:21:31.507648
+combo_rank_1,0.840000,cot_prompt_node,"Analyze the context and possible double entendres in sentences (A) and (B). Identify which of the sentences employs sarcasm through careful reasoning, and finally, output your answer as: FINAL_ANSWER(...",4,2025-08-03T22:21:31.507648
+combo_rank_2,0.840000,direct_prompt_node,"Given the two sentences labeled (A) and (B), identify which one contains sarcasm. Reply with your final selection enclosed as: FINAL_ANSWER((A))",4,2025-08-03T22:21:31.507648
+combo_rank_2,0.840000,expert_prompt_node,"As a specialist in both language and humor, examine the two sentences labeled (A) and (B), determine which one is sarcastic, and present your conclusion enclosed in FINAL_ANSWER((...)) syntax.",4,2025-08-03T22:21:31.507648
+combo_rank_2,0.840000,cot_prompt_node,"Analyze the context and possible double entendres present in sentences (A) and (B). Determine which one employs sarcasm by reasoning through each step, and finally, present your answer in the format: ...",4,2025-08-03T22:21:31.507648
+combo_rank_3,0.840000,direct_prompt_node,"Given the two sentences labeled (A) and (B), identify which one is sarcastic. Respond by indicating your final selection in the format: FINAL_ANSWER((A)).",4,2025-08-03T22:21:31.507648
+combo_rank_3,0.840000,expert_prompt_node,"As a specialist in both language and humor, examine the two sentences labeled (A) and (B), determine which one is sarcastic, and present your conclusion enclosed in FINAL_ANSWER((...)) syntax.",4,2025-08-03T22:21:31.507648
+combo_rank_3,0.840000,cot_prompt_node,"Analyze the context and possible double entendres in sentences (A) and (B). Determine which sentence employs sarcasm by reasoning carefully through each step, and then present your final answer enclos...",4,2025-08-03T22:21:31.507648
