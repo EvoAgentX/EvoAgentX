@@ -43,6 +43,30 @@ workflow_generation_output = ProjectWorkflowGenerationResponse
 workflow_execution_input = ProjectWorkflowExecutionRequest
 workflow_execution_output = ProjectWorkflowExecutionResponse
 
+### _____________________________________________
+### Parallel Workflow Generation Models
+### _____________________________________________
+
+class WorkflowGenerationStatus(BaseModel):
+    """Status model for individual workflow generation"""
+    workflow_id: str
+    workflow_name: str
+    status: str  # pending, generating, completed, failed
+    progress: Optional[float] = None  # 0.0 to 1.0
+    error_message: Optional[str] = None
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+
+class ParallelWorkflowGenerationResponse(BaseModel):
+    """Response model for parallel workflow generation status"""
+    project_short_id: str
+    total_workflows: int
+    completed_workflows: int
+    failed_workflows: int
+    workflows: List[WorkflowGenerationStatus]
+    overall_status: str  # running, completed, failed
+    estimated_completion_time: Optional[str] = None
+
 ## Database Schema for Workflow Storage:
 # workflow_id: str (Primary Key)
 # project_short_id: str  # Project identifier

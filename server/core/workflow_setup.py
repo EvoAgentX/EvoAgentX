@@ -8,12 +8,15 @@ import json
 import os
 from typing import Dict, Any, List
 from dotenv import load_dotenv
+from datetime import datetime
 
 from evoagentx.workflow import WorkFlowGenerator, WorkFlowGraph, WorkFlow
 from evoagentx.models import LLMConfig
 from evoagentx.models.model_configs import OpenAILLMConfig, OpenRouterConfig
 from evoagentx.models.model_utils import create_llm_instance
 from evoagentx.core.module_utils import parse_json_from_text
+from evoagentx.tools import MCPToolkit
+from evoagentx.tools import GoogleFreeSearchToolkit, DDGSSearchToolkit, WikipediaSearchToolkit, ArxivToolkit, StorageToolkit, CMDToolkit, RSSToolkit
 
 from ..prompts import WORKFLOW_GENERATION_GOAL_PROMPT, WORKFLOW_REQUIREMENT_PROMPT
 from ..database.db import database, requirement_database
@@ -29,6 +32,9 @@ default_llm_config = {
 
 # Supabase configuration
 SUPABASE_BUCKET_REQUIREMENT = os.getenv("SUPABASE_BUCKET_REQUIREMENT", "requirements")
+
+# Default tools for workflow generation
+default_tools = [GoogleFreeSearchToolkit(), DDGSSearchToolkit(), WikipediaSearchToolkit(), ArxivToolkit(), StorageToolkit(), CMDToolkit(), RSSToolkit()]
 
 async def retrieve_requirement_from_storage(project_short_id: str) -> str:
     """
@@ -132,8 +138,24 @@ async def generate_workflow_from_goal(goal: str, llm_config_dict: Dict[str, Any]
     """
     Generate a workflow from a goal.
     """
-    # For now, return a placeholder - this will be implemented in workflow_generation.py
-    return f"Generated workflow for goal: {goal}"
+    try:
+        # Convert dictionary to appropriate LLM config object and create LLM instance
+        llm_config = create_llm_config(llm_config_dict)
+        llm = create_llm_instance(llm_config)
+        
+        if mcp_config:
+            tools = MCPToolkit(config=mcp_config)
+        else:
+            tools = default_tools
+    except Exception as e:
+        print(f"Error initializing components: {e}")
+        return None
+    
+    workflow_generator = WorkFlowGenerator(llm=llm, tools=tools)
+    
+    # Generate the workflow
+    workflow_graph: WorkFlowGraph = workflow_generator.generate_workflow(goal=goal)
+    return workflow_graph
 
 
 async def setup_project(project_short_id: str) -> List[Dict[str, Any]]:
@@ -150,6 +172,31 @@ async def setup_project(project_short_id: str) -> List[Dict[str, Any]]:
     extracted_data = await extract_workflow_requirements(detailed_requirements)
     
     print(f"✅ Extracted {len(extracted_data['workflows'])} workflows")
+    
+    # Create initial workflow records with "uninitialized" status
+    print(f"📝 Creating initial workflow records...")
+    for extracted_workflow in extracted_data["workflows"]:
+        workflow_id = extracted_workflow["workflow_id"]
+        task_info = {
+            "workflow_name": extracted_workflow["workflow_name"],
+            "workflow_requirement": extracted_workflow["workflow_requirement"],
+            "workflow_inputs": extracted_workflow["workflow_inputs"],
+            "workflow_outputs": extracted_workflow["workflow_outputs"],
+            "database_information": extracted_data["database_information"]
+        }
+        
+        # Create initial workflow document with "uninitialized" status
+        workflow_doc = {
+            "id": workflow_id,
+            "status": "uninitialized",  # Start with uninitialized
+            "task_info": task_info,
+            "workflow_graph": None,  # No workflow graph yet
+            "project_short_id": project_short_id,
+            "execution_result": None
+        }
+        
+        await database.insert("workflows", workflow_doc)
+        print(f"📝 Created initial workflow record: {workflow_id} (status: uninitialized)")
     
     # Generate workflows for each extracted workflow
     print(f"🏗️ Generating workflows...")
@@ -197,31 +244,22 @@ async def setup_project(project_short_id: str) -> List[Dict[str, Any]]:
     
     print(f"✅ Generated {len(generated_workflows)} workflows")
     
-    # Insert each workflow as individual records and create workflow configs
+    # Update workflow records with generated workflows and set status to pending
     workflow_configs = []
     for workflow_data in generated_workflows:
         workflow_id = workflow_data["workflow_id"]
-        # Create task_info with workflow details
-        task_info = {
-            "workflow_name": workflow_data["workflow_name"],
-            "workflow_requirement": workflow_data["workflow_requirement"],
-            "workflow_inputs": workflow_data["workflow_inputs"],
-            "workflow_outputs": workflow_data["workflow_outputs"],
-            "database_information": extracted_data["database_information"]
-        }
         
-        # Create individual workflow document according to database schema
-        workflow_doc = {
-            "id": workflow_id,
-            "status": "pending",
-            "task_info": task_info,
-            "workflow_graph": workflow_data["workflow_graph"],
-            "project_short_id": project_short_id,
-            "execution_result": None
-        }
-        
-        await database.insert("workflows", workflow_doc)
-        print(f"✅ Created workflow record: {workflow_id}")
+        # Update the existing workflow record with generated data and set status to pending
+        await database.update(
+            "workflows",
+            {"id": workflow_id},
+            {
+                "workflow_graph": workflow_data["workflow_graph"],
+                "status": "pending",  # Set to pending after successful generation
+                "updated_at": datetime.now()
+            }
+        )
+        print(f"✅ Updated workflow record: {workflow_id} (status: pending)")
         
         # Create workflow config for response
         workflow_config = {
@@ -235,3 +273,310 @@ async def setup_project(project_short_id: str) -> List[Dict[str, Any]]:
         workflow_configs.append(workflow_config)
     
     return workflow_configs
+
+async def setup_project_parallel(project_short_id: str) -> List[Dict[str, Any]]:
+    """
+    Phase 1: Setup workflow with extraction AND parallel generation with retry logic.
+    This is an enhanced version with parallel execution and automatic retries.
+    Takes the same input as setup_project: project_short_id
+    Returns a list of workflow configurations.
+    """
+    # Retrieve requirement document from storage
+    print(f"📥 Retrieving requirement document for project {project_short_id}...")
+    detailed_requirements = await retrieve_requirement_from_storage(project_short_id)
+    
+    # Extract workflows and database info
+    print(f"🔍 Extracting workflows from detailed requirements...")
+    extracted_data = await extract_workflow_requirements(detailed_requirements)
+    
+    print(f"✅ Extracted {len(extracted_data['workflows'])} workflows")
+    
+    # Create initial workflow records with "uninitialized" status
+    print(f"📝 Creating initial workflow records...")
+    for extracted_workflow in extracted_data["workflows"]:
+        workflow_id = extracted_workflow["workflow_id"]
+        task_info = {
+            "workflow_name": extracted_workflow["workflow_name"],
+            "workflow_requirement": extracted_workflow["workflow_requirement"],
+            "workflow_inputs": extracted_workflow["workflow_inputs"],
+            "workflow_outputs": extracted_workflow["workflow_outputs"],
+            "database_information": extracted_data["database_information"]
+        }
+        
+        # Create initial workflow document with "uninitialized" status
+        workflow_doc = {
+            "id": workflow_id,
+            "status": "uninitialized",  # Start with uninitialized
+            "task_info": task_info,
+            "workflow_graph": None,  # No workflow graph yet
+            "project_short_id": project_short_id,
+            "execution_result": None
+        }
+        
+        await database.insert("workflows", workflow_doc)
+        print(f"📝 Created initial workflow record: {workflow_id} (status: uninitialized)")
+    
+    # Generate workflows for each extracted workflow in parallel with retry logic
+    print(f"🏗️ Generating workflows in parallel with retry logic...")
+    
+    # Create semaphore to limit concurrent LLM API calls (rate limiting)
+    concurrency_level = int(os.getenv("PARALLEL_WORKFLOW_CONCURRENCY", "5"))
+    semaphore = asyncio.Semaphore(concurrency_level)  # Use configurable concurrency level
+    print(f"   Using concurrency level: {concurrency_level}")
+    
+    async def generate_single_workflow_with_retry(extracted_workflow: Dict[str, Any], max_retries: int = 2) -> Dict[str, Any]:
+        """Generate a single workflow with retry logic and rate limiting"""
+        workflow_id = extracted_workflow["workflow_id"]
+        workflow_name = extracted_workflow["workflow_name"]
+        
+        for attempt in range(max_retries + 1):
+            try:
+                async with semaphore:
+                    if attempt > 0:
+                        print(f"   🔄 Retry {attempt} for workflow: {workflow_name}")
+                    else:
+                        print(f"   Generating workflow: {workflow_name}")
+                    
+                    # Use WORKFLOW_GENERATION_GOAL_PROMPT with proper structure
+                    formatted_goal = WORKFLOW_GENERATION_GOAL_PROMPT.format(
+                        workflow_inputs=extracted_workflow["workflow_inputs"],
+                        workflow_outputs=extracted_workflow["workflow_outputs"],
+                        requirement=extracted_workflow["workflow_requirement"]
+                    )
+                    
+                    # Generate workflow
+                    workflow_graph = await generate_workflow_from_goal(
+                        formatted_goal, 
+                        default_llm_config, 
+                        mcp_config={}
+                    )
+                    
+                    try:
+                        if hasattr(workflow_graph, 'get_config'):
+                            workflow_dict = workflow_graph.get_config()
+                        elif hasattr(workflow_graph, 'get_workflow_description'):
+                            workflow_dict = {
+                                "goal": workflow_graph.goal,
+                                "description": workflow_graph.get_workflow_description()
+                            }
+                        else:
+                            workflow_dict = str(workflow_graph)
+                    except Exception as e:
+                        workflow_dict = f"Workflow generated successfully (serialization error: {str(e)})"
+                    
+                    return {
+                        "workflow_name": workflow_name,
+                        "workflow_id": workflow_id,
+                        "workflow_requirement": extracted_workflow["workflow_requirement"],
+                        "workflow_inputs": extracted_workflow["workflow_inputs"],
+                        "workflow_outputs": extracted_workflow["workflow_outputs"],
+                        "workflow_graph": workflow_dict,
+                        "success": True
+                    }
+                    
+            except Exception as e:
+                error_msg = f"Attempt {attempt + 1} failed: {str(e)}"
+                print(f"   ❌ {error_msg}")
+                
+                if attempt < max_retries:
+                    # Wait before retry (exponential backoff)
+                    wait_time = 2 ** attempt
+                    print(f"   ⏳ Waiting {wait_time}s before retry...")
+                    await asyncio.sleep(wait_time)
+                else:
+                    # Final failure - return error info instead of updating database
+                    return {
+                        "workflow_name": workflow_name,
+                        "workflow_id": workflow_id,
+                        "workflow_requirement": extracted_workflow["workflow_requirement"],
+                        "workflow_inputs": extracted_workflow["workflow_inputs"],
+                        "workflow_outputs": extracted_workflow["workflow_outputs"],
+                        "workflow_graph": f"Workflow generation failed after {max_retries + 1} attempts. Last error: {str(e)}",
+                        "success": False,
+                        "error": str(e)
+                    }
+    
+    # Create concurrent tasks for all workflow generations
+    workflow_tasks = [
+        generate_single_workflow_with_retry(extracted_workflow) 
+        for extracted_workflow in extracted_data["workflows"]
+    ]
+    
+    # Execute all workflow generations concurrently
+    generated_workflows = await asyncio.gather(*workflow_tasks, return_exceptions=True)
+    
+    # Handle results from parallel execution
+    processed_workflows = []
+    for i, result in enumerate(generated_workflows):
+        if isinstance(result, Exception):
+            print(f"❌ Error generating workflow {extracted_data['workflows'][i]['workflow_name']}: {str(result)}")
+            # Create a fallback workflow entry for failed generations
+            fallback_workflow = {
+                "workflow_name": extracted_data['workflows'][i]['workflow_name'],
+                "workflow_id": extracted_data['workflows'][i]['workflow_id'],
+                "workflow_requirement": extracted_data['workflows'][i]['workflow_requirement'],
+                "workflow_inputs": extracted_data['workflows'][i]['workflow_inputs'],
+                "workflow_outputs": extracted_data['workflows'][i]['workflow_outputs'],
+                "workflow_graph": f"Workflow generation failed after retries: {str(result)}",
+                "success": False,
+                "error": str(result)
+            }
+            processed_workflows.append(fallback_workflow)
+        else:
+            # Check if the result has success flag
+            if hasattr(result, 'get') and result.get("success") is False:
+                print(f"❌ Workflow generation failed for {result['workflow_name']}: {result.get('error', 'Unknown error')}")
+            else:
+                print(f"✅ Workflow generation succeeded for {result['workflow_name']}")
+            processed_workflows.append(result)
+    
+    print(f"✅ Generated {len(processed_workflows)} workflows (parallel execution with retry)")
+    
+    # Update workflow records with generated workflows and set appropriate status
+    workflow_configs = []
+    for workflow_data in processed_workflows:
+        workflow_id = workflow_data["workflow_id"]
+        
+        # Set status based on generation success
+        if workflow_data.get("success", True):
+            status = "pending"  # Set to pending after successful generation
+        else:
+            status = "failed"   # Set to failed if generation failed
+        
+        # Update the existing workflow record with generated data and status
+        await database.update(
+            "workflows",
+            {"id": workflow_id},
+            {
+                "workflow_graph": workflow_data["workflow_graph"],
+                "status": status,
+                "updated_at": datetime.now()
+            }
+        )
+        print(f"✅ Updated workflow record: {workflow_id} (status: {status})")
+        
+        # Create workflow config for response
+        workflow_config = {
+            "workflow_id": workflow_id,
+            "workflow_name": workflow_data["workflow_name"],
+            "workflow_inputs": workflow_data["workflow_inputs"],
+            "workflow_outputs": workflow_data["workflow_outputs"],
+            "workflow_graph": workflow_data["workflow_graph"],
+        }
+        
+        workflow_configs.append(workflow_config)
+    
+    return workflow_configs
+
+async def get_project_workflow_status(project_short_id: str) -> Dict[str, Any]:
+    """
+    Get the status of parallel workflow generation for a project.
+    Returns detailed status of all workflows being generated.
+    """
+    try:
+        # Find all workflows for the project
+        workflows = await database.find_many("workflows", {"project_short_id": project_short_id})
+        
+        if not workflows:
+            raise ValueError(f"No workflows found for project {project_short_id}")
+        
+        # Calculate overall statistics
+        total_workflows = len(workflows)
+        uninitialized_workflows = sum(1 for w in workflows if w.get("status") == "uninitialized")
+        completed_workflows = sum(1 for w in workflows if w.get("status") == "completed")
+        failed_workflows = sum(1 for w in workflows if w.get("status") == "failed")
+        pending_workflows = sum(1 for w in workflows if w.get("status") == "pending")
+        
+        # Determine overall status
+        if failed_workflows == total_workflows:
+            overall_status = "failed"
+        elif uninitialized_workflows == total_workflows:
+            overall_status = "uninitialized"
+        elif pending_workflows == total_workflows:
+            overall_status = "pending"
+        elif completed_workflows == total_workflows:
+            overall_status = "completed"
+        elif failed_workflows > 0:
+            overall_status = "completed_with_failures"
+        else:
+            overall_status = "running"
+        
+        # Build individual workflow statuses
+        workflow_statuses = []
+        for workflow in workflows:
+            # Calculate progress based on status
+            if workflow.get("status") == "completed":
+                progress = 1.0
+            elif workflow.get("status") == "failed":
+                progress = 0.0
+            elif workflow.get("status") == "pending":
+                progress = 0.5  # Generation complete, ready for execution
+            elif workflow.get("status") == "uninitialized":
+                progress = 0.0  # Not started yet
+            else:
+                progress = 0.0
+            
+            # Extract error information from workflow_graph if it contains error message
+            error_message = None
+            workflow_graph = workflow.get("workflow_graph", "")
+            if isinstance(workflow_graph, str) and "Workflow generation failed" in workflow_graph:
+                error_message = workflow_graph
+            
+            # Handle datetime fields safely
+            started_at = None
+            completed_at = None
+            
+            created_at = workflow.get("created_at")
+            if created_at:
+                if hasattr(created_at, 'isoformat'):
+                    started_at = created_at.isoformat()
+                elif isinstance(created_at, str):
+                    started_at = created_at
+                else:
+                    started_at = str(created_at)
+            
+            updated_at = workflow.get("updated_at")
+            if updated_at and workflow.get("status") == "completed":
+                if hasattr(updated_at, 'isoformat'):
+                    completed_at = updated_at.isoformat()
+                elif isinstance(updated_at, str):
+                    completed_at = updated_at
+                else:
+                    completed_at = str(updated_at)
+            
+            status = {
+                "workflow_id": workflow["id"],
+                "workflow_name": workflow.get("task_info", {}).get("workflow_name", "Unknown"),
+                "status": workflow.get("status", "pending"),
+                "progress": progress,
+                "error_message": error_message,
+                "started_at": started_at,
+                "completed_at": completed_at
+            }
+            workflow_statuses.append(status)
+        
+        # Calculate estimated completion time based on current progress
+        estimated_completion_time = None
+        if overall_status == "running" and completed_workflows > 0:
+            # Simple estimation: assume remaining workflows take same time as completed ones
+            remaining_workflows = total_workflows - completed_workflows - failed_workflows
+            if remaining_workflows > 0:
+                # This is a placeholder - in a real implementation, you'd track actual timing
+                estimated_minutes = remaining_workflows * 2  # Assume 2 minutes per workflow
+                estimated_completion_time = f"~{estimated_minutes} minutes"
+        
+        return {
+            "project_short_id": project_short_id,
+            "total_workflows": total_workflows,
+            "uninitialized_workflows": uninitialized_workflows,
+            "completed_workflows": completed_workflows,
+            "failed_workflows": failed_workflows,
+            "pending_workflows": pending_workflows,
+            "workflows": workflow_statuses,
+            "overall_status": overall_status,
+            "estimated_completion_time": estimated_completion_time,
+            "success_rate": f"{(completed_workflows / total_workflows * 100):.1f}%" if total_workflows > 0 else "0%"
+        }
+        
+    except Exception as e:
+        raise ValueError(f"Failed to get project workflow status: {str(e)}")

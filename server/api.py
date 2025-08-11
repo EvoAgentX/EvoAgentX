@@ -12,7 +12,7 @@ from contextlib import asynccontextmanager
 from .models import (
     ProjectSetupRequest, ProjectSetupResponse, ProjectWorkflowGenerationRequest, ProjectWorkflowGenerationResponse,
     ProjectWorkflowExecutionRequest, ProjectWorkflowExecutionResponse, UserQueryRequest, UserQueryResponse,
-    WorkflowGraphResponse
+    WorkflowGraphResponse, ParallelWorkflowGenerationResponse
 )
 from .core import (
     setup_project, generate_workflow, execute_workflow, execute_workflow_with_websocket,
@@ -130,6 +130,25 @@ async def setup_new_project(request: ProjectSetupRequest) -> ProjectSetupRespons
         logger.error(f"Error setting up project for project_short_id {request.project_short_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error setting up workflow: {str(e)}")
 
+@app.post("/project/setup-parallel", response_model=ProjectSetupResponse)
+async def setup_new_project_parallel(request: ProjectSetupRequest) -> ProjectSetupResponse:
+    """
+    Phase 1: Setup workflow with extraction AND parallel generation with retry logic.
+    This is an enhanced version with parallel execution and automatic retries.
+    Takes the same input as the regular setup: {"project_short_id": "string"}
+    """
+    try:
+        from .core.workflow_setup import setup_project_parallel
+        
+        workflow_graphs = await setup_project_parallel(request.project_short_id)
+        return ProjectSetupResponse(
+            workflow_graphs=workflow_graphs,
+            message="Project setup completed successfully with parallel workflow generation and retry logic"
+        )
+    except Exception as e:
+        logger.error(f"Error setting up project in parallel for project_short_id {request.project_short_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error setting up parallel workflow: {str(e)}")
+
 @app.post("/workflow/{workflow_id}/generate", response_model=ProjectWorkflowGenerationResponse)
 async def generate_workflow_with_workflow_id(workflow_id: str) -> ProjectWorkflowGenerationResponse:
     """
@@ -148,6 +167,27 @@ async def generate_workflow_with_workflow_id(workflow_id: str) -> ProjectWorkflo
     except Exception as e:
         logger.error(f"Internal server error during workflow generation for workflow_id {workflow_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Internal server error during workflow generation: {str(e)}")
+
+@app.get("/project/{project_short_id}/parallel-generation-status", response_model=ParallelWorkflowGenerationResponse)
+async def get_parallel_workflow_generation_status(project_short_id: str) -> ParallelWorkflowGenerationResponse:
+    """
+    Get the status of parallel workflow generation for a project.
+    Shows progress of all workflows being generated concurrently.
+    """
+    try:
+        from .core.workflow_setup import get_project_workflow_status
+        
+        # Get the parallel generation status
+        status = await get_project_workflow_status(project_short_id)
+        
+        return ParallelWorkflowGenerationResponse(**status)
+        
+    except ValueError as e:
+        logger.error(f"Failed to get parallel generation status for project {project_short_id}: {str(e)}")
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        logger.error(f"Internal server error getting parallel generation status for project {project_short_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 @app.post("/workflow/{workflow_id}/execute", response_model=ProjectWorkflowExecutionResponse)
 async def execute_workflow_with_workflow_id(workflow_id: str, request: ProjectWorkflowExecutionRequest) -> ProjectWorkflowExecutionResponse:
@@ -272,6 +312,89 @@ async def execute_workflow_websocket(
                 "type": "error",
                 "content": f"WebSocket error: {str(e)}",
                 "result": None
+            }))
+        except:
+            pass  # Connection might be closed
+
+@app.websocket("/project/{project_short_id}/parallel-generation-progress")
+async def parallel_workflow_generation_progress(
+    websocket: WebSocket,
+    project_short_id: str
+):
+    """
+    WebSocket endpoint for real-time parallel workflow generation progress.
+    Provides live updates on the status of all workflows being generated concurrently.
+    """
+    try:
+        # Accept WebSocket connection
+        await websocket.accept()
+        
+        # Send connection confirmation
+        await websocket.send_text(json.dumps({
+            "type": "connection",
+            "content": "Parallel workflow generation progress WebSocket connected",
+            "project_short_id": project_short_id
+        }))
+        
+        # Send initial status
+        try:
+            from .core.workflow_setup import get_project_workflow_status
+            initial_status = await get_project_workflow_status(project_short_id)
+            
+            await websocket.send_text(json.dumps({
+                "type": "status_update",
+                "content": "Initial parallel generation status",
+                "status": initial_status
+            }))
+            
+            # Monitor progress and send updates
+            last_status = initial_status
+            while True:
+                # Wait a bit before checking for updates
+                await asyncio.sleep(2)
+                
+                try:
+                    current_status = await get_project_workflow_status(project_short_id)
+                    
+                    # Only send update if status changed
+                    if current_status != last_status:
+                        await websocket.send_text(json.dumps({
+                            "type": "status_update",
+                            "content": "Parallel generation status updated",
+                            "status": current_status
+                        }))
+                        last_status = current_status
+                        
+                        # If all workflows are completed or failed, send final update and close
+                        if current_status["overall_status"] in ["completed", "failed"]:
+                            await websocket.send_text(json.dumps({
+                                "type": "completion",
+                                "content": f"Parallel workflow generation {current_status['overall_status']}",
+                                "status": current_status
+                            }))
+                            break
+                            
+                except Exception as e:
+                    await websocket.send_text(json.dumps({
+                        "type": "error",
+                        "content": f"Error getting status update: {str(e)}"
+                    }))
+                    break
+                    
+        except Exception as e:
+            await websocket.send_text(json.dumps({
+                "type": "error",
+                "content": f"Error in parallel generation progress: {str(e)}"
+            }))
+    
+    except WebSocketDisconnect:
+        print(f"Parallel generation progress WebSocket disconnected for project {project_short_id}")
+    except Exception as e:
+        print(f"Parallel generation progress WebSocket error for project {project_short_id}: {e}")
+        try:
+            await websocket.send_text(json.dumps({
+                "type": "error",
+                "content": f"WebSocket error: {str(e)}"
             }))
         except:
             pass  # Connection might be closed

@@ -19,7 +19,8 @@ A powerful, flexible server for AI workflow generation with multiple API pattern
 
 - **Three API Patterns**: Simple sync, task streaming, and persistent client sessions
 - **Real-time Streaming**: Server-Sent Events (SSE) for live progress updates
-- **AI Workflow Generation**: LLM-powered workflow creation
+- **AI Workflow Generation**: LLM-powered workflow creation with parallel execution
+- **Parallel Workflow Generation**: Concurrent workflow generation for improved performance
 - **Concurrent Processing**: Multiple tasks per client session
 - **Resource Management**: Automatic session cleanup and monitoring
 - **Access Control**: Simple token-based authentication for all endpoints
@@ -42,10 +43,65 @@ graph TB
         F --> I
     end
     
+    subgraph "Parallel Workflow Generation"
+        L[Project Setup] --> M[Parallel Workflow Generation]
+        M --> N[Concurrent LLM Calls]
+        N --> O[Status Tracking]
+        O --> P[Real-time Progress]
+    end
+    
     subgraph "Data Flow"
         I --> J[Real-time Updates]
         D --> K[Workflow Results]
+        P --> J
     end
+```
+
+## ⚡ Parallel Workflow Generation
+
+The server now supports **parallel workflow generation** for significantly improved performance when working with projects that have multiple workflows.
+
+### Key Benefits
+
+- **🚀 Performance**: Workflow generation time reduces from `N × single_workflow_time` to `max(single_workflow_time)`
+- **📊 Scalability**: Efficiently handle projects with many workflows
+- **🔄 Real-time Progress**: Live updates via WebSocket during parallel execution
+- **⚙️ Configurable Concurrency**: Adjustable concurrency level via environment variables
+
+### Configuration
+
+```bash
+# Set concurrency level for parallel workflow generation
+PARALLEL_WORKFLOW_CONCURRENCY=5
+```
+
+### New Endpoints
+
+- **`GET /project/{project_short_id}/parallel-generation-status`**: Get current status of parallel workflow generation
+- **`WebSocket /project/{project_short_id}/parallel-generation-progress`**: Real-time progress updates
+
+### Usage Example
+
+```python
+import asyncio
+import websockets
+import json
+
+async def monitor_parallel_generation(project_id):
+    uri = f"ws://localhost:8001/project/{project_id}/parallel-generation-progress"
+    
+    async with websockets.connect(uri) as websocket:
+        async for message in websocket:
+            data = json.loads(message)
+            print(f"Status: {data['type']}")
+            
+            if data['type'] == 'status_update':
+                status = data['status']
+                print(f"Progress: {status['completed_workflows']}/{status['total_workflows']}")
+                
+            elif data['type'] == 'completion':
+                print(f"Generation completed with status: {status['overall_status']}")
+                break
 ```
 
 ## 📋 Table of Contents

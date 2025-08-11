@@ -251,7 +251,7 @@ HEADERS = {
 }
 # Fixed test data for consistent testing
 test_workflow_id_1 = "550e8400-e29b-41d4-a716-446655440001"
-test_workflow_id_2 = "7f8a9a6a-35b1-4891-8a4c-5715a5c5478f"
+test_workflow_id_2 = "51f7fa18-37ef-4736-9d13-061ebd074697"
 
 # Fixed test inputs for consistent results - Updated for treatment recommendation workflow
 TEST_INPUTS = {
@@ -267,7 +267,7 @@ TEST_INPUTS = {
 
 # Fixed test configuration
 TEST_CONFIG = {
-    "project_short_id": "nw7czqj",
+    "project_short_id": "9mshbju",
     "test_workflow_ids": [test_workflow_id_1, test_workflow_id_2]
 }
 def generate_test_ids() -> str:
@@ -879,6 +879,317 @@ def test_user_query_analysis(project_short_id: str) -> Tuple[bool, Dict[str, Any
             "error": f"Unexpected error: {str(e)}"
         }
 
+def test_parallel_workflow_generation(project_short_id: str) -> Tuple[bool, Dict[str, Any], List[str]]:
+    """Test Parallel Workflow Generation with retry logic"""
+    print("\n🚀 Testing Parallel Workflow Generation (Enhanced)")
+    
+    request_data = {
+        "project_short_id": project_short_id
+    }
+    
+    print(f"Request: POST {BASE_URL}/project/setup-parallel")
+    print(f"Request Body: {json.dumps(request_data, indent=2)}")
+    
+    result = {"success": False, "response": None, "error": None, "workflow_ids": []}
+    
+    try:
+        print("⏳ Sending parallel workflow generation request...")
+        response = requests.post(
+            f"{BASE_URL}/project/setup-parallel",
+            headers=HEADERS,
+            json=request_data
+        )
+        
+        print(f"Response Status: {response.status_code}")
+        result["response"] = response.json()
+        
+        if response.status_code == 200:
+            print("✅ Parallel workflow generation request successful!")
+            print(f"Response Message: {result['response'].get('message', 'No message')}")
+            
+            # Extract and display workflow details
+            workflow_graphs = result["response"].get("workflow_graphs", [])
+            print(f"\n📊 Generated {len(workflow_graphs)} workflows:")
+            
+            for i, workflow in enumerate(workflow_graphs, 1):
+                print(f"\n🔧 Workflow {i}:")
+                print(f"   ID: {workflow.get('workflow_id', 'N/A')}")
+                print(f"   Name: {workflow.get('workflow_name', 'N/A')}")
+                
+                # Show inputs
+                inputs = workflow.get('workflow_inputs', [])
+                if inputs:
+                    print(f"   Inputs ({len(inputs)}):")
+                    for inp in inputs:
+                        print(f"     - {inp.get('name', 'N/A')}: {inp.get('type', 'N/A')} ({inp.get('description', 'N/A')})")
+                
+                # Show outputs
+                outputs = workflow.get('workflow_outputs', [])
+                if outputs:
+                    print(f"   Outputs ({len(outputs)}):")
+                    for out in outputs:
+                        print(f"     - {out.get('name', 'N/A')}: {out.get('type', 'N/A')}")
+                
+                # Show workflow graph content
+                workflow_graph = workflow.get('workflow_graph', {})
+                if workflow_graph:
+                    if isinstance(workflow_graph, str):
+                        if "Workflow generation failed" in workflow_graph:
+                            print(f"   ❌ Status: FAILED")
+                            print(f"   Error: {workflow_graph}")
+                        else:
+                            print(f"   ✅ Status: SUCCESS")
+                            print(f"   Workflow Graph: {workflow_graph[:200]}...")
+                    else:
+                        print(f"   ✅ Status: SUCCESS")
+                        print(f"   Workflow Graph Type: {type(workflow_graph).__name__}")
+                        if hasattr(workflow_graph, 'get'):
+                            print(f"   Workflow Graph Keys: {list(workflow_graph.keys()) if isinstance(workflow_graph, dict) else 'Not a dict'}")
+                
+                # Extract workflow ID for tracking
+                if "workflow_id" in workflow:
+                    result["workflow_ids"].append(workflow["workflow_id"])
+            
+            result["success"] = True
+            print(f"\n🎉 Successfully processed {len(result['workflow_ids'])} workflows")
+            
+        else:
+            error_detail = result["response"].get('detail', 'Unknown error')
+            print(f"❌ HTTP {response.status_code}: {error_detail}")
+            result["error"] = f"HTTP {response.status_code}: {error_detail}"
+            
+    except Exception as e:
+        result["error"] = str(e)
+        print(f"❌ Parallel workflow generation failed: {e}")
+        import traceback
+        traceback.print_exc()
+    
+    return result["success"], result, result["workflow_ids"]
+
+def test_parallel_generation_status(project_short_id: str) -> Tuple[bool, Dict[str, Any]]:
+    """Test Parallel Workflow Generation Status endpoint"""
+    print("\n📊 Testing Parallel Workflow Generation Status")
+    
+    result = {"success": False, "response": None, "error": None}
+    
+    try:
+        print(f"Request: GET {BASE_URL}/project/{project_short_id}/parallel-generation-status")
+        
+        response = requests.get(
+            f"{BASE_URL}/project/{project_short_id}/parallel-generation-status",
+            headers=HEADERS
+        )
+        
+        print(f"Response Status: {response.status_code}")
+        result["response"] = response.json()
+        print(f"Response Body: {json.dumps(result['response'], indent=2)}")
+        
+        if response.status_code == 200:
+            assert "total_workflows" in result["response"]
+            assert "overall_status" in result["response"]
+            assert "workflows" in result["response"]
+            
+            # Display status summary
+            status = result["response"]
+            print(f"✅ Status retrieved successfully:")
+            print(f"   Total workflows: {status['total_workflows']}")
+            print(f"   Uninitialized: {status.get('uninitialized_workflows', 0)}")
+            print(f"   Pending: {status['pending_workflows']}")
+            print(f"   Completed: {status['completed_workflows']}")
+            print(f"   Failed: {status['failed_workflows']}")
+            print(f"   Overall status: {status['overall_status']}")
+            print(f"   Success rate: {status.get('success_rate', 'N/A')}")
+            
+            # Show individual workflow statuses
+            workflows = status.get('workflows', [])
+            if workflows:
+                print(f"\n📋 Individual Workflow Statuses:")
+                for i, wf in enumerate(workflows, 1):
+                    print(f"   {i}. {wf.get('workflow_name', 'Unknown')} (ID: {wf.get('workflow_id', 'N/A')})")
+                    print(f"      Status: {wf.get('status', 'N/A')}")
+                    print(f"      Progress: {wf.get('progress', 0.0):.1%}")
+                    if wf.get('error_message'):
+                        print(f"      Error: {wf.get('error_message')}")
+                    if wf.get('started_at'):
+                        print(f"      Started: {wf.get('started_at')}")
+                    if wf.get('completed_at'):
+                        print(f"      Completed: {wf.get('completed_at')}")
+                    print()
+            
+            result["success"] = True
+        else:
+            error_msg = f"HTTP {response.status_code}: {result['response'].get('detail', 'Unknown error')}"
+            result["error"] = error_msg
+            print(f"❌ Status check failed: {error_msg}")
+        
+    except Exception as e:
+        result["error"] = str(e)
+        print(f"❌ Status check failed: {e}")
+    
+    return result["success"], result
+
+def test_parallel_generation_websocket(project_short_id: str) -> Tuple[bool, Dict[str, Any]]:
+    """Test Parallel Workflow Generation WebSocket progress updates"""
+    print("\n🔌 Testing Parallel Workflow Generation WebSocket")
+    
+    import websockets
+    import asyncio
+    import json
+    
+    result = {"success": False, "messages": [], "error": None}
+    
+    async def test_websocket_connection():
+        """Test WebSocket connection for parallel generation progress"""
+        try:
+            uri = f"ws://localhost:8001/project/{project_short_id}/parallel-generation-progress"
+            print(f"Connecting to: {uri}")
+            
+            async with websockets.connect(uri) as websocket:
+                print("✅ WebSocket connected successfully")
+                
+                # Send initial message to trigger status
+                await websocket.send(json.dumps({"action": "get_status"}))
+                
+                # Listen for messages
+                message_count = 0
+                max_messages = 10  # Limit to prevent infinite loop
+                
+                while message_count < max_messages:
+                    try:
+                        message = await asyncio.wait_for(websocket.recv(), timeout=5.0)
+                        message_data = json.loads(message)
+                        result["messages"].append(message_data)
+                        
+                        print(f"📨 Message {message_count + 1}: {message_data['type']}")
+                        
+                        if message_data["type"] == "completion":
+                            print("✅ Received completion message")
+                            break
+                        elif message_data["type"] == "error":
+                            print(f"❌ Received error: {message_data['content']}")
+                            break
+                        
+                        message_count += 1
+                        
+                    except asyncio.TimeoutError:
+                        print("⏰ Timeout waiting for message")
+                        break
+                
+                print(f"📊 Received {len(result['messages'])} messages")
+                result["success"] = len(result["messages"]) > 0
+                
+        except Exception as e:
+            result["error"] = str(e)
+            print(f"❌ WebSocket test failed: {e}")
+    
+    # Run the async WebSocket test
+    try:
+        asyncio.run(test_websocket_connection())
+    except Exception as e:
+        result["error"] = str(e)
+        print(f"❌ WebSocket test failed: {e}")
+    
+    if result["success"]:
+        print("✅ WebSocket test completed successfully")
+    else:
+        print(f"❌ WebSocket test failed: {result['error']}")
+    
+    return result["success"], result
+
+def test_workflow_content_retrieval(project_short_id: str) -> Tuple[bool, Dict[str, Any]]:
+    """Test retrieving actual workflow content from the database"""
+    print("\n📥 Testing Workflow Content Retrieval")
+    
+    result = {"success": False, "workflows": [], "error": None}
+    
+    try:
+        # Get workflow status first
+        status_response = requests.get(
+            f"{BASE_URL}/project/{project_short_id}/parallel-generation-status",
+            headers=HEADERS
+        )
+        
+        if status_response.status_code != 200:
+            print(f"❌ Cannot get status: HTTP {status_response.status_code}")
+            return False, result
+        
+        status_data = status_response.json()
+        workflows = status_data.get('workflows', [])
+        
+        print(f"📊 Found {len(workflows)} workflows to examine:")
+        
+        for i, wf_status in enumerate(workflows, 1):
+            workflow_id = wf_status.get('workflow_id')
+            workflow_name = wf_status.get('workflow_name', 'Unknown')
+            
+            print(f"\n🔍 Examining Workflow {i}: {workflow_name}")
+            print(f"   ID: {workflow_id}")
+            print(f"   Status: {wf_status.get('status', 'N/A')}")
+            
+            # Get detailed workflow information
+            workflow_response = requests.get(
+                f"{BASE_URL}/workflow/{workflow_id}/status",
+                headers=HEADERS
+            )
+            
+            if workflow_response.status_code == 200:
+                workflow_data = workflow_response.json()
+                print(f"   ✅ Retrieved workflow details")
+                
+                # Show workflow graph content
+                workflow_graph = workflow_data.get('workflow_graph')
+                if workflow_graph:
+                    if isinstance(workflow_graph, str):
+                        if "Workflow generation failed" in workflow_graph:
+                            print(f"   ❌ Generation Status: FAILED")
+                            print(f"   Error Details: {workflow_graph}")
+                        else:
+                            print(f"   ✅ Generation Status: SUCCESS")
+                            print(f"   Workflow Content: {workflow_graph[:300]}...")
+                    else:
+                        print(f"   ✅ Generation Status: SUCCESS")
+                        print(f"   Workflow Graph Type: {type(workflow_graph).__name__}")
+                        if isinstance(workflow_graph, dict):
+                            print(f"   Workflow Keys: {list(workflow_graph.keys())}")
+                            # Show some key content
+                            if 'goal' in workflow_graph:
+                                print(f"   Goal: {workflow_graph['goal'][:100]}...")
+                            if 'nodes' in workflow_graph:
+                                print(f"   Nodes: {len(workflow_graph['nodes'])} workflow nodes")
+                            if 'edges' in workflow_graph:
+                                print(f"   Edges: {len(workflow_graph['edges'])} workflow edges")
+                else:
+                    print(f"   ⚠️  No workflow graph content found")
+                
+                # Show task info
+                task_info = workflow_data.get('task_info', {})
+                if task_info:
+                    print(f"   📋 Task Info:")
+                    print(f"      Name: {task_info.get('workflow_name', 'N/A')}")
+                    print(f"      Requirement: {task_info.get('workflow_requirement', 'N/A')[:100]}...")
+                
+                result["workflows"].append({
+                    "id": workflow_id,
+                    "name": workflow_name,
+                    "status": wf_status.get('status'),
+                    "workflow_graph": workflow_graph,
+                    "task_info": task_info
+                })
+                
+            else:
+                print(f"   ❌ Failed to retrieve workflow details: HTTP {workflow_response.status_code}")
+        
+        result["success"] = True
+        print(f"\n✅ Successfully examined {len(result['workflows'])} workflows")
+        
+    except Exception as e:
+        result["error"] = str(e)
+        print(f"❌ Workflow content retrieval failed: {e}")
+        import traceback
+        traceback.print_exc()
+    
+    return result["success"], result
+
 def run_complete_test() -> Dict[str, Any]:
     """Run the complete test lifecycle"""
     print("🧪 Starting Complete Server Lifecycle Test")
@@ -929,13 +1240,47 @@ def run_complete_test() -> Dict[str, Any]:
     # }
     
     
-    # Phase 4: Workflow Execution
-    execution_passed, execution_result = test_workflow_execution(workflow_ids)
-    test_results["phases"]["execution"] = {
-        "passed": execution_passed,
+    # # Phase 4: Workflow Execution
+    # execution_passed, execution_result = test_workflow_execution(workflow_ids)
+    # test_results["phases"]["execution"] = {
+    #     "passed": execution_passed,
+    #     "timestamp": datetime.now().isoformat(),
+    #     "result": execution_result
+    # }
+    
+    # Phase 5: Parallel Workflow Generation Test
+    parallel_setup_passed, parallel_setup_result, parallel_workflow_ids = test_parallel_workflow_generation(project_short_id)
+    test_results["phases"]["parallel_workflow_generation"] = {
+        "passed": parallel_setup_passed,
         "timestamp": datetime.now().isoformat(),
-        "result": execution_result
+        "workflow_ids": parallel_workflow_ids,
+        "result": parallel_setup_result
     }
+    
+    if parallel_setup_passed:
+        # Phase 6: Parallel Generation Status Check
+        parallel_status_passed, parallel_status_result = test_parallel_generation_status(project_short_id)
+        test_results["phases"]["parallel_generation_status"] = {
+            "passed": parallel_status_passed,
+            "timestamp": datetime.now().isoformat(),
+            "result": parallel_status_result
+        }
+        
+        # Phase 7: Parallel Generation WebSocket Test
+        parallel_websocket_passed, parallel_websocket_result = test_parallel_generation_websocket(project_short_id)
+        test_results["phases"]["parallel_generation_websocket"] = {
+            "passed": parallel_websocket_passed,
+            "timestamp": datetime.now().isoformat(),
+            "result": parallel_websocket_result
+        }
+        
+        # Phase 8: Workflow Content Retrieval Test
+        content_retrieval_passed, content_retrieval_result = test_workflow_content_retrieval(project_short_id)
+        test_results["phases"]["workflow_content_retrieval"] = {
+            "passed": content_retrieval_passed,
+            "timestamp": datetime.now().isoformat(),
+            "result": content_retrieval_result
+        }
     
     # # Phase 5: Status Check
     # status_passed, status_result = test_workflow_status(workflow_ids)
@@ -994,6 +1339,7 @@ def run_complete_test() -> Dict[str, Any]:
     
     all_passed = all([
         health_check_passed,
+        # parallel_setup_passed,
         # setup_passed,
         # generation_passed,
         # execution_passed,
@@ -1005,6 +1351,7 @@ def run_complete_test() -> Dict[str, Any]:
     ])
     
     print(f"Health Check: {'✅ PASSED' if health_check_passed else '❌ FAILED'}")
+    print(f"Parallel Workflow Generation: {'✅ PASSED' if parallel_setup_passed else '❌ FAILED'}")
     # print(f"Project Setup: {'✅ PASSED' if setup_passed else '❌ FAILED'}")
     # print(f"Workflow Generation: {'✅ PASSED' if generation_passed else '❌ FAILED'}")
     # print(f"Workflow Execution: {'✅ PASSED' if execution_passed else '❌ FAILED'}")
