@@ -235,7 +235,8 @@ Please provide the paraphrased version in the following format:
 
     def _plot_and_save_performance_graph(self, algorithm_name: str):
         if not self.enable_logging or plt is None:
-            if plt is None: logger.warning("Matplotlib not found, skipping plot generation.")
+            if plt is None:
+                logger.warning("Matplotlib not found, skipping plot generation.")
             return
         if not self.best_scores_per_gen and not self.best_combo_scores_per_gen:
             logger.warning("No performance data to plot.")
@@ -277,7 +278,7 @@ Please provide the paraphrased version in the following format:
         ax_combined.grid(True, which='both', linestyle='--', linewidth=0.5)
         plt.tight_layout()
 
-        combined_filepath = os.path.join(self.log_dir, f"performance_summary_OVERALL.png")
+        combined_filepath = os.path.join(self.log_dir, "performance_summary_OVERALL.png")
         try:
             plt.savefig(combined_filepath, dpi=300, bbox_inches='tight')
             logger.info(f"Overall performance plot saved to: {combined_filepath}")
@@ -704,10 +705,12 @@ Now process the given prompts and provide your output in the following format:
     async def optimize(self, benchmark: BIGBenchHard) -> tuple[Dict[str, str], dict, dict]:
         self._setup_logging_directory(benchmark)
         initial_config = self.get_current_cfg()
-        if not initial_config: raise ValueError("Registry is empty.")
+        if not initial_config:
+            raise ValueError("Registry is empty.")
         await self._initialize_node_populations(initial_config)
         dev_set = benchmark.get_dev_data()
-        if not dev_set: raise ValueError("Benchmark has no development set.")
+        if not dev_set:
+            raise ValueError("Benchmark has no development set.")
         
         self._best_score_so_far = -float('inf')
         self._generations_without_improvement = 0
@@ -1047,11 +1050,13 @@ Please provide the final evolved prompt in the following format:
     async def optimize(self, benchmark: BIGBenchHard) -> tuple[Dict[str, str], dict, dict]:
         self._setup_logging_directory(benchmark)
         initial_config = self.get_current_cfg()
-        if not initial_config: raise ValueError("Registry is empty.")
-        logger.info(f"Optimizing with DEOptimizer (Pipelined Combination Evolution).")
+        if not initial_config:
+            raise ValueError("Registry is empty.")
+        logger.info("Optimizing with DEOptimizer (Pipelined Combination Evolution).")
         await self._initialize_node_populations(initial_config)
         dev_set = benchmark.get_dev_data()
-        if not dev_set: raise ValueError("Benchmark has no development set.")
+        if not dev_set:
+            raise ValueError("Benchmark has no development set.")
         
         # 重置早停计数器
         self._best_score_so_far = -float('inf')
