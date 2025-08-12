@@ -1,23 +1,27 @@
-import inspect
 import asyncio
+import inspect
 from copy import deepcopy
+from typing import List, Optional
+
 from pydantic import Field, create_model
-from typing import Optional, List
-from ..core.logging import logger
-from ..core.module import BaseModule
-from ..core.message import Message, MessageType
-from ..core.module_utils import generate_id
-from ..models.base_model import BaseLLM
+from tenacity import retry, stop_after_attempt
+
+from ..actions import ActionInput, ActionOutput
 from ..agents.agent import Agent
 from ..agents.agent_manager import AgentManager, AgentState
+from ..core.logging import logger
+from ..core.message import Message, MessageType
+from ..core.module import BaseModule
+from ..core.module_utils import generate_id
+from ..hitl import HITLBaseAgent, HITLManager
+from ..models.base_model import BaseLLM
 from ..storages.base import StorageHandler
-from .environment import Environment, TrajectoryState
-from .workflow_manager import WorkFlowManager, NextAction
-from .workflow_graph import WorkFlowNode, WorkFlowGraph
-from .action_graph import ActionGraph
-from ..hitl import HITLManager, HITLBaseAgent
 from ..utils.utils import generate_dynamic_class_name, get_unique_class_name
-from ..actions import ActionInput, ActionOutput
+from .action_graph import ActionGraph
+from .environment import Environment, TrajectoryState
+from .workflow_graph import WorkFlowGraph, WorkFlowNode
+from .workflow_manager import NextAction, WorkFlowManager
+
 
 class WorkFlow(BaseModule):
 
@@ -40,6 +44,7 @@ class WorkFlow(BaseModule):
         if self.agent_manager is None:
             logger.warning("agent_manager is NoneType when initializing a WorkFlow instance")
 
+    @retry(stop=stop_after_attempt(3))
     def execute(self, inputs: dict = {}, **kwargs) -> str:
         """
         Synchronous wrapper for async_execute. Creates a new event loop and runs the async method.
@@ -92,9 +97,10 @@ class WorkFlow(BaseModule):
                 logger.info(f"Executing subtask: {task.name}")
                 await self.execute_task(task=task)
             except Exception as e:
+                logger.exception(e)
                 failed = True
                 error_message = Message(
-                    content=f"An Error occurs when executing the workflow: {e}",
+                    content=f"An Error occurs when executing task {task.name}: {e}",
                     msg_type=MessageType.ERROR, 
                     wf_goal=goal
                 )
@@ -131,7 +137,8 @@ class WorkFlow(BaseModule):
         task: WorkFlowNode = await self.workflow_manager.schedule_next_task(graph=self.graph, env=self.environment)
         logger.info(f"The next subtask to be executed is: {task.name}")
         return task
-        
+    
+    @retry(stop=stop_after_attempt(3))
     async def execute_task(self, task: WorkFlowNode):
         """
         Asynchronously execute a workflow task.
