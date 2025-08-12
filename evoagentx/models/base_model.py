@@ -1,21 +1,23 @@
-import yaml
-import inspect
 import asyncio
-from abc import ABC, abstractmethod
-from pydantic import Field
-from typing import Union, Optional, Type, Callable, List
-from pydantic_core import PydanticUndefined
+import inspect
 import json
+from abc import ABC, abstractmethod
+from collections.abc import Callable
+from typing import Dict, List, Optional, Type, Union
 
+import yaml
+from pydantic import Field
+from pydantic_core import PydanticUndefined
+
+from ..core.module_utils import (
+    extract_code_blocks,
+    get_type_name,
+    parse_data_from_text,
+    parse_json_from_text,
+    parse_xml_from_text,
+)
 from ..core.parser import Parser
 from .model_configs import LLMConfig
-from ..core.module_utils import (
-    parse_json_from_text, 
-    get_type_name,
-    parse_xml_from_text,
-    parse_data_from_text
-)
-
 
 PARSER_VALID_MODE = ["str", "json", "xml", "title", "custom"]
 
@@ -284,11 +286,13 @@ class LLMOutputParser(Parser):
         Returns:
             A dictionary mapping title names to their section contents.
         """
-        attrs: List[str] = cls.get_attrs()
-        if not attrs:
+        attrs_with_types: List[tuple] = cls.get_attrs(return_type=True)
+        
+        if len(attrs_with_types) == 0:
             return {}
         
-        output_titles = [title_format.format(title=attr) for attr in attrs]
+        attr_type_lookup: Dict[str, str] = {attr_and_type[0]: attr_and_type[1] for attr_and_type in attrs_with_types}
+        output_titles = [title_format.format(title=attr) for attr in attr_type_lookup.keys()]
 
         def is_output_title(text: str):
             for title in output_titles:
@@ -296,22 +300,42 @@ class LLMOutputParser(Parser):
                     return True, title
             return False, None
 
+        def process_lines(lines: List[str], datatype: str):
+            raw_value = "\n".join(lines)
+            try:
+                # see if the content contains any code block
+                code_blocks = extract_code_blocks(raw_value)
+                # only use the content from the last code block
+                raw_value = code_blocks[-1]
+                value = parse_data_from_text(raw_value, datatype)
+            except Exception:
+                raise ValueError(f"Cannot parse text: {raw_value} into {datatype} data!")
+            return value
+
         data = {}
-        current_output_name: str = None
-        current_output_content: list = None
+        current_attr_name: str = None
+        current_attr_lines: list = None
         for line in content.split("\n"):
             is_title, title = is_output_title(line)
             if is_title:
-                if current_output_name is not None and current_output_content is not None:
-                    data[current_output_name] = "\n".join(current_output_content)
-                current_output_content = []
-                current_output_name = title.replace("#", "").strip()
+                if current_attr_name is not None and current_attr_lines is not None:
+                    # if we already have some content for a title, and now we reach a new title
+                    attr_type = attr_type_lookup[current_attr_name]
+                    attr_value = process_lines(lines=current_attr_lines, datatype=attr_type)
+                    data[current_attr_name] = attr_value
+
+                # reset content for new title
+                current_attr_lines = []
+                current_attr_name = title.replace("#", "").strip()
                 output_titles.remove(title)
             else: 
-                if current_output_content is not None:
-                    current_output_content.append(line)
-        if current_output_name is not None and current_output_content is not None:
-            data[current_output_name] = "\n".join(current_output_content)
+                if current_attr_lines is not None:
+                    current_attr_lines.append(line)
+        if current_attr_name is not None and current_attr_lines is not None:
+            # if we have some content for a title, and now we reach the end
+            attr_type = attr_type_lookup[current_attr_name]
+            attr_value = process_lines(lines=current_attr_lines, datatype=attr_type)
+            data[current_attr_name] = attr_value
         return data
     
     @classmethod
