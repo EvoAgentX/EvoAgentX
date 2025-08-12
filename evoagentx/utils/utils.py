@@ -218,3 +218,12 @@ json_to_python_type = {
     "object": dict,
     "array": list,
 }
+
+python_to_json_type = {
+    str: "string",
+    int: "integer",
+    float: "number",
+    bool: "boolean",
+    dict: "object",
+    list: "array",
+}
