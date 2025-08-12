@@ -47,7 +47,7 @@ tools: ["File Tool", "Browser Tool"]
 """
 
 
-TOOL_CALLING_TEMPLATE = """
+TOOL_CALLING_TEMPLATE_OLD = """
 ### Tools Calling Instructions
 You may have access to various tools that might help you accomplish your task.
 Once you have completed all preparations, you SHOULD NOT call any tool and just generate the final answer.
@@ -102,5 +102,44 @@ You should not call any tool if you completed the goal
 The tool you called must exist in the available tools
 You should never write comments in the call_tool function
 If your next move cannot be completed by the tool, you should not call the tool
+"""
+
+
+TOOL_CALLING_TEMPLATE = """
+# Tool Calling Guide
+
+## When to Use Tools
+- Use tools only when necessary to complete your task
+- Check history first - if the information is already available, don't call tools
+- If tools can't help with the task, proceed without them
+
+## How to Call Tools
+1. Include a brief explanation of:
+   - What you know from the history
+   - What information is needed
+   - Why you're using the tool
+
+2. Format your tool calls exactly as shown:
+```ToolCalling
+[
+    {{
+        "function_name": "tool_name",
+        "function_args": {{
+            "param1": "value1",
+            "param2": "value2"
+        }}
+    }},
+    ...
+]
+```
+
+**Important Notes**
+- Only use tools listed in Available Tools
+- Never write comments in tool calls
+- Stop generating after the tool call JSON
+- Each tool call must include both function_name and function_args
+
+## Available Tools
+{tools_description}
 """
 
