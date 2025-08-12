@@ -9,7 +9,6 @@ from tqdm import tqdm
 
 from ..core.logging import logger
 from ..core.registry import MODULE_REGISTRY
-from ..models import LLMConfig
 
 
 def make_parent_folder(path: str):
@@ -172,10 +171,11 @@ def tool_names_to_tools(
     return tool_list
 
 
-def add_llm_config_to_agent_dict(agent_dict: Dict, llm_config: Optional[LLMConfig] = None) -> Dict:
+def add_llm_config_to_agent_dict(agent_dict: Dict, llm_config: Optional['LLMConfig'] = None) -> Dict:
     """Add llm_config to agent_dict if it is not present and converts llm_config dict to LLMConfig
     If `is_human` is True, llm_config will not be added.
     """
+    from ..models import LLMConfig
 
     if agent_dict.get("is_human", False):
         return agent_dict
@@ -195,7 +195,7 @@ def add_llm_config_to_agent_dict(agent_dict: Dict, llm_config: Optional[LLMConfi
 
 def create_agent_from_dict(
     agent_dict: Dict, 
-    llm_config: Optional[LLMConfig] = None,
+    llm_config: Optional['LLMConfig'] = None,
     tools: Optional[List] = None,
     agents: Optional[List] = None,
 ) -> 'Agent':
