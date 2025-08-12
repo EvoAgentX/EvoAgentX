@@ -225,7 +225,7 @@ class BaseModule(BaseModel, metaclass=MetaModule):
         Raises:
             ValueError: When the input is not a valid JSON string
         """
-        use_logger = kwargs.get("log", True)
+        use_logger = kwargs.pop("log", True)
         try:
             data = yaml.safe_load(content)
         except Exception:
@@ -262,7 +262,7 @@ class BaseModule(BaseModel, metaclass=MetaModule):
         Raises:
             ValueError: When the input does not contain valid JSON strings or the JSON is incompatible with the class
         """
-        use_logger = kwargs.get("log", True)
+        use_logger = kwargs.pop("log", True)
         
         extracted_json_list = parse_json_from_text(content)
         if len(extracted_json_list) == 0:
