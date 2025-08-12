@@ -67,7 +67,7 @@ Each sub-task should follow the structure below:
 ### Notes:
 - Provide clear and concise names for the sub-tasks, inputs, and outputs. 
 - Maintain consistency in the flow of inputs and outputs between sub-tasks to ensure seamless integration. 
-- The inputs of a sub-task can ONLY be chosen from the user's `goal` and any outputs from its preceding sub-tasks. 
+- The inputs of a sub-task can ONLY be chosen from the workflow's inputs and any outputs from its preceding sub-tasks. 
 - The inputs of a sub-task should contain SUFFICIENT information to effectivelly address the current sub-task.
 - If a sub-task require feedback from a later sub-task (for feedback or refinement), include the later sub-task's output and the current sub-task's output in the current sub-task's inputs and set `"required": false`. 
 - You will be provided with the inputs and outputs requirements of the workflow in the "### Workflow Inputs" and "### Workflow Outputs" sections. The first sub-task should only include the workflow inputs as its inputs. The final sub-task should only include the workflow outputs as its outputs.
@@ -217,7 +217,7 @@ Provide a brief explanation of your reasoning for breaking down the task and the
 Restate the user's goal clearly and concisely.
 
 ## Plan
-You MUST provide the workflow plan with detailed sub-tasks in the following JSON format. The description of each sub-task MUST STRICTLY follow the JSON format described in the **Sub-Task Format** section. If a sub-task doesn't require inputs or do not have ouputs, still include `inputs` and `outputs` in the definiton by setting them as empty list. 
+You MUST provide the workflow plan with detailed sub-tasks in the following JSON format. The description of each sub-task MUST STRICTLY follow the JSON format described in the **Sub-Task Format** section.
 ```json
 {{
     "sub_tasks": [
@@ -252,7 +252,7 @@ Let's begin.
 ### Workflow Outputs:
 {workflow_outputs}
 
-Output:
+### Output:
 """
 
 TASK_PLANNING_ACTION_PROMPT = TASK_PLANNING_ACTION_INST + TASK_PLANNING_ACTION_DEMOS + TASK_PLANNING_OUTPUT_FORMAT
