@@ -55,7 +55,7 @@ You are tasked with generating agents to complete a sub-task within a workflow. 
 - Review the prebuilt agents and their descriptions in the "### Prebuilt Agents" section.
 - Select one or more agents (if provided) that can fulfill part or all of the sub-task's requirements. 
 - If the provided agents are not relevant, you may choose not to select any. Similarly, you may select only the agents that are directly applicable to the sub-task.
-- You MUST provide the inputs and outputs for each selected agent.
+- You MUST provide the inputs and outputs for each selected agent in the following format.
 ```json
 {{
     "name": "the name of the selected agent", 
@@ -106,15 +106,21 @@ You are tasked with generating agents to complete a sub-task within a workflow. 
     "prompt_template": {{
         "class_name": "ChatTemplate",
         "instruction": "(Required) A detailed prompt that instructs the agent on how to fulfill its responsibilities.",
-        "constraints": "(Optional) Constraints that the agent must follow. A list of strings", 
+        "constraints": [
+            "(Optional) Constraints that the agent must follow. A list of strings", 
+            ...
+        ]
     }},
-    "tool_names": "(Optional) The tools the agent may use, selected from the tools listed in the '### Tools' section. If no tool is required or no tools are provided, set this field to `null`, otherwise set as a list of str.",
+    "tool_names": [
+        "(Optional) The tools the agent may use, selected from the tools listed in the '### Tools' section. If no tool is required or no tools are provided, set this field to `null`, otherwise set as a list of str.",
+        ...
+    ]
 }}
 ```
 5.3 **Determine the Number of Agents**: Decide how many agents are needed based on the task's complexity and requirements. 
 - **Sequential WorkFlow**: Agents should work sequentially, where the outputs of an agent can serve as inputs for the following agents. 
 - **Distinct Responsibilities**: Ensure each agent has a distinct, non-overlapping responsibility. 
-5.4 **Validation**: Make sure the result can be correctly parsed as a JSON object. Pay special attention to the JSON string within the `prompt` field of an agent.
+5.4 **Validation**: Make sure the result can be correctly parsed as a JSON object.
 
 
 ### Notes:
@@ -134,7 +140,7 @@ Restate the objectives and requirements of the sub-task.
 
 ## Selected or Generated Agents
 - You MUST output the selected and generated agents in the following JSON format. Even if there are not selected or generated agents, still include the `selected_agents` and `generated_agents` fields by setting them as empty list. 
-- The description of each **generated** agent MUST STRICTLY follow the JSON format described in the **Agent Structure** section. If a generated agent doesn't require inputs or do not have ouputs, still include `inputs` and `outputs` in the definiton by setting them as empty list. 
+- The description of each **generated** agent MUST STRICTLY follow the JSON format described in the '5.1 **Agent Structure**' section.
 ```json
 {{
     "selected_agents": [
@@ -164,11 +170,11 @@ Let's begin.
 ### Suggestions (suggestions to refine the selected or generated agents):
 {suggestion}
 
-### Prebuilt Agents
-{prebuilt_agents}
-
 ### Tools
 {tools}
+
+### Prebuilt Agents
+{prebuilt_agents}
 
 ### User's Goal:
 {goal}
