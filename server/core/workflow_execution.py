@@ -3,9 +3,20 @@ Workflow execution logic.
 Phase 3: Execute workflow with provided inputs.
 """
 
+import asyncio
 import json
 import os
-from typing import Dict, Any, Callable, List
+import uuid
+import queue
+import sys
+import threading
+import time
+import re
+from datetime import datetime
+from typing import Dict, Any, List, Optional, Callable, Type
+from io import StringIO
+from contextlib import redirect_stdout, redirect_stderr
+
 from dotenv import load_dotenv
 
 from evoagentx.workflow import WorkFlowGenerator, WorkFlowGraph, WorkFlow
@@ -13,20 +24,32 @@ from evoagentx.models import LLMConfig
 from evoagentx.models.model_configs import OpenAILLMConfig, OpenRouterConfig
 from evoagentx.models.model_utils import create_llm_instance
 from evoagentx.agents.agent_manager import AgentManager
+from evoagentx.core.module_utils import parse_json_from_text
 from evoagentx.tools import MCPToolkit
 
-from ..prompts import CUSTOM_OUTPUT_EXTRACTION_PROMPT
-from ..database.db import database
+# Import loguru for enhanced logging
+try:
+    from loguru import logger
+except ImportError:
+    import logging
+    logger = logging.getLogger(__name__)
+
+from ..prompts import WORKFLOW_REQUIREMENT_PROMPT, CUSTOM_OUTPUT_EXTRACTION_PROMPT
+from ..db import database
+
 from ..utils.output_parser import parse_workflow_output
 from ..utils.tool_creator import create_tools_with_database
+from ..utils.websocket_utils import WebSocketEnhancedSink, WebSocketProgressTracker
 
 load_dotenv(os.path.join(os.path.dirname(__file__), '../config/app.env'))
 
 # Default LLM configuration
 default_llm_config = {
+    "model": "gpt-4o",
     "openai_key": os.getenv("OPENAI_API_KEY"),
-    "model": "gpt-4o-mini",
-    "temperature": 0.1
+    # "stream": True,
+    "output_response": True,
+    "max_tokens": 16000
 }
 
 # Placeholder for sudo execution result
@@ -51,7 +74,6 @@ async def list_workflows(skip: int = 0, limit: int = 100, status: str = None) ->
 
 async def update_workflow_status(workflow_id: str, status: str, **kwargs):
     """Update workflow status and other fields"""
-    from datetime import datetime
     # Update status and any additional fields
     updates = {"status": status, "updated_at": datetime.now(), **kwargs}
     await database.update(
@@ -262,7 +284,7 @@ async def execute_workflow(workflow_id: str, inputs: Dict[str, Any]) -> Dict[str
         )
         
         # Return only the essential data
-        return execution_result
+        return execution_result["parsed_json"]
         
     except Exception as e:
         await update_workflow_status(workflow_id, "failed")
@@ -272,15 +294,177 @@ async def execute_workflow(workflow_id: str, inputs: Dict[str, Any]) -> Dict[str
         }
 
 
-# WebSocket execution will be implemented here
+# WebSocket execution implementation - restored from old service
 async def execute_workflow_with_websocket(
     workflow_id: str, 
     inputs: Dict[str, Any], 
     websocket_send_func: Callable
 ) -> Dict[str, Any]:
     """
-    Execute workflow with WebSocket support for real-time progress updates.
+    Execute workflow with WebSocket-based real-time progress updates.
+    Enhanced to support all message types from the system diagram.
+    
+    Args:
+        workflow_id: The workflow ID to execute
+        inputs: Input parameters for workflow execution
+        websocket_send_func: Function to send messages via WebSocket
+        
+    Returns:
+        Dict containing execution results
     """
-    # For now, just call the regular execution function
-    # WebSocket implementation will be added later
-    return await execute_workflow(workflow_id, inputs)
+    progress_tracker = WebSocketProgressTracker(websocket_send_func, workflow_id, "workflow")
+    websocket_sink = None
+    execution_start_time = time.time()
+    
+    try:
+        # Send connection confirmation
+        await progress_tracker.send_connection_confirmation()
+        
+        # Send start notification
+        await progress_tracker.send_start_notification("Workflow execution")
+        
+        # Send initial progress
+        await progress_tracker.send_progress_update("initializing", 0.0, "Starting workflow execution...")
+        
+        # Check if workflow exists
+        workflow = await get_workflow(workflow_id)
+        if not workflow:
+            await progress_tracker.send_error(f"Workflow with ID {workflow_id} not found")
+            raise ValueError(f"Workflow with ID {workflow_id} not found")
+        
+        await progress_tracker.send_progress_update("validating", 0.1, "Validating workflow configuration...")
+        
+        # Check if workflow generation was completed
+        if workflow.get("workflow_graph") is None:
+            await progress_tracker.send_error(f"Workflow {workflow_id} has not completed generation phase")
+            raise ValueError(f"Workflow {workflow_id} has not completed generation phase")
+        
+        await progress_tracker.send_progress_update("preparing", 0.2, "Preparing workflow execution...")
+        
+        # Update workflow status
+        await update_workflow_status(workflow_id, "running")
+        
+        # Get workflow graph and task info
+        workflow_graph = workflow["workflow_graph"]
+        task_info = workflow.get("task_info", {})
+        workflow_name = task_info.get("workflow_name", workflow_id)
+        
+        if workflow_graph is None:
+            await progress_tracker.send_error("No workflow graph available")
+            await update_workflow_status(workflow_id, "failed")
+            return {
+                "status": "failed",
+                "error": "No workflow graph available"
+            }
+        
+        # Generate execution ID
+        execution_id = f"exec_{workflow_id}_{int(time.time())}"
+        
+        await progress_tracker.send_progress_update("executing", 0.3, f"Executing workflow: {workflow_name}")
+        
+        # Get database information (currently ignored - database tools disabled)
+        database_information = task_info.get("database_information")
+        
+        # Setup WebSocket enhanced sink
+        websocket_sink = WebSocketEnhancedSink(websocket_send_func, workflow_id, "workflow")
+        
+        # Add custom sink to loguru
+        sink_id = None
+        try:
+            sink_id = logger.add(websocket_sink.write, level="INFO", format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}")
+        except Exception as e:
+            print(f"Warning: Could not add loguru sink: {e}")
+        
+        try:
+            # Send progress for workflow initialization
+            await progress_tracker.send_progress_update("initializing", 0.5, "Initializing workflow components...")
+            
+            # Execute the workflow (database tools disabled)
+            execution_result = await execute_workflow_from_config(
+                workflow_graph, 
+                default_llm_config, 
+                mcp_config={}, 
+                inputs=inputs,
+                database_information=database_information,
+                task_info=task_info
+            )
+            
+            await progress_tracker.send_progress_update("finalizing", 0.9, "Finalizing execution results...")
+            
+            if execution_result is None:
+                await progress_tracker.send_error(f"Failed to execute workflow: {workflow_name}")
+                await update_workflow_status(workflow_id, "failed")
+                return {
+                    "original_message": "Failed to execute workflow",
+                    "parsed_json": None
+                }
+            
+            # execution_result now already contains the parsed format from execute_workflow_from_config
+            # No need to parse again since it already returns {"original_message": "...", "parsed_json": ...}
+            
+            # Get captured output from the sink
+            captured_output = websocket_sink.get_buffer_contents() if websocket_sink else {}
+            
+            # Update workflow storage with execution results
+            try:
+                await update_workflow_status(
+                    workflow_id, 
+                    "completed",
+                    execution_result=execution_result
+                )
+                print(f"✅ Successfully saved execution result to database for workflow {workflow_id}")
+            except Exception as e:
+                print(f"❌ Error saving execution result to database: {e}")
+                # Continue execution even if database save fails
+            
+            # Calculate total execution time
+            total_execution_time = time.time() - execution_start_time
+            
+            # Return only the essential data for WebSocket clients
+            final_result = {
+                "original_message": execution_result.get("original_message", ""),
+                "parsed_json": execution_result.get("parsed_json", None)
+            }
+            
+            await progress_tracker.send_progress_update("completed", 1.0, "Workflow execution completed successfully")
+            
+            # Send completion message
+            await progress_tracker.send_completion(final_result, "Workflow execution completed successfully")
+            
+            # Send workflow status update: complete
+            if hasattr(progress_tracker, 'send_workflow_status'):
+                await progress_tracker.send_workflow_status("complete", None)  # None for workflow_id when complete
+            else:
+                # Fallback to using the websocket_send_func directly
+                try:
+                    from ..utils.websocket_utils import send_workflow_status_message
+                    await send_workflow_status_message(websocket_send_func, "complete", None)
+                except Exception as e:
+                    print(f"Warning: Could not send completion status: {e}")
+            
+            return final_result
+            
+        except Exception as e:
+            # Send execution error
+            await progress_tracker.send_error(f"Workflow execution failed: {str(e)}")
+            await update_workflow_status(workflow_id, "failed")
+            raise e
+            
+        finally:
+            # Cleanup
+            if websocket_sink:
+                websocket_sink.stop()
+            if sink_id:
+                try:
+                    logger.remove(sink_id)
+                except Exception as e:
+                    print(f"Warning: Could not remove loguru sink: {e}")
+    
+    except Exception as e:
+        # Send connection error for unexpected failures
+        await progress_tracker.send_error(f"Unexpected error: {str(e)}")
+        await update_workflow_status(workflow_id, "failed")
+        return {
+            "original_message": f"Failed to execute workflow: {str(e)}",
+            "parsed_json": None
+        }

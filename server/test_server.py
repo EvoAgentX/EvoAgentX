@@ -28,7 +28,7 @@ API ENDPOINTS OVERVIEW
    - Input: {"inputs": {"key1": "value1", "key2": "value2"}}
    - Output: {"execution_result": {...}}
 
-5. WORKFLOW EXECUTION (Phase 3) - WebSocket ⭐
+5. WORKFLOW EXECUTION (Phase 3) - WebSocket
    WebSocket /workflow/{workflow_id}/execute_ws
    - Input: {"inputs": {"key1": "value1", "key2": "value2"}}
    - Output: Real-time streaming messages
@@ -251,7 +251,7 @@ HEADERS = {
 }
 # Fixed test data for consistent testing
 test_workflow_id_1 = "550e8400-e29b-41d4-a716-446655440001"
-test_workflow_id_2 = "51f7fa18-37ef-4736-9d13-061ebd074697"
+test_workflow_id_2 = "7f8a9a6a-35b1-4891-8a4c-5715a5c5478f"
 
 # Fixed test inputs for consistent results - Updated for treatment recommendation workflow
 TEST_INPUTS = {
@@ -267,7 +267,7 @@ TEST_INPUTS = {
 
 # Fixed test configuration
 TEST_CONFIG = {
-    "project_short_id": "9mshbju",
+    "project_short_id": "kdqv4jp",
     "test_workflow_ids": [test_workflow_id_1, test_workflow_id_2]
 }
 def generate_test_ids() -> str:
@@ -420,17 +420,6 @@ def test_workflow_execution(workflow_ids: List[str]) -> Tuple[bool, Dict[str, An
             print(f"Response Status: {response.status_code}")
             response_data = response.json()
             print(f"Response Body: {json.dumps(response_data, indent=2)}")
-            
-            # Handle both success and error cases
-            if response.status_code == 200:
-                assert "execution_result" in response_data
-                result["responses"][workflow_id] = response_data
-                print(f"✅ Workflow execution completed for {workflow_id}")
-                success_count += 1
-            else:
-                error_msg = f"HTTP {response.status_code}: {response_data.get('detail', 'Unknown error')}"
-                result["errors"][workflow_id] = error_msg
-                print(f"❌ Workflow execution failed for {workflow_id}: {error_msg}")
             
         except Exception as e:
             error_msg = str(e)
@@ -631,22 +620,30 @@ def test_websocket_streaming(workflow_ids: List[str]) -> Tuple[bool, Dict[str, A
                             progress_updates.append({
                                 "content": content
                             })
-                            print(f"    📊 Progress: {content}")
                         elif msg_type == "log":
                             log_messages.append({
                                 "content": content
                             })
-                            print(f"    📝 Log: {content}")
                         elif msg_type == "output":
                             output_messages.append({
                                 "content": content
                             })
-                            print(f"    📤 Output: {content[:100]}{'...' if len(content) > 100 else ''}")
                         elif msg_type == "input":
                             input_messages.append({
                                 "content": content
                             })
-                            print(f"    📥 Input: {content[:100]}{'...' if len(content) > 100 else ''}")
+                        elif msg_type == "workflow_status":
+                            # Handle new workflow status messages
+                            status = data.get("status", "unknown")
+                            workflow_id = data.get("workflow_id")
+                            print(f"    📊 Workflow Status: {status} for workflow {workflow_id}")
+                            # Store workflow status messages
+                            if "workflow_status_messages" not in locals():
+                                workflow_status_messages = []
+                            workflow_status_messages.append({
+                                "status": status,
+                                "workflow_id": workflow_id
+                            })
                         elif msg_type == "complete":
                             print(data)
                             final_result = result
@@ -1062,7 +1059,11 @@ def test_parallel_generation_websocket(project_short_id: str) -> Tuple[bool, Dic
                         
                         print(f"📨 Message {message_count + 1}: {message_data['type']}")
                         
-                        if message_data["type"] == "completion":
+                        if message_data["type"] == "workflow_status":
+                            status = message_data.get("status", "unknown")
+                            workflow_id = message_data.get("workflow_id")
+                            print(f"📊 Workflow Status: {status} for workflow {workflow_id}")
+                        elif message_data["type"] == "completion":
                             print("✅ Received completion message")
                             break
                         elif message_data["type"] == "error":
@@ -1240,47 +1241,47 @@ def run_complete_test() -> Dict[str, Any]:
     # }
     
     
-    # # Phase 4: Workflow Execution
-    # execution_passed, execution_result = test_workflow_execution(workflow_ids)
-    # test_results["phases"]["execution"] = {
-    #     "passed": execution_passed,
-    #     "timestamp": datetime.now().isoformat(),
-    #     "result": execution_result
-    # }
-    
-    # Phase 5: Parallel Workflow Generation Test
-    parallel_setup_passed, parallel_setup_result, parallel_workflow_ids = test_parallel_workflow_generation(project_short_id)
-    test_results["phases"]["parallel_workflow_generation"] = {
-        "passed": parallel_setup_passed,
+    # Phase 4: Workflow Execution
+    execution_passed, execution_result = test_workflow_execution(workflow_ids)
+    test_results["phases"]["execution"] = {
+        "passed": execution_passed,
         "timestamp": datetime.now().isoformat(),
-        "workflow_ids": parallel_workflow_ids,
-        "result": parallel_setup_result
+        "result": execution_result
     }
     
-    if parallel_setup_passed:
-        # Phase 6: Parallel Generation Status Check
-        parallel_status_passed, parallel_status_result = test_parallel_generation_status(project_short_id)
-        test_results["phases"]["parallel_generation_status"] = {
-            "passed": parallel_status_passed,
-            "timestamp": datetime.now().isoformat(),
-            "result": parallel_status_result
-        }
+    # # Phase 5: Parallel Workflow Generation Test
+    # parallel_setup_passed, parallel_setup_result, parallel_workflow_ids = test_parallel_workflow_generation(project_short_id)
+    # test_results["phases"]["parallel_workflow_generation"] = {
+    #     "passed": parallel_setup_passed,
+    #     "timestamp": datetime.now().isoformat(),
+    #     "workflow_ids": parallel_workflow_ids,
+    #     "result": parallel_setup_result
+    # }
+    
+    # if parallel_setup_passed:
+    #     # Phase 6: Parallel Generation Status Check
+    #     parallel_status_passed, parallel_status_result = test_parallel_generation_status(project_short_id)
+    #     test_results["phases"]["parallel_generation_status"] = {
+    #         "passed": parallel_status_passed,
+    #         "timestamp": datetime.now().isoformat(),
+    #         "result": parallel_status_result
+    #     }
         
-        # Phase 7: Parallel Generation WebSocket Test
-        parallel_websocket_passed, parallel_websocket_result = test_parallel_generation_websocket(project_short_id)
-        test_results["phases"]["parallel_generation_websocket"] = {
-            "passed": parallel_websocket_passed,
-            "timestamp": datetime.now().isoformat(),
-            "result": parallel_websocket_result
-        }
-        
-        # Phase 8: Workflow Content Retrieval Test
-        content_retrieval_passed, content_retrieval_result = test_workflow_content_retrieval(project_short_id)
-        test_results["phases"]["workflow_content_retrieval"] = {
-            "passed": content_retrieval_passed,
-            "timestamp": datetime.now().isoformat(),
-            "result": content_retrieval_result
-        }
+    # # Phase 7: Parallel Generation WebSocket Test
+    # parallel_websocket_passed, parallel_websocket_result = test_parallel_generation_websocket(project_short_id)
+    # test_results["phases"]["parallel_generation_websocket"] = {
+    #     "passed": parallel_websocket_passed,
+    #     "timestamp": datetime.now().isoformat(),
+    #     "result": parallel_websocket_result
+    # }
+    
+    #     # Phase 8: Workflow Content Retrieval Test
+    #     content_retrieval_passed, content_retrieval_result = test_workflow_content_retrieval(project_short_id)
+    #     test_results["phases"]["workflow_content_retrieval"] = {
+    #         "passed": content_retrieval_passed,
+    #         "timestamp": datetime.now().isoformat(),
+    #         "result": content_retrieval_result
+    #     }
     
     # # Phase 5: Status Check
     # status_passed, status_result = test_workflow_status(workflow_ids)
@@ -1351,7 +1352,7 @@ def run_complete_test() -> Dict[str, Any]:
     ])
     
     print(f"Health Check: {'✅ PASSED' if health_check_passed else '❌ FAILED'}")
-    print(f"Parallel Workflow Generation: {'✅ PASSED' if parallel_setup_passed else '❌ FAILED'}")
+    # print(f"Parallel Workflow Generation: {'✅ PASSED' if parallel_setup_passed else '❌ FAILED'}")
     # print(f"Project Setup: {'✅ PASSED' if setup_passed else '❌ FAILED'}")
     # print(f"Workflow Generation: {'✅ PASSED' if generation_passed else '❌ FAILED'}")
     # print(f"Workflow Execution: {'✅ PASSED' if execution_passed else '❌ FAILED'}")

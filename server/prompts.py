@@ -18,9 +18,11 @@ Here are some things to notice:
 - There might be lots of functionalities in this web app but you should only focus on those with AI requirements.
 - If the relevant data is not given, you should keep it empty. You should never make up any data.
 - Only extract information that is explicitly mentioned in the requirement - do not invent data.
-- The workflow names should match those in the API endpoints.
+- The workflow names should match those in the AI workflow section.
 - You should write a workflow requirement for each workflow, which will be further used to generate the workflow code.
-- You might be able to extract the workflow names from the API endpoints
+- You must extract the workflow configs from the AI workflow section.
+- You may not confuse the workflow configs with other content, like the entity section.
+- You may not change the input and output names, they should be extract from the AI workflow section.
 
 ## Example 1
 Here is an example of a workflow requirement. The data here is fake and should only be used as an example.
@@ -145,9 +147,10 @@ You are an experienced workflow designer. You are given a workflow requirement a
 Please carefully analyze the following requirement documentation and generate a workflow with given inputs and outputs formats.
 
 ## Key things to notice:
-- You must strictly follow the inputs formats
-- You must strictly follow the outputs formats
-- You should come up with detailed inputs/outputs, for example, instead of "content", you should call it "tale_content"
+- You must strictly follow the inputs formats for the whole workflow
+- You must strictly follow the outputs formats for the whole workflow
+- You should come up with detailed inputs/outputs names for nodes in the middle, for example, instead of "content", you should call it "tale_content"
+
 
 ## Requirement documentation:
 {requirement}

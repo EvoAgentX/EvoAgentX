@@ -27,9 +27,6 @@ class ProjectWorkflowExecutionRequest(BaseModel):
     """Request model for workflow execution - Phase 3"""
     inputs: Dict[str, Any]
 
-class ProjectWorkflowExecutionResponse(BaseModel):
-    """Response model for workflow execution - Phase 3"""
-    execution_result: Optional[Dict[str, Any]] = None  # running result / status
 
 class WorkflowGraphResponse(BaseModel):
     """Response model for workflow graph retrieval"""
@@ -41,7 +38,6 @@ setup_output = ProjectSetupResponse
 workflow_generation_input = ProjectWorkflowGenerationRequest
 workflow_generation_output = ProjectWorkflowGenerationResponse
 workflow_execution_input = ProjectWorkflowExecutionRequest
-workflow_execution_output = ProjectWorkflowExecutionResponse
 
 ### _____________________________________________
 ### Parallel Workflow Generation Models

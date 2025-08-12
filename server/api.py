@@ -11,7 +11,7 @@ from contextlib import asynccontextmanager
 
 from .models import (
     ProjectSetupRequest, ProjectSetupResponse, ProjectWorkflowGenerationRequest, ProjectWorkflowGenerationResponse,
-    ProjectWorkflowExecutionRequest, ProjectWorkflowExecutionResponse, UserQueryRequest, UserQueryResponse,
+    ProjectWorkflowExecutionRequest, UserQueryRequest, UserQueryResponse,
     WorkflowGraphResponse, ParallelWorkflowGenerationResponse
 )
 from .core import (
@@ -189,15 +189,15 @@ async def get_parallel_workflow_generation_status(project_short_id: str) -> Para
         logger.error(f"Internal server error getting parallel generation status for project {project_short_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
-@app.post("/workflow/{workflow_id}/execute", response_model=ProjectWorkflowExecutionResponse)
-async def execute_workflow_with_workflow_id(workflow_id: str, request: ProjectWorkflowExecutionRequest) -> ProjectWorkflowExecutionResponse:
+@app.post("/workflow/{workflow_id}/execute")
+async def execute_workflow_with_workflow_id(workflow_id: str, request: ProjectWorkflowExecutionRequest) -> Dict[str, Any]:
     """
     Phase 3: Execute workflow with provided inputs.
     This is the third phase of the workflow process.
     """
     try:
         result = await execute_workflow(workflow_id, request.inputs)
-        return ProjectWorkflowExecutionResponse(execution_result=result)
+        return result
     except ValueError as e:
         logger.error(f"Workflow execution failed for workflow_id {workflow_id}: {str(e)}")
         raise HTTPException(status_code=422, detail=f"Workflow execution failed: {str(e)}")
@@ -314,7 +314,7 @@ async def execute_workflow_websocket(
                 "result": None
             }))
         except:
-            pass  # Connection might be closed
+            print("Connection might be closed")
 
 @app.websocket("/project/{project_short_id}/parallel-generation-progress")
 async def parallel_workflow_generation_progress(
@@ -347,40 +347,82 @@ async def parallel_workflow_generation_progress(
                 "status": initial_status
             }))
             
-            # Monitor progress and send updates
-            last_status = initial_status
-            while True:
-                # Wait a bit before checking for updates
-                await asyncio.sleep(2)
+            # Check if workflows need to be generated
+            workflows = initial_status.get("workflows", [])
+            uninitialized_workflows = [wf for wf in workflows if wf.get("status") == "uninitialized"]
+            
+            if uninitialized_workflows:
+                # Send status update: uninitialized for each workflow
+                for workflow in uninitialized_workflows:
+                    await websocket.send_text(json.dumps({
+                        "type": "workflow_status",
+                        "status": "uninitialized",
+                        "workflow_id": workflow.get("workflow_id")
+                    }))
                 
+                # Start parallel generation with status messages
+                from .core.workflow_setup import setup_project_parallel_with_status_messages
+                
+                async def send_websocket_message(message: str):
+                    await websocket.send_text(message)
+                
+                # Run the parallel setup with WebSocket status messages
                 try:
-                    current_status = await get_project_workflow_status(project_short_id)
+                    await setup_project_parallel_with_status_messages(project_short_id, send_websocket_message)
                     
-                    # Only send update if status changed
-                    if current_status != last_status:
-                        await websocket.send_text(json.dumps({
-                            "type": "status_update",
-                            "content": "Parallel generation status updated",
-                            "status": current_status
-                        }))
-                        last_status = current_status
-                        
-                        # If all workflows are completed or failed, send final update and close
-                        if current_status["overall_status"] in ["completed", "failed"]:
-                            await websocket.send_text(json.dumps({
-                                "type": "completion",
-                                "content": f"Parallel workflow generation {current_status['overall_status']}",
-                                "status": current_status
-                            }))
-                            break
-                            
+                    # Send completion message
+                    await websocket.send_text(json.dumps({
+                        "type": "completion",
+                        "content": "Parallel workflow generation completed",
+                        "status": "completed"
+                    }))
+                    
                 except Exception as e:
                     await websocket.send_text(json.dumps({
                         "type": "error",
-                        "content": f"Error getting status update: {str(e)}"
+                        "content": f"Error during parallel generation: {str(e)}"
                     }))
-                    break
+            else:
+                # All workflows are already processed, just monitor for changes
+                await websocket.send_text(json.dumps({
+                    "type": "info",
+                    "content": "All workflows already processed, monitoring for status changes"
+                }))
+                
+                # Monitor progress and send updates
+                last_status = initial_status
+                while True:
+                    # Wait a bit before checking for updates
+                    await asyncio.sleep(2)
                     
+                    try:
+                        current_status = await get_project_workflow_status(project_short_id)
+                        
+                        # Only send update if status changed
+                        if current_status != last_status:
+                            await websocket.send_text(json.dumps({
+                                "type": "status_update",
+                                "content": "Parallel generation status updated",
+                                "status": current_status
+                            }))
+                            last_status = current_status
+                            
+                            # If all workflows are completed or failed, send final update and close
+                            if current_status["overall_status"] in ["completed", "failed"]:
+                                await websocket.send_text(json.dumps({
+                                    "type": "completion",
+                                    "content": f"Parallel workflow generation {current_status['overall_status']}",
+                                    "status": current_status
+                                }))
+                                break
+                                
+                    except Exception as e:
+                        await websocket.send_text(json.dumps({
+                            "type": "error",
+                            "content": f"Error getting status update: {str(e)}"
+                        }))
+                        break
+                        
         except Exception as e:
             await websocket.send_text(json.dumps({
                 "type": "error",
