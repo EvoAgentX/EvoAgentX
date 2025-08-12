@@ -11,7 +11,7 @@ from contextlib import asynccontextmanager
 
 from .models import (
     ProjectSetupRequest, ProjectSetupResponse, ProjectWorkflowGenerationRequest, ProjectWorkflowGenerationResponse,
-    ProjectWorkflowExecutionRequest, UserQueryRequest, UserQueryResponse,
+    ProjectWorkflowExecutionRequest, ProjectWorkflowExecutionResponse, UserQueryRequest, UserQueryResponse,
     WorkflowGraphResponse, ParallelWorkflowGenerationResponse
 )
 from .core import (
@@ -189,15 +189,15 @@ async def get_parallel_workflow_generation_status(project_short_id: str) -> Para
         logger.error(f"Internal server error getting parallel generation status for project {project_short_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
-@app.post("/workflow/{workflow_id}/execute")
-async def execute_workflow_with_workflow_id(workflow_id: str, request: ProjectWorkflowExecutionRequest) -> Dict[str, Any]:
+@app.post("/workflow/{workflow_id}/execute", response_model=ProjectWorkflowExecutionResponse)
+async def execute_workflow_with_workflow_id(workflow_id: str, request: ProjectWorkflowExecutionRequest) -> ProjectWorkflowExecutionResponse:
     """
     Phase 3: Execute workflow with provided inputs.
     This is the third phase of the workflow process.
     """
     try:
         result = await execute_workflow(workflow_id, request.inputs)
-        return result
+        return ProjectWorkflowExecutionResponse(parsed_json=result)
     except ValueError as e:
         logger.error(f"Workflow execution failed for workflow_id {workflow_id}: {str(e)}")
         raise HTTPException(status_code=422, detail=f"Workflow execution failed: {str(e)}")

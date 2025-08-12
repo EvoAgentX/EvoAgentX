@@ -248,11 +248,8 @@ async def execute_workflow(workflow_id: str, inputs: Dict[str, Any]) -> Dict[str
         if workflow_graph is None:
             print(f"⚠️ No workflow graph available for {workflow_name}")
             await update_workflow_status(workflow_id, "failed")
-            return {
-                "original_message": "No workflow graph available",
-                "parsed_json": None
-            }
-        
+            raise ValueError(f"Workflow {workflow_id} is not found")
+            
         print(f"🚀 Executing workflow: {workflow_name}")
         
         # Get database information for dynamic MongoDB toolkit
@@ -271,10 +268,7 @@ async def execute_workflow(workflow_id: str, inputs: Dict[str, Any]) -> Dict[str
         if execution_result is None:
             print(f"❌ Failed to execute workflow: {workflow_name}")
             await update_workflow_status(workflow_id, "failed")
-            return {
-                "original_message": "Failed to execute workflow",
-                "parsed_json": None
-            }
+            raise ValueError(f"Execution is not successful: {execution_result}")
         
         # Update workflow storage with execution results
         await update_workflow_status(
@@ -288,10 +282,7 @@ async def execute_workflow(workflow_id: str, inputs: Dict[str, Any]) -> Dict[str
         
     except Exception as e:
         await update_workflow_status(workflow_id, "failed")
-        return {
-            "original_message": f"Failed to execute workflow: {str(e)}",
-            "parsed_json": None
-        }
+        raise ValueError(f"Execution is not successful: {e}")
 
 
 # WebSocket execution implementation - restored from old service

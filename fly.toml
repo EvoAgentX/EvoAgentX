@@ -1,5 +1,12 @@
+# fly.toml app configuration file generated for evoagentx-server on 2025-08-12T16:25:14+08:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
 app = 'evoagentx-server'
 primary_region = 'sea'
+
+[build]
 
 [env]
   LOG_LEVEL = 'warning'
@@ -14,15 +21,15 @@ primary_region = 'sea'
   min_machines_running = 1
   processes = ['app']
 
-[[http_service.checks]]
-  interval = '600s'
-  timeout = '100s'
-  grace_period = '30s'
-  method = 'GET'
-  path = '/health'
-  protocol = 'http'
+  [[http_service.checks]]
+    interval = '10m0s'
+    timeout = '1m40s'
+    grace_period = '30s'
+    method = 'GET'
+    path = '/health'
+    protocol = 'http'
 
 [[vm]]
-  memory = '2gb'
+  memory = '1gb'
   cpu_kind = 'shared'
-  cpus = 1
+  cpus = 2
