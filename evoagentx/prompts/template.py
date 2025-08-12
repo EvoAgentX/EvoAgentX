@@ -1,14 +1,17 @@
+from copy import deepcopy
+from typing import Any, List, Optional, Tuple, Type, Union
+
 import regex
-from copy import deepcopy 
 from pydantic import Field
 from pydantic_core import PydanticUndefined
-from typing import Union, Optional, List, Any, Type
 
-from ..core.logging import logger 
-from ..core.module import BaseModule 
-from ..models.base_model import LLMOutputParser, PARSER_VALID_MODE 
-from ..tools import Toolkit
+from ..core.logging import logger
+from ..core.module import BaseModule
+from ..models.base_model import PARSER_VALID_MODE, LLMOutputParser
 from ..prompts.tool_calling import TOOL_CALLING_TEMPLATE
+from ..tools import Toolkit
+from ..utils.utils import python_to_json_type
+
 
 class PromptTemplate(BaseModule):
 
@@ -132,7 +135,7 @@ class PromptTemplate(BaseModule):
             field_values = values
         return "\n".join(f"[[ **{field}** ]]:\n{value}" for field, value in field_values.items())
     
-    def get_output_template(self, outputs_format: Type[LLMOutputParser], parse_mode: str="title", title_format: str="## {title}") -> str:
+    def get_output_template(self, outputs_format: Type[LLMOutputParser], parse_mode: str="title", title_format: str="## {title}") -> Tuple[str, List[str]]:
         
         if outputs_format is None:
             raise ValueError("`outputs_format` is required in `get_output_format`.")
@@ -216,20 +219,31 @@ class PromptTemplate(BaseModule):
         if outputs_format is None or parse_mode in [None, "str", "custom"] or len(outputs_format.get_attrs()) == 0:
             return "### Outputs Format\nPlease generate a response that best fits the task instruction.\n"
         
+        required_outputs = self.get_required_inputs_or_outputs(outputs_format)
         ouptut_template, output_keys = self.get_output_template(outputs_format, parse_mode=parse_mode, title_format=title_format)
-        output_str = "### Outputs Format\nYou MUST strictly follow the following format when generating your output:\n\n"
+        fields_str = ", ".join(f'"{field}"' for field in required_outputs)
+        output_str = "### Outputs Format\nYou MUST strictly follow the following rules when generating your output.\n\n"
         if parse_mode == "json":
-            output_str += "Format your output in json format, such as:\n"
+            output_str += f"Your final response (after tool calling) must contain a json with these fields: {fields_str}.\nExample:\n"
         elif parse_mode == "xml":
-            output_str += "Format your output in xml format, such as:\n"
+            output_str += f"Your final response (after tool calling) must contain a xml formatted section with these elements: {fields_str}.\nExample:\n"
         elif parse_mode == "title":
-            output_str += "Format your output in sectioned title format, such as:\n"
+            output_str += f"Your final response (after tool calling) must contain these sectioned titles: {fields_str}.\nExample:\n"
         
         example_values = {} 
         for key in output_keys:
             field_info = outputs_format.model_fields.get(key)
             if field_info and field_info.description:
-                example_values[key] = "[" + field_info.description + "]"
+                try:
+                    field_type = python_to_json_type[field_info.annotation]
+                except KeyError:
+                    field_type = "string"
+
+                if field_type == "string":
+                    type_prompt = ""
+                else:
+                    type_prompt = f"(Must be in a valid JSON '{field_type}' format. DO NOT add comments.)"
+                example_values[key] = f"[{type_prompt} {field_info.description}]"
             else:
                 example_values[key] = "[Your output here]"
         output_str += ouptut_template.format(**example_values)
