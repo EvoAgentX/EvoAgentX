@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 import time
@@ -18,6 +19,7 @@ from ..agents.agent_adaptor import AgentAdaptor
 from ..agents.agent_generator import AgentGenerator
 from ..agents.task_planner import TaskPlanner
 from ..agents.workflow_reviewer import WorkFlowReviewer
+from ..core.base_config import Parameter
 from ..core.logging import logger
 from ..core.message import Message, MessageType
 from ..core.module import BaseModule
@@ -30,7 +32,6 @@ from ..storages.storages_config import DBConfig, StoreConfig, VectorStoreConfig
 from ..tools.tool import Tool, Toolkit
 from ..utils.utils import recursive_remove
 from ..workflow.workflow_graph import WorkFlowEdge, WorkFlowGraph, WorkFlowNode
-from ..core.base_config import Parameter
 
 
 class WorkFlowGenerator(BaseModule):
@@ -164,9 +165,9 @@ class WorkFlowGenerator(BaseModule):
 
         # Generate the initial workflow plan
         cur_retries = 0
-        plan, added_retries = self._execute_with_retry(
+        workflow, added_retries = self._execute_with_retry(
             operation_name="Generating a workflow plan",
-            operation=self.generate_plan,
+            operation=self.generate_workflow_plan,
             retries_left=retry,
             goal=goal,
             workflow_inputs=workflow_inputs,
@@ -177,42 +178,48 @@ class WorkFlowGenerator(BaseModule):
         )
         cur_retries += added_retries
 
-        # Build workflow from plan
-        workflow, added_retries = self._execute_with_retry(
-            operation_name="Building workflow from plan",
-            operation=self.build_workflow_from_plan,
-            retries_left=retry - cur_retries,
-            goal=goal,
-            plan=plan
-        )
-        cur_retries += added_retries
-
-        # Validate initial workflow structure
-        logger.info("Validating initial workflow structure...")
-        workflow._validate_workflow_structure()
-        logger.info(f"Successfully generate the following workflow:\n{workflow.get_workflow_description()}")
-
         # generate / assigns the initial agents
         logger.info("Generating agents for the workflow ...")
         workflow, added_retries = self._execute_with_retry(
             operation_name="Generating agents for the workflow",
             operation=self.generate_agents,
             retries_left=retry - cur_retries,
-            goal=goal,
             workflow=workflow,
             examples=agent_examples
         )
 
-        # Validate workflow after agent generation
-        logger.info("Validating workflow after agent generation...")
-        workflow._validate_workflow_structure()
-        # Validate that all nodes have agents
-        for node in workflow.nodes:
-            if not node.agents:
-                raise ValueError(f"Node {node.name} has no agents assigned after agent generation")
-
-        # remove temporary agents_rag_engine
         self.agents_rag_engine = None
+        return workflow
+
+
+    def generate_workflow_plan(
+        self, 
+        goal: str, 
+        workflow_inputs: List[Parameter] = [Parameter(name="workflow_input", type="string", description="workflow input")], 
+        workflow_outputs: List[Parameter] = [Parameter(name="workflow_output", type="string", description="workflow output")], 
+        **kwargs
+    ) -> WorkFlowGraph:
+        """
+        Generates a workflow plan based on the given goal, workflow inputs, and workflow outputs.
+        Also validates the workflow plan by checking the workflow graph structure.
+
+        Args:
+            goal (str): The goal to generate a workflow for
+            workflow_inputs (List[Parameter]): List of workflow inputs
+            workflow_outputs (List[Parameter]): List of workflow outputs
+            **kwargs: Additional arguments to pass to the task planner agent
+        
+        Returns:
+            WorkFlowGraph: The generated workflow graph
+        """
+
+        logger.info("Generating workflow plan...")
+        plan = self.generate_plan(goal=goal, workflow_inputs=workflow_inputs, workflow_outputs=workflow_outputs, **kwargs)
+        logger.info("Building workflow from plan...")
+        workflow = self.build_workflow_from_plan(goal=goal, plan=plan)
+        logger.info("Validating initial workflow structure...")
+        workflow._validate_workflow_structure()
+        logger.info(f"Successfully generate the following workflow:\n{workflow.get_workflow_description()}")
         return workflow
 
 
@@ -225,6 +232,20 @@ class WorkFlowGenerator(BaseModule):
         suggestion: Optional[str] = None, 
         examples: Optional[List[Dict]] = None
     ) -> TaskPlanningOutput:
+        """
+        Generates a workflow plan based on the given goal, workflow inputs, and workflow outputs.
+        
+        Args:
+            goal (str): The goal to generate a workflow plan for
+            workflow_inputs (List[Parameter]): List of workflow inputs
+            workflow_outputs (List[Parameter]): List of workflow outputs
+            history (Optional[str]): Optional history of the conversation
+            suggestion (Optional[str]): Optional suggestion for the workflow plan
+            examples (Optional[List[Dict]]): Optional examples of similar workflows
+        
+        Returns:
+            TaskPlanningOutput: The generated plan
+        """
 
         task_planner: TaskPlanner = self.task_planner
         task_planning_action_data = {
@@ -246,53 +267,94 @@ class WorkFlowGenerator(BaseModule):
 
     def generate_agents(
         self, 
-        goal: str, 
+        workflow: WorkFlowGraph,
+        examples: Optional[List[Dict]] = None,
+        # history: Optional[str] = None, 
+        # suggestion: Optional[str] = None
+    ) -> WorkFlowGraph:
+        """
+        Generates agents for a given workflow plan.
+        
+        Args:
+            workflow (WorkFlowGraph): The workflow plan to generate agents for
+            examples (Optional[List[Dict]]): Optional examples of similar workflows
+        
+        Returns:
+            WorkFlowGraph: The workflow graph with generated/prebuilt agents
+        """
+        workflow = asyncio.run(self.async_generate_agents(workflow, examples))
+        logger.info("Validating workflow after agent generation...")
+        workflow._validate_workflow_structure()
+        # Validate that all nodes have agents
+        for node in workflow.nodes:
+            if not node.agents:
+                raise ValueError(f"Node '{node.name}' has no agents assigned after agent generation")
+        return workflow
+
+
+    async def async_generate_agents(
+        self, 
         workflow: WorkFlowGraph,
         examples: Optional[List[Dict]] = None,
         # history: Optional[str] = None, 
         # suggestion: Optional[str] = None
     ) -> WorkFlowGraph:
 
-        if self.rag_engine is not None and self.agents_rag_engine is None and examples is not None:
+        if examples is not None:
             self._create_agents_rag_engine(examples)
 
-        agent_generator: AgentGenerator = self.agent_generator
         workflow_desc = workflow.get_workflow_description()
-        agent_generation_action_name = agent_generator.agent_generation_action_name
-        
-        for subtask in workflow.nodes:
-            if self.agents_rag_engine is not None:
-                rag_results = self.agents_rag_engine.query(subtask.description).corpus.chunks
-                agent_examples = [json.loads(chunk.metadata.custom_fields["agent"]) for chunk in rag_results]
-            else:
-                agent_examples = None
-
-            subtask_fields = ["name", "description", "inputs", "outputs"]
-            subtask_dict = subtask.to_dict(ignore=["class_name"])
-            subtask_data = {key: value for key, value in subtask_dict.items() if key in subtask_fields}
-            subtask_desc = json.dumps(subtask_data, indent=4)
-            agent_generation_action_data = {
-                "goal": goal, 
-                "workflow": workflow_desc, 
-                "task": subtask_desc, 
-                "prebuilt_agents": self.prebuilt_agents,
-                "tools": self.tools,
-                "examples": agent_examples,
-            }
-            logger.info(f"Generating agents for subtask: {subtask_data['name']}")
-            agent_generator_output: AgentGenerationOutput = agent_generator.execute(
-                action_name=agent_generation_action_name, 
-                action_input_data=agent_generation_action_data,
-                return_msg_type=MessageType.RESPONSE
-            ).content
-            
-            agents = self._process_agent_generator_output(agent_generator_output)
-            subtask.set_agents(agents=agents)
+        agent_generation_tasks = [self._generate_agents_for_node(node, workflow.goal, workflow_desc) for node in workflow.nodes]
+        processed_nodes = await asyncio.gather(*agent_generation_tasks)
+        workflow.nodes = processed_nodes
         return workflow
     
 
+    async def _generate_agents_for_node(self, node: WorkFlowNode, goal: str, workflow_desc: str) -> WorkFlowNode:
+        if self.agents_rag_engine is not None:
+            rag_results = await self.agents_rag_engine.query_async(node.description)
+            chunks = rag_results.corpus.chunks
+            agent_examples = [json.loads(chunk.metadata.custom_fields["agent"]) for chunk in chunks]
+        else:
+            agent_examples = None
+
+        node_fields = ["name", "description", "inputs", "outputs"]
+        node_dict = node.to_dict(ignore=["class_name"])
+        node_data = {key: value for key, value in node_dict.items() if key in node_fields}
+        node_desc = json.dumps(node_data, indent=4)
+        agent_generation_action_data = {
+            "goal": goal, 
+            "workflow": workflow_desc, 
+            "task": node_desc, 
+            "prebuilt_agents": self.prebuilt_agents,
+            "tools": self.tools,
+            "examples": agent_examples,
+        }
+        logger.info(f"Generating agents for node: {node_data['name']}")
+        agent_generator_output: AgentGenerationOutput = await self.agent_generator.async_execute(
+            action_name=self.agent_generator.agent_generation_action_name, 
+            action_input_data=agent_generation_action_data,
+            return_msg_type=MessageType.RESPONSE
+        )
+        
+        agents = self._process_agent_generator_output(agent_generator_output.content)
+        node.set_agents(agents=agents)
+        return node
+
+
     # def review_plan(self, goal: str, )
     def build_workflow_from_plan(self, goal: str, plan: TaskPlanningOutput) -> WorkFlowGraph:
+        """
+        Builds a workflow graph from task planner agent's output by setting sub-tasks as nodes
+        and infer edges between nodes based on their inputs and outputs.
+        
+        Args:
+            goal (str): The goal of the workflow
+            plan (TaskPlanningOutput): The task planner agent's output
+        
+        Returns:
+            WorkFlowGraph: The workflow graph
+        """
         nodes: List[WorkFlowNode] = plan.sub_tasks
         # infer edges from sub-tasks' inputs and outputs
         edges: List[WorkFlowEdge] = []
@@ -326,6 +388,77 @@ class WorkFlowGenerator(BaseModule):
 
     @staticmethod
     def _extract_tasks_and_agents(workflow_dict: Dict) -> tuple[Dict, List[Dict]]:
+        """
+        Extracts tasks and agents from a workflow dictionary.
+        
+        Args:
+            workflow_dict (Dict): The workflow dictionary
+        
+        Returns:
+            tuple[Dict, List[Dict]]: A tuple containing the tasks and agents
+
+        tasks example:
+            {
+                "goal": "...",
+                "sub_tasks": [
+                    {
+                        "name": "...",
+                        "description": "...",
+                        "inputs": [
+                            {
+                                "name": "...",
+                                "description": "...",
+                                "type": "..."
+                            }
+                        ],
+                        "outputs": [
+                            {
+                                "name": "...",
+                                "description": "...",
+                                "type": "..."
+                            }
+                        ]
+                    },
+                    ...
+                ]
+            }
+
+        agents example:
+            [
+                {
+                    "subtask": {
+                        ...
+                    },
+                    "agents": [
+                        {
+                            "name": "...",
+                            "description": "...",
+                            "inputs": [
+                                {
+                                    "name": "...",
+                                    "description": "...",
+                                    "type": "..."
+                                }
+                            ],
+                            "outputs": [
+                                {
+                                    "name": "...",
+                                    "description": "...",
+                                    "type": "..."
+                                }
+                            ],
+                            "prompt_template": {
+                                "class_name": "ChatTemplate",
+                                "instruction": "..."
+                            },
+                            "tool_names": [...]
+                        },
+                        ...
+                    ]
+                },
+                ...
+            ]
+        """
         keys_to_remove = [
             "class_name",
             "required",
@@ -442,8 +575,8 @@ class WorkFlowGenerator(BaseModule):
         prebuilt_agent = self.prebuilt_agents_map[agent.name]
 
         # Creates unique agent adaptor name
-        agent_adaptor_name = agent.name
-        i = 1
+        agent_adaptor_name = agent.name + "V1"
+        i = 2
         while agent_adaptor_name in self.agent_adaptor_names:
             agent_adaptor_name = f"{agent.name}V{i}"
             i += 1
