@@ -1,7 +1,7 @@
 import asyncio
 import inspect
 from copy import deepcopy
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from pydantic import Field, create_model
 from tenacity import retry, stop_after_attempt
@@ -45,12 +45,13 @@ class WorkFlow(BaseModule):
             logger.warning("agent_manager is NoneType when initializing a WorkFlow instance")
 
     @retry(stop=stop_after_attempt(3))
-    def execute(self, inputs: dict = {}, **kwargs) -> str:
+    def execute(self, inputs: dict = {}, extract_output: bool = False, **kwargs) -> Union[dict, str]:
         """
         Synchronous wrapper for async_execute. Creates a new event loop and runs the async method.
         
         Args:
             inputs: Dictionary of inputs for workflow execution
+            extract_output: Use LLM to extract the workflow output
             **kwargs (Any): Additional keyword arguments
             
         Returns:
@@ -59,16 +60,17 @@ class WorkFlow(BaseModule):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
-            return loop.run_until_complete(self.async_execute(inputs, **kwargs))
+            return loop.run_until_complete(self.async_execute(inputs, extract_output, **kwargs))
         finally:
             loop.close()
 
-    async def async_execute(self, inputs: dict = {}, **kwargs) -> str:
+    async def async_execute(self, inputs: dict = {}, extract_output: bool = False, **kwargs) -> Union[dict, str]:
         """
         Asynchronously execute the workflow.
         
         Args:
             inputs: Dictionary of inputs for workflow execution
+            extract_output: Use LLM to extract the final workflow output
             **kwargs (Any): Additional keyword arguments
             
         Returns:
@@ -111,8 +113,22 @@ class WorkFlow(BaseModule):
             return "Workflow Execution Failed"
         
         logger.info("Extracting WorkFlow Output ...")
-        output: str = await self.workflow_manager.extract_output(graph=self.graph, env=self.environment)
+
+        if extract_output:
+            output: str = await self.workflow_manager.extract_output(graph=self.graph, env=self.environment)
+        else:
+            output: dict = self._get_workflow_outputs()
         return output
+
+
+    def _get_workflow_outputs(self) -> dict:
+        end_tasks = self.graph.find_end_nodes()
+        output_names = []
+        for task in end_tasks:
+            output_names.extend(self.graph.get_node(task).get_output_names())
+
+        return self.environment.get_execution_data(output_names)
+
     
     def _prepare_inputs(self, inputs: dict) -> dict:
         """
