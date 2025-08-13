@@ -23,6 +23,9 @@ Here are some things to notice:
 - You must extract the workflow configs from the AI workflow section.
 - You may not confuse the workflow configs with other content, like the entity section.
 - You may not change the input and output names, they should be extract from the AI workflow section.
+- You should never create any new inputs/outputs, you should strictly follow the given inputs/outputs.
+- You should never change the input and output names, they should be extract from the AI workflow section.
+- You MUST ensure the extracted workflow id matches the requirement content
 
 ## Example 1
 Here is an example of a workflow requirement. The data here is fake and should only be used as an example.
@@ -30,65 +33,56 @@ Here is an example of a workflow requirement. The data here is fake and should o
 {{
     "workflows": [
         {{
-            "workflow_name": "stock_analysis",
-            "workflow_id": "042705af-ed39-4589-8a7f-00f13d5e6b03",
-            "workflow_requirement": "Analyze the stock price and the related news. Use tools to request the data and news from the given database, then save the result to the database. The final result should include a detailed analysis report in .md format and a summary in .txt format.",
+            "workflow_name": "<workflow_name_placeholder>",
+            "workflow_id": "<workflow_id_placeholder>",
+            "workflow_requirement": "<workflow_requirement_placeholder>",
             "workflow_inputs": [
                 {{
-                    "name": "stock_code",
-                    "type": "string",
-                    "description": "The stock code to analyze"
-                }},
-                {{
-                    "name": "database_connection_url",
-                    "type": "string",
-                    "description": "The connection url of the database to use"
-                }},
-                {{
-                    "name": "database_name",
-                    "type": "string",
-                    "description": "The name of the database to use"
+                    "name": "<input_name_placeholder>",
+                    "type": "<input_type_placeholder>",
+                    "description": "<input_description_placeholder>",
+                    "required": <true_or_false_placeholder>
                 }}
             ],
             "workflow_outputs": [
                 {{
-                    "name": "stock_analysis_report",
-                    "type": "string",
-                    "description": "The analysis report in .md format"
+                    "name": "<output_name_placeholder>",
+                    "type": "<output_type_placeholder>",
+                    "description": "<output_description_placeholder>",
+                    "required": <true_or_false_placeholder>
                 }},
                 {{
-                    "name": "stock_analysis_summary",
-                    "type": "string",
-                    "description": "The summary in .txt format"
+                    "name": "<output_name_placeholder>",
+                    "type": "<output_type_placeholder>",
+                    "description": "<output_description_placeholder>",
+                    "required": <true_or_false_placeholder>
                 }}
             ]
         }},
         {{
-            "workflow_name": "stock_recommendation",
-            "workflow_id": "1a2b3c4d-5e6f-7890-abcd-ef1234567890",
-            "workflow_requirement": "Recommend the stock to the user. Use tools to request the data and news from the given database, then save the result to the database. The final result should include a detailed analysis report in .md format and a summary in .txt format.",
+            "workflow_name": "<workflow_name_placeholder>",
+            "workflow_id": "<workflow_id_placeholder>",
+            "workflow_requirement": "<workflow_requirement_placeholder>",
             "workflow_inputs": [
                 {{
-                    "name": "stock_code",
-                    "type": "string",
-                    "description": "The stock code to recommend"
+                    "name": "<input_name_placeholder>",
+                    "type": "<input_type_placeholder>",
+                    "description": "<input_description_placeholder>",
+                    "required": <true_or_false_placeholder>
                 }},
                 {{
-                    "name": "database_connection_url",
-                    "type": "string",
-                    "description": "The connection url of the database to use"
-                }},
-                {{
-                    "name": "database_name",
-                    "type": "string",
-                    "description": "The name of the database to use"
+                    "name": "<input_name_placeholder>",
+                    "type": "<input_type_placeholder>",
+                    "description": "<input_description_placeholder>",
+                    "required": <true_or_false_placeholder>
                 }}
             ],
             "workflow_outputs": [
                 {{
-                    "name": "stock_recommendation_report",
-                    "type": "string",
-                    "description": "The recommendation report in .md format"
+                    "name": "<output_name_placeholder>",
+                    "type": "<output_type_placeholder>",
+                    "description": "<output_description_placeholder>",
+                    "required": <true_or_false_placeholder>
                 }}
             ]
         }}
@@ -97,22 +91,18 @@ Here is an example of a workflow requirement. The data here is fake and should o
         "database_name": "",
         "database_entities": [
             {{
-                "name": "stock",
-                "type": "object",
+                "name": "<entity_name_placeholder>",
+                "type": "<entity_type_placeholder>",
                 "properties": {{
-                    "stock_code": {{ "type": "string", "required": true }},
-                    "stock_price": {{ "type": "number", "required": true }},
-                    "company_name": {{ "type": "string", "required": true }},
-                    "stock_news_count": {{ "type": "number", "required": true }}
+                    "<property_name_placeholder>": {{ "type": "<property_type_placeholder>", "required": true }},
+                    "<property_name_placeholder>": {{ "type": "<property_type_placeholder>", "required": true }}
                 }}
             }},
             {{
-                "name": "stock_news",
-                "type": "object",
+                "name": "<entity_name_placeholder>",
+                "type": "<entity_type_placeholder>",
                 "properties": {{
-                    "news_title": {{ "type": "string", "required": true }},
-                    "news_date": {{ "type": "date", "required": true }},
-                    "news_content": {{ "type": "string", "required": true }}
+                    "<property_name_placeholder>": {{ "type": "<property_type_placeholder>", "required": true }},
                 }}
             }}
         ]
@@ -150,7 +140,8 @@ Please carefully analyze the following requirement documentation and generate a 
 - You must strictly follow the inputs formats for the whole workflow
 - You must strictly follow the outputs formats for the whole workflow
 - You should come up with detailed inputs/outputs names for nodes in the middle, for example, instead of "content", you should call it "tale_content"
-
+- You should never come up with any other names for the inputs/outputs, you should strictly follow the given names.
+- You should never create any new inputs/outputs, you should strictly follow the given inputs/outputs.
 
 ## Requirement documentation:
 {requirement}

@@ -114,6 +114,9 @@ async def execute_workflow_from_config(workflow: Dict[str, Any], llm_config_dict
         Dict containing only the essential execution results:
         - original_message: The raw output from workflow execution
         - parsed_json: Extracted JSON from the output (if found)
+        
+    Raises:
+        Exception: Any error that occurs during workflow execution
     """
     try:
         if sudo_execution_result:
@@ -213,12 +216,9 @@ async def execute_workflow_from_config(workflow: Dict[str, Any], llm_config_dict
         }
         
     except Exception as e:
-        # Return error in the same format
-        error_message = f"In the execution process, got error:\n{e}"
-        return {
-            "original_message": error_message,
-            "parsed_json": None
-        }
+        # Re-raise the exception instead of returning an error dictionary
+        # This allows proper error handling in the calling functions
+        raise e
 
 
 async def execute_workflow(workflow_id: str, inputs: Dict[str, Any]) -> Dict[str, Any]:

@@ -251,23 +251,26 @@ HEADERS = {
 }
 # Fixed test data for consistent testing
 test_workflow_id_1 = "550e8400-e29b-41d4-a716-446655440001"
-test_workflow_id_2 = "7f8a9a6a-35b1-4891-8a4c-5715a5c5478f"
+test_workflow_id_2 = "7f3e8b2a-9c4d-4e1f-8a5b-6d2c9e4f7a8b"
+
+
+
+
 
 # Fixed test inputs for consistent results - Updated for treatment recommendation workflow
 TEST_INPUTS = {
-    "character_name": "Alice",
-    "character_type": "human",
+    "main_character": "Alice",
+    "story_theme": "friendship",
     "setting": "a magical forest",
-    "genre": "fantasy",
     "target_age": "8-12",
-    "moral_lesson": "friendship and courage",
     "story_length": "medium",
-    "language": "English"
+    "language": "English",
+    "additional_characters": "The Wizard, The Fairy, The Dragon"
 }
 
 # Fixed test configuration
 TEST_CONFIG = {
-    "project_short_id": "kdqv4jp",
+    "project_short_id": "63xwavz",
     "test_workflow_ids": [test_workflow_id_1, test_workflow_id_2]
 }
 def generate_test_ids() -> str:
@@ -1218,14 +1221,14 @@ def run_complete_test() -> Dict[str, Any]:
         print("❌ Health check failed, stopping test")
         return test_results
     
-    # # Phase 2: Project Setup
-    # setup_passed, setup_result, workflow_ids = test_project_setup(project_short_id)
-    # test_results["phases"]["setup"] = {
-    #     "passed": setup_passed,
-    #     "timestamp": datetime.now().isoformat(),
-    #     "workflow_ids": workflow_ids,
-    #     "result": setup_result
-    # }
+    # Phase 2: Project Setup
+    setup_passed, setup_result, workflow_ids = test_project_setup(project_short_id)
+    test_results["phases"]["setup"] = {
+        "passed": setup_passed,
+        "timestamp": datetime.now().isoformat(),
+        "workflow_ids": workflow_ids,
+        "result": setup_result
+    }
     
     # if not setup_passed:
     #     print("❌ Project setup failed, stopping test")
