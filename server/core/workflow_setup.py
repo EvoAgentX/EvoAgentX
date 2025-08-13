@@ -32,7 +32,7 @@ default_llm_config = {
 }
 
 # Supabase configuration
-SUPABASE_BUCKET_REQUIREMENT = os.getenv("SUPABASE_BUCKET_REQUIREMENT", "requirements")
+SUPABASE_BUCKET_STORAGE = os.getenv("SUPABASE_BUCKET_STORAGE", "requirements")
 
 # Default tools for workflow generation
 default_tools = [GoogleFreeSearchToolkit(), DDGSSearchToolkit(), WikipediaSearchToolkit(), ArxivToolkit(), StorageToolkit(), CMDToolkit(), RSSToolkit()]
@@ -66,7 +66,7 @@ async def retrieve_requirement_from_storage(project_short_id: str) -> str:
         # Download the requirement document using the existing client
         response = (
             requirement_database.client.storage
-            .from_(SUPABASE_BUCKET_REQUIREMENT)
+            .from_(SUPABASE_BUCKET_STORAGE)
             .download(file_path)
         )
         

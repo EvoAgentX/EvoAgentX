@@ -36,7 +36,7 @@ from .utils.output_parser import parse_workflow_output
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-SUPABASE_BUCKET_REQUIREMENT = os.getenv("SUPABASE_BUCKET_REQUIREMENT")
+SUPABASE_BUCKET_STORAGE = os.getenv("SUPABASE_BUCKET_STORAGE")
 default_llm_config = {
     "model": "gpt-4o",
     "openai_key": OPENAI_API_KEY,
@@ -108,7 +108,7 @@ async def retrieve_requirement_from_storage(project_short_id: str) -> str:
         # Download the requirement document using the existing client
         response = (
             requirement_database.client.storage
-            .from_(SUPABASE_BUCKET_REQUIREMENT)
+            .from_(SUPABASE_BUCKET_STORAGE)
             .download(file_path)
         )
         

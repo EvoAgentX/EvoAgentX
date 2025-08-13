@@ -568,7 +568,7 @@ def create_database(db_type: str = "memory", **kwargs) -> Database:
         return InMemoryDatabase(table_names=table_names)
 
 global requirement_database
-requirement_database = create_database("supabase", url=os.environ.get("SUPABASE_URL_REQUIREMENT"), key=os.environ.get("SUPABASE_KEY_REQUIREMENT"))
+requirement_database = create_database("supabase", url=os.environ.get("SUPABASE_URL_STORAGE"), key=os.environ.get("SUPABASE_KEY_STORAGE"))
 asyncio.run(requirement_database.connect())
 
 # Global database instance
