@@ -217,10 +217,57 @@ class WorkFlowGenerator(BaseModule):
         plan = self.generate_plan(goal=goal, workflow_inputs=workflow_inputs, workflow_outputs=workflow_outputs, **kwargs)
         logger.info("Building workflow from plan...")
         workflow = self.build_workflow_from_plan(goal=goal, plan=plan)
-        logger.info("Validating initial workflow structure...")
+        logger.info("Validating workflow structure...")
         workflow._validate_workflow_structure()
-        logger.info(f"Successfully generate the following workflow:\n{workflow.get_workflow_description()}")
+        logger.info("Checking workflow inputs and outputs...")
+        self._check_workflow_inputs_outputs(workflow, workflow_inputs, workflow_outputs)
+        logger.info(f"Successfully generated the following workflow:\n{workflow.get_workflow_description()}")
         return workflow
+
+
+    def _check_workflow_inputs_outputs(
+        self, 
+        workflow_graph: WorkFlowGraph, 
+        workflow_inputs: List[Parameter], 
+        workflow_outputs: List[Parameter]
+    ):
+
+        initial_nodes = workflow_graph.find_initial_nodes()
+        graph_inputs = []
+
+        for node_name in initial_nodes:
+            graph_inputs.extend(workflow_graph.get_node(node_name).inputs)
+
+        graph_inputs_dict = {input.name: input for input in graph_inputs}
+
+        for workflow_input in workflow_inputs:
+            if workflow_input.name not in graph_inputs_dict:
+                raise ValueError(f"Workflow input '{workflow_input.name}' is not found in the workflow graph")
+            
+            if workflow_input.type != graph_inputs_dict[workflow_input.name].type:
+                raise ValueError(f"Workflow input '{workflow_input.name}' type does not match the type specified by the user")
+
+            if workflow_input.required != graph_inputs_dict[workflow_input.name].required:
+                raise ValueError(f"Workflow input '{workflow_input.name}' required status does not match the required status specified by the user")
+
+        end_nodes = workflow_graph.find_end_nodes()
+        graph_outputs = []
+
+        for node_name in end_nodes:
+            graph_outputs.extend(workflow_graph.get_node(node_name).outputs)
+
+        graph_outputs_dict = {output.name: output for output in graph_outputs}
+
+        for workflow_output in workflow_outputs:
+            if workflow_output.name not in graph_outputs_dict:
+                raise ValueError(f"Workflow output '{workflow_output.name}' is not found in the workflow graph")
+            
+            if workflow_output.type != graph_outputs_dict[workflow_output.name].type:
+                raise ValueError(f"Workflow output '{workflow_output.name}' type does not match the type specified by the user")
+
+            if workflow_output.required != graph_outputs_dict[workflow_output.name].required:
+                raise ValueError(f"Workflow output '{workflow_output.name}' required status does not match the required status specified by the user")
+
 
 
     def generate_plan(
@@ -283,8 +330,6 @@ class WorkFlowGenerator(BaseModule):
             WorkFlowGraph: The workflow graph with generated/prebuilt agents
         """
         workflow = asyncio.run(self.async_generate_agents(workflow, examples))
-        logger.info("Validating workflow after agent generation...")
-        workflow._validate_workflow_structure()
         # Validate that all nodes have agents
         for node in workflow.nodes:
             if not node.agents:
