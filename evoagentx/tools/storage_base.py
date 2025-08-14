@@ -4,11 +4,13 @@ import pickle
 import csv
 import yaml
 import xml.etree.ElementTree as ET
-from typing import Dict, Any, List
+import shutil
+from typing import Dict, Any, List, Optional
 from pathlib import Path
 import mimetypes
 import hashlib
 from datetime import datetime
+from abc import ABC, abstractmethod
 
 # For handling various file types
 try:
@@ -34,11 +36,10 @@ from ..core.module import BaseModule
 from ..core.logging import logger
 
 
-class StorageBase(BaseModule):
+class StorageBase(BaseModule, ABC):
     """
-    Base class for comprehensive storage operations supporting various file types.
-    Provides save, read, and append functionality for documents, data files, images, videos, and sound files.
-    Designed with scalability in mind for future database integration.
+    Abstract base class for comprehensive storage operations supporting various file types.
+    Provides unified interface for local and remote storage operations.
     """
     
     def __init__(self, base_path: str = ".", **kwargs):
@@ -50,8 +51,7 @@ class StorageBase(BaseModule):
             **kwargs: Additional keyword arguments for parent class initialization
         """
         super().__init__(**kwargs)
-        self.base_path = Path(base_path)
-        self.base_path.mkdir(parents=True, exist_ok=True)
+        self.base_path = base_path
         
         # File types that support append operations
         self.appendable_formats = {
@@ -63,14 +63,55 @@ class StorageBase(BaseModule):
             '.pickle': self._append_pickle,
             '.xlsx': self._append_excel
         }
+        
+        # Initialize storage-specific setup
+        self._initialize_storage()
     
-    def _resolve_path(self, file_path: str) -> Path:
+    # Abstract methods that must be implemented by subclasses
+    @abstractmethod
+    def _read_raw(self, path: str, **kwargs) -> bytes:
+        """Read raw file content - must be implemented by subclasses"""
+        pass
+    
+    @abstractmethod
+    def _write_raw(self, path: str, content: bytes, **kwargs) -> bool:
+        """Write raw file content - must be implemented by subclasses"""
+        pass
+    
+    @abstractmethod
+    def _delete_raw(self, path: str) -> bool:
+        """Delete file or directory - must be implemented by subclasses"""
+        pass
+    
+    @abstractmethod
+    def _list_raw(self, path: str = None, **kwargs) -> List[Dict[str, Any]]:
+        """List files and directories - must be implemented by subclasses"""
+        pass
+    
+    @abstractmethod
+    def _exists_raw(self, path: str) -> bool:
+        """Check if path exists - must be implemented by subclasses"""
+        pass
+    
+    @abstractmethod
+    def _create_directory_raw(self, path: str) -> bool:
+        """Create directory - must be implemented by subclasses"""
+        pass
+    
+    def _resolve_path(self, file_path: str) -> str:
         """Resolve file path, prepending base_path if it's a relative path"""
-        path = Path(file_path)
-        if not path.is_absolute():
+        # For remote storage, we might need different path resolution logic
+        # This is a basic implementation that can be overridden by subclasses
+        if not file_path.startswith('/') and not file_path.startswith('./'):
             # If it's a relative path, prepend the base path
-            path = self.base_path / path
-        return path
+            return f"{self.base_path}/{file_path}"
+        return file_path
+    
+    def _initialize_storage(self):
+        """
+        Initialize storage-specific setup. Override in subclasses for storage-specific initialization.
+        """
+        pass
     
     def get_file_type(self, file_path: str) -> str:
         """Get the file extension from a file path"""
@@ -80,28 +121,26 @@ class StorageBase(BaseModule):
         """Get the MIME type of a file"""
         return mimetypes.guess_type(file_path)[0] or 'application/octet-stream'
     
+    def exists(self, path: str) -> bool:
+        """Check if path exists"""
+        resolved_path = self._resolve_path(path)
+        return self._exists_raw(resolved_path)
+    
     def get_file_info(self, file_path: str) -> Dict[str, Any]:
         """Get comprehensive information about a file"""
         try:
-            path = self._resolve_path(file_path)
-            if not path.exists():
+            resolved_path = self._resolve_path(file_path)
+            if not self._exists_raw(resolved_path):
                 return {"success": False, "error": f"File {file_path} does not exist"}
             
-            stat = path.stat()
+            # For now, return basic info - subclasses can override for more details
             return {
                 "success": True,
-                "file_path": str(path),
-                "file_name": path.name,
-                "file_extension": path.suffix.lower(),
-                "mime_type": self.get_mime_type(str(path)),
-                "size_bytes": stat.st_size,
-                "size_mb": round(stat.st_size / (1024 * 1024), 2),
-                "created_time": datetime.fromtimestamp(stat.st_ctime).isoformat(),
-                "modified_time": datetime.fromtimestamp(stat.st_mtime).isoformat(),
-                "is_file": path.is_file(),
-                "is_directory": path.is_dir(),
-                "is_readable": os.access(path, os.R_OK),
-                "is_writable": os.access(path, os.W_OK)
+                "file_path": resolved_path,
+                "file_name": Path(resolved_path).name,
+                "file_extension": Path(resolved_path).suffix.lower(),
+                "mime_type": self.get_mime_type(resolved_path),
+                "exists": True
             }
         except Exception as e:
             logger.error(f"Error getting file info for {file_path}: {str(e)}")
@@ -111,14 +150,13 @@ class StorageBase(BaseModule):
         """Calculate hash of a file"""
         try:
             resolved_path = self._resolve_path(file_path)
+            content = self._read_raw(resolved_path)
             hash_func = hashlib.new(algorithm)
-            with open(resolved_path, 'rb') as f:
-                for chunk in iter(lambda: f.read(4096), b""):
-                    hash_func.update(chunk)
+            hash_func.update(content)
             
             return {
                 "success": True,
-                "file_path": str(resolved_path),
+                "file_path": resolved_path,
                 "algorithm": algorithm,
                 "hash": hash_func.hexdigest()
             }
@@ -126,236 +164,190 @@ class StorageBase(BaseModule):
             logger.error(f"Error calculating hash for {file_path}: {str(e)}")
             return {"success": False, "error": str(e), "file_path": file_path}
     
+    def create_directory(self, path: str) -> Dict[str, Any]:
+        """Create directory"""
+        try:
+            resolved_path = self._resolve_path(path)
+            success = self._create_directory_raw(resolved_path)
+            if success:
+                return {"success": True, "path": resolved_path, "message": "Directory created successfully"}
+            else:
+                return {"success": False, "error": "Failed to create directory", "path": resolved_path}
+        except Exception as e:
+            logger.error(f"Error creating directory {path}: {str(e)}")
+            return {"success": False, "error": str(e), "path": path}
+    
+    def delete(self, path: str) -> Dict[str, Any]:
+        """Delete file or directory"""
+        try:
+            resolved_path = self._resolve_path(path)
+            success = self._delete_raw(resolved_path)
+            if success:
+                return {"success": True, "path": resolved_path, "message": "Deleted successfully"}
+            else:
+                return {"success": False, "error": "Failed to delete", "path": resolved_path}
+        except Exception as e:
+            logger.error(f"Error deleting {path}: {str(e)}")
+            return {"success": False, "error": str(e), "path": path}
+    
+    def move(self, source: str, destination: str) -> Dict[str, Any]:
+        """Move/rename file or directory"""
+        try:
+            resolved_source = self._resolve_path(source)
+            resolved_destination = self._resolve_path(destination)
+            
+            # Read source content
+            content = self._read_raw(resolved_source)
+            
+            # Write to destination
+            success = self._write_raw(resolved_destination, content)
+            if success:
+                # Delete source
+                self._delete_raw(resolved_source)
+                return {"success": True, "source": resolved_source, "destination": resolved_destination, "message": "Moved successfully"}
+            else:
+                return {"success": False, "error": "Failed to write to destination", "source": resolved_source, "destination": resolved_destination}
+        except Exception as e:
+            logger.error(f"Error moving {source} to {destination}: {str(e)}")
+            return {"success": False, "error": str(e), "source": source, "destination": destination}
+    
+    def copy(self, source: str, destination: str) -> Dict[str, Any]:
+        """Copy file"""
+        try:
+            resolved_source = self._resolve_path(source)
+            resolved_destination = self._resolve_path(destination)
+            
+            # Read source content
+            content = self._read_raw(resolved_source)
+            
+            # Write to destination
+            success = self._write_raw(resolved_destination, content)
+            if success:
+                return {"success": True, "source": resolved_source, "destination": resolved_destination, "message": "Copied successfully"}
+            else:
+                return {"success": False, "error": "Failed to write to destination", "source": resolved_source, "destination": resolved_destination}
+        except Exception as e:
+            logger.error(f"Error copying {source} to {destination}: {str(e)}")
+            return {"success": False, "error": str(e), "source": source, "destination": destination}
+    
+    def list(self, path: str = None, max_depth: int = 3, include_hidden: bool = False) -> Dict[str, Any]:
+        """List files and directories"""
+        try:
+            resolved_path = self._resolve_path(path) if path else str(self.base_path)
+            items = self._list_raw(resolved_path, max_depth=max_depth, include_hidden=include_hidden)
+            
+            return {
+                "success": True,
+                "path": resolved_path,
+                "items": items,
+                "total_count": len(items)
+            }
+        except Exception as e:
+            logger.error(f"Error listing {path}: {str(e)}")
+            return {"success": False, "error": str(e), "path": path}
+    
     def save(self, file_path: str, content: Any, **kwargs) -> Dict[str, Any]:
         """Save content to a file with automatic format detection"""
         try:
-            # Resolve the file path (prepend base_path if relative)
+            # Resolve the file path
             resolved_path = self._resolve_path(file_path)
-            file_extension = resolved_path.suffix.lower()
-            
-            # Ensure directory exists
-            resolved_path.parent.mkdir(parents=True, exist_ok=True)
+            file_extension = Path(resolved_path).suffix.lower()
             
             # Handle different file types
             if file_extension == '.json':
-                return self._save_json(str(resolved_path), content, **kwargs)
+                return self._save_json(resolved_path, content, **kwargs)
             elif file_extension in ['.yaml', '.yml']:
-                return self._save_yaml(str(resolved_path), content, **kwargs)
+                return self._save_yaml(resolved_path, content, **kwargs)
             elif file_extension == '.csv':
-                return self._save_csv(str(resolved_path), content, **kwargs)
+                return self._save_csv(resolved_path, content, **kwargs)
             elif file_extension == '.xlsx':
-                return self._save_excel(str(resolved_path), content, **kwargs)
+                return self._save_excel(resolved_path, content, **kwargs)
             elif file_extension == '.xml':
-                return self._save_xml(str(resolved_path), content, **kwargs)
+                return self._save_xml(resolved_path, content, **kwargs)
             elif file_extension == '.pickle':
-                return self._save_pickle(str(resolved_path), content, **kwargs)
+                return self._save_pickle(resolved_path, content, **kwargs)
             elif file_extension == '.pdf':
-                return self._save_pdf(str(resolved_path), content, **kwargs)
+                return self._save_pdf(resolved_path, content, **kwargs)
             elif file_extension in ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff']:
-                return self._save_image(str(resolved_path), content, **kwargs)
+                return self._save_image(resolved_path, content, **kwargs)
             else:
-                # Default to text/binary handling
-                return self._save_text(str(resolved_path), content, **kwargs)
-            
+                # Default to text
+                return self._save_text(resolved_path, content, **kwargs)
+                
         except Exception as e:
-            logger.error(f"Error saving file {file_path}: {str(e)}")
-            return {"success": False, "error": str(e), "file_path": str(file_path)}
+            logger.error(f"Error saving {file_path}: {str(e)}")
+            return {"success": False, "error": str(e), "file_path": file_path}
     
     def read(self, file_path: str, **kwargs) -> Dict[str, Any]:
         """Read content from a file with automatic format detection"""
         try:
-            # Resolve the file path (prepend base_path if relative)
             resolved_path = self._resolve_path(file_path)
-            if not resolved_path.exists():
-                return {"success": False, "error": f"File {file_path} does not exist"}
-            
-            file_extension = resolved_path.suffix.lower()
+            file_extension = Path(resolved_path).suffix.lower()
             
             # Handle different file types
             if file_extension == '.json':
-                return self._read_json(str(resolved_path), **kwargs)
+                return self._read_json(resolved_path, **kwargs)
             elif file_extension in ['.yaml', '.yml']:
-                return self._read_yaml(str(resolved_path), **kwargs)
+                return self._read_yaml(resolved_path, **kwargs)
             elif file_extension == '.csv':
-                return self._read_csv(str(resolved_path), **kwargs)
+                return self._read_csv(resolved_path, **kwargs)
             elif file_extension == '.xlsx':
-                return self._read_excel(str(resolved_path), **kwargs)
+                return self._read_excel(resolved_path, **kwargs)
             elif file_extension == '.xml':
-                return self._read_xml(str(resolved_path), **kwargs)
+                return self._read_xml(resolved_path, **kwargs)
             elif file_extension == '.pickle':
-                return self._read_pickle(str(resolved_path), **kwargs)
+                return self._read_pickle(resolved_path, **kwargs)
             elif file_extension == '.pdf':
-                return self._read_pdf(str(resolved_path), **kwargs)
+                return self._read_pdf(resolved_path, **kwargs)
             elif file_extension in ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff']:
-                return self._read_image(str(resolved_path), **kwargs)
+                return self._read_image(resolved_path, **kwargs)
             else:
-                # Default to text/binary handling
-                return self._read_text(str(resolved_path), **kwargs)
-            
+                # Default to text
+                return self._read_text(resolved_path, **kwargs)
+                
         except Exception as e:
-            logger.error(f"Error reading file {file_path}: {str(e)}")
-            return {"success": False, "error": str(e), "file_path": str(file_path)}
+            logger.error(f"Error reading {file_path}: {str(e)}")
+            return {"success": False, "error": str(e), "file_path": file_path}
     
     def append(self, file_path: str, content: Any, **kwargs) -> Dict[str, Any]:
         """Append content to a file (only for supported formats)"""
         try:
-            # Resolve the file path (prepend base_path if relative)
             resolved_path = self._resolve_path(file_path)
-            file_extension = resolved_path.suffix.lower()
+            file_extension = Path(resolved_path).suffix.lower()
             
-            # Check if format supports append
-            if file_extension not in self.appendable_formats:
-                return {
-                    "success": False, 
-                    "error": f"Append not supported for {file_extension} files",
-                    "supported_formats": list(self.appendable_formats.keys())
-                }
-            
-            # Ensure directory exists
-            resolved_path.parent.mkdir(parents=True, exist_ok=True)
-            
-            # Use the appropriate append handler
-            append_handler = self.appendable_formats[file_extension]
-            return append_handler(str(resolved_path), content, **kwargs)
-            
+            if file_extension in self.appendable_formats:
+                return self.appendable_formats[file_extension](resolved_path, content, **kwargs)
+            else:
+                return {"success": False, "error": f"Append not supported for {file_extension} files"}
+                
         except Exception as e:
-            logger.error(f"Error appending to file {file_path}: {str(e)}")
-            return {"success": False, "error": str(e), "file_path": str(file_path)}
+            logger.error(f"Error appending to {file_path}: {str(e)}")
+            return {"success": False, "error": str(e), "file_path": file_path}
     
     def get_supported_formats(self) -> Dict[str, Any]:
         """Get information about supported file formats"""
         return {
             "success": True,
-            "appendable_formats": list(self.appendable_formats.keys()),
-            "all_formats": [
-                '.txt', '.json', '.csv', '.yaml', '.yml', '.xml', '.xlsx', '.pickle',
-                '.pdf', '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff',
-                '.mp4', '.avi', '.mp3', '.wav'
-            ],
-            "categories": {
-                "Documents": ['.pdf', '.txt'],
-                "Data Files": ['.json', '.csv', '.yaml', '.yml', '.xml', '.xlsx', '.pickle'],
-                "Images": ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff'],
-                "Media": ['.mp4', '.avi', '.mp3', '.wav']
+            "supported_formats": {
+                "text": [".txt", ".md", ".log"],
+                "structured_data": [".json", ".yaml", ".yml", ".xml", ".csv"],
+                "spreadsheets": [".xlsx", ".xls"],
+                "binary": [".pickle", ".pkl"],
+                "documents": [".pdf"],
+                "images": [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff"],
+                "appendable": list(self.appendable_formats.keys())
+            },
+            "features": {
+                "read": True,
+                "write": True,
+                "append": True,
+                "delete": True,
+                "move": True,
+                "copy": True,
+                "list": True,
+                "create_directory": True
             }
         }
-    
-    def list_files(self, path: str = None, max_depth: int = 3, include_hidden: bool = False) -> Dict[str, Any]:
-        """List files and directories in a structured tree format"""
-        try:
-            if path is None:
-                path = str(self.base_path)
-            
-            path_obj = Path(path)
-            if not path_obj.exists():
-                return {"success": False, "error": f"Path {path} does not exist"}
-            
-            if not path_obj.is_dir():
-                return {"success": False, "error": f"Path {path} is not a directory"}
-            
-            def build_tree(current_path: Path, current_depth: int) -> Dict[str, Any]:
-                if current_depth > max_depth:
-                    return {"type": "truncated", "path": str(current_path)}
-                
-                result = {
-                    "type": "directory",
-                    "path": str(current_path),
-                    "name": current_path.name,
-                    "items": []
-                }
-                
-                try:
-                    items = list(current_path.iterdir())
-                    
-                    # Filter hidden files if needed
-                    if not include_hidden:
-                        items = [item for item in items if not item.name.startswith('.')]
-                    
-                    # Sort: directories first, then files
-                    directories = [item for item in items if item.is_dir()]
-                    files = [item for item in items if item.is_file()]
-                    
-                    directories.sort(key=lambda x: x.name.lower())
-                    files.sort(key=lambda x: x.name.lower())
-                    
-                    # Add directories
-                    for item in directories:
-                        if current_depth < max_depth:
-                            result["items"].append(build_tree(item, current_depth + 1))
-                        else:
-                            result["items"].append({
-                                "type": "directory",
-                                "path": str(item),
-                                "name": item.name,
-                                "items": []
-                            })
-                    
-                    # Add files
-                    for item in files:
-                        try:
-                            stat = item.stat()
-                            file_info = {
-                                "type": "file",
-                                "path": str(item),
-                                "name": item.name,
-                                "extension": item.suffix.lower(),
-                                "size_bytes": stat.st_size,
-                                "size_mb": round(stat.st_size / (1024 * 1024), 2),
-                                "modified_time": datetime.fromtimestamp(stat.st_mtime).isoformat()
-                            }
-                            result["items"].append(file_info)
-                        except Exception:
-                            # Skip files we can't access
-                            continue
-                            
-                except PermissionError:
-                    result["error"] = "Permission denied"
-                except Exception as e:
-                    result["error"] = str(e)
-                
-                return result
-            
-            tree = build_tree(path_obj, 0)
-            
-            # Add summary statistics
-            def count_items(node: Dict[str, Any]) -> tuple:
-                files = 0
-                dirs = 0
-                total_size = 0
-                
-                if node.get("type") == "file":
-                    files = 1
-                    total_size = node.get("size_bytes", 0)
-                elif node.get("type") == "directory":
-                    dirs = 1
-                    for item in node.get("items", []):
-                        f, d, s = count_items(item)
-                        files += f
-                        dirs += d
-                        total_size += s
-                
-                return files, dirs, total_size
-            
-            files_count, dirs_count, total_size = count_items(tree)
-            
-            return {
-                "success": True,
-                "items": tree.get("items", []),
-                "tree": tree,
-                "summary": {
-                    "path": str(path_obj),
-                    "total_files": files_count,
-                    "total_directories": dirs_count,
-                    "total_size_bytes": total_size,
-                    "total_size_mb": round(total_size / (1024 * 1024), 2),
-                    "max_depth": max_depth,
-                    "include_hidden": include_hidden
-                }
-            }
-            
-        except Exception as e:
-            logger.error(f"Error listing files in {path}: {str(e)}")
-            return {"success": False, "error": str(e), "path": path}
     
     # Text file handlers
     def _save_text(self, file_path: str, content: Any, encoding: str = 'utf-8', **kwargs) -> Dict[str, Any]:
@@ -929,7 +921,6 @@ class StorageBase(BaseModule):
                 }
             elif isinstance(content, str) and Path(content).exists():
                 # Content is a file path to an existing image
-                import shutil
                 shutil.copy2(content, file_path)
                 return {
                     "success": True,

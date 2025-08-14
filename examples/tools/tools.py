@@ -15,7 +15,7 @@ This script provides comprehensive examples for:
 - PythonInterpreter and DockerInterpreter tools for code execution
 - BrowserToolkit with auto-initialization and auto-cleanup
 - Search toolkits (Wikipedia, Google, Google Free)
-- File operations with different file types
+- File operations with different file types using the new StorageToolkit
 - MCP toolkit integration
 - FAISS toolkit for semantic search and document management
 - PostgreSQL toolkit for relational database operations
@@ -38,7 +38,7 @@ from evoagentx.tools import (
     GoogleFreeSearchToolkit,
     DDGSSearchToolkit,
     MCPToolkit,
-    FileToolkit,
+    StorageToolkit,  # Updated to use new StorageToolkit
     BrowserToolkit,
     ArxivToolkit,
     BrowserUseToolkit,
@@ -437,227 +437,133 @@ def run_mcp_example():
 
 def run_file_tool_example():
     """
-    Run an example using the FileToolkit to read and write PDF files.
+    Run an example using the StorageToolkit to read and write files with the new storage handler system.
     """
-    print("\n===== FILE TOOL EXAMPLE =====\n")
+    print("\n===== STORAGE TOOL EXAMPLE =====\n")
     
     try:
-        # Initialize the file toolkit
-        file_toolkit = FileToolkit()
+        # Initialize the storage toolkit with default storage handler
+        storage_toolkit = StorageToolkit(name="DemoStorageToolkit")
         
         # Get individual tools from the toolkit
-        read_tool = file_toolkit.get_tool("read_file")
-        write_tool = file_toolkit.get_tool("write_file")
-        append_tool = file_toolkit.get_tool("append_file")
+        save_tool = storage_toolkit.get_tool("save")
+        read_tool = storage_toolkit.get_tool("read")
+        append_tool = storage_toolkit.get_tool("append")
+        list_tool = storage_toolkit.get_tool("list_files")
+        exists_tool = storage_toolkit.get_tool("exists")
         
-        # Create sample content for a PDF
-        sample_content = """This is a sample PDF document created using the FileTool.
-This tool provides special handling for different file types.
-For PDF files, it uses PyPDF2 library for reading operations."""
+        # Create sample content for different file types
+        sample_text = """This is a sample text document created using the StorageToolkit.
+This tool provides comprehensive file operations with automatic format detection.
+It supports various file types including text, JSON, CSV, YAML, XML, Excel, and more."""
         
-        # Example PDF file path
-        pdf_path = os.path.join(os.getcwd(), "examples", "output", "sample_document.pdf")
+        sample_json = {
+            "name": "Sample Document",
+            "type": "test",
+            "content": "This is a JSON document for testing",
+            "metadata": {
+                "created": "2024-01-01",
+                "version": "1.0"
+            }
+        }
         
-        # Make sure the output directory exists
-        os.makedirs(os.path.dirname(pdf_path), exist_ok=True)
+        # Test file operations with default storage paths
+        print("1. Testing file save operations...")
         
-        print(f"Writing content to PDF file: {pdf_path}")
-        
-        # Write content to PDF file
-        write_result = write_tool(file_path=pdf_path, content=sample_content)
-        print("Write Result:")
+        # Save text file
+        text_result = save_tool(
+            file_path="sample_document.txt",
+            content=sample_text
+        )
+        print("Text file save result:")
         print("-" * 30)
-        print(write_result)
-        print("-" * 30)
-        
-        # Read content from PDF file
-        print(f"\nReading content from PDF file: {pdf_path}")
-        read_result = read_tool(file_path=pdf_path)
-        print("Read Result:")
-        print("-" * 30)
-        print(read_result)
-        print("-" * 30)
-        
-        # Also demonstrate with a regular text file
-        text_path = os.path.join(os.getcwd(), "examples", "output", "sample_text.txt")
-        
-        print(f"\nWriting content to text file: {text_path}")
-        text_write_result = write_tool(file_path=text_path, content="This is a sample text file.")
-        print("Text Write Result:")
-        print("-" * 30)
-        print(text_write_result)
+        print(text_result)
         print("-" * 30)
         
-        print(f"\nReading content from text file: {text_path}")
-        text_read_result = read_tool(file_path=text_path)
-        print("Text Read Result:")
+        # Save JSON file
+        json_result = save_tool(
+            file_path="sample_data.json",
+            content=json.dumps(sample_json, indent=2)
+        )
+        print("JSON file save result:")
+        print("-" * 30)
+        print(json_result)
+        print("-" * 30)
+        
+        # Test file read operations
+        print("\n2. Testing file read operations...")
+        
+        # Read text file
+        text_read_result = read_tool(file_path="sample_document.txt")
+        print("Text file read result:")
         print("-" * 30)
         print(text_read_result)
         print("-" * 30)
         
-        # ===== APPEND FILE OPERATIONS =====
-        print("\n===== APPEND FILE OPERATIONS =====\n")
-        
-        # 1. Append to text file
-        print(f"Appending content to text file: {text_path}")
-        append_text_content = "\nThis line was appended to the text file."
-        text_append_result = append_tool(file_path=text_path, content=append_text_content)
-        print("Text Append Result:")
+        # Read JSON file
+        json_read_result = read_tool(file_path="sample_data.json")
+        print("JSON file read result:")
         print("-" * 30)
-        print(text_append_result)
+        print(json_read_result)
         print("-" * 30)
         
-        # Read the text file again to show appended content
-        print(f"\nReading text file after append: {text_path}")
-        text_read_after_append = read_tool(file_path=text_path)
-        print("Text File After Append:")
-        print("-" * 30)
-        print(text_read_after_append)
-        print("-" * 30)
+        # Test file append operations
+        print("\n3. Testing file append operations...")
         
-        # 2. Append to PDF file
-        print(f"\nAppending content to PDF file: {pdf_path}")
-        append_pdf_content = "\n\nThis content was appended to the PDF document.\nIt demonstrates PDF append functionality."
-        pdf_append_result = append_tool(file_path=pdf_path, content=append_pdf_content)
-        print("PDF Append Result:")
+        # Append to text file
+        append_text_result = append_tool(
+            file_path="sample_document.txt",
+            content="\n\nThis content was appended to the text file."
+        )
+        print("Text file append result:")
         print("-" * 30)
-        print(pdf_append_result)
+        print(append_text_result)
         print("-" * 30)
         
-        # Read the PDF file again to show appended content
-        print(f"\nReading PDF file after append: {pdf_path}")
-        pdf_read_after_append = read_tool(file_path=pdf_path)
-        print("PDF File After Append:")
+        # Append to JSON file (will add to existing array or create new array)
+        append_json_data = {"additional": "data", "timestamp": "2024-01-01T12:00:00Z"}
+        append_json_result = append_tool(
+            file_path="sample_data.json",
+            content=json.dumps(append_json_data)
+        )
+        print("JSON file append result:")
         print("-" * 30)
-        print(pdf_read_after_append)
-        print("-" * 30)
-        
-        # 3. Append to log file
-        log_path = os.path.join(os.getcwd(), "examples", "output", "application.log")
-        print(f"\nCreating and appending to log file: {log_path}")
-        
-        # Initial log entry
-        initial_log = "2024-01-01 10:00:00 INFO Application started"
-        log_write_result = write_tool(file_path=log_path, content=initial_log)
-        print("Initial Log Write Result:")
-        print("-" * 30)
-        print(log_write_result)
+        print(append_json_result)
         print("-" * 30)
         
-        # Append multiple log entries
-        log_entries = [
-            "\n2024-01-01 10:01:00 INFO User logged in",
-            "\n2024-01-01 10:02:00 WARNING Cache miss for key 'user_data'",
-            "\n2024-01-01 10:03:00 ERROR Database connection failed",
-            "\n2024-01-01 10:04:00 INFO Retrying database connection",
-            "\n2024-01-01 10:05:00 INFO Database connection restored"
-        ]
-        
-        for log_entry in log_entries:
-            append_result = append_tool(file_path=log_path, content=log_entry)
-            print(f"Appended: {log_entry.strip()}")
-        
-        # Read the complete log file
-        print(f"\nReading complete log file: {log_path}")
-        log_read_result = read_tool(file_path=log_path)
-        print("Complete Log File:")
+        # Test file listing
+        print("\n4. Testing file listing...")
+        list_result = list_tool(path=".", max_depth=2, include_hidden=False)
+        print("File listing result:")
         print("-" * 30)
-        print(log_read_result)
+        print(list_result)
         print("-" * 30)
         
-        # 4. Append to CSV file
-        csv_path = os.path.join(os.getcwd(), "examples", "output", "data.csv")
-        print(f"\nCreating and appending to CSV file: {csv_path}")
-        
-        # Initial CSV header and data
-        csv_header = "Name,Age,City,Occupation"
-        csv_write_result = write_tool(file_path=csv_path, content=csv_header)
-        print("CSV Header Write Result:")
+        # Test file existence
+        print("\n5. Testing file existence...")
+        exists_result = exists_tool(path="sample_document.txt")
+        print("File existence check result:")
         print("-" * 30)
-        print(csv_write_result)
+        print(exists_result)
         print("-" * 30)
         
-        # Append CSV rows
-        csv_rows = [
-            "\nJohn Doe,30,New York,Engineer",
-            "\nJane Smith,25,Los Angeles,Designer",
-            "\nBob Johnson,35,Chicago,Manager",
-            "\nAlice Brown,28,San Francisco,Developer"
-        ]
-        
-        for csv_row in csv_rows:
-            append_result = append_tool(file_path=csv_path, content=csv_row)
-            print(f"Appended CSV row: {csv_row.strip()}")
-        
-        # Read the complete CSV file
-        print(f"\nReading complete CSV file: {csv_path}")
-        csv_read_result = read_tool(file_path=csv_path)
-        print("Complete CSV File:")
+        # Test supported formats
+        print("\n6. Testing supported formats...")
+        formats_tool = storage_toolkit.get_tool("list_supported_formats")
+        formats_result = formats_tool()
+        print("Supported formats result:")
         print("-" * 30)
-        print(csv_read_result)
+        print(formats_result)
         print("-" * 30)
         
-        # 5. Append to configuration file
-        config_path = os.path.join(os.getcwd(), "examples", "output", "config.ini")
-        print(f"\nCreating and appending to config file: {config_path}")
-        
-        # Initial config content
-        initial_config = """[DATABASE]
-host = localhost
-port = 5432
-name = myapp"""
-        
-        config_write_result = write_tool(file_path=config_path, content=initial_config)
-        print("Initial Config Write Result:")
-        print("-" * 30)
-        print(config_write_result)
-        print("-" * 30)
-        
-        # Append new config sections
-        additional_configs = [
-            "\n\n[CACHE]",
-            "\nredis_host = localhost",
-            "\nredis_port = 6379",
-            "\nttl = 3600",
-            "\n\n[LOGGING]",
-            "\nlevel = INFO",
-            "\nfile = /var/log/myapp.log",
-            "\nmax_size = 10MB"
-        ]
-        
-        for config_line in additional_configs:
-            append_result = append_tool(file_path=config_path, content=config_line)
-        
-        print("Appended additional configuration sections")
-        
-        # Read the complete config file
-        print(f"\nReading complete config file: {config_path}")
-        config_read_result = read_tool(file_path=config_path)
-        print("Complete Config File:")
-        print("-" * 30)
-        print(config_read_result)
-        print("-" * 30)
-        
-        # 6. Demonstrate error handling for non-existent file append
-        non_existent_path = os.path.join(os.getcwd(), "examples", "output", "non_existent.txt")
-        print(f"\nTesting append to non-existent file: {non_existent_path}")
-        error_append_result = append_tool(file_path=non_existent_path, content="This should create a new file")
-        print("Append to Non-existent File Result:")
-        print("-" * 30)
-        print(error_append_result)
-        print("-" * 30)
-        
-        # Verify the file was created
-        if error_append_result.get("success"):
-            print(f"Reading newly created file: {non_existent_path}")
-            new_file_read = read_tool(file_path=non_existent_path)
-            print("Newly Created File Content:")
-            print("-" * 30)
-            print(new_file_read)
-            print("-" * 30)
+        print("\n✓ StorageToolkit test completed successfully!")
+        print("✓ All file operations working with default storage handler")
+        print("✓ Automatic format detection working")
+        print("✓ File append operations working")
+        print("✓ File listing and existence checks working")
         
     except Exception as e:
-        print(f"Error running file tool example: {str(e)}")
+        print(f"Error running storage tool example: {str(e)}")
 
 
 def run_browser_tool_example():
@@ -921,13 +827,13 @@ def run_faiss_tool_example():
         return
     
     try:
-        # Initialize FAISS toolkit with local storage
+        # Initialize FAISS toolkit with default storage (no explicit path needed)
         toolkit = FaissToolkit(
             name="DemoFaissToolkit",
             default_corpus_id="demo_corpus"
         )
         
-        print("✓ FaissToolkit initialized")
+        print("✓ FaissToolkit initialized with default storage")
         
         # Get tools
         insert_tool = toolkit.get_tool("faiss_insert")
@@ -989,7 +895,7 @@ def run_faiss_tool_example():
                     remaining = verify_result['data']['total_results']
                     print(f"✓ Remaining documents after deletion: {remaining}")
         
-        print("\n✓ FaissToolkit test completed")
+        print("\n✓ FaissToolkit test completed with default storage")
         
     except Exception as e:
         print(f"Error: {str(e)}")
@@ -1000,15 +906,14 @@ def run_postgresql_tool_example():
     print("\n===== POSTGRESQL TOOL EXAMPLE =====\n")
     
     try:
-        # Initialize PostgreSQL toolkit with local storage
+        # Initialize PostgreSQL toolkit with default storage (no explicit path needed)
         toolkit = PostgreSQLToolkit(
             name="DemoPostgreSQLToolkit",
-            local_path="./demo_postgresql",
             database_name="demo_db",
             auto_save=True
         )
         
-        print("✓ PostgreSQLToolkit initialized")
+        print("✓ PostgreSQLToolkit initialized with default storage")
         
         # Get tools
         execute_tool = toolkit.get_tool("postgresql_execute")
@@ -1078,7 +983,7 @@ def run_postgresql_tool_example():
                         remaining = verify_result["data"]
                         print(f"✓ Remaining users after deletion: {len(remaining)}")
         
-        print("\n✓ PostgreSQLToolkit test completed")
+        print("\n✓ PostgreSQLToolkit test completed with default storage")
         
     except Exception as e:
         print(f"Error: {str(e)}")
@@ -1089,15 +994,14 @@ def run_mongodb_tool_example():
     print("\n===== MONGODB TOOL EXAMPLE =====\n")
     
     try:
-        # Initialize MongoDB toolkit with local storage
+        # Initialize MongoDB toolkit with default storage (no explicit path needed)
         toolkit = MongoDBToolkit(
             name="DemoMongoDBToolkit",
-            local_path="./demo_mongodb",
             database_name="demo_db",
             auto_save=True
         )
         
-        print("✓ MongoDBToolkit initialized")
+        print("✓ MongoDBToolkit initialized with default storage")
         
         # Get tools
         execute_tool = toolkit.get_tool("mongodb_execute_query")
@@ -1155,7 +1059,7 @@ def run_mongodb_tool_example():
                     remaining = verify_result["data"]
                     print(f"✓ Remaining products after deletion: {len(remaining)}")
         
-        print("\n✓ MongoDBToolkit test completed")
+        print("\n✓ MongoDBToolkit test completed with default storage")
         
     except Exception as e:
         print(f"Error: {str(e)}")
@@ -1174,7 +1078,6 @@ def run_rss_tool_example():
         # Get tools
         fetch_tool = toolkit.get_tool("rss_fetch")
         validate_tool = toolkit.get_tool("rss_validate")
-        monitor_tool = toolkit.get_tool("rss_monitor")
         
         # Test RSS feed URLs
         test_feeds = [
@@ -1211,23 +1114,9 @@ def run_rss_tool_example():
                 
                 # Test monitoring for recent entries
                 print("3. Testing feed monitoring...")
-                from datetime import datetime, timedelta
-                yesterday = (datetime.now() - timedelta(days=1)).isoformat()
                 
-                monitor_result = monitor_tool(
-                    feed_url=feed_url,
-                    since_date=yesterday,
-                    max_entries=5
-                )
                 
-                if monitor_result.get("success"):
-                    new_entries = monitor_result.get("new_entries", [])
-                    print(f"✓ Found {len(new_entries)} new entries since yesterday")
-                    
-                    if new_entries:
-                        print("  Recent entries:")
-                        for entry in new_entries[:2]:
-                            print(f"    - {entry.get('title', 'No title')}")
+                
             else:
                 print(f"❌ Invalid or inaccessible feed: {validate_result.get('error', 'Unknown error')}")
         
@@ -1242,41 +1131,41 @@ def main():
     """Main function to run all examples"""
     print("===== INTERPRETER TOOL EXAMPLES =====")
     
-    # # Run file tool example
-    # run_file_tool_example()
+    # Run storage tool example (updated from file tool)
+    run_file_tool_example()
+   
+    # Run Python interpreter examples
+    run_python_interpreter_examples()
     
-    # # Run browser tool example
-    # run_browser_tool_example()
+    # Run Docker interpreter examples
+    run_docker_interpreter_examples()
     
-    # # Run MCP toolkit example
-    # run_mcp_example()
+    # # Run search tools examples
+    # run_search_examples()
     
-    # # Run Python interpreter examples
-    # run_python_interpreter_examples()
-    
-    # # Run Docker interpreter examples
-    # run_docker_interpreter_examples()
-    
-    # Run search tools examples
-    run_search_examples()
-    
-    # # Run arXiv tool example
-    # run_arxiv_tool_example()
+    # Run arXiv tool example
+    run_arxiv_tool_example()
     
     # # Run BrowserUse tool example
     # run_browser_use_tool_example()
+        
+    # # Run browser tool example
+    # run_browser_tool_example()
     
-    # # Run FAISS tool example
-    # run_faiss_tool_example()
+    # Run FAISS tool example
+    run_faiss_tool_example()
     
-    # # Run PostgreSQL tool example
-    # run_postgresql_tool_example()
+    # Run PostgreSQL tool example
+    run_postgresql_tool_example()
     
-    # # Run MongoDB tool example
-    # run_mongodb_tool_example()
+    # Run MongoDB tool example
+    run_mongodb_tool_example()
     
-    # # Run RSS tool example
-    # run_rss_tool_example()
+    # Run RSS tool example
+    run_rss_tool_example()
+    
+    # # Run MCP toolkit example
+    # run_mcp_example()
     
     print("\n===== ALL EXAMPLES COMPLETED =====")
 

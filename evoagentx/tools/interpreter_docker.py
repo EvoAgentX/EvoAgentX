@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import ClassVar, Dict, List, Optional
 from .interpreter_base import BaseInterpreter
 from .tool import Tool,Toolkit
+from .storage_handler import FileStorageHandler
 import os
 from pydantic import Field
 
@@ -51,6 +52,7 @@ class DockerInterpreter(BaseInterpreter):
         container_directory:str = "/home/app/",
         container_command:str = "tail -f /dev/null",
         tmp_directory:str = "/tmp",
+        storage_handler: FileStorageHandler = None,
         **data
     ):
         """
@@ -85,6 +87,7 @@ class DockerInterpreter(BaseInterpreter):
         self.container = None
         self.image_tag = image_tag
         self.dockerfile_path = dockerfile_path
+        self.storage_handler = storage_handler
         self._initialize_if_needed()
         
         # Upload directory if specified
@@ -283,19 +286,12 @@ class DockerInterpreter(BaseInterpreter):
             RuntimeError: If container is not properly initialized or execution fails
             ValueError: If file content is invalid or exceeds limits
         """
-        # Check if file exists and is readable
-        if not os.path.isfile(file_path):
-            raise FileNotFoundError(f"Script file not found: {file_path}")
-            
-        if not os.access(file_path, os.R_OK):
-            raise PermissionError(f"Cannot read script file: {file_path}")
-        
-        # Read the file content
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                code = f.read()
-        except Exception as e:
-            raise RuntimeError(f"Failed to read script file: {e}")
+        # Read file using storage handler
+        result = self.storage_handler.read(file_path)
+        if result["success"]:
+            code = result["content"]
+        else:
+            raise RuntimeError(f"Could not read file '{file_path}': {result.get('error', 'Unknown error')}")
             
         # Execute the code
         return self.execute(code, language)
@@ -379,9 +375,15 @@ class DockerInterpreterToolkit(Toolkit):
         container_directory: str = "/home/app/",
         container_command: str = "tail -f /dev/null",
         tmp_directory: str = "/tmp",
+        storage_handler: FileStorageHandler = None,
         **kwargs
     ):
-        # Create the shared Docker interpreter instance
+        # Initialize storage handler if not provided
+        if storage_handler is None:
+            from .storage_file import LocalStorageHandler
+            storage_handler = LocalStorageHandler(base_path="./workplace/docker")
+        
+        # Create the shared Docker interpreter instance with storage handler
         docker_interpreter = DockerInterpreter(
             name="DockerInterpreter",
             image_tag=image_tag,
@@ -393,6 +395,7 @@ class DockerInterpreterToolkit(Toolkit):
             container_directory=container_directory,
             container_command=container_command,
             tmp_directory=tmp_directory,
+            storage_handler=storage_handler,
             **kwargs
         )
         
@@ -407,4 +410,5 @@ class DockerInterpreterToolkit(Toolkit):
         
         # Store docker_interpreter as instance variable
         self.docker_interpreter = docker_interpreter
+        self.storage_handler = storage_handler
     

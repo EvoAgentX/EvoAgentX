@@ -1,7 +1,8 @@
 import requests
 import base64
 from typing import Dict, Optional, List
-from .tool import Tool
+from .tool import Tool, Toolkit
+from .storage_handler import FileStorageHandler
 
 class ImageAnalysisTool(Tool):
     name: str = "image_analysis"
@@ -30,10 +31,11 @@ class ImageAnalysisTool(Tool):
     }
     required: Optional[List[str]] = ["prompt"]
 
-    def __init__(self, api_key, model="openai/gpt-4o"):
+    def __init__(self, api_key, model="openai/gpt-4o", storage_handler: FileStorageHandler = None):
         super().__init__()
         self.api_key = api_key
         self.model = model
+        self.storage_handler = storage_handler
 
     def __call__(
         self,
@@ -57,16 +59,32 @@ class ImageAnalysisTool(Tool):
                 "image_url": {"url": image_url}
             })
         elif image_path:
-            with open(image_path, "rb") as f:
-                base64_image = base64.b64encode(f.read()).decode("utf-8")
+            # Read image using storage handler
+            result = self.storage_handler.read(image_path)
+            if result["success"]:
+                image_content = result["content"]
+                if isinstance(image_content, str):
+                    # If content is string, encode it
+                    image_content = image_content.encode('utf-8')
+                base64_image = base64.b64encode(image_content).decode("utf-8")
+            else:
+                return {"error": f"Failed to read image: {result.get('error', 'Unknown error')}"}
             data_url = f"data:image/jpeg;base64,{base64_image}"
             messages[0]["content"].append({
                 "type": "image_url",
                 "image_url": {"url": data_url}
             })
         elif pdf_path:
-            with open(pdf_path, "rb") as f:
-                base64_pdf = base64.b64encode(f.read()).decode("utf-8")
+            # Read PDF using storage handler
+            result = self.storage_handler.read(pdf_path)
+            if result["success"]:
+                pdf_content = result["content"]
+                if isinstance(pdf_content, str):
+                    # If content is string, encode it
+                    pdf_content = pdf_content.encode('utf-8')
+                base64_pdf = base64.b64encode(pdf_content).decode("utf-8")
+            else:
+                return {"error": f"Failed to read PDF: {result.get('error', 'Unknown error')}"}
             data_url = f"data:application/pdf;base64,{base64_pdf}"
             messages[0]["content"].append({
                 "type": "file",
@@ -97,4 +115,43 @@ class ImageAnalysisTool(Tool):
             }
             return result
         except Exception as e:
-            return {"error": f"Failed to parse OpenRouter response: {e}", "raw": response.text} 
+            return {"error": f"Failed to parse OpenRouter response: {e}", "raw": response.text}
+
+
+class ImageAnalysisToolkit(Toolkit):
+    """
+    Toolkit for image analysis with storage handler integration.
+    """
+    
+    def __init__(self, name: str = "ImageAnalysisToolkit", api_key: str = None, model: str = "openai/gpt-4o", storage_handler: FileStorageHandler = None):
+        """
+        Initialize the image analysis toolkit.
+        
+        Args:
+            name: Name of the toolkit
+            api_key: API key for OpenRouter
+            model: Model to use for image analysis
+            storage_handler: Storage handler for file operations
+        """
+        # Initialize storage handler if not provided
+        if storage_handler is None:
+            from .storage_file import LocalStorageHandler
+            storage_handler = LocalStorageHandler(base_path="./workplace/analysis")
+        
+        # Create the image analysis tool
+        tool = ImageAnalysisTool(
+            api_key=api_key,
+            model=model,
+            storage_handler=storage_handler
+        )
+        
+        # Create tools list
+        tools = [tool]
+        
+        # Initialize parent with tools
+        super().__init__(name=name, tools=tools)
+        
+        # Store instance variables
+        self.api_key = api_key
+        self.model = model
+        self.storage_handler = storage_handler 

@@ -1,5 +1,6 @@
 from typing import Dict, Optional, List
-from .tool import Tool
+from .tool import Tool, Toolkit
+from .storage_handler import FileStorageHandler
 import requests
 import os
 import base64
@@ -20,10 +21,11 @@ class FluxImageGenerationTool(Tool):
     }
     required: List[str] = ["prompt"]
 
-    def __init__(self, api_key: str, save_path: str = "./imgs"):
+    def __init__(self, api_key: str, save_path: str = "./imgs", storage_handler: FileStorageHandler = None):
         super().__init__()
         self.api_key = api_key
         self.save_path = save_path
+        self.storage_handler = storage_handler
 
     def __call__(self, prompt: str, input_image: str = None, seed: int = 42, aspect_ratio: str = None, output_format: str = "jpeg", prompt_upsampling: bool = False, safety_tolerance: int = 2):
         # Create request
@@ -72,22 +74,60 @@ class FluxImageGenerationTool(Tool):
             elif result["status"] in ["Error", "Failed"]:
                 raise ValueError(f"Generation failed: {result}")
 
-        # Download and save the image
+        # Download the image
         image_response = requests.get(image_url)
         image_response.raise_for_status()
+        image_content = image_response.content
         
-        os.makedirs(self.save_path, exist_ok=True)
-        file_path = os.path.join(self.save_path, f"flux_{seed}.{output_format}")
-        # Prevent filename conflict
-
-        # print(f"file_path: {file_path}")
-
+        # Generate filename
+        filename = f"flux_{seed}.{output_format}"
         i = 1
-        while os.path.exists(file_path):
-            file_path = os.path.join(self.save_path, f"flux_{seed}_{i}.{output_format}")
+        while self.storage_handler.exists(filename):
+            filename = f"flux_{seed}_{i}.{output_format}"
             i += 1
+        
+        # Save the image using storage handler
+        result = self.storage_handler.save(filename, image_content)
+        if result["success"]:
+            return {"file_path": filename, "storage_handler": type(self.storage_handler).__name__}
+        else:
+            return {"error": f"Failed to save image: {result.get('error', 'Unknown error')}"}
 
-        with open(file_path, "wb") as f:
-            f.write(image_response.content)
 
-        return {"file_path": file_path}
+class FluxImageGenerationToolkit(Toolkit):
+    """
+    Toolkit for Flux image generation with storage handler integration.
+    """
+    
+    def __init__(self, name: str = "FluxImageGenerationToolkit", api_key: str = None, save_path: str = "./imgs", storage_handler: FileStorageHandler = None):
+        """
+        Initialize the Flux image generation toolkit.
+        
+        Args:
+            name: Name of the toolkit
+            api_key: API key for Flux image generation
+            save_path: Default save path for images
+            storage_handler: Storage handler for file operations
+        """
+        # Initialize storage handler if not provided
+        if storage_handler is None:
+            from .storage_file import LocalStorageHandler
+            storage_handler = LocalStorageHandler(base_path="./workplace/images")
+        
+        # Create the image generation tool
+        tool = FluxImageGenerationTool(
+            api_key=api_key,
+            save_path=save_path,
+            storage_handler=storage_handler
+        )
+        
+        # Create tools list
+        tools = [tool]
+        
+        # Initialize parent with tools
+        super().__init__(name=name, tools=tools)
+        
+        # Store instance variables
+        self.api_key = api_key
+        self.save_path = save_path
+        self.storage_handler = storage_handler

@@ -47,6 +47,7 @@ from datetime import datetime
 from pathlib import Path
 
 from .tool import Tool, Toolkit
+from .storage_file import LocalStorageHandler
 from ..core.module import BaseModule
 from ..core.logging import logger
 from ..rag.rag import RAGEngine
@@ -54,6 +55,7 @@ from ..rag.rag_config import RAGConfig
 from ..rag.schema import Query, Document, Chunk, Corpus, DocumentMetadata
 from ..storages.base import StorageHandler
 from ..storages.storages_config import StoreConfig
+from .storage_handler import FileStorageHandler
 
 
 def _ensure_database_path(db_path: str) -> str:
@@ -194,6 +196,8 @@ class FaissDatabase(BaseModule):
         rag_config: RAGConfig,
         default_corpus_id: str = "default",
         default_index_type: str = "vector",
+        storage_handler: StorageHandler = None,
+        file_handler: FileStorageHandler = None,
         **kwargs
     ):
         """
@@ -204,15 +208,22 @@ class FaissDatabase(BaseModule):
             rag_config (RAGConfig): Configuration for RAG pipeline
             default_corpus_id (str): Default corpus ID for operations
             default_index_type (str): Default index type for vector operations
+            storage_handler (StorageHandler, optional): Storage handler for file operations
             **kwargs: Additional arguments for BaseModule
         """
         super().__init__(**kwargs)
         
-        # Initialize storage handler
+        # Initialize storage handler for database operations
         self.storage_handler = StorageHandler(storageConfig=storage_config)
         
         # Initialize RAG engine
         self.rag_engine = RAGEngine(config=rag_config, storage_handler=self.storage_handler)
+        
+        # Initialize file storage handler for external file operations
+        # Use LocalStorageHandler as default if none provided
+        if storage_handler is None:
+            storage_handler = LocalStorageHandler(base_path="./workplace/storage")
+        self.file_storage_handler = storage_handler
         
         # Set defaults
         self.default_corpus_id = default_corpus_id
@@ -230,6 +241,45 @@ class FaissDatabase(BaseModule):
     ) -> Dict[str, Any]:
         """
         Query the vector database with semantic search.
+        
+        Args:
+            query (str): The query string to search for
+            corpus_id (str, optional): Corpus ID to search in
+            top_k (int): Number of top results to return
+            similarity_threshold (float): Minimum similarity threshold
+            metadata_filters (Dict[str, Any], optional): Metadata filters for search
+            
+        Returns:
+            Dict[str, Any]: Search results with chunks and scores
+        """
+        try:
+            # Check if we're already in an event loop
+            try:
+                loop = asyncio.get_running_loop()
+                # We're in an event loop, use thread executor to avoid asyncio.run() conflict
+                logger.info(f"Detected running event loop, using thread executor for query")
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(self._query_sync, query, corpus_id, top_k, similarity_threshold, metadata_filters)
+                    return future.result()
+            except RuntimeError:
+                # No event loop running, safe to use asyncio.run() in the RAG engine
+                logger.info(f"No event loop detected, using direct query processing")
+                return self._query_sync(query, corpus_id, top_k, similarity_threshold, metadata_filters)
+                
+        except Exception as e:
+            logger.error(f"Query failed: {str(e)}")
+            return {"success": False, "error": str(e)}
+    
+    def _query_sync(
+        self,
+        query: str,
+        corpus_id: Optional[str] = None,
+        top_k: int = 5,
+        similarity_threshold: float = 0.0,
+        metadata_filters: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Synchronous version of query that can be safely called from a thread.
         
         Args:
             query (str): The query string to search for
@@ -372,14 +422,36 @@ class FaissDatabase(BaseModule):
             List[Document]: List of Document objects created from the file
         """
         try:
-            # Use RAG engine's read method to process the file
+            # Use StorageHandler to read the file if available
+            if self.file_storage_handler:
+                result = self.file_storage_handler.read(file_path)
+                if result["success"]:
+                    file_content = result["content"]
+                else:
+                    raise Exception(f"Failed to read file: {result.get('error', 'Unknown error')}")
+            else:
+                # Fallback to direct file reading
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    file_content = f.read()
+            
+            # Use RAG engine to process the content
             temp_corpus_id = f"temp_file_{uuid4().hex[:8]}"
-            corpus = self.rag_engine.read(
-                file_paths=file_path,
-                corpus_id=temp_corpus_id
+            
+            # Create a temporary document for processing
+            temp_doc = Document(
+                text=file_content,
+                metadata=DocumentMetadata(
+                    source_file=file_path,
+                    doc_index=doc_index,
+                    insertion_time=datetime.now().isoformat()
+                ),
+                doc_id=str(uuid4())
             )
             
-            # Convert chunks back to documents
+            # Process the document through RAG engine
+            corpus = self.rag_engine.process_documents([temp_doc], corpus_id=temp_corpus_id)
+            
+            # Convert chunks back to documents with proper metadata
             documents = []
             for chunk in corpus.chunks:
                 doc_metadata = metadata.copy() if metadata else {}
@@ -874,6 +946,8 @@ class FaissToolkit(Toolkit):
         default_corpus_id: str = "default",
         default_index_type: str = "vector",
         db_path: Optional[str] = None,
+        storage_handler: StorageHandler = None,
+        file_handler: FileStorageHandler = None,
         **kwargs
     ):
         """
@@ -886,6 +960,8 @@ class FaissToolkit(Toolkit):
             default_corpus_id (str): Default corpus ID for operations
             default_index_type (str): Default index type for vector operations
             db_path (str, optional): Custom database path. If provided, will check for existing database or create new one
+            storage_handler (StorageHandler, optional): Storage handler for file operations
+            file_handler (FileStorageHandler, optional): File handler for file operations
             **kwargs: Additional arguments
         """
         # Use default configurations if not provided
@@ -900,7 +976,9 @@ class FaissToolkit(Toolkit):
             storage_config=storage_config,
             rag_config=rag_config,
             default_corpus_id=default_corpus_id,
-            default_index_type=default_index_type
+            default_index_type=default_index_type,
+            storage_handler=storage_handler,
+            file_handler=file_handler
         )
         
         # Create tools with the shared database instance

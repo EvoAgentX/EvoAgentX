@@ -157,13 +157,22 @@ def execute_workflow(stock_code, data_dir, report_dir, timestamp):
         # Load workflow graph
         workflow_graph: WorkFlowGraph = WorkFlowGraph.from_file(module_save_path)
         agent_manager = AgentManager(tools=tools)
+        
+        # Override any placeholder LLM configs in the workflow with our actual config
+        for node in workflow_graph.nodes:
+            if node.agents:
+                for agent in node.agents:
+                    if isinstance(agent, dict) and "llm_config" in agent:
+                        # Replace any placeholder API keys with our actual config
+                        agent["llm_config"] = llm.config.to_dict()
+        
         agent_manager.add_agents_from_workflow(workflow_graph, llm_config=llm.config)
         workflow = WorkFlow(graph=workflow_graph, agent_manager=agent_manager, llm=llm)
         workflow.init_module()
 
         # Construct the goal string
-        output_file = report_dir / f"text_report_{stock_code}_{timestamp}.md"
-        past_report = report_dir / f"text_report_{stock_code}_{timestamp}_previous.md"
+        comprehensive_report_file = report_dir / f"comprehensive_report_{stock_code}_{timestamp}.md"
+        past_report = report_dir / f"comprehensive_report_{stock_code}_{timestamp}_previous.md"
         
         goal = f"""I need a daily trading decision for stock {stock_code}.
 Available funds: {available_funds} RMB
@@ -176,16 +185,93 @@ Past report folder: {past_report}
 Please read ALL files in the data folder and generate a comprehensive trading decision report in Chinese based on real data. Return the complete content.
 """
 
-        output = workflow.execute({"goal": goal})
+        # Execute the workflow
+        workflow.execute({"goal": goal})
+        
+        # Get the raw output from the workflow environment instead of using output extraction
         try:
-            with open(output_file, "w", encoding="utf-8") as f:
-                f.write(output)
-            print(f"Trading decision report saved to: {output_file}")
-            # # Also save a backup
-            # with open(report_dir / f"text_report_{stock_code}_{timestamp}_back.md", "w", encoding="utf-8") as f:
-            #     f.write(output)
+            # Get the final task's messages from the environment
+            end_tasks = workflow.graph.find_end_nodes()
+            if end_tasks:
+                final_task = end_tasks[0]  # Get the first end task
+                final_messages = workflow.environment.get_task_messages(tasks=final_task, n=1)
+                
+                if final_messages:
+                    # Get the raw content from the final message
+                    raw_output = str(final_messages[0].content)
+                    
+                    # Check if the output is JSON and extract the markdown content
+                    if raw_output.strip().startswith('{'):
+                        try:
+                            import json
+                            json_data = json.loads(raw_output)
+                            if 'comprehensive_report' in json_data:
+                                # Extract the markdown content from JSON
+                                markdown_content = json_data['comprehensive_report']
+                                # Save the clean markdown content
+                                with open(comprehensive_report_file, "w", encoding="utf-8") as f:
+                                    f.write(markdown_content)
+                                print(f"✅ Comprehensive report saved to: {comprehensive_report_file}")
+                            else:
+                                # Fallback: save the raw content
+                                with open(comprehensive_report_file, "w", encoding="utf-8") as f:
+                                    f.write(raw_output)
+                                print(f"✅ Comprehensive report saved to: {comprehensive_report_file}")
+                        except json.JSONDecodeError:
+                            # If JSON parsing fails, save the raw content
+                            with open(comprehensive_report_file, "w", encoding="utf-8") as f:
+                                f.write(raw_output)
+                            print(f"✅ Comprehensive report saved to: {comprehensive_report_file}")
+                    else:
+                        # If it's not JSON, save the raw content directly
+                        with open(comprehensive_report_file, "w", encoding="utf-8") as f:
+                            f.write(raw_output)
+                        print(f"✅ Comprehensive report saved to: {comprehensive_report_file}")
+                    
+                else:
+                    # Fallback: get all messages and use the last one
+                    all_messages = workflow.environment.get()
+                    if all_messages:
+                        raw_output = str(all_messages[-1].content)
+                        
+                        # Check if the output is JSON and extract the markdown content
+                        if raw_output.strip().startswith('{'):
+                            try:
+                                import json
+                                json_data = json.loads(raw_output)
+                                if 'comprehensive_report' in json_data:
+                                    # Extract the markdown content from JSON
+                                    markdown_content = json_data['comprehensive_report']
+                                    # Save the clean markdown content
+                                    with open(comprehensive_report_file, "w", encoding="utf-8") as f:
+                                        f.write(markdown_content)
+                                    print(f"✅ Comprehensive report saved to: {comprehensive_report_file}")
+                                else:
+                                    # Fallback: save the raw content
+                                    with open(comprehensive_report_file, "w", encoding="utf-8") as f:
+                                        f.write(raw_output)
+                                    print(f"✅ Comprehensive report saved to: {comprehensive_report_file}")
+                            except json.JSONDecodeError:
+                                # If JSON parsing fails, save the raw content
+                                with open(comprehensive_report_file, "w", encoding="utf-8") as f:
+                                    f.write(raw_output)
+                                print(f"✅ Comprehensive report saved to: {comprehensive_report_file}")
+                        else:
+                            # If it's not JSON, save the raw content directly
+                            with open(comprehensive_report_file, "w", encoding="utf-8") as f:
+                                f.write(raw_output)
+                            print(f"✅ Comprehensive report saved to: {comprehensive_report_file}")
+                    else:
+                        print("❌ No messages found in workflow environment")
+                        
+            else:
+                print("❌ No end tasks found in workflow")
+                
         except Exception as e:
-            print(f"Error saving report: {e}")
+            print(f"Error saving comprehensive report: {e}")
+            import traceback
+            traceback.print_exc()
+            
     except Exception as e:
         print(f"Error executing workflow: {e}")
         import traceback
@@ -193,22 +279,22 @@ Please read ALL files in the data folder and generate a comprehensive trading de
 
 
 def generate_html_report(stock_code, base_dir, report_dir, graphs_dir, timestamp):
-    """Generate HTML report from markdown and charts"""
+    """Generate HTML report from comprehensive markdown and charts"""
     try:
         # Import the HTML generator
         from html_report_generator import HTMLGenerator
         
-        # Define file paths
-        md_file = report_dir / f"text_report_{stock_code}_{timestamp}.md"
+        # Define file paths - use comprehensive report as primary
+        comprehensive_report_file = report_dir / f"comprehensive_report_{stock_code}_{timestamp}.md"
         html_output = base_dir/ datetime.now().strftime('%Y%m%d') / "html_report" / f"report_{stock_code}_{timestamp}.html"
         
         # Find chart files
         technical_chart = graphs_dir / f"{stock_code}_technical_charts.png"
         price_volume_chart = graphs_dir / f"{stock_code}_candlestick_chart.png"
         
-        # Check if markdown file exists
-        if not md_file.exists():
-            print(f"❌ Markdown file not found: {md_file}")
+        # Check if comprehensive report exists (primary file)
+        if not comprehensive_report_file.exists():
+            print(f"❌ Comprehensive report file not found: {comprehensive_report_file}")
             return False
         
         # Check if charts exist
@@ -220,11 +306,11 @@ def generate_html_report(stock_code, base_dir, report_dir, graphs_dir, timestamp
             print(f"⚠️  Price/volume chart not found: {price_volume_chart}")
             price_volume_chart = ""
         
-        # Generate HTML report
+        # Generate HTML report with comprehensive report
         print(f"[4] 生成HTML报告: {html_output}")
         generator = HTMLGenerator(str(html_output))
         output_file = generator.generate_report(
-            str(md_file), 
+            str(comprehensive_report_file), 
             str(technical_chart) if technical_chart else "", 
             str(price_volume_chart) if price_volume_chart else ""
         )
@@ -240,6 +326,21 @@ def generate_html_report(stock_code, base_dir, report_dir, graphs_dir, timestamp
         import traceback
         traceback.print_exc()
         return False
+
+
+def check_reports_exist(stock_code, report_dir, timestamp):
+    """Check if comprehensive report exists"""
+    comprehensive_report_file = report_dir / f"comprehensive_report_{stock_code}_{timestamp}.md"
+    
+    comprehensive_exists = comprehensive_report_file.exists()
+    
+    print(f"📊 报告生成状态:")
+    if comprehensive_exists:
+        print(f"   ✅ 综合分析报告: {comprehensive_report_file}")
+    else:
+        print(f"   ❌ 综合分析报告: {comprehensive_report_file}")
+    
+    return comprehensive_exists
 
 
 def generate_html_from_existing_files(stock_code, timestamp=None):
@@ -261,6 +362,14 @@ def generate_html_from_existing_files(stock_code, timestamp=None):
     if not graphs_dir.exists():
         print(f"⚠️  图表目录不存在: {graphs_dir}")
         graphs_dir = None
+    
+    # Check for comprehensive report
+    comprehensive_report_file = report_dir / f"comprehensive_report_{stock_code}_{timestamp}.md"
+    
+    if comprehensive_report_file.exists():
+        print(f"✅ 找到综合分析报告: {comprehensive_report_file}")
+    else:
+        print(f"❌ 未找到综合分析报告: {comprehensive_report_file}")
     
     return generate_html_report(stock_code, base_dir, report_dir, graphs_dir, timestamp)
 
@@ -297,8 +406,13 @@ def main():
     
     # === Workflow logic from workflow_invest.py ===
     print(f"[3] 生成报告到: {report_dir}")
+    print(f"   将生成一个文件:")
+    print(f"   - comprehensive_report_{stock_code}_{timestamp}.md (综合分析报告)")
     # generate_workflow(llm, tools)
     execute_workflow(stock_code, data_dir, report_dir, timestamp)
+    
+    # Check if comprehensive report was generated successfully
+    comprehensive_exists = check_reports_exist(stock_code, report_dir, timestamp)
     
     # === Generate HTML report ===
     print(f"\n[4] 生成HTML报告")
@@ -306,8 +420,13 @@ def main():
     
     if html_success:
         print("\n✅ 全部流程完成！包括HTML报告生成")
+        print(f"📁 报告文件位置:")
+        print(f"   - 综合分析报告: {report_dir}/comprehensive_report_{stock_code}_{timestamp}.md")
+        print(f"   - HTML报告: {base_dir}/{timestamp}/html_report/report_{stock_code}_{timestamp}.html")
     else:
         print("\n✅ 主要流程完成！(HTML报告生成失败)")
+        print(f"📁 报告文件位置:")
+        print(f"   - 综合分析报告: {report_dir}/comprehensive_report_{stock_code}_{timestamp}.md")
 
 if __name__ == "__main__":
     main()

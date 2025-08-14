@@ -1,7 +1,13 @@
 from .tool import Tool, Toolkit
-from .storage_base import StorageBase
+from .storage_handler import FileStorageHandler, LocalStorageHandler
 from typing import Dict, Any, List, Optional
 from ..core.logging import logger
+import os
+import shutil
+from pathlib import Path
+from datetime import datetime
+
+
 
 
 class SaveTool(Tool):
@@ -35,9 +41,9 @@ class SaveTool(Tool):
     }
     required: Optional[List[str]] = ["file_path", "content"]
 
-    def __init__(self, storage_base: StorageBase = None):
+    def __init__(self, storage_handler: FileStorageHandler = None):
         super().__init__()
-        self.storage_base = storage_base or StorageBase()
+        self.storage_handler = storage_handler or LocalStorageHandler()
 
     def __call__(self, file_path: str, content: str, encoding: str = "utf-8", indent: int = 2, 
                  sheet_name: str = "Sheet1", root_tag: str = "root") -> Dict[str, Any]:
@@ -57,7 +63,7 @@ class SaveTool(Tool):
         """
         try:
             # Parse content based on file type
-            file_extension = self.storage_base.get_file_type(file_path)
+            file_extension = self.storage_handler.get_file_type(file_path)
             parsed_content = content
             
             # Try to parse JSON content for appropriate file types
@@ -96,22 +102,13 @@ class SaveTool(Tool):
                 "root_tag": root_tag
             }
             
-            result = self.storage_base.save(file_path, parsed_content, **kwargs)
-            
-            if result["success"]:
-                logger.info(f"Successfully saved file: {file_path}")
-            else:
-                logger.error(f"Failed to save file {file_path}: {result.get('error', 'Unknown error')}")
+            result = self.storage_handler.save(file_path, parsed_content, **kwargs)
             
             return result
             
         except Exception as e:
-            logger.error(f"Error in save tool: {str(e)}")
-            return {
-                "success": False,
-                "error": str(e),
-                "file_path": file_path
-            }
+            logger.error(f"Error in SaveTool: {str(e)}")
+            return {"success": False, "error": str(e), "file_path": file_path}
 
 
 class ReadTool(Tool):
@@ -137,9 +134,9 @@ class ReadTool(Tool):
     }
     required: Optional[List[str]] = ["file_path"]
 
-    def __init__(self, storage_base: StorageBase = None):
+    def __init__(self, storage_handler: FileStorageHandler = None):
         super().__init__()
-        self.storage_base = storage_base or StorageBase()
+        self.storage_handler = storage_handler or LocalStorageHandler()
 
     def __call__(self, file_path: str, encoding: str = "utf-8", sheet_name: str = None, head: int = 0) -> Dict[str, Any]:
         """
@@ -149,58 +146,25 @@ class ReadTool(Tool):
             file_path: Path to the file to read
             encoding: Text encoding for text files
             sheet_name: Sheet name for Excel files
-            head: Number of characters to return from the beginning (0 means return everything)
+            head: Number of characters to return from the beginning
             
         Returns:
-            Dictionary containing the read content and metadata
+            Dictionary containing the read operation result
         """
         try:
-            kwargs = {"encoding": encoding}
-            if sheet_name:
-                kwargs["sheet_name"] = sheet_name
+            kwargs = {
+                "encoding": encoding,
+                "sheet_name": sheet_name,
+                "head": head
+            }
             
-            result = self.storage_base.read(file_path, **kwargs)
-            
-            if result["success"]:
-                # Apply head limit if specified
-                if head > 0:
-                    content = result.get("content")
-                    if isinstance(content, str):
-                        # For string content, truncate by characters
-                        original_length = len(content)
-                        result["content"] = content[:head]
-                        result["original_length"] = original_length
-                        result["truncated_length"] = len(result["content"])
-                        logger.info(f"Successfully read file: {file_path} (truncated to {head} characters)")
-                    elif isinstance(content, list):
-                        # For list content (like JSON arrays), truncate by number of items
-                        original_length = len(content)
-                        result["content"] = content[:head]
-                        result["original_length"] = original_length
-                        result["truncated_length"] = len(result["content"])
-                        logger.info(f"Successfully read file: {file_path} (truncated to {head} items)")
-                    else:
-                        # For other data types, convert to string and truncate
-                        content_str = str(content)
-                        original_length = len(content_str)
-                        result["content"] = content_str[:head]
-                        result["original_length"] = original_length
-                        result["truncated_length"] = len(result["content"])
-                        logger.info(f"Successfully read file: {file_path} (truncated to {head} characters)")
-                else:
-                    logger.info(f"Successfully read file: {file_path}")
-            else:
-                logger.error(f"Failed to read file {file_path}: {result.get('error', 'Unknown error')}")
+            result = self.storage_handler.read(file_path, **kwargs)
             
             return result
             
         except Exception as e:
-            logger.error(f"Error in read tool: {str(e)}")
-            return {
-                "success": False,
-                "error": str(e),
-                "file_path": file_path
-            }
+            logger.error(f"Error in ReadTool: {str(e)}")
+            return {"success": False, "error": str(e), "file_path": file_path}
 
 
 class AppendTool(Tool):
@@ -226,13 +190,13 @@ class AppendTool(Tool):
     }
     required: Optional[List[str]] = ["file_path", "content"]
 
-    def __init__(self, storage_base: StorageBase = None):
+    def __init__(self, storage_handler: FileStorageHandler = None):
         super().__init__()
-        self.storage_base = storage_base or StorageBase()
+        self.storage_handler = storage_handler or LocalStorageHandler()
 
     def __call__(self, file_path: str, content: str, encoding: str = "utf-8", sheet_name: str = None) -> Dict[str, Any]:
         """
-        Append content to a file (only for supported formats).
+        Append content to a file with automatic format detection.
         
         Args:
             file_path: Path to the file to append to
@@ -245,7 +209,7 @@ class AppendTool(Tool):
         """
         try:
             # Parse content based on file type
-            file_extension = self.storage_base.get_file_type(file_path)
+            file_extension = self.storage_handler.get_file_type(file_path)
             parsed_content = content
             
             # Try to parse JSON content for appropriate file types
@@ -277,35 +241,173 @@ class AppendTool(Tool):
                 except json.JSONDecodeError:
                     return {"success": False, "error": "Excel content must be valid JSON array"}
             
-            kwargs = {"encoding": encoding}
-            if sheet_name:
-                kwargs["sheet_name"] = sheet_name
+            kwargs = {
+                "encoding": encoding,
+                "sheet_name": sheet_name
+            }
             
-            result = self.storage_base.append(file_path, parsed_content, **kwargs)
-            
-            if result["success"]:
-                logger.info(f"Successfully appended to file: {file_path}")
-            else:
-                logger.error(f"Failed to append to file {file_path}: {result.get('error', 'Unknown error')}")
+            result = self.storage_handler.append(file_path, parsed_content, **kwargs)
             
             return result
             
         except Exception as e:
-            logger.error(f"Error in append tool: {str(e)}")
-            return {
-                "success": False,
-                "error": str(e),
-                "file_path": file_path
-            }
+            logger.error(f"Error in AppendTool: {str(e)}")
+            return {"success": False, "error": str(e), "file_path": file_path}
+
+
+class DeleteTool(Tool):
+    name: str = "delete"
+    description: str = "Delete a file or directory"
+    inputs: Dict[str, Dict[str, str]] = {
+        "path": {
+            "type": "string",
+            "description": "Path to the file or directory to delete"
+        }
+    }
+    required: Optional[List[str]] = ["path"]
+
+    def __init__(self, storage_handler: FileStorageHandler = None):
+        super().__init__()
+        self.storage_handler = storage_handler or LocalStorageHandler()
+
+    def __call__(self, path: str) -> Dict[str, Any]:
+        """
+        Delete a file or directory.
+        
+        Args:
+            path: Path to the file or directory to delete
+            
+        Returns:
+            Dictionary containing the delete operation result
+        """
+        try:
+            result = self.storage_handler.delete(path)
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error in DeleteTool: {str(e)}")
+            return {"success": False, "error": str(e), "path": path}
+
+
+class MoveTool(Tool):
+    name: str = "move"
+    description: str = "Move or rename a file or directory"
+    inputs: Dict[str, Dict[str, str]] = {
+        "source": {
+            "type": "string",
+            "description": "Source path of the file or directory to move"
+        },
+        "destination": {
+            "type": "string",
+            "description": "Destination path where to move the file or directory"
+        }
+    }
+    required: Optional[List[str]] = ["source", "destination"]
+
+    def __init__(self, storage_handler: FileStorageHandler = None):
+        super().__init__()
+        self.storage_handler = storage_handler or LocalStorageHandler()
+
+    def __call__(self, source: str, destination: str) -> Dict[str, Any]:
+        """
+        Move or rename a file or directory.
+        
+        Args:
+            source: Source path of the file or directory to move
+            destination: Destination path where to move the file or directory
+            
+        Returns:
+            Dictionary containing the move operation result
+        """
+        try:
+            result = self.storage_handler.move(source, destination)
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error in MoveTool: {str(e)}")
+            return {"success": False, "error": str(e), "source": source, "destination": destination}
+
+
+class CopyTool(Tool):
+    name: str = "copy"
+    description: str = "Copy a file"
+    inputs: Dict[str, Dict[str, str]] = {
+        "source": {
+            "type": "string",
+            "description": "Source path of the file to copy"
+        },
+        "destination": {
+            "type": "string",
+            "description": "Destination path where to copy the file"
+        }
+    }
+    required: Optional[List[str]] = ["source", "destination"]
+
+    def __init__(self, storage_handler: FileStorageHandler = None):
+        super().__init__()
+        self.storage_handler = storage_handler or LocalStorageHandler()
+
+    def __call__(self, source: str, destination: str) -> Dict[str, Any]:
+        """
+        Copy a file.
+        
+        Args:
+            source: Source path of the file to copy
+            destination: Destination path where to copy the file
+            
+        Returns:
+            Dictionary containing the copy operation result
+        """
+        try:
+            result = self.storage_handler.copy(source, destination)
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error in CopyTool: {str(e)}")
+            return {"success": False, "error": str(e), "source": source, "destination": destination}
+
+
+class CreateDirectoryTool(Tool):
+    name: str = "create_directory"
+    description: str = "Create a directory"
+    inputs: Dict[str, Dict[str, str]] = {
+        "path": {
+            "type": "string",
+            "description": "Path of the directory to create"
+        }
+    }
+    required: Optional[List[str]] = ["path"]
+
+    def __init__(self, storage_handler: FileStorageHandler = None):
+        super().__init__()
+        self.storage_handler = storage_handler or LocalStorageHandler()
+
+    def __call__(self, path: str) -> Dict[str, Any]:
+        """
+        Create a directory.
+        
+        Args:
+            path: Path of the directory to create
+            
+        Returns:
+            Dictionary containing the create directory operation result
+        """
+        try:
+            result = self.storage_handler.create_directory(path)
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error in CreateDirectoryTool: {str(e)}")
+            return {"success": False, "error": str(e), "path": path}
 
 
 class ListFileTool(Tool):
     name: str = "list_files"
-    description: str = "List files and directories in a path with structured tree-like information"
+    description: str = "List files and directories in a path with structured information"
     inputs: Dict[str, Dict[str, str]] = {
         "path": {
             "type": "string",
-            "description": "Path to list files from (default: current workplace directory)"
+            "description": "Path to list files from (default: current working directory)"
         },
         "max_depth": {
             "type": "integer",
@@ -318,13 +420,13 @@ class ListFileTool(Tool):
     }
     required: Optional[List[str]] = []
 
-    def __init__(self, storage_base: StorageBase = None):
+    def __init__(self, storage_handler: FileStorageHandler = None):
         super().__init__()
-        self.storage_base = storage_base or StorageBase()
+        self.storage_handler = storage_handler or LocalStorageHandler()
 
     def __call__(self, path: str = None, max_depth: int = 3, include_hidden: bool = False) -> Dict[str, Any]:
         """
-        List files and directories in a structured tree format.
+        List files and directories in a path.
         
         Args:
             path: Path to list files from
@@ -332,28 +434,53 @@ class ListFileTool(Tool):
             include_hidden: Include hidden files and directories
             
         Returns:
-            Dictionary containing structured file tree information
+            Dictionary containing the list operation result
         """
         try:
-            if path is None:
-                path = str(self.storage_base.base_path)
-            
-            result = self.storage_base.list_files(path, max_depth, include_hidden)
-            
-            if result["success"]:
-                logger.info(f"Successfully listed files in: {path}")
-            else:
-                logger.error(f"Failed to list files in {path}: {result.get('error', 'Unknown error')}")
-            
+            result = self.storage_handler.list(path, max_depth=max_depth, include_hidden=include_hidden)
             return result
             
         except Exception as e:
-            logger.error(f"Error in list_files tool: {str(e)}")
+            logger.error(f"Error in ListFileTool: {str(e)}")
+            return {"success": False, "error": str(e), "path": path}
+
+
+class ExistsTool(Tool):
+    name: str = "exists"
+    description: str = "Check if a file or directory exists"
+    inputs: Dict[str, Dict[str, str]] = {
+        "path": {
+            "type": "string",
+            "description": "Path to check for existence"
+        }
+    }
+    required: Optional[List[str]] = ["path"]
+
+    def __init__(self, storage_handler: FileStorageHandler = None):
+        super().__init__()
+        self.storage_handler = storage_handler or LocalStorageHandler()
+
+    def __call__(self, path: str) -> Dict[str, Any]:
+        """
+        Check if a file or directory exists.
+        
+        Args:
+            path: Path to check for existence
+            
+        Returns:
+            Dictionary containing the existence check result
+        """
+        try:
+            exists = self.storage_handler.exists(path)
             return {
-                "success": False,
-                "error": str(e),
-                "path": path
+                "success": True,
+                "path": path,
+                "exists": exists
             }
+            
+        except Exception as e:
+            logger.error(f"Error in ExistsTool: {str(e)}")
+            return {"success": False, "error": str(e), "path": path}
 
 
 class ListSupportedFormatsTool(Tool):
@@ -362,86 +489,59 @@ class ListSupportedFormatsTool(Tool):
     inputs: Dict[str, Dict[str, str]] = {}
     required: Optional[List[str]] = []
 
-    def __init__(self, storage_base: StorageBase = None):
+    def __init__(self, storage_handler: FileStorageHandler = None):
         super().__init__()
-        self.storage_base = storage_base or StorageBase()
+        self.storage_handler = storage_handler or LocalStorageHandler()
 
     def __call__(self) -> Dict[str, Any]:
         """
         List all supported file formats and their capabilities.
         
         Returns:
-            Dictionary containing supported formats and their capabilities
+            Dictionary containing supported formats information
         """
         try:
-            result = self.storage_base.get_supported_formats()
-            
-            if result["success"]:
-                logger.info("Successfully retrieved supported formats")
-            else:
-                logger.error("Failed to get supported formats")
-            
+            result = self.storage_handler.get_supported_formats()
             return result
             
         except Exception as e:
-            logger.error(f"Error in list_supported_formats tool: {str(e)}")
-            return {
-                "success": False,
-                "error": str(e)
-            }
-
-
-
-
-
-
-"""
-TODO:
-API key stored in Header (Authorization)
-Fixed API key -- simple check (STR compare?)
-Encode - Decode -- SHA265?
-
-
-Further (plan / Optional):
-- IP whitelist
-- Expire?
-- Pipline check -- Middle ware
-
-"""
-
-
-
+            logger.error(f"Error in ListSupportedFormatsTool: {str(e)}")
+            return {"success": False, "error": str(e)}
 
 
 class StorageToolkit(Toolkit):
     """
-    Comprehensive storage toolkit that provides save, read, and append functionality
-    for various file types including documents, data files, images, videos, and sound files.
-    Designed with scalability in mind for future database integration.
+    Comprehensive storage toolkit with local filesystem operations.
+    Provides tools for reading, writing, appending, deleting, moving, copying files,
+    creating directories, and listing files with support for various file formats.
     """
     
-    def __init__(self, name: str = "StorageToolkit", base_path: str = "."):
+    def __init__(self, name: str = "StorageToolkit", base_path: str = "./workplace/storage", storage_handler: FileStorageHandler = None):
         """
-        Initialize the StorageToolkit with a shared storage base instance.
+        Initialize the storage toolkit.
         
         Args:
             name: Name of the toolkit
-            base_path: Base directory for storage operations (default: current directory)
+            base_path: Base directory for storage operations (default: ./workplace/storage)
+            storage_handler: Storage handler instance (defaults to LocalStorageHandler)
         """
-        # Create the shared storage base instance
-        storage_base = StorageBase(base_path=base_path)
+        # Create the shared storage handler instance
+        if storage_handler is None:
+            storage_handler = LocalStorageHandler(base_path=base_path)
         
-        # Initialize tools with the shared storage base
+        # Create tools with the storage handler
         tools = [
-            SaveTool(storage_base=storage_base),
-            ReadTool(storage_base=storage_base),
-            AppendTool(storage_base=storage_base),
-            ListFileTool(storage_base=storage_base),
-            ListSupportedFormatsTool(storage_base=storage_base)
+            SaveTool(storage_handler=storage_handler),
+            ReadTool(storage_handler=storage_handler),
+            AppendTool(storage_handler=storage_handler),
+            DeleteTool(storage_handler=storage_handler),
+            MoveTool(storage_handler=storage_handler),
+            CopyTool(storage_handler=storage_handler),
+            CreateDirectoryTool(storage_handler=storage_handler),
+            ListFileTool(storage_handler=storage_handler),
+            ExistsTool(storage_handler=storage_handler),
+            ListSupportedFormatsTool(storage_handler=storage_handler)
         ]
         
-        # Initialize parent with tools
         super().__init__(name=name, tools=tools)
-        
-        # Store storage_base as instance variable
-        self.storage_base = storage_base 
+        self.storage_handler = storage_handler 

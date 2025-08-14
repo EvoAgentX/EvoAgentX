@@ -1,5 +1,4 @@
 from .tool import Tool,Toolkit
-from .file_tool import FileToolkit
 from .interpreter_docker import DockerInterpreterToolkit
 from .interpreter_python import PythonInterpreterToolkit
 from .search_google import GoogleSearchToolkit
@@ -14,15 +13,19 @@ from .browser_use import BrowserUseToolkit
 from .database_mongodb import MongoDBToolkit
 from .database_postgresql import PostgreSQLToolkit
 from .database_faiss import FaissToolkit
+from .storage_handler import FileStorageHandler, LocalStorageHandler, SupabaseStorageHandler
 from .storage_file import StorageToolkit
+from .flux_image_generation import FluxImageGenerationToolkit
+from .OpenAI_Image_Generation import OpenAIImageGenerationToolkit
+from .image_analysis import ImageAnalysisToolkit
 from .cmd_toolkit import CMDToolkit
 from .rss_feed import RSSToolkit
+from .file_tool import FileToolkit
 
 
 __all__ = [
     "Tool", 
     "Toolkit",
-    "FileToolkit",
     "DockerInterpreterToolkit", 
     "PythonInterpreterToolkit",
     "GoogleSearchToolkit",
@@ -37,8 +40,15 @@ __all__ = [
     "MongoDBToolkit",
     "PostgreSQLToolkit",
     "FaissToolkit",
+    "FileStorageHandler",
+    "LocalStorageHandler",
+    "SupabaseStorageHandler",
     "StorageToolkit",
+    "FluxImageGenerationToolkit",
+    "OpenAIImageGenerationToolkit",
+    "ImageAnalysisToolkit",
     "CMDToolkit",
-    "RSSToolkit"
+    "RSSToolkit",
+    "FileToolkit"
 ]
 

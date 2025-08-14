@@ -3,6 +3,7 @@ import subprocess
 from typing import Dict, Any, List, Optional
 
 from .tool import Tool, Toolkit
+from .storage_handler import FileStorageHandler
 from ..core.logging import logger
 
 
@@ -11,16 +12,18 @@ class CMDBase:
     Base class for command execution with permission checking and cross-platform support.
     """
     
-    def __init__(self, default_shell: str = None):
+    def __init__(self, default_shell: str = None, storage_handler: FileStorageHandler = None):
         """
         Initialize CMDBase with system detection and shell configuration.
         
         Args:
             default_shell: Override default shell detection
+            storage_handler: Storage handler for file operations
         """
         self.system = platform.system().lower()
         self.default_shell = default_shell or self._detect_default_shell()
         self.permission_cache = {}  # Cache permission responses
+        self.storage_handler = storage_handler
         
     def _detect_default_shell(self) -> str:
         """Detect the default shell for the current system."""
@@ -208,7 +211,7 @@ class CMDBase:
                 shell=False  # We're already using shell commands
             )
             
-            return {
+            result_dict = {
                 "success": result.returncode == 0,
                 "command": command,
                 "stdout": result.stdout,
@@ -217,6 +220,13 @@ class CMDBase:
                 "system": self.system,
                 "shell": self.default_shell
             }
+            
+            # Add file operation context if storage handler is available
+            if self.storage_handler:
+                result_dict["storage_handler"] = type(self.storage_handler).__name__
+                result_dict["storage_base_path"] = str(self.storage_handler.base_path)
+            
+            return result_dict
             
         except subprocess.TimeoutExpired:
             return {
@@ -302,16 +312,22 @@ class CMDToolkit(Toolkit):
     and cross-platform support. Supports Linux, macOS, and Windows.
     """
     
-    def __init__(self, name: str = "CMDToolkit", default_shell: str = None):
+    def __init__(self, name: str = "CMDToolkit", default_shell: str = None, storage_handler: FileStorageHandler = None):
         """
         Initialize the CMDToolkit with a shared command base instance.
         
         Args:
             name: Name of the toolkit
             default_shell: Override default shell detection
+            storage_handler: Storage handler for file operations
         """
-        # Create the shared command base instance
-        cmd_base = CMDBase(default_shell=default_shell)
+        # Initialize storage handler if not provided
+        if storage_handler is None:
+            from .storage_file import LocalStorageHandler
+            storage_handler = LocalStorageHandler(base_path="./workplace/cmd")
+        
+        # Create the shared command base instance with storage handler
+        cmd_base = CMDBase(default_shell=default_shell, storage_handler=storage_handler)
         
         # Initialize tools with the shared command base
         tools = [
@@ -320,6 +336,5 @@ class CMDToolkit(Toolkit):
         
         # Initialize parent with tools
         super().__init__(name=name, tools=tools)
-        
-        # Store cmd_base as instance variable
-        self.cmd_base = cmd_base 
+        self.cmd_base = cmd_base
+        self.storage_handler = storage_handler 
