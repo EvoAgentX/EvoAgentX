@@ -409,6 +409,47 @@ class WebSocketProgressTracker:
 
 
 # Convenience functions for common operations
+async def send_workflow_status_message(websocket_send_func: Callable, status: str, workflow_id: str, message: str = None):
+    """Send workflow status message."""
+    if message:
+        content = f"Workflow {workflow_id}: {message}"
+    else:
+        content = f"Workflow {workflow_id} status: {status}"
+    
+    status_data = {
+        "type": "workflow_status",
+        "data": {
+            "status": status,
+            "workflow_id": workflow_id,
+            "content": content,
+            "result": None
+        }
+    }
+    
+    try:
+        await websocket_send_func(json.dumps(status_data))
+    except Exception as e:
+        print(f"Error sending workflow status message: {e}")
+
+
+async def send_workflow_completion_message(websocket_send_func: Callable, workflow_graphs: List[Dict[str, Any]]):
+    """Send workflow completion message when all workflows are generated."""
+    completion_data = {
+        "type": "complete",
+        "data": {
+            "status": "complete",
+            "workflow_id": None,
+            "content": None,
+            "result": workflow_graphs
+        }
+    }
+    
+    try:
+        await websocket_send_func(json.dumps(completion_data))
+    except Exception as e:
+        print(f"Error sending workflow completion message: {e}")
+
+
 async def send_simple_message(websocket_send_func: Callable, message_type: str, content: str, result: Any = None):
     """Send a simple websocket message."""
     message_data = {

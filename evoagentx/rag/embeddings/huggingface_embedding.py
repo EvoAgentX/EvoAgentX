@@ -1,6 +1,5 @@
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, ClassVar, Any
 
-from sentence_transformers import SentenceTransformer
 from llama_index.core.embeddings import BaseEmbedding
 
 from evoagentx.core.logging import logger
@@ -10,13 +9,13 @@ from .base import BaseEmbeddingWrapper, EmbeddingProvider, SUPPORTED_MODELS
 class HuggingFaceEmbedding(BaseEmbedding):
     """HuggingFace embedding model compatible with LlamaIndex BaseEmbedding."""
     
-    model: SentenceTransformer = None
-    _dimension: int = None
+    model: ClassVar[Any] = None
+    _dimension: Optional[int] = None
     model_name: str = "sentence-transformers/all-MiniLM-L6-v2"
     embed_batch_size: int = 10
     device: Optional[str] = None
     normalize: bool = False
-    model_kwargs: Dict = {}
+    model_kwargs: Dict[str, Any] = {}
     
     def __init__(
         self,
@@ -32,17 +31,34 @@ class HuggingFaceEmbedding(BaseEmbedding):
 
         if not EmbeddingProvider.validate_model(EmbeddingProvider.HUGGINGFACE, model_name):
             raise ValueError(f"Unsupported HuggingFace model: {model_name}. Supported models: {SUPPORTED_MODELS['huggingface']}")
+        
+        # Lazy import and initialization
+        self._initialize_model()
+
+    def _initialize_model(self):
+        """Lazy initialize the SentenceTransformer model."""
         try:
-            self.model = SentenceTransformer(model_name, device=device, **model_kwargs)
-            logger.debug(f"Initialized HuggingFace embedding model: {model_name}")
+            from sentence_transformers import SentenceTransformer
+            self.model = SentenceTransformer(self.model_name, device=self.device, **self.model_kwargs)
+            self._dimension = self.model.get_sentence_embedding_dimension()
+            logger.debug(f"Initialized HuggingFace embedding model: {self.model_name}")
+        except ImportError:
+            raise ImportError(
+                "sentence-transformers package is required for HuggingFace embeddings. "
+                "Please install it with: pip install sentence-transformers"
+            )
         except Exception as e:
             logger.error(f"Failed to initialize HuggingFace embedding: {str(e)}")
             raise
 
-        self._dimension = self.model.get_sentence_embedding_dimension()
+    def _ensure_model_loaded(self):
+        """Ensure the model is loaded before use."""
+        if self.model is None:
+            self._initialize_model()
 
     def _get_query_embedding(self, query: str) -> List[float]:
         """Get embedding for a query string."""
+        self._ensure_model_loaded()
         try:
             embedding = self.model.encode(
                 query,
@@ -56,6 +72,7 @@ class HuggingFaceEmbedding(BaseEmbedding):
 
     def _get_text_embedding(self, text: str) -> List[float]:
         """Get embedding for a text string."""
+        self._ensure_model_loaded()
         try:
             embedding = self.model.encode(
                 text,
@@ -69,6 +86,7 @@ class HuggingFaceEmbedding(BaseEmbedding):
 
     def _get_text_embeddings(self, texts: List[str]) -> List[List[float]]:
         """Get embeddings for a list of texts synchronously."""
+        self._ensure_model_loaded()
         try:
             embeddings = self.model.encode(
                 texts,
@@ -88,6 +106,8 @@ class HuggingFaceEmbedding(BaseEmbedding):
     @property
     def dimension(self) -> int:
         """Return the embedding dimension."""
+        if self._dimension is None:
+            self._ensure_model_loaded()
         return self._dimension
 
 
@@ -106,7 +126,6 @@ class HuggingFaceEmbeddingWrapper(BaseEmbeddingWrapper):
         self.normalize = normalize
         self.model_kwargs = model_kwargs
         self._embedding_model = None
-        self._embedding_model = self.get_embedding_model()
 
     def get_embedding_model(self) -> BaseEmbedding:
         """Return the LlamaIndex-compatible embedding model."""
@@ -127,4 +146,4 @@ class HuggingFaceEmbeddingWrapper(BaseEmbeddingWrapper):
     @property
     def dimensions(self) -> int:
         """Return the embedding dimensions."""
-        return self._embedding_model.dimension
+        return self.get_embedding_model().dimension

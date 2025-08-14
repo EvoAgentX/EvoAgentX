@@ -142,6 +142,7 @@ Please carefully analyze the following requirement documentation and generate a 
 - You should come up with detailed inputs/outputs names for nodes in the middle, for example, instead of "content", you should call it "tale_content"
 - You should never come up with any other names for the inputs/outputs, you should strictly follow the given names.
 - You should never create any new inputs/outputs, you should strictly follow the given inputs/outputs.
+- You should assign tools to agents that are needed for the workflow.
 
 ## Requirement documentation:
 {requirement}

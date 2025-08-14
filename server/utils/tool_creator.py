@@ -8,7 +8,7 @@ from typing import Dict, Any, List
 from dotenv import load_dotenv
 
 # Load environment variables
-load_dotenv(override=True)
+load_dotenv("config/app.env", override=True)
 
 # Centralized server configuration
 SERVER_CONFIG = {
@@ -27,181 +27,6 @@ SERVER_CONFIG = {
     }
 }
 
-# Default tools list for workflow generation (provides tool information without instances)
-# This is used by the workflow generator to understand available capabilities
-DEFAULT_TOOLS_FOR_GENERATION = [
-    # MCP Tools
-    {
-        "name": "MCPToolkit",
-        "description": "Model Context Protocol communication tools",
-        "capabilities": ["external_tool_integration", "protocol_communication"],
-        "category": "communication"
-    },
-    
-    # Search Tools
-    {
-        "name": "WikipediaSearchToolkit", 
-        "description": "Search Wikipedia for articles and content",
-        "capabilities": ["web_search", "content_retrieval", "knowledge_base"],
-        "category": "search"
-    },
-    {
-        "name": "GoogleSearchToolkit",
-        "description": "Search Google using Custom Search API",
-        "capabilities": ["web_search", "content_retrieval", "real_time_info"],
-        "category": "search"
-    },
-    {
-        "name": "GoogleFreeSearchToolkit", 
-        "description": "Free Google search operations",
-        "capabilities": ["web_search", "content_retrieval", "no_api_key_required"],
-        "category": "search"
-    },
-    {
-        "name": "DDGSSearchToolkit",
-        "description": "DuckDuckGo search operations",
-        "capabilities": ["web_search", "content_retrieval", "privacy_focused"],
-        "category": "search"
-    },
-    
-    # Content Tools
-    {
-        "name": "RSSToolkit",
-        "description": "RSS feed reading and parsing",
-        "capabilities": ["feed_reading", "content_aggregation", "news_monitoring"],
-        "category": "content"
-    },
-    {
-        "name": "RequestToolkit",
-        "description": "HTTP request operations",
-        "capabilities": ["web_requests", "api_calls", "data_fetching"],
-        "category": "communication"
-    },
-    
-    # Database Tools
-    {
-        "name": "PostgreSQLToolkit",
-        "description": "PostgreSQL database operations",
-        "capabilities": ["sql_queries", "data_management", "relational_database"],
-        "category": "database"
-    },
-    {
-        "name": "MongoDBToolkit",
-        "description": "MongoDB document database operations",
-        "capabilities": ["document_queries", "data_management", "nosql_database"],
-        "category": "database"
-    },
-    
-    # File Tools
-    {
-        "name": "FileToolkit",
-        "description": "Basic file operations",
-        "capabilities": ["file_reading", "file_writing", "file_management"],
-        "category": "file_operations"
-    },
-    
-    # Storage-Dependent Tools (require storage handler)
-    {
-        "name": "ArxivToolkit",
-        "description": "Download and search arXiv papers",
-        "capabilities": ["academic_search", "pdf_download", "research_papers"],
-        "category": "research",
-        "requires_storage": True
-    },
-    {
-        "name": "FaissToolkit", 
-        "description": "Vector database operations and semantic search",
-        "capabilities": ["vector_search", "semantic_search", "document_indexing"],
-        "category": "ai_search",
-        "requires_storage": True
-    },
-    {
-        "name": "CMDToolkit",
-        "description": "Command line execution with file operations",
-        "capabilities": ["command_execution", "system_operations", "file_operations"],
-        "category": "system",
-        "requires_storage": True
-    },
-    {
-        "name": "StorageToolkit",
-        "description": "Comprehensive storage operations",
-        "capabilities": ["file_storage", "file_management", "format_support"],
-        "category": "storage",
-        "requires_storage": True
-    },
-    
-    # Image Generation Tools (require API keys and storage)
-    {
-        "name": "FluxImageGenerationToolkit",
-        "description": "AI image generation using Flux API",
-        "capabilities": ["image_generation", "ai_art", "creative_content"],
-        "category": "image_generation",
-        "requires_storage": True,
-        "requires_api_key": "BFL_API_KEY"
-    },
-    {
-        "name": "OpenAIImageGenerationToolkit",
-        "description": "AI image generation using OpenAI DALL-E",
-        "capabilities": ["image_generation", "ai_art", "creative_content"],
-        "category": "image_generation", 
-        "requires_storage": True,
-        "requires_api_key": "OPENAI_API_KEY"
-    },
-    {
-        "name": "ImageAnalysisToolkit",
-        "description": "AI-powered image and PDF analysis",
-        "capabilities": ["image_analysis", "pdf_analysis", "content_extraction"],
-        "category": "image_analysis",
-        "requires_storage": True,
-        "requires_api_key": "OPENROUTER_API_KEY"
-    }
-]
-
-# Helper function to get tool information for generation
-def get_tools_for_generation() -> List[Dict[str, Any]]:
-    """
-    Get the list of available tools for workflow generation.
-    This provides tool information without creating actual instances.
-    
-    Returns:
-        List of tool information dictionaries
-    """
-    return DEFAULT_TOOLS_FOR_GENERATION.copy()
-
-# Helper function to get tools by category
-def get_tools_by_category(category: str) -> List[Dict[str, Any]]:
-    """
-    Get tools filtered by category.
-    
-    Args:
-        category: Tool category to filter by
-        
-    Returns:
-        List of tools in the specified category
-    """
-    return [tool for tool in DEFAULT_TOOLS_FOR_GENERATION if tool.get("category") == category]
-
-# Helper function to get tools that require storage
-def get_storage_dependent_tools() -> List[Dict[str, Any]]:
-    """
-    Get tools that require storage handler.
-    
-    Returns:
-        List of storage-dependent tools
-    """
-    return [tool for tool in DEFAULT_TOOLS_FOR_GENERATION if tool.get("requires_storage", False)]
-
-# Helper function to get tools that require API keys
-def get_api_key_dependent_tools() -> List[Dict[str, Any]]:
-    """
-    Get tools that require API keys.
-    
-    Returns:
-        List of API key-dependent tools
-    """
-    return [tool for tool in DEFAULT_TOOLS_FOR_GENERATION if tool.get("requires_api_key")]
-
-# Import all available tools for actual tool creation
 from evoagentx.tools import (
     # Default tools (no storage needed)
     MCPToolkit,
@@ -233,6 +58,23 @@ from evoagentx.tools import (
     # BrowserUseToolkit,
     # PythonInterpreterToolkit,
 )
+
+generation_tools = [
+    GoogleFreeSearchToolkit(),
+    DDGSSearchToolkit(),
+    WikipediaSearchToolkit(),
+    ArxivToolkit(),
+    # StorageToolkit(),
+    CMDToolkit(),
+    RSSToolkit(),
+    RequestToolkit(),
+    # PostgreSQLToolkit(),
+    # MongoDBToolkit(),
+    # FileToolkit(),
+    # ImageAnalysisToolkit(),
+    FluxImageGenerationToolkit(),
+    # OpenAIImageGenerationToolkit(),
+]
 
 
 def create_tools(project_short_id: str, database_information: Dict[str, Any] = None) -> List[Any]:
@@ -307,20 +149,8 @@ def _create_default_tools() -> List[Any]:
     default_tools = []
     
     try:
-        # MCP Toolkit
-        mcp_toolkit = MCPToolkit()
-        default_tools.append(mcp_toolkit)
-        print("✅ MCPToolkit created")
-    except Exception as e:
-        print(f"❌ Failed to create MCPToolkit: {e}")
-    
-    try:
         # Search tools with reasonable server defaults
-        wiki_toolkit = WikipediaSearchToolkit(
-            num_search_pages=10,  # Reasonable limit for server
-            max_content_words=2000,  # Prevent memory issues
-            max_summary_sentences=3  # Concise summaries
-        )
+        wiki_toolkit = WikipediaSearchToolkit()
         default_tools.append(wiki_toolkit)
         print("✅ WikipediaSearchToolkit created with server defaults")
     except Exception as e:
@@ -383,16 +213,16 @@ def _create_default_tools() -> List[Any]:
     except Exception as e:
         print(f"❌ Failed to create PostgreSQLToolkit: {e}")
     
-    try:
-        mongo_toolkit = MongoDBToolkit(
-            auto_save=SERVER_CONFIG["database_defaults"]["auto_save"],
-            local_path=SERVER_CONFIG["database_defaults"]["local_path"],
-            read_only=SERVER_CONFIG["database_defaults"]["read_only"]
-        )
-        default_tools.append(mongo_toolkit)
-        print("✅ MongoDBToolkit created with server defaults")
-    except Exception as e:
-        print(f"❌ Failed to create MongoDBToolkit: {e}")
+    # try:
+    #     mongo_toolkit = MongoDBToolkit(
+    #         auto_save=SERVER_CONFIG["database_defaults"]["auto_save"],
+    #         local_path=SERVER_CONFIG["database_defaults"]["local_path"],
+    #         read_only=SERVER_CONFIG["database_defaults"]["read_only"]
+    #     )
+    #     default_tools.append(mongo_toolkit)
+    #     print("✅ MongoDBToolkit created with server defaults")
+    # except Exception as e:
+    #     print(f"❌ Failed to create MongoDBToolkit: {e}")
     
     try:
         # File tools
@@ -468,23 +298,23 @@ def _create_storage_tools(storage_handler: SupabaseStorageHandler) -> List[Any]:
     except Exception as e:
         print(f"❌ Failed to create FluxImageGenerationToolkit: {e}")
     
-    try:
-        # OpenAI image generation
-        openai_api_key = os.getenv("OPENAI_API_KEY")
-        openai_org_id = os.getenv("OPENAI_ORGANIZATION_ID")
-        if openai_api_key and openai_org_id:
-            openai_img_toolkit = OpenAIImageGenerationToolkit(
-                api_key=openai_api_key,
-                organization_id=openai_org_id,
-                save_path=SERVER_CONFIG["file_defaults"]["image_save_dir"],  # Appended to storage handler base path
-                storage_handler=storage_handler
-            )
-            storage_tools.append(openai_img_toolkit)
-            print("✅ OpenAIImageGenerationToolkit created with storage handler")
-        else:
-            print("⚠️  OpenAIImageGenerationToolkit skipped - missing OpenAI credentials")
-    except Exception as e:
-        print(f"❌ Failed to create OpenAIImageGenerationToolkit: {e}")
+    # try:
+    #     # OpenAI image generation
+    #     openai_api_key = os.getenv("OPENAI_API_KEY")
+    #     openai_org_id = os.getenv("OPENAI_ORGANIZATION_ID")
+    #     if openai_api_key and openai_org_id:
+    #         openai_img_toolkit = OpenAIImageGenerationToolkit(
+    #             api_key=openai_api_key,
+    #             organization_id=openai_org_id,
+    #             save_path=SERVER_CONFIG["file_defaults"]["image_save_dir"],  # Appended to storage handler base path
+    #             storage_handler=storage_handler
+    #         )
+    #         storage_tools.append(openai_img_toolkit)
+    #         print("✅ OpenAIImageGenerationToolkit created with storage handler")
+    #     else:
+    #         print("⚠️  OpenAIImageGenerationToolkit skipped - missing OpenAI credentials")
+    # except Exception as e:
+    #     print(f"❌ Failed to create OpenAIImageGenerationToolkit: {e}")
     
     try:
         # Image analysis toolkit

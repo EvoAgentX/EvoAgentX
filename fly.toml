@@ -21,13 +21,13 @@ primary_region = 'sea'
 
   [[http_service.checks]]
     interval = '10m0s'
-    timeout = '1m40s'
-    grace_period = '60s'
+    timeout = '10m40s'
+    grace_period = '600s'
     method = 'GET'
     path = '/health'
     protocol = 'http'
 
 [[vm]]
-  memory = '8gb'
+  memory = '2gb'
   cpu_kind = 'performance'
   cpus = 2

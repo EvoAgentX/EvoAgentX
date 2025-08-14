@@ -46,10 +46,53 @@ async def update_workflow_status(workflow_id: str, status: str, **kwargs):
 
 async def generate_workflow_from_goal(goal: str, llm_config_dict: Dict[str, Any], mcp_config: dict = None) -> str:
     """
-    Generate a workflow from a goal.
+    Generate a workflow from a goal using the WorkFlowGenerator with tools.
     """
-    # For now, return a placeholder - this will be implemented with actual workflow generation
-    return f"Generated workflow for goal: {goal}"
+    try:
+        # Start with the predefined generation tools
+        from ..utils import generation_tools
+        tools = generation_tools.copy()
+        
+        # Create LLM instance from config
+        # Convert dict to proper LLMConfig object
+        if llm_config_dict.get("openai_key"):
+            from evoagentx.models.model_configs import OpenAILLMConfig
+            llm_config = OpenAILLMConfig(**llm_config_dict)
+        else:
+            # Default to OpenAI if no specific config
+            from evoagentx.models.model_configs import OpenAILLMConfig
+            llm_config = OpenAILLMConfig(
+                model="gpt-4o-mini",
+                openai_key=os.getenv("OPENAI_API_KEY"),
+                temperature=0.1
+            )
+        
+        llm = create_llm_instance(llm_config)
+        
+        # Add MCP tools if config is provided
+        if mcp_config:
+            try:
+                from evoagentx.tools import MCPToolkit
+                mcp_toolkit = MCPToolkit(config=mcp_config)
+                mcp_tools = mcp_toolkit.get_toolkits()
+                tools.extend(mcp_tools)
+                print(f"🔧 Added {len(mcp_tools)} MCP tools to generation tools")
+            except Exception as e:
+                print(f"⚠️  Failed to load MCP tools: {e}, proceeding with generation tools only")
+        
+        print(f"🔧 Using {len(tools)} total tools for workflow generation")
+        
+        # Initialize the WorkFlowGenerator with LLM and tools
+        workflow_generator = WorkFlowGenerator(llm=llm, tools=tools)
+        
+        # Generate the actual workflow
+        workflow_graph = workflow_generator.generate_workflow(goal=goal)
+        
+        # Return the workflow graph as a string (you might want to serialize this differently)
+        return workflow_graph.get_config()
+        
+    except Exception as e:
+        raise ValueError(f"Failed to generate workflow from goal: {str(e)}")
 
 
 async def generate_workflow(workflow_id: str) -> Dict[str, Any]:
@@ -66,20 +109,36 @@ async def generate_workflow(workflow_id: str) -> Dict[str, Any]:
         if workflow.get("task_info") is None or workflow.get("task_info").get("workflow_requirement") is None:
             raise ValueError(f"Workflow {workflow_id} has no workflow requirement")
         
+        # Load MCP configuration for tools
+        mcp_config = None
+        try:
+            # Try to load MCP config from the sample config file
+            mcp_config_path = os.path.join(os.path.dirname(__file__), '../sample_mcp.config')
+            if os.path.exists(mcp_config_path):
+                import json
+                with open(mcp_config_path, 'r') as f:
+                    mcp_config = json.load(f)
+                print(f"🔧 Loaded MCP configuration from {mcp_config_path}")
+            else:
+                print(f"⚠️  No MCP configuration found at {mcp_config_path}, proceeding without tools")
+        except Exception as e:
+            print(f"⚠️  Failed to load MCP configuration: {e}, proceeding without tools")
+        
         formatted_goal = WORKFLOW_GENERATION_GOAL_PROMPT.format(
             workflow_inputs=workflow["task_info"]["workflow_inputs"],
             workflow_outputs=workflow["task_info"]["workflow_outputs"],
             requirement=workflow["task_info"]["workflow_requirement"]
         )
         
-        workflow_graph = await generate_workflow_from_goal(
+        # Generate the actual workflow using the WorkFlowGenerator with tools
+        generated_workflow = await generate_workflow_from_goal(
                 formatted_goal, 
                 default_llm_config, 
-                mcp_config={}
+                mcp_config=mcp_config  # Pass the actual MCP config instead of empty dict
             )
         
-        # The workflow_graph now contains the single generated workflow from setup
-        workflow_graph = workflow["workflow_graph"]
+        # Use the generated workflow, not the existing one
+        workflow_graph = generated_workflow
         
         await database.update(
             "workflows",

@@ -9,6 +9,8 @@ from datetime import datetime
 from .api import app
 from dotenv import load_dotenv
 
+from .utils import generation_tools
+
 load_dotenv(os.path.join(os.path.dirname(__file__), 'config/app.env'), override=True)
 target_port = 8001
 CREATE_PUBLIC_TUNNEL = False

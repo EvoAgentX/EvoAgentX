@@ -57,16 +57,6 @@ class WorkflowGenerationStatus(BaseModel):
     started_at: Optional[str] = None
     completed_at: Optional[str] = None
 
-class ParallelWorkflowGenerationResponse(BaseModel):
-    """Response model for parallel workflow generation status"""
-    project_short_id: str
-    total_workflows: int
-    completed_workflows: int
-    failed_workflows: int
-    workflows: List[WorkflowGenerationStatus]
-    overall_status: str  # running, completed, failed
-    estimated_completion_time: Optional[str] = None
-
 ## Database Schema for Workflow Storage:
 # workflow_id: str (Primary Key)
 # project_short_id: str  # Project identifier

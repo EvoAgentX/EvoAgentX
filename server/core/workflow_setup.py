@@ -21,6 +21,7 @@ from evoagentx.tools import GoogleFreeSearchToolkit, DDGSSearchToolkit, Wikipedi
 from ..prompts import WORKFLOW_GENERATION_GOAL_PROMPT, WORKFLOW_REQUIREMENT_PROMPT
 from ..database.db import database, requirement_database
 from ..utils.websocket_utils import WebSocketProgressTracker, send_progress_message, send_log_message, send_error_message
+from ..utils import generation_tools
 
 load_dotenv(os.path.join(os.path.dirname(__file__), '../config/app.env'))
 
@@ -33,9 +34,6 @@ default_llm_config = {
 
 # Supabase configuration
 SUPABASE_BUCKET_STORAGE = os.getenv("SUPABASE_BUCKET_STORAGE", "requirements")
-
-# Default tools for workflow generation
-default_tools = [GoogleFreeSearchToolkit(), DDGSSearchToolkit(), WikipediaSearchToolkit(), ArxivToolkit(), StorageToolkit(), CMDToolkit(), RSSToolkit()]
 
 async def retrieve_requirement_from_storage(project_short_id: str) -> str:
     """
@@ -142,17 +140,29 @@ async def extract_workflow_requirements(detailed_requirements: str) -> Dict[str,
 
 async def generate_workflow_from_goal(goal: str, llm_config_dict: Dict[str, Any], mcp_config: dict = None) -> str:
     """
-    Generate a workflow from a goal.
+    Generate a workflow from a goal using the WorkFlowGenerator with tools.
     """
+    # Start with the predefined generation tools
+    tools = generation_tools.copy()
+    
     try:
         # Convert dictionary to appropriate LLM config object and create LLM instance
         llm_config = create_llm_config(llm_config_dict)
         llm = create_llm_instance(llm_config)
         
+        # Add MCP tools if config is provided
         if mcp_config:
-            tools = MCPToolkit(config=mcp_config)
-        else:
-            tools = default_tools
+            try:
+                from evoagentx.tools import MCPToolkit
+                mcp_toolkit = MCPToolkit(config=mcp_config)
+                mcp_tools = mcp_toolkit.get_toolkits()
+                tools.extend(mcp_tools)
+                print(f"🔧 Added {len(mcp_tools)} MCP tools to generation tools")
+            except Exception as e:
+                print(f"⚠️  Failed to load MCP tools: {e}, proceeding with generation tools only")
+        
+        print(f"🔧 Using {len(tools)} total tools for workflow generation")
+        
     except Exception as e:
         print(f"Error initializing components: {e}")
         return None
@@ -485,7 +495,7 @@ async def setup_project_parallel(project_short_id: str) -> List[Dict[str, Any]]:
 async def setup_project_parallel_with_status_messages(project_short_id: str, websocket_send_func: Callable = None) -> List[Dict[str, Any]]:
     """
     Phase 1: Setup workflow with extraction AND parallel generation with retry logic.
-    This version can send WebSocket status messages if a websocket_send_func is provided.
+    This version sends WebSocket status messages in the new format if a websocket_send_func is provided.
     """
     # Retrieve requirement document from storage
     print(f"📥 Retrieving requirement document for project {project_short_id}...")
@@ -524,18 +534,17 @@ async def setup_project_parallel_with_status_messages(project_short_id: str, web
         await database.insert("workflows", workflow_doc)
         print(f"📝 Created initial workflow record: {workflow_id} (status: uninitialized)")
         
-        # Send status update when workflow is retrieved and put into database
+        # Send status update: uninitialized after workflow is extracted and added to database
         if websocket_send_func:
-            await send_workflow_status_message(websocket_send_func, "retrieved", workflow_id, f"Workflow {workflow_id} retrieved and stored in database")
-    
-    # Send status update: uninitialized after requirement extraction and before generation
-    if websocket_send_func:
-        from ..utils.websocket_utils import send_workflow_status_message
-        for workflow_id in workflow_ids:
-            await send_workflow_status_message(websocket_send_func, "uninitialized", workflow_id)
-        print(f"📤 Sent WebSocket status update: uninitialized for {len(workflow_ids)} workflows")
-    else:
-        print(f"📤 Status update: uninitialized for {len(workflow_ids)} workflows (no WebSocket)")
+            await websocket_send_func(json.dumps({
+                "type": "workflow_status",
+                "data": {
+                    "status": "uninitialized",
+                    "workflow_id": workflow_id,
+                    "content": "workflow extracted",
+                    "result": None
+                }
+            }))
     
     # Generate workflows for each extracted workflow in parallel with retry logic
     print(f"🏗️ Generating workflows in parallel with retry logic...")
@@ -678,6 +687,18 @@ async def setup_project_parallel_with_status_messages(project_short_id: str, web
         )
         print(f"✅ Updated workflow record: {workflow_id} (status: {status})")
         
+        # Send status update: pending after successful generation
+        if websocket_send_func and workflow_data.get("success", True):
+            await websocket_send_func(json.dumps({
+                "type": "workflow_status",
+                "data": {
+                    "status": "pending",
+                    "workflow_id": workflow_id,
+                    "content": "workflow generated",
+                    "result": workflow_data
+                }
+            }))
+        
         # Create workflow config for response
         workflow_config = {
             "workflow_id": workflow_id,
@@ -688,15 +709,6 @@ async def setup_project_parallel_with_status_messages(project_short_id: str, web
         }
         
         workflow_configs.append(workflow_config)
-    
-    # Send status update: pending after successful generation
-    if websocket_send_func and successful_workflows:
-        from ..utils.websocket_utils import send_workflow_status_message
-        for workflow_id in successful_workflows:
-            await send_workflow_status_message(websocket_send_func, "pending", workflow_id)
-        print(f"📤 Sent WebSocket status update: pending for {len(successful_workflows)} workflows")
-    else:
-        print(f"📤 Status update: pending for {len(successful_workflows)} workflows (no WebSocket)")
     
     return workflow_configs
 

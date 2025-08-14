@@ -14,24 +14,10 @@ RUN apt-get update && apt-get install -y \
     tk-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy and install base requirements first (most stable)
-COPY requirements-base.txt ./
-RUN pip install --no-cache-dir -r requirements-base.txt
-
-# Copy and install AI/ML requirements
-COPY requirements-ai.txt ./
-RUN pip install --no-cache-dir -r requirements-ai.txt
-
-# Copy and install web/FastAPI requirements
-COPY requirements-web.txt ./
-RUN pip install --no-cache-dir -r requirements-web.txt
-
-# Copy and install tools requirements
-COPY requirements-tools.txt ./
-RUN pip install --no-cache-dir -r requirements-tools.txt
-
-# Copy server requirements
+# Copy requirements and install Python dependencies
+COPY requirements.txt ./
 COPY server/requirements.txt ./server/
+RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install --no-cache-dir -r server/requirements.txt
 
 # Copy only essential directories needed by the server
