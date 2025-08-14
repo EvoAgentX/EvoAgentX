@@ -86,10 +86,17 @@ class FluxImageGenerationTool(Tool):
             filename = f"flux_{seed}_{i}.{output_format}"
             i += 1
         
-        # Save the image using storage handler
-        result = self.storage_handler.save(filename, image_content)
+        # Save the image using storage handler with save_path
+        if self.save_path:
+            # If save_path is specified and different from default, prepend it to filename
+            full_filename = f"{self.save_path}/{filename}"
+        else:
+            # Use the filename as is
+            full_filename = filename
+        
+        result = self.storage_handler.save(full_filename, image_content)
         if result["success"]:
-            return {"file_path": filename, "storage_handler": type(self.storage_handler).__name__}
+            return {"file_path": full_filename, "storage_handler": type(self.storage_handler).__name__}
         else:
             return {"error": f"Failed to save image: {result.get('error', 'Unknown error')}"}
 
@@ -112,7 +119,7 @@ class FluxImageGenerationToolkit(Toolkit):
         # Initialize storage handler if not provided
         if storage_handler is None:
             from .storage_file import LocalStorageHandler
-            storage_handler = LocalStorageHandler(base_path="./workplace/images")
+            storage_handler = LocalStorageHandler(base_path=save_path)
         
         # Create the image generation tool
         tool = FluxImageGenerationTool(

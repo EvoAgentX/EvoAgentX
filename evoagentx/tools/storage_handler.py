@@ -26,6 +26,93 @@ class FileStorageHandler(StorageBase):
         """
         super().__init__(base_path=base_path, **kwargs)
     
+    def translate_in(self, file_path: str) -> str:
+        """
+        Translate input file path by combining it with base_path.
+        This method takes a user-provided path and converts it to the full system path.
+        
+        Args:
+            file_path (str): User-provided file path (can be relative or absolute)
+            
+        Returns:
+            str: Full system path combining base_path and file_path
+        """
+        # If the path is already absolute, return as is
+        if os.path.isabs(file_path):
+            return file_path
+        
+        # Always combine base_path with file_path to ensure working directory is respected
+        # Check if this is a remote storage handler (like Supabase)
+        if hasattr(self, 'bucket_name') and hasattr(self, 'supabase'):
+            # For remote storage, treat base_path as a prefix within the bucket
+            # Don't use os.path.join as it's designed for local filesystems
+            if self.base_path.startswith('/'):
+                # Remove leading slash and combine
+                clean_base = self.base_path.lstrip('/')
+                if clean_base:
+                    return f"{clean_base}/{file_path}"
+                else:
+                    return file_path
+            else:
+                # Combine base_path and file_path with forward slash
+                return f"{self.base_path}/{file_path}"
+        else:
+            # For local storage, use os.path.join for proper filesystem handling
+            combined_path = os.path.join(self.base_path, file_path)
+            normalized_path = os.path.normpath(combined_path)
+            return normalized_path
+    
+    def translate_out(self, full_path: str) -> str:
+        """
+        Translate output full path by removing the base_path prefix.
+        This method takes a full system path and converts it back to the user-relative path.
+        
+        Args:
+            full_path (str): Full system path
+            
+        Returns:
+            str: User-relative path with base_path removed
+        """
+        # If base_path is just "." or empty, return the full_path as is
+        if self.base_path in [".", "", None]:
+            return full_path
+        
+        # Check if this is a remote storage handler (like Supabase)
+        if hasattr(self, 'bucket_name') and hasattr(self, 'supabase'):
+            # For remote storage, handle path prefix removal
+            if self.base_path.startswith('/'):
+                clean_base = self.base_path.lstrip('/')
+            else:
+                clean_base = self.base_path
+            
+            if clean_base and full_path.startswith(f"{clean_base}/"):
+                # Remove the base_path prefix
+                relative_path = full_path[len(f"{clean_base}/"):]
+                return relative_path
+            elif clean_base and full_path == clean_base:
+                # If the full_path is exactly the base_path, return empty string
+                return ""
+            else:
+                # If the path doesn't start with base_path, return as is
+                return full_path
+        else:
+            # For local storage, use os.path operations for proper filesystem handling
+            # Convert both paths to absolute paths for comparison
+            base_abs = os.path.abspath(self.base_path)
+            full_abs = os.path.abspath(full_path)
+            
+            # Check if the full_path starts with base_path
+            if full_abs.startswith(base_abs):
+                # Remove the base_path prefix
+                relative_path = full_abs[len(base_abs):]
+                # Remove leading separator if present
+                if relative_path.startswith(os.sep):
+                    relative_path = relative_path[1:]
+                return relative_path
+            
+            # If the path doesn't start with base_path, return as is
+            return full_path
+    
     def create_file(self, file_path: str, content: Any, **kwargs) -> Dict[str, Any]:
         """
         Create a new file with the specified content.
@@ -38,7 +125,43 @@ class FileStorageHandler(StorageBase):
         Returns:
             Dict[str, Any]: Result of the operation with success status and details
         """
-        return self.save(file_path, content, **kwargs)
+        try:
+            # Convert content to bytes if it's not already
+            if isinstance(content, str):
+                content_bytes = content.encode(kwargs.get('encoding', 'utf-8'))
+            elif isinstance(content, bytes):
+                content_bytes = content
+            else:
+                content_bytes = str(content).encode(kwargs.get('encoding', 'utf-8'))
+            
+            # Use translate_in to get the full path
+            full_path = self.translate_in(file_path)
+            
+            # Write the file using the raw method
+            success = self._write_raw(full_path, content_bytes, **kwargs)
+            
+            if success:
+                return {
+                    "success": True,
+                    "message": f"File '{file_path}' created successfully",
+                    "file_path": file_path,
+                    "full_path": full_path,
+                    "size": len(content_bytes)
+                }
+            else:
+                return {
+                    "success": False,
+                    "message": f"Failed to create file '{file_path}'",
+                    "file_path": file_path,
+                    "full_path": full_path
+                }
+        except Exception as e:
+            logger.error(f"Error creating file {file_path}: {str(e)}")
+            return {
+                "success": False,
+                "message": f"Error creating file: {str(e)}",
+                "file_path": file_path
+            }
     
     def read_file(self, file_path: str, **kwargs) -> Dict[str, Any]:
         """
@@ -51,7 +174,34 @@ class FileStorageHandler(StorageBase):
         Returns:
             Dict[str, Any]: Result of the operation with file content and success status
         """
-        return self.read(file_path, **kwargs)
+        try:
+            # Use translate_in to get the full path
+            full_path = self.translate_in(file_path)
+            
+            # Read the file using the raw method
+            content_bytes = self._read_raw(full_path, **kwargs)
+            
+            # Convert to string if encoding is specified
+            if 'encoding' in kwargs:
+                content = content_bytes.decode(kwargs['encoding'])
+            else:
+                content = content_bytes
+            
+            return {
+                "success": True,
+                "message": f"File '{file_path}' read successfully",
+                "file_path": file_path,
+                "full_path": full_path,
+                "content": content,
+                "size": len(content_bytes)
+            }
+        except Exception as e:
+            logger.error(f"Error reading file {file_path}: {str(e)}")
+            return {
+                "success": False,
+                "message": f"Error reading file: {str(e)}",
+                "file_path": file_path
+            }
     
     def update_file(self, file_path: str, content: Any, **kwargs) -> Dict[str, Any]:
         """
@@ -65,8 +215,8 @@ class FileStorageHandler(StorageBase):
         Returns:
             Dict[str, Any]: Result of the operation with success status and details
         """
-        # For update, we use the same save method as it handles both create and update
-        return self.save(file_path, content, **kwargs)
+        # For update, we use the same create_file method as it handles both create and update
+        return self.create_file(file_path, content, **kwargs)
     
     def delete_file(self, file_path: str) -> Dict[str, Any]:
         """
@@ -78,7 +228,34 @@ class FileStorageHandler(StorageBase):
         Returns:
             Dict[str, Any]: Result of the operation with success status and details
         """
-        return self.delete(file_path)
+        try:
+            # Use translate_in to get the full path
+            full_path = self.translate_in(file_path)
+            
+            # Delete the file using the raw method
+            success = self._delete_raw(full_path)
+            
+            if success:
+                return {
+                    "success": True,
+                    "message": f"File '{file_path}' deleted successfully",
+                    "file_path": file_path,
+                    "full_path": full_path
+                }
+            else:
+                return {
+                    "success": False,
+                    "message": f"Failed to delete file '{file_path}'",
+                    "file_path": file_path,
+                    "full_path": full_path
+                }
+        except Exception as e:
+            logger.error(f"Error deleting file {file_path}: {str(e)}")
+            return {
+                "success": False,
+                "message": f"Error deleting file: {str(e)}",
+                "file_path": file_path
+            }
     
     def list_files(self, path: str = None, max_depth: int = 3, include_hidden: bool = False) -> Dict[str, Any]:
         """
@@ -92,7 +269,28 @@ class FileStorageHandler(StorageBase):
         Returns:
             Dict[str, Any]: Result of the operation with file list and success status
         """
-        return self.list(path, max_depth, include_hidden)
+        try:
+            # Use translate_in to get the full path if provided
+            full_path = self.translate_in(path) if path else self.base_path
+            
+            # List files using the raw method
+            items = self._list_raw(full_path, max_depth, include_hidden)
+            
+            return {
+                "success": True,
+                "message": f"Listed {len(items)} items from '{path or 'base directory'}'",
+                "path": path,
+                "full_path": full_path,
+                "items": items,
+                "total_count": len(items)
+            }
+        except Exception as e:
+            logger.error(f"Error listing files in {path}: {str(e)}")
+            return {
+                "success": False,
+                "message": f"Error listing files: {str(e)}",
+                "path": path
+            }
     
     def file_exists(self, file_path: str) -> bool:
         """
@@ -104,7 +302,13 @@ class FileStorageHandler(StorageBase):
         Returns:
             bool: True if file exists, False otherwise
         """
-        return self.exists(file_path)
+        try:
+            # Use translate_in to get the full path
+            full_path = self.translate_in(file_path)
+            return self._exists_raw(full_path)
+        except Exception as e:
+            logger.error(f"Error checking if file exists {file_path}: {str(e)}")
+            return False
     
     def get_file_information(self, file_path: str) -> Dict[str, Any]:
         """
@@ -116,7 +320,27 @@ class FileStorageHandler(StorageBase):
         Returns:
             Dict[str, Any]: File information including size, type, timestamps, etc.
         """
-        return self.get_file_info(file_path)
+        try:
+            # Use translate_in to get the full path
+            full_path = self.translate_in(file_path)
+            
+            if hasattr(self, '_get_file_info_raw'):
+                file_info = self._get_file_info_raw(full_path)
+                # Add the translated paths to the result
+                file_info['file_path'] = file_path
+                file_info['full_path'] = full_path
+                return file_info
+            else:
+                # Fallback to basic info
+                return {
+                    'file_path': file_path,
+                    'full_path': full_path,
+                    'exists': self._exists_raw(full_path),
+                    'type': 'file'  # Default assumption
+                }
+        except Exception as e:
+            logger.error(f"Error getting file info for {file_path}: {str(e)}")
+            return {}
     
     def create_directory(self, path: str) -> Dict[str, Any]:
         """
@@ -128,7 +352,34 @@ class FileStorageHandler(StorageBase):
         Returns:
             Dict[str, Any]: Result of the operation with success status and details
         """
-        return super().create_directory(path)
+        try:
+            # Use translate_in to get the full path
+            full_path = self.translate_in(path)
+            
+            # Create directory using the raw method
+            success = self._create_directory_raw(full_path)
+            
+            if success:
+                return {
+                    "success": True,
+                    "message": f"Directory '{path}' created successfully",
+                    "path": path,
+                    "full_path": full_path
+                }
+            else:
+                return {
+                    "success": False,
+                    "message": f"Failed to create directory '{path}'",
+                    "path": path,
+                    "full_path": full_path
+                }
+        except Exception as e:
+            logger.error(f"Error creating directory {path}: {str(e)}")
+            return {
+                "success": False,
+                "message": f"Error creating directory: {str(e)}",
+                "path": path
+            }
     
     def copy_file(self, source: str, destination: str) -> Dict[str, Any]:
         """
@@ -141,7 +392,41 @@ class FileStorageHandler(StorageBase):
         Returns:
             Dict[str, Any]: Result of the operation with success status and details
         """
-        return self.copy(source, destination)
+        try:
+            # Use translate_in to get the full paths
+            full_source = self.translate_in(source)
+            full_destination = self.translate_in(destination)
+            
+            # Read source file
+            source_content = self._read_raw(full_source)
+            
+            # Write to destination
+            success = self._write_raw(full_destination, source_content)
+            
+            if success:
+                return {
+                    "success": True,
+                    "message": f"File copied from '{source}' to '{destination}'",
+                    "source": source,
+                    "destination": destination,
+                    "full_source": full_source,
+                    "full_destination": full_destination
+                }
+            else:
+                return {
+                    "success": False,
+                    "message": f"Failed to copy file from '{source}' to '{destination}'",
+                    "source": source,
+                    "destination": destination
+                }
+        except Exception as e:
+            logger.error(f"Error copying file from {source} to {destination}: {str(e)}")
+            return {
+                "success": False,
+                "message": f"Error copying file: {str(e)}",
+                "source": source,
+                "destination": destination
+            }
     
     def move_file(self, source: str, destination: str) -> Dict[str, Any]:
         """
@@ -154,7 +439,49 @@ class FileStorageHandler(StorageBase):
         Returns:
             Dict[str, Any]: Result of the operation with success status and details
         """
-        return self.move(source, destination)
+        try:
+            # Use translate_in to get the full paths
+            full_source = self.translate_in(source)
+            full_destination = self.translate_in(destination)
+            
+            # Copy file to destination
+            copy_success = self._write_raw(full_destination, self._read_raw(full_source))
+            
+            if copy_success:
+                # Delete source file
+                delete_success = self._delete_raw(full_source)
+                
+                if delete_success:
+                    return {
+                        "success": True,
+                        "message": f"File moved from '{source}' to '{destination}'",
+                        "source": source,
+                        "destination": destination,
+                        "full_source": full_source,
+                        "full_destination": full_destination
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "message": f"File copied but failed to delete source '{source}'",
+                        "source": source,
+                        "destination": destination
+                    }
+            else:
+                return {
+                    "success": False,
+                    "message": f"Failed to copy file from '{source}' to '{destination}'",
+                    "source": source,
+                    "destination": destination
+                }
+        except Exception as e:
+            logger.error(f"Error moving file from {source} to {destination}: {str(e)}")
+            return {
+                "success": False,
+                "message": f"Error moving file: {str(e)}",
+                "source": source,
+                "destination": destination
+            }
     
     def append_to_file(self, file_path: str, content: Any, **kwargs) -> Dict[str, Any]:
         """
@@ -168,7 +495,65 @@ class FileStorageHandler(StorageBase):
         Returns:
             Dict[str, Any]: Result of the operation with success status and details
         """
-        return self.append(file_path, content, **kwargs)
+        try:
+            # Use translate_in to get the full path
+            full_path = self.translate_in(file_path)
+            
+            # Read existing content
+            existing_content = self._read_raw(full_path)
+            
+            # Convert new content to bytes
+            if isinstance(content, str):
+                new_content_bytes = content.encode(kwargs.get('encoding', 'utf-8'))
+                # For text files, decode existing content and append
+                existing_content_str = existing_content.decode(kwargs.get('encoding', 'utf-8'))
+                combined_content = existing_content_str + content
+                combined_bytes = combined_content.encode(kwargs.get('encoding', 'utf-8'))
+            else:
+                new_content_bytes = str(content).encode(kwargs.get('encoding', 'utf-8'))
+                # For binary files, just concatenate bytes
+                combined_bytes = existing_content + new_content_bytes
+            
+            # Write back to file
+            success = self._write_raw(full_path, combined_bytes, **kwargs)
+            
+            if success:
+                return {
+                    "success": True,
+                    "message": f"Content appended to '{file_path}'",
+                    "file_path": file_path,
+                    "full_path": full_path,
+                    "content_length": len(new_content_bytes)
+                }
+            else:
+                return {
+                    "success": False,
+                    "message": f"Failed to append content to '{file_path}'",
+                    "file_path": file_path,
+                    "full_path": full_path
+                }
+        except Exception as e:
+            logger.error(f"Error appending to file {file_path}: {str(e)}")
+            return {
+                "success": False,
+                "message": f"Error appending to file: {str(e)}",
+                "file_path": file_path
+            }
+    
+    def save(self, file_path: str, content: Any, **kwargs) -> Dict[str, Any]:
+        """
+        Save content to a file (alias for create_file).
+        This method is expected by some tools like flux image generation.
+        
+        Args:
+            file_path (str): Path where the file should be saved
+            content (Any): Content to save to the file
+            **kwargs: Additional arguments for file creation
+            
+        Returns:
+            Dict[str, Any]: Result of the operation
+        """
+        return self.create_file(file_path, content, **kwargs)
 
 
 class LocalStorageHandler(FileStorageHandler):
@@ -352,6 +737,7 @@ class SupabaseStorageHandler(FileStorageHandler):
             base_path: Base path for storage operations (default: "/")
             **kwargs: Additional keyword arguments for parent class initialization
         """
+        # Call parent constructor first
         super().__init__(base_path=base_path, **kwargs)
         
         # Get bucket name from environment or use default
@@ -385,6 +771,12 @@ class SupabaseStorageHandler(FileStorageHandler):
     
     def _initialize_storage(self):
         """Initialize remote storage - verify bucket exists and is accessible"""
+        # Check if required attributes are available
+        if not hasattr(self, 'bucket_name') or not hasattr(self, 'supabase'):
+            # If attributes aren't set yet, skip initialization
+            # This will be called again after attributes are set in __init__
+            return
+        
         try:
             # Test bucket access by listing files (empty list is fine)
             logger.info(f"Testing bucket access for: {self.bucket_name}")
@@ -396,19 +788,14 @@ class SupabaseStorageHandler(FileStorageHandler):
     
     def _resolve_path(self, file_path: str) -> str:
         """Resolve file path for remote storage"""
-        # For Supabase, we use the base_path as a prefix
-        # Remove any leading slash from file_path
-        clean_file_path = file_path.lstrip('/')
-        
-        # If base_path is just "/", don't add it
+        # Use the translate_in method to combine base_path with file_path
+        # For Supabase, we need to handle the special case where base_path is "/"
         if self.base_path == "/":
-            return clean_file_path
-        
-        # Otherwise, combine base_path and file_path
-        if not clean_file_path.startswith(self.base_path):
-            return f"{self.base_path}/{clean_file_path}".replace('//', '/')
+            # If base_path is "/", just clean the file_path
+            return file_path.lstrip('/')
         else:
-            return clean_file_path
+            # Use the standard translate_in method
+            return self.translate_in(file_path)
     
     def _read_raw(self, path: str, **kwargs) -> bytes:
         """Read raw file content from Supabase Storage"""
