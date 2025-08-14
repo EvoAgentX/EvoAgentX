@@ -1,5 +1,3 @@
-import sys
-import subprocess
 from typing import List, Dict, Optional
 
 from llama_index.core.embeddings import BaseEmbedding
@@ -7,15 +5,14 @@ from llama_index.core.embeddings import BaseEmbedding
 from evoagentx.core.logging import logger
 from .base import BaseEmbeddingWrapper, EmbeddingProvider, SUPPORTED_MODELS
 
-try:
-    from ollama import Client
-except ImportError:
-    logger.warning("The 'ollama' library is not installed. Attempting to install it.")
+# Lazy import for ollama to reduce image size
+def _get_ollama_client():
+    """Lazy import of ollama Client to reduce image size."""
     try:
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "ollama"])
         from ollama import Client
-    except subprocess.CalledProcessError:
-        logger.error("Failed to install 'ollama'. Please install it manually using 'pip install ollama'.")
+        return Client
+    except ImportError:
+        logger.error("The 'ollama' library is not installed. Please install it manually using 'pip install ollama'.")
         raise ImportError("The 'ollama' library is required.")
 
 
@@ -31,7 +28,7 @@ class OllamaEmbedding(BaseEmbedding):
     """Ollama embedding model compatible with LlamaIndex BaseEmbedding."""
     
     base_url: str = None
-    client: Client = None
+    client: Optional[object] = None  # Will be set to ollama.Client instance
     model_name: str = "nomic-embed-text"
     embed_batch_size: int = 10
     embedding_dims: int = None
@@ -53,6 +50,7 @@ class OllamaEmbedding(BaseEmbedding):
             raise ValueError(f"Unsupported Ollama model: {model_name}. Supported models: {SUPPORTED_MODELS['ollama']}")
 
         try:
+            Client = _get_ollama_client()
             self.client = Client(host=self.base_url)
             self._ensure_model_exists()
             logger.debug(f"Initialized Ollama embedding model: {model_name}")

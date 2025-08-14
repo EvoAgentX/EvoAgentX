@@ -332,7 +332,7 @@ async def parallel_workflow_generation_progress(
         # Send connection confirmation
         await websocket.send_text(json.dumps({
             "type": "connection",
-            "content": "Parallel workflow generation progress WebSocket connected",
+            "data": "Parallel workflow generation progress WebSocket connected",
             "project_short_id": project_short_id
         }))
         
@@ -343,7 +343,7 @@ async def parallel_workflow_generation_progress(
             
             await websocket.send_text(json.dumps({
                 "type": "status_update",
-                "content": "Initial parallel generation status",
+                "data": "Initial parallel generation status",
                 "status": initial_status
             }))
             
@@ -368,25 +368,30 @@ async def parallel_workflow_generation_progress(
                 
                 # Run the parallel setup with WebSocket status messages
                 try:
-                    await setup_project_parallel_with_status_messages(project_short_id, send_websocket_message)
+                    workflow_results = await setup_project_parallel_with_status_messages(project_short_id, send_websocket_message)
                     
-                    # Send completion message
+                    # Extract just the workflow_graphs from the results
+                    workflow_graphs = []
+                    for workflow in workflow_results:
+                        if "workflow_graph" in workflow:
+                            workflow_graphs.append(workflow["workflow_graph"])
+                    
+                    # Send success message with just the workflow_graph list
                     await websocket.send_text(json.dumps({
-                        "type": "completion",
-                        "content": "Parallel workflow generation completed",
-                        "status": "completed"
+                        "type": "success",
+                        "data": workflow_graphs
                     }))
                     
                 except Exception as e:
                     await websocket.send_text(json.dumps({
                         "type": "error",
-                        "content": f"Error during parallel generation: {str(e)}"
+                        "data": f"Error during parallel generation: {str(e)}"
                     }))
             else:
                 # All workflows are already processed, just monitor for changes
                 await websocket.send_text(json.dumps({
                     "type": "info",
-                    "content": "All workflows already processed, monitoring for status changes"
+                    "data": "All workflows already processed, monitoring for status changes"
                 }))
                 
                 # Monitor progress and send updates
@@ -402,7 +407,7 @@ async def parallel_workflow_generation_progress(
                         if current_status != last_status:
                             await websocket.send_text(json.dumps({
                                 "type": "status_update",
-                                "content": "Parallel generation status updated",
+                                "data": "Parallel generation status updated",
                                 "status": current_status
                             }))
                             last_status = current_status
@@ -411,7 +416,7 @@ async def parallel_workflow_generation_progress(
                             if current_status["overall_status"] in ["completed", "failed"]:
                                 await websocket.send_text(json.dumps({
                                     "type": "completion",
-                                    "content": f"Parallel workflow generation {current_status['overall_status']}",
+                                    "data": f"Parallel workflow generation {current_status['overall_status']}",
                                     "status": current_status
                                 }))
                                 break
@@ -419,14 +424,14 @@ async def parallel_workflow_generation_progress(
                     except Exception as e:
                         await websocket.send_text(json.dumps({
                             "type": "error",
-                            "content": f"Error getting status update: {str(e)}"
+                            "data": f"Error getting status update: {str(e)}"
                         }))
                         break
                         
         except Exception as e:
             await websocket.send_text(json.dumps({
                 "type": "error",
-                "content": f"Error in parallel generation progress: {str(e)}"
+                "data": f"Error in parallel generation progress: {str(e)}"
             }))
     
     except WebSocketDisconnect:
@@ -436,7 +441,7 @@ async def parallel_workflow_generation_progress(
         try:
             await websocket.send_text(json.dumps({
                 "type": "error",
-                "content": f"WebSocket error: {str(e)}"
+                "data": f"WebSocket error: {str(e)}"
             }))
         except:
             pass  # Connection might be closed

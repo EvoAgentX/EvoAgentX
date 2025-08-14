@@ -21,13 +21,24 @@ from ..workflow.workflow_graph import WorkFlowGraph, WorkFlowNode
 # Check if logs folder exists before importing textgrad
 log_folder_exists = os.path.exists("./logs")
 
-import textgrad as tg
-from textgrad import Variable, EngineLM
-from textgrad import logger as tg_logger
-from textgrad import sh as tg_file_handler
-from textgrad.autograd import StringBasedFunction
-from textgrad.loss import MultiFieldEvaluation, TextLoss
-from textgrad.optimizer import TextualGradientDescent
+# Lazy import helper for textgrad
+def _import_textgrad():
+    """Lazy import textgrad package and its components."""
+    try:
+        import textgrad as tg
+        from textgrad import Variable, EngineLM
+        from textgrad import logger as tg_logger
+        from textgrad import sh as tg_file_handler
+        from textgrad.autograd import StringBasedFunction
+        from textgrad.loss import MultiFieldEvaluation, TextLoss
+        from textgrad.optimizer import TextualGradientDescent
+        
+        return tg, Variable, EngineLM, tg_logger, tg_file_handler, StringBasedFunction, MultiFieldEvaluation, TextLoss, TextualGradientDescent
+    except ImportError:
+        raise ImportError(
+            "textgrad package is required for TextGradOptimizer. "
+            "Please install it with: pip install textgrad"
+        )
 
 from ..prompts.optimizers.textgrad_optimizer import (
     CODE_LOSS_PROMPT,
@@ -40,15 +51,20 @@ from ..prompts.optimizers.textgrad_optimizer import (
     CODE_REVIEW_EXAMPLE,
 )
 
-tg_logger.removeHandler(tg_file_handler)
-# remove the logs folder created by textgrad
+# Remove textgrad logs handler if logs folder was created
 if not log_folder_exists and os.path.exists("./logs"):
     shutil.rmtree("./logs")
 
 
-class TextGradEngine(EngineLM):
+class TextGradEngine:
     def __init__(self, llm: BaseLLM):
         self.llm = llm
+        # Lazy import EngineLM
+        _, _, EngineLM, _, _, _, _, _, _ = _import_textgrad()
+        # Create a mixin class dynamically
+        self.__class__ = type('TextGradEngine', (EngineLM,), {})
+        # Re-initialize with the new class
+        self.__init__(llm)
 
     def generate(self, prompt: str, system_prompt: str = None, **kwargs):
         with suppress_logger_info():
@@ -67,10 +83,17 @@ class CustomAgentCall:
     
     def __call__(
         self, 
-        instruction: Variable, 
-        system_prompt: Variable,
-        **inputs: Variable
-    ) -> Variable:
+        instruction, 
+        system_prompt,
+        **inputs
+    ):
+        # Lazy import Variable
+        _, Variable, _, _, _, _, _, _, _ = _import_textgrad()
+        
+        # Type hints for clarity
+        instruction: Variable = instruction
+        system_prompt: Variable = system_prompt
+        inputs: dict[str, Variable] = inputs
 
         action = self.agent.actions[0]
         input_names = action.inputs_format.get_attrs()
@@ -101,6 +124,9 @@ class TextGradAgent:
         agent: Agent,
         optimize_mode: Literal["all", "system_prompt", "instruction"] = "all"
     ):
+        # Lazy import textgrad components
+        _, Variable, _, _, _, StringBasedFunction, _, _, _ = _import_textgrad()
+        
         self.name = agent.name
 
         require_grad = {
@@ -129,10 +155,10 @@ class TextGradAgent:
         self.output_description = " and ".join(agent.actions[0].outputs_format.get_attr_descriptions().values())
         self.last_output = None
 
-    def __call__(self, inputs: dict[str, Variable]) -> Variable:
+    def __call__(self, inputs: dict[str, Any]) -> Any:
         """Given textgrad.Variable inputs, generates a textgrad.Variable output."""
 
-        forward_inputs: dict[str, Variable] = {
+        forward_inputs: dict[str, Any] = {
             "instruction": self.instruction, 
             "system_prompt": self.system_prompt,
             **inputs
@@ -172,6 +198,12 @@ class TextGradOptimizer(BaseModule):
         
 
     def _init_textgrad(self, dataset: Benchmark, use_answers: bool = True):
+        # Lazy import textgrad components
+        _, Variable, _, tg_logger, tg_file_handler, _, MultiFieldEvaluation, TextLoss, TextualGradientDescent = _import_textgrad()
+        
+        # Remove textgrad logs handler
+        tg_logger.removeHandler(tg_file_handler)
+        
         # Disable TextGrad's short variable value to allow the optimizer to receive the full variable value
         def disable_short_variable_value(self, n_words_offset: int = 10):
             return self.value
@@ -302,6 +334,9 @@ class TextGradOptimizer(BaseModule):
     ) -> None:
         """Performs one optimization step using a batch of data."""
 
+        # Lazy import Variable
+        _, Variable, _, _, _, _, _, _, _ = _import_textgrad()
+        
         losses = []
         logger.info("Executing workflow...")
 
@@ -330,6 +365,9 @@ class TextGradOptimizer(BaseModule):
                 loss = self.loss_fn(output)
                 losses.append(loss)
 
+        # Lazy import textgrad
+        tg, _, _, _, _, _, _, _, _ = _import_textgrad()
+        
         total_loss = tg.sum(losses)
         logger.info("Computing gradients...")
         total_loss.backward(self.optimizer_engine)
@@ -340,7 +378,7 @@ class TextGradOptimizer(BaseModule):
         logger.info("Agents updated")
 
 
-    def forward(self, inputs: dict[str, str]) -> Variable:
+    def forward(self, inputs: dict[str, str]) -> Any:
         """Returns the final output from the workflow."""
         self._visited_nodes = set()
         end_node = self.graph.find_end_nodes()[0]
@@ -466,8 +504,11 @@ class TextGradOptimizer(BaseModule):
         return formatted_label
 
 
-    def _initial_inputs_to_variables(self, initial_inputs: dict[str, str]) -> dict[str, Variable]:
+    def _initial_inputs_to_variables(self, initial_inputs: dict[str, str]) -> dict[str, Any]:
         """Converts inputs to the initial nodes to textgrad variables."""
+        # Lazy import Variable
+        _, Variable, _, _, _, _, _, _, _ = _import_textgrad()
+        
         variables = {}
         initial_nodes = self.graph.find_initial_nodes()
         for initial_node in initial_nodes:
@@ -487,7 +528,7 @@ class TextGradOptimizer(BaseModule):
 
 
 
-    def _compute_node(self, node: Union[str, WorkFlowNode], initial_inputs: dict[str, Variable]) -> Variable:
+    def _compute_node(self, node: Union[str, WorkFlowNode], initial_inputs: dict[str, Any]) -> Any:
         """Computes the output of a node in the workflow graph by recursively computing the required inputs.
 
         Args:
@@ -503,7 +544,7 @@ class TextGradOptimizer(BaseModule):
         if node.name in self._visited_nodes:
             return node.textgrad_agent.last_output
 
-        input_variables: dict[str, Variable] = {}    # inputs to TextGradAgent
+        input_variables: dict[str, Any] = {}    # inputs to TextGradAgent
         input_node_names: set[str] = set()           # which nodes we need to compute the output of      
 
         for input in node.inputs:
@@ -609,7 +650,7 @@ class TextGradOptimizer(BaseModule):
         return graph
 
 
-    def _get_all_system_prompts(self) -> List[Variable]:
+    def _get_all_system_prompts(self) -> List[Any]:
         """Gets all system prompts from the textgrad agents."""
         system_prompts = []
         for node in self.graph.nodes:
@@ -617,7 +658,7 @@ class TextGradOptimizer(BaseModule):
         return system_prompts
 
     
-    def _get_all_instructions(self) -> List[Variable]:
+    def _get_all_instructions(self) -> List[Any]:
         """Gets all prompt templates from the textgrad agents."""
         instructions = []
         for node in self.graph.nodes:

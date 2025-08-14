@@ -79,25 +79,25 @@ OUTPUT MESSAGE TYPES:
 ====================
 
 1. CONNECTION CONFIRMATION
-   {"type": "connection", "content": "WebSocket connection established", "result": null}
+   {"type": "connection", "data": "WebSocket connection established", "result": null}
 
 2. EXECUTION START
-   {"type": "start", "content": "Workflow execution started", "result": null}
+   {"type": "start", "data": "Workflow execution started", "result": null}
 
 3. PROGRESS UPDATES
-   {"type": "progress", "content": "Executing workflow: story_generation (75% complete)", "result": null}
+   {"type": "progress", "data": "Executing workflow: story_generation (75% complete)", "result": null}
 
 4. LOG MESSAGES
-   {"type": "log", "content": "INFO: Starting workflow execution", "result": null}
+   {"type": "log", "data": "INFO: Starting workflow execution", "result": null}
 
 5. OUTPUT MESSAGES
-   {"type": "output", "content": "Processing user data...", "result": null}
+   {"type": "output", "data": "Processing user data...", "result": null}
 
 6. COMPLETION
-   {"type": "complete", "content": "Workflow execution completed successfully", "result": {...}}
+   {"type": "complete", "data": "Workflow execution completed successfully", "result": {...}}
 
 7. ERROR MESSAGES
-   {"type": "error", "content": "Failed to connect to database", "result": null}
+   {"type": "error", "data": "Failed to connect to database", "result": null}
 
 EXAMPLE COMPLETE WORKFLOW:
 ==========================
@@ -175,12 +175,12 @@ Success Case:
         "parsed_json": {...}
     },
     "messages": [
-        {"type": "connection", "content": "WebSocket connection established", "result": null},
-        {"type": "start", "content": "Workflow execution started", "result": null},
-        {"type": "progress", "content": "Executing workflow: name (75% complete)", "result": null},
-        {"type": "log", "content": "INFO: Starting workflow execution", "result": null},
-        {"type": "output", "content": "Processing user data...", "result": null},
-        {"type": "complete", "content": "Workflow execution completed successfully", "result": {...}}
+        {"type": "connection", "data": "WebSocket connection established", "result": null},
+        {"type": "start", "data": "Workflow execution started", "result": null},
+        {"type": "progress", "data": "Executing workflow: name (75% complete)", "result": null},
+        {"type": "log", "data": "INFO: Starting workflow execution", "result": null},
+        {"type": "output", "data": "Processing user data...", "result": null},
+        {"type": "complete", "data": "Workflow execution completed successfully", "result": {...}}
     ]
 }
 
@@ -206,25 +206,25 @@ Error Cases:
 WebSocket Message Types:
 -----------------------
 1. connection: Initial connection confirmation
-   {"type": "connection", "content": "WebSocket connection established", "result": null}
+   {"type": "connection", "data": "WebSocket connection established", "result": null}
 
 2. start: Execution start notification
-   {"type": "start", "content": "Workflow execution started", "result": null}
+   {"type": "start", "data": "Workflow execution started", "result": null}
 
 3. progress: Real-time progress updates
-   {"type": "progress", "content": "Executing workflow: name (75% complete)", "result": null}
+   {"type": "progress", "data": "Executing workflow: name (75% complete)", "result": null}
 
 4. log: Log messages from workflow execution
-   {"type": "log", "content": "INFO: Database connection established", "result": null}
+   {"type": "log", "data": "INFO: Database connection established", "result": null}
 
 5. output: Execution output messages
-   {"type": "output", "content": "Processing user data...", "result": null}
+   {"type": "output", "data": "Processing user data...", "result": null}
 
 6. complete: Final execution result
-   {"type": "complete", "content": "Workflow execution completed successfully", "result": {...}}
+   {"type": "complete", "data": "Workflow execution completed successfully", "result": {...}}
 
 7. error: Error messages
-   {"type": "error", "content": "Failed to connect to database", "result": null}
+   {"type": "error", "data": "Failed to connect to database", "result": null}
 """
 
 import asyncio
@@ -270,7 +270,7 @@ TEST_INPUTS = {
 
 # Fixed test configuration
 TEST_CONFIG = {
-    "project_short_id": "63xwavz",
+    "project_short_id": "9mshbju",
     "test_workflow_ids": [test_workflow_id_1, test_workflow_id_2]
 }
 def generate_test_ids() -> str:
@@ -1029,7 +1029,11 @@ def test_parallel_generation_status(project_short_id: str) -> Tuple[bool, Dict[s
     return result["success"], result
 
 def test_parallel_generation_websocket(project_short_id: str) -> Tuple[bool, Dict[str, Any]]:
-    """Test Parallel Workflow Generation WebSocket progress updates"""
+    """Test Parallel Workflow Generation WebSocket progress updates
+    
+    This test connects to the parallel generation WebSocket endpoint and prints
+    all received messages in full detail to verify the new message format.
+    """
     print("\n🔌 Testing Parallel Workflow Generation WebSocket")
     
     import websockets
@@ -1046,31 +1050,28 @@ def test_parallel_generation_websocket(project_short_id: str) -> Tuple[bool, Dic
             
             async with websockets.connect(uri) as websocket:
                 print("✅ WebSocket connected successfully")
+                print("📝 Note: Messages now use 'data' field instead of 'content' field")
+                print("📋 Expected flow: connection → status updates → success (with workflow_graph list)")
                 
-                # Send initial message to trigger status
-                await websocket.send(json.dumps({"action": "get_status"}))
-                
-                # Listen for messages
+                # Listen for messages (no need to send anything - auto-starts on connection)
                 message_count = 0
-                max_messages = 10  # Limit to prevent infinite loop
+                max_messages = 1000  # Increased limit for more messages
                 
                 while message_count < max_messages:
                     try:
-                        message = await asyncio.wait_for(websocket.recv(), timeout=5.0)
+                        message = await asyncio.wait_for(websocket.recv(), timeout=1000.0)
                         message_data = json.loads(message)
                         result["messages"].append(message_data)
                         
-                        print(f"📨 Message {message_count + 1}: {message_data['type']}")
+                        # Print the full message
+                        print(f"📨 Message {message_count + 1}: {json.dumps(message_data, indent=2)}")
                         
-                        if message_data["type"] == "workflow_status":
-                            status = message_data.get("status", "unknown")
-                            workflow_id = message_data.get("workflow_id")
-                            print(f"📊 Workflow Status: {status} for workflow {workflow_id}")
-                        elif message_data["type"] == "completion":
-                            print("✅ Received completion message")
+                        if message_data["type"] == "success":
+                            print("✅ Received success message with workflow graphs")
+                            print(f"📊 Number of workflow graphs: {len(message_data.get('data', []))}")
                             break
                         elif message_data["type"] == "error":
-                            print(f"❌ Received error: {message_data['content']}")
+                            print(f"❌ Received error message")
                             break
                         
                         message_count += 1
@@ -1244,22 +1245,22 @@ def run_complete_test() -> Dict[str, Any]:
     # }
     
     
-    # Phase 4: Workflow Execution
-    execution_passed, execution_result = test_workflow_execution(workflow_ids)
-    test_results["phases"]["execution"] = {
-        "passed": execution_passed,
-        "timestamp": datetime.now().isoformat(),
-        "result": execution_result
-    }
-    
-    # # Phase 5: Parallel Workflow Generation Test
-    # parallel_setup_passed, parallel_setup_result, parallel_workflow_ids = test_parallel_workflow_generation(project_short_id)
-    # test_results["phases"]["parallel_workflow_generation"] = {
-    #     "passed": parallel_setup_passed,
+    # # Phase 4: Workflow Execution
+    # execution_passed, execution_result = test_workflow_execution(workflow_ids)
+    # test_results["phases"]["execution"] = {
+    #     "passed": execution_passed,
     #     "timestamp": datetime.now().isoformat(),
-    #     "workflow_ids": parallel_workflow_ids,
-    #     "result": parallel_setup_result
+    #     "result": execution_result
     # }
+    
+    # Phase 5: Parallel Workflow Generation Test
+    parallel_setup_passed, parallel_setup_result, parallel_workflow_ids = test_parallel_workflow_generation(project_short_id)
+    test_results["phases"]["parallel_workflow_generation"] = {
+        "passed": parallel_setup_passed,
+        "timestamp": datetime.now().isoformat(),
+        "workflow_ids": parallel_workflow_ids,
+        "result": parallel_setup_result
+    }
     
     # if parallel_setup_passed:
     #     # Phase 6: Parallel Generation Status Check

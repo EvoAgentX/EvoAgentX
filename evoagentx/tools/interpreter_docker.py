@@ -2,7 +2,6 @@ import io
 import shlex
 import tarfile
 import uuid
-import docker
 from pathlib import Path
 from typing import ClassVar, Dict, List, Optional
 from .interpreter_base import BaseInterpreter
@@ -83,6 +82,7 @@ class DockerInterpreter(BaseInterpreter):
         self.tmp_directory = tmp_directory
         
         # Initialize Docker client and container
+        import docker
         self.client = docker.from_env()
         self.container = None
         self.image_tag = image_tag

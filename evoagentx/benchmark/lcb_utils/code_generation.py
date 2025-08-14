@@ -8,7 +8,7 @@ from enum import Enum
 from datetime import datetime
 from dataclasses import dataclass
 
-from datasets import load_dataset
+# Removed top-level import: from datasets import load_dataset
 
 
 class Platform(Enum):
@@ -124,25 +124,35 @@ class CodeGenerationProblem:
 
 
 def load_code_generation_dataset(release_version="release_v1", cache_dir: str = None, start_date=None, end_date=None) -> list[CodeGenerationProblem]:
-    dataset = load_dataset("livecodebench/code_generation_lite", split="test", version_tag=release_version, trust_remote_code=True, cache_dir=cache_dir)
-    dataset = [CodeGenerationProblem(**p) for p in dataset]  # type: ignore
-    if start_date is not None:
-        p_start_date = datetime.strptime(start_date, "%Y-%m-%d")
-        dataset = [e for e in dataset if p_start_date <= e.contest_date]
+    try:
+        from datasets import load_dataset
+        dataset = load_dataset("livecodebench/code_generation_lite", split="test", version_tag=release_version, trust_remote_code=True, cache_dir=cache_dir)
+        dataset = [CodeGenerationProblem(**p) for p in dataset]  # type: ignore
+        if start_date is not None:
+            p_start_date = datetime.strptime(start_date, "%Y-%m-%d")
+            dataset = [e for e in dataset if p_start_date <= e.contest_date]
 
-    if end_date is not None:
-        p_end_date = datetime.strptime(end_date, "%Y-%m-%d")
-        dataset = [e for e in dataset if e.contest_date <= p_end_date]
-    
-    # print(f"Loaded {len(dataset)} problems")
-    return dataset
+        if end_date is not None:
+            p_end_date = datetime.strptime(end_date, "%Y-%m-%d")
+            dataset = [e for e in dataset if e.contest_date <= p_end_date]
+        
+        # print(f"Loaded {len(dataset)} problems")
+        return dataset
+    except ImportError:
+        print("Error: datasets package not found. Please install it with 'pip install datasets'")
+        return []
 
 
 def load_code_generation_dataset_not_fast(release_version="release_v1") -> list[CodeGenerationProblem]:
-    dataset = load_dataset("livecodebench/code_generation", split="test")
-    dataset = [CodeGenerationProblem(**p) for p in dataset]  # type: ignore
-    # print(f"Loaded {len(dataset)} problems")
-    return dataset
+    try:
+        from datasets import load_dataset
+        dataset = load_dataset("livecodebench/code_generation", split="test")
+        dataset = [CodeGenerationProblem(**p) for p in dataset]  # type: ignore
+        # print(f"Loaded {len(dataset)} problems")
+        return dataset
+    except ImportError:
+        print("Error: datasets package not found. Please install it with 'pip install datasets'")
+        return []
 
 
 if __name__ == "__main__":

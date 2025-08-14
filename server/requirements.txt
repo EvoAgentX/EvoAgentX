@@ -2,7 +2,6 @@ fastapi>=0.115.11
 uvicorn>=0.34.0
 fastapi-cors>=0.0.6
 sse-starlette
-pydantic>=2.9.0,<=2.10.6
 aiohttp
 sseclient-py
 requests
@@ -10,15 +9,4 @@ pyngrok
 supabase
 websocket-client
 websockets>=11.0
-python-dotenv>=1.0.0
-loguru>=0.7.3
-selenium
-webdriver-manager
-beautifulsoup4
-PyPDF2
-html2text
 httpx>=0.24.1
-tenacity
-openai>=1.55.3
-litellm>=1.55.6
-datasets>=3.4.0

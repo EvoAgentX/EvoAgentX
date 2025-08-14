@@ -3,7 +3,7 @@
 from datetime import datetime
 from dataclasses import dataclass
 
-from datasets import load_dataset
+# Removed top-level import: from datasets import load_dataset
 
 
 @dataclass
@@ -57,10 +57,15 @@ class CodeExecutionProblem:
 
 
 def load_code_execution_dataset(release_version="release_v1", cache_dir: str = None) -> list[CodeExecutionProblem]:
-    dataset = load_dataset("livecodebench/execution-v2", split="test", trust_remote_code=True, cache_dir=cache_dir)  # type: ignore
-    dataset = [CodeExecutionProblem(**p) for p in dataset]  # type: ignore
-    # print(f"Loaded {len(dataset)} problems")
-    return dataset
+    try:
+        from datasets import load_dataset
+        dataset = load_dataset("livecodebench/execution-v2", split="test", trust_remote_code=True, cache_dir=cache_dir)  # type: ignore
+        dataset = [CodeExecutionProblem(**p) for p in dataset]  # type: ignore
+        # print(f"Loaded {len(dataset)} problems")
+        return dataset
+    except ImportError:
+        print("Error: datasets package not found. Please install it with 'pip install datasets'")
+        return []
 
 
 if __name__ == "__main__":

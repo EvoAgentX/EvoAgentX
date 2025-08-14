@@ -3,7 +3,7 @@
 import json
 from datetime import datetime
 from dataclasses import dataclass
-from datasets import load_dataset
+# Removed top-level import: from datasets import load_dataset
 
 
 @dataclass
@@ -60,10 +60,15 @@ class TestOutputPredictionProblem:
 
 
 def load_test_prediction_dataset(release_version="release_v1", cache_dir: str = None,) -> list[TestOutputPredictionProblem]:
-    dataset = load_dataset("livecodebench/test_generation", split="test", trust_remote_code=True, cache_dir=cache_dir)  # type: ignore
-    dataset = [TestOutputPredictionProblem(**d) for d in dataset]
-    # print(f"Loaded {len(dataset)} prediction problems")
-    return dataset
+    try:
+        from datasets import load_dataset
+        dataset = load_dataset("livecodebench/test_generation", split="test", trust_remote_code=True, cache_dir=cache_dir)  # type: ignore
+        dataset = [TestOutputPredictionProblem(**d) for d in dataset]
+        # print(f"Loaded {len(dataset)} prediction problems")
+        return dataset
+    except ImportError:
+        print("Error: datasets package not found. Please install it with 'pip install datasets'")
+        return []
 
 
 if __name__ == "__main__":

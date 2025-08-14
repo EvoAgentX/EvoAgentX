@@ -68,7 +68,7 @@ sudo_execution_result = None
 from evoagentx.tools import GoogleFreeSearchToolkit, DDGSSearchToolkit, WikipediaSearchToolkit, ArxivToolkit, StorageToolkit, CMDToolkit, RSSToolkit
 default_tools = [GoogleFreeSearchToolkit(), DDGSSearchToolkit(), WikipediaSearchToolkit(), ArxivToolkit(), StorageToolkit(), CMDToolkit(), RSSToolkit()]
 
-def create_tools_with_database(database_information: Dict[str, Any] = None) -> list:
+def create_tools(database_information: Dict[str, Any] = None) -> list:
     """
     Create tools list (database tools disabled).
     
@@ -282,7 +282,7 @@ async def execute_workflow_from_config(workflow: Dict[str, Any], llm_config_dict
         if mcp_config:
             mcp_toolkit = MCPToolkit(config=mcp_config)
             tools = mcp_toolkit.get_tools()
-        tools += create_tools_with_database(database_information)
+        tools += create_tools(database_information)
         
         agent_manager = AgentManager(tools=tools)
         agent_manager.add_agents_from_workflow(workflow_graph, llm_config=llm_config)

@@ -10,20 +10,31 @@ from collections import defaultdict
 import optuna
 from typing import Optional, Callable, Literal, List, Any, Dict, Union, Tuple, Set 
 
-import dspy 
-from dspy import MIPROv2
-from dspy.clients import LM, Provider
-from dspy.utils.callback import BaseCallback 
-from dspy.utils.parallelizer import ParallelExecutor 
-from dspy.propose.grounded_proposer import GroundedProposer 
-from dspy.teleprompt.utils import (
-    create_n_fewshot_demo_sets, 
-    get_signature, 
-    create_minibatch, 
-    print_full_program, 
-    save_candidate_program, 
-    get_program_with_highest_avg_score
-) 
+# Lazy import helper for dspy
+def _import_dspy():
+    """Lazy import dspy package and its components."""
+    try:
+        import dspy 
+        from dspy import MIPROv2
+        from dspy.clients import LM, Provider
+        from dspy.utils.callback import BaseCallback 
+        from dspy.utils.parallelizer import ParallelExecutor 
+        from dspy.propose.grounded_proposer import GroundedProposer 
+        from dspy.teleprompt.utils import (
+            create_n_fewshot_demo_sets, 
+            get_signature, 
+            create_minibatch, 
+            print_full_program, 
+            save_candidate_program, 
+            get_program_with_highest_avg_score
+        )
+        
+        return dspy, MIPROv2, LM, Provider, BaseCallback, ParallelExecutor, GroundedProposer, create_n_fewshot_demo_sets, get_signature, create_minibatch, print_full_program, save_candidate_program, get_program_with_highest_avg_score
+    except ImportError:
+        raise ImportError(
+            "dspy package is required for MiproOptimizer. "
+            "Please install it with: pip install dspy"
+        )
 
 from ..core.logging import logger 
 from ..core.callbacks import suppress_cost_logging, suppress_logger_info
@@ -59,8 +70,7 @@ BOLD = "\033[1m"
 ENDC = "\033[0m"  # Resets the color to default
 
 
-class MiproLMWrapper(LM):
-
+class MiproLMWrapper:
     """
     A wrapper class for the LLM model. It converts the BaseLLM model in EvoAgentX to a dspy.LM object. 
     """
@@ -73,7 +83,7 @@ class MiproLMWrapper(LM):
         max_tokens: int = 4000, 
         cache: bool = True,
         cache_in_memory: bool = True,
-        callbacks: Optional[List[BaseCallback]] = None,
+        callbacks: Optional[List[Any]] = None,
         num_retries: int = 3,
         provider=None,
         finetuning_model: Optional[str] = None,
@@ -81,6 +91,13 @@ class MiproLMWrapper(LM):
         train_kwargs: Optional[dict[str, Any]] = None,
         **kwargs,
     ):
+        # Lazy import dspy components
+        _, _, LM, Provider, BaseCallback, _, _, _, _, _, _, _, _, _ = _import_dspy()
+        
+        # Create a mixin class dynamically
+        self.__class__ = type('MiproLMWrapper', (LM,), {})
+        # Re-initialize with the new class
+        self.__init__(model, model_type, temperature, max_tokens, cache, cache_in_memory, callbacks, num_retries, provider, finetuning_model, launch_kwargs, train_kwargs, **kwargs)
         self.model = model 
         self.model_type = model_type
         self.cache = cache
@@ -178,7 +195,9 @@ class MiproEvaluator:
                     self._log_counter += 1
             return avg_score
 
-    def metric(self, example: dspy.Example, prediction: Any, *args, **kwargs):
+    def metric(self, example: Any, prediction: Any, *args, **kwargs):
+        # Lazy import dspy
+        dspy, _, _, _, _, _, _, _, _, _, _, _, _, _ = _import_dspy()
 
         if isinstance(self.benchmark.get_train_data()[0], dspy.Example):
             # the data in original benchmark is a dspy.Example
@@ -228,6 +247,9 @@ class MiproEvaluator:
             executor = None 
 
         def process_item(example):
+            # Lazy import dspy
+            dspy, _, _, _, _, _, _, _, _, _, _, _, _, _ = _import_dspy()
+            
             # Set the suppress_cost_logs context in the worker thread
             token = suppress_cost_logs.set(current_suppress_cost)
             try:
@@ -293,7 +315,46 @@ class MiproEvaluator:
         return round(100 * ncorrect / ntotal, 2)
 
 
-class MiproOptimizer(BaseOptimizer, MIPROv2):
+class MiproOptimizer(BaseOptimizer):
+    def __init__(
+        self,
+        registry: ParamRegistry,
+        program: Callable,
+        optimizer_llm: BaseLLM,
+        evaluator: Optional[Callable] = None,
+        eval_rounds: Optional[int] = 1, 
+        metric_threshold: Optional[float] = None,
+        max_bootstrapped_demos: int = 4, 
+        max_labeled_demos: int = 4, 
+        auto: Optional[Literal["light", "medium", "heavy"]] = "medium", 
+        max_steps: int = None, 
+        num_candidates: Optional[int] = None, 
+        num_threads: Optional[int] = None, 
+        max_errors: int = 10, 
+        seed: int = 9, 
+        init_temperature: float = 0.5, 
+        track_stats: bool = True, 
+        save_path: Optional[str] = None,  
+        minibatch: bool = True, 
+        minibatch_size: int = 35, 
+        minibatch_full_eval_steps: int = 5, 
+        program_aware_proposer: bool = True,
+        data_aware_proposer: bool = True,
+        view_data_batch_size: int = 10,
+        tip_aware_proposer: bool = True,
+        fewshot_aware_proposer: bool = True,
+        requires_permission_to_run: bool = False,
+        provide_traceback: Optional[bool] = None,
+        verbose: bool = False, 
+        **kwargs
+    ):
+        # Lazy import dspy components
+        _, MIPROv2, _, _, _, _, _, _, _, _, _, _, _, _ = _import_dspy()
+        
+        # Create a mixin class dynamically
+        self.__class__ = type('MiproOptimizer', (BaseOptimizer, MIPROv2), {})
+        # Re-initialize with the new class
+        self.__init__(registry, program, optimizer_llm, evaluator, eval_rounds, metric_threshold, max_bootstrapped_demos, max_labeled_demos, auto, max_steps, num_candidates, num_threads, max_errors, seed, init_temperature, track_stats, save_path, minibatch, minibatch_size, minibatch_full_eval_steps, program_aware_proposer, data_aware_proposer, view_data_batch_size, tip_aware_proposer, fewshot_aware_proposer, requires_permission_to_run, provide_traceback, verbose, **kwargs)
 
     def __init__(
         self,
@@ -377,6 +438,9 @@ class MiproOptimizer(BaseOptimizer, MIPROv2):
         self._validate_program(program=program)
         self.model = self._convert_to_dspy_module(registry, program)
         self.optimizer_llm = MiproLMWrapper(optimizer_llm)
+        # Lazy import dspy
+        dspy, _, _, _, _, _, _, _, _, _, _, _, _, _ = _import_dspy()
+        
         dspy.configure(lm=self.optimizer_llm)
         self.task_model = dspy.settings.lm 
         self.prompt_model = dspy.settings.lm 
@@ -434,6 +498,9 @@ class MiproOptimizer(BaseOptimizer, MIPROv2):
         if not callable(program):
             raise TypeError("program must be callable")
         
+        # Lazy import dspy
+        dspy, _, _, _, _, _, _, _, _, _, _, _, _, _ = _import_dspy()
+        
         # Check if program has save method
         if not hasattr(program, 'save'):
             # raise ValueError("program must have a `save` method")
@@ -447,7 +514,7 @@ class MiproOptimizer(BaseOptimizer, MIPROv2):
         
         # Check if program has load method
         if not hasattr(program, 'load'):
-            # raise ValueError("program must have a `load` method")
+            # raise ValueError("program must have a `load(path=...)` method")
             logger.warning("program does not have a `load(path=...)` method, will use the default load method in dspy.Module")
         else:
             # Check load method signature
@@ -502,6 +569,9 @@ class MiproOptimizer(BaseOptimizer, MIPROv2):
             if sig.return_annotation not in [float, int, bool]:
                 raise TypeError("evaluator must return a float, int, or bool")
             
+        # Lazy import dspy
+        dspy, _, _, _, _, _, _, _, _, _, _, _, _, _ = _import_dspy()
+        
         # check if the evaluator has a `metric` method with correct signature 
         if not hasattr(evaluator, 'metric'):
             raise ValueError("evaluator must have a `metric(example: dspy.Example, prediction: Any) -> float/int/bool` method")
@@ -563,6 +633,8 @@ class MiproOptimizer(BaseOptimizer, MIPROv2):
         return evaluator
 
     def _convert_to_dspy_module(self, registry: ParamRegistry, program: Callable):
+        # Lazy import dspy
+        dspy, _, _, _, _, _, _, _, _, _, _, _, _, _ = _import_dspy()
 
         if isinstance(program, dspy.Module):
             return program
@@ -698,11 +770,14 @@ class MiproOptimizer(BaseOptimizer, MIPROv2):
                 input_keys = candidate_input_keys
         return input_keys
 
-    def _set_and_validate_datasets(self, dataset: Benchmark):
+    def _set_and_validate_datasets(self, dataset: Benchmark) -> Tuple[List[Any], List[Any]]:
 
         trainset = dataset.get_train_data() 
         if not trainset:
             raise ValueError("No training data found in the dataset. Please set `_train_data` in the benchmark.")
+        # Lazy import dspy
+        dspy, _, _, _, _, _, _, _, _, _, _, _, _, _ = _import_dspy()
+        
         if trainset and not isinstance(trainset[0], (dict, dspy.Example)):
             raise ValueError("Training set in the benchmark must be a list of dictionaries or dspy.Example objects.")
         
@@ -729,11 +804,14 @@ class MiproOptimizer(BaseOptimizer, MIPROv2):
         
         return dspy_trainset, dspy_valset
     
-    def _convert_benchmark_data_to_dspy_examples(self, data: List[dict], input_keys: List[str]) -> List[dspy.Example]:
+    def _convert_benchmark_data_to_dspy_examples(self, data: List[dict], input_keys: List[str]) -> List[Any]:
 
         """
         Convert the benchmark data to a list of dspy Example. This is required since the evaluator accepts a list of dspy Example. 
         """
+        # Lazy import dspy
+        dspy, _, _, _, _, _, _, _, _, _, _, _, _, _ = _import_dspy()
+        
         dspy_examples = [
             example.with_inputs(*input_keys)
             if isinstance(example, dspy.Example) else dspy.Example(**example).with_inputs(*input_keys)
@@ -742,7 +820,7 @@ class MiproOptimizer(BaseOptimizer, MIPROv2):
 
         return dspy_examples
 
-    def _bootstrap_fewshot_examples(self, program: Any, trainset: List, seed: int, teacher: Any) -> Optional[List]:
+    def _bootstrap_fewshot_examples(self, program: Any, trainset: List, seed: int, teacher: Any) -> Optional[List[Any]]:
 
         logger.info("==> STEP 1: BOOTSTRAP FEWSHOT EXAMPLES <==")
         if self.max_bootstrapped_demos > 0:
@@ -757,6 +835,9 @@ class MiproOptimizer(BaseOptimizer, MIPROv2):
         zeroshot = self.max_bootstrapped_demos == 0 and self.max_labeled_demos == 0
 
         try:
+            # Lazy import dspy functions
+            _, _, _, _, _, _, _, create_n_fewshot_demo_sets, _, _, _, _, _, _ = _import_dspy()
+            
             with suppress_logger_info():
                 demo_candidates = create_n_fewshot_demo_sets(
                     student=program,
@@ -785,7 +866,7 @@ class MiproOptimizer(BaseOptimizer, MIPROv2):
         self,
         program: Any,
         trainset: List,
-        demo_candidates: Optional[List],
+        demo_candidates: Optional[List[Any]],
         view_data_batch_size: int,
         program_aware_proposer: bool,
         data_aware_proposer: bool,
@@ -797,6 +878,9 @@ class MiproOptimizer(BaseOptimizer, MIPROv2):
             "We will use the few-shot examples from the previous step, a generated dataset summary, a summary of the program code, and a randomly selected prompting tip to propose instructions."
         )
 
+        # Lazy import dspy components
+        _, _, _, _, _, _, GroundedProposer, _, get_signature, _, _, _, _, _ = _import_dspy()
+        
         proposer = GroundedProposer(
             program=program,
             trainset=trainset,
@@ -837,7 +921,7 @@ class MiproOptimizer(BaseOptimizer, MIPROv2):
         self,
         program: Any,
         instruction_candidates: Dict[int, List[str]],
-        demo_candidates: Optional[List],
+        demo_candidates: Optional[List[Any]],
         evaluator: Callable, 
         valset: List,
         num_trials: int,
@@ -871,6 +955,9 @@ class MiproOptimizer(BaseOptimizer, MIPROv2):
         logger.info(f"Default program score: {default_score}\n")
 
         trial_logs = {}
+        # Lazy import dspy functions
+        _, _, _, _, _, _, _, _, _, _, _, save_candidate_program, _, _ = _import_dspy()
+        
         trial_logs[1] = {}
         trial_logs[1]["full_eval_program_path"] = save_candidate_program(program, self.save_path, -1)
         trial_logs[1]["full_eval_score"] = default_score
@@ -1031,7 +1118,7 @@ class MiproOptimizer(BaseOptimizer, MIPROv2):
         self,
         candidate_program: Any,
         instruction_candidates: Dict[int, List[str]],
-        demo_candidates: Optional[List],
+        demo_candidates: Optional[List[Any]],
         trial: optuna.trial.Trial,
         trial_logs: Dict,
         trial_num: int,
@@ -1039,6 +1126,9 @@ class MiproOptimizer(BaseOptimizer, MIPROv2):
         chosen_params = []
         raw_chosen_params = {}
 
+        # Lazy import dspy functions
+        _, _, _, _, _, _, _, _, get_signature, _, _, _, _, _ = _import_dspy()
+        
         for i, predictor in enumerate(candidate_program.predictors()):
             # Select instruction
             instruction_idx = trial.suggest_categorical(
@@ -1075,6 +1165,9 @@ class MiproOptimizer(BaseOptimizer, MIPROv2):
         candidate_program,
         total_eval_calls,
     ):
+        # Lazy import dspy functions
+        _, _, _, _, _, _, _, _, _, _, _, save_candidate_program, _, _ = _import_dspy()
+        
         trial_logs[trial_num]["mb_program_path"] = save_candidate_program(candidate_program, self.save_path, trial_num=trial_num, note="mb")
         trial_logs[trial_num]["mb_score"] = score
         trial_logs[trial_num]["total_eval_calls_so_far"] = total_eval_calls
@@ -1106,6 +1199,9 @@ class MiproOptimizer(BaseOptimizer, MIPROv2):
         candidate_program,
         total_eval_calls,
     ):
+        # Lazy import dspy functions
+        _, _, _, _, _, _, _, _, _, _, _, save_candidate_program, _, _ = _import_dspy()
+        
         trial_logs[trial_num]["full_eval_program_path"] = save_candidate_program(
             candidate_program, self.save_path, trial_num
         )
@@ -1135,9 +1231,12 @@ class MiproOptimizer(BaseOptimizer, MIPROv2):
         study: optuna.Study,
         instruction_candidates: List,
         demo_candidates: List,
-    ):
+    ) -> Tuple[float, Any, int]:
         logger.info(f"===== Trial {trial_num + 1} / {adjusted_num_trials} - Full Evaluation =====")
 
+        # Lazy import dspy functions
+        _, _, _, _, _, _, _, _, _, _, _, save_candidate_program, get_program_with_highest_avg_score, _ = _import_dspy()
+        
         # Identify best program to evaluate fully
         highest_mean_program, mean_score, combo_key, params = get_program_with_highest_avg_score(
             param_score_dict, fully_evaled_param_combos
@@ -1193,7 +1292,7 @@ class MiproOptimizer(BaseOptimizer, MIPROv2):
 
     def evaluate(
         self, 
-        evalset: Optional[List[dspy.Example]] = None, 
+        evalset: Optional[List[Any]] = None, 
         dataset: Optional[Benchmark] = None, 
         eval_mode: Optional[str] = "dev", 
         program: Optional[PromptTuningModule] = None, 
@@ -1256,6 +1355,9 @@ def eval_candidate_program(
                 return_all_scores=return_all_scores, 
             ) 
         else:
+            # Lazy import dspy functions
+            _, _, _, _, _, _, _, _, _, create_minibatch, _, _, _, _ = _import_dspy()
+            
             return evaluator(
                 program=candidate_program, 
                 evalset=create_minibatch(evalset, batch_size, rng), 
@@ -1292,6 +1394,9 @@ class WorkFlowGraphProgram:
         new_graph.reset_graph() 
 
         # execute the graph with WorkFlow 
+        # Lazy import dspy
+        dspy, _, _, _, _, _, _, _, _, _, _, _, _, _ = _import_dspy()
+        
         use_teacher = dspy.settings.get("use_teacher", False)
         if use_teacher:
             # use teacher model to execute the graph, used for optimization
@@ -1314,6 +1419,9 @@ class WorkFlowGraphProgram:
         """
         Inject the teacher settings into the graph and agent manager.
         """
+        # Lazy import dspy
+        dspy, _, _, _, _, _, _, _, _, _, _, _, _, _ = _import_dspy()
+        
         # dspy.settings.lm is configured in MiproOptimizer, which is a MiproLMWrapper instance
         optimizer_llm_config = dspy.settings.lm.model.config.to_dict()
         for node in graph.nodes:
@@ -1371,10 +1479,16 @@ class MiproEvaluatorWrapper(MiproEvaluator):
         self.return_all_scores = return_all_scores
         self.return_outputs = return_outputs
 
-    def metric(self, example: dspy.Example, prediction: Any, *args, **kwargs):
+    def metric(self, example: Any, prediction: Any, *args, **kwargs):
+        # Lazy import dspy
+        dspy, _, _, _, _, _, _, _, _, _, _, _, _, _ = _import_dspy()
+        
+        # Type hint for clarity
+        example: dspy.Example = example
+        
         return super().metric(example, prediction, *args, **kwargs)
 
-    def __call__(self, program: PromptTuningModule, evalset: List[dspy.Example], **kwargs) -> float: 
+    def __call__(self, program: PromptTuningModule, evalset: List[Any], **kwargs) -> float: 
 
         # sync the candidate prompts and instructions to the workflow graph
         program.sync_predict_inputs_to_program()
@@ -1393,6 +1507,9 @@ class MiproEvaluatorWrapper(MiproEvaluator):
 
         # update agents
         self.evaluator.agent_manager.update_agents_from_workflow(workflow_graph=graph, llm_config=self.evaluator.llm.config, **kwargs)
+        
+        # Lazy import dspy
+        dspy, _, _, _, _, _, _, _, _, _, _, _, _, _ = _import_dspy()
         
         if isinstance(self.benchmark.get_train_data()[0], dspy.Example):
             data = evalset

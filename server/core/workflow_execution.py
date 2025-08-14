@@ -38,7 +38,7 @@ from ..prompts import WORKFLOW_REQUIREMENT_PROMPT, CUSTOM_OUTPUT_EXTRACTION_PROM
 from ..db import database
 
 from ..utils.output_parser import parse_workflow_output
-from ..utils.tool_creator import create_tools_with_database
+from ..utils.tool_creator import create_tools
 from ..utils.websocket_utils import WebSocketEnhancedSink, WebSocketProgressTracker
 
 load_dotenv(os.path.join(os.path.dirname(__file__), '../config/app.env'))
@@ -137,12 +137,25 @@ async def execute_workflow_from_config(workflow: Dict[str, Any], llm_config_dict
         else:
             workflow_graph: WorkFlowGraph = WorkFlowGraph.from_dict(workflow)
         
-        # Create tools (database tools disabled)
+        # Extract project_short_id from workflow data
+        project_short_id = None
+        if isinstance(workflow, dict) and "project_short_id" in workflow:
+            project_short_id = workflow["project_short_id"]
+        elif hasattr(workflow, "project_short_id"):
+            project_short_id = workflow.project_short_id
+        
+        # Create tools with proper storage handling
         tools = []
         if mcp_config:
             mcp_toolkit = MCPToolkit(config=mcp_config)
             tools = mcp_toolkit.get_tools()
-        tools += create_tools_with_database(database_information)
+        
+        # Create tools with project_short_id for storage configuration
+        if project_short_id:
+            tools += create_tools(project_short_id, database_information)
+        else:
+            print("⚠️  No project_short_id found, creating tools without storage support")
+            tools += create_tools("default", database_information)
         
         agent_manager = AgentManager(tools=tools)
         agent_manager.add_agents_from_workflow(workflow_graph, llm_config=llm_config)

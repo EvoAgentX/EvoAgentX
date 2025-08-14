@@ -15,8 +15,8 @@ python-multipart==0.0.6
 bcrypt==4.0.1
 celery==5.3.4
 redis==5.0.0
-pytest==7.4.2
-pytest-asyncio==0.21.0
+# pytest==7.4.2
+# pytest-asyncio==0.21.0
 httpx==0.24.1
 asgi-lifespan==1.0.1
 python-dotenv==1.0.0

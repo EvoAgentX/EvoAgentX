@@ -523,6 +523,10 @@ async def setup_project_parallel_with_status_messages(project_short_id: str, web
         
         await database.insert("workflows", workflow_doc)
         print(f"📝 Created initial workflow record: {workflow_id} (status: uninitialized)")
+        
+        # Send status update when workflow is retrieved and put into database
+        if websocket_send_func:
+            await send_workflow_status_message(websocket_send_func, "retrieved", workflow_id, f"Workflow {workflow_id} retrieved and stored in database")
     
     # Send status update: uninitialized after requirement extraction and before generation
     if websocket_send_func:
