@@ -209,6 +209,25 @@ def create_agent_from_dict(
     agent = cls.from_dict(data=agent_dict, llm_config=llm_config, tools=tools, agents=agents)
     return agent
 
+def fix_json_booleans(json_string: str) -> str:
+    """
+    Finds and replaces isolated "True" and "False" with "true" and "false".
+
+    The '\b' in the regex stands for a "word boundary", which ensures that
+    we only match the full words and not substrings like "True" in "IsTrue".
+
+    Args:
+        json_string (str): The input JSON string.
+
+    Returns:
+        str: The modified JSON string with booleans in lowercase.
+    """
+    # Use re.sub() with a word boundary (\b) to ensure we only match
+    # the isolated words 'True' and 'False' and not substrings like "True" in "IsTrue"
+    modified_string = re.sub(r'\bTrue\b', 'true', json_string)
+    modified_string = re.sub(r'\bFalse\b', 'false', modified_string)
+    return modified_string
+
 
 json_to_python_type = {
     "string": str,
