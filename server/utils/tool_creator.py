@@ -6,6 +6,7 @@ Creates and configures tools with proper storage handling.
 import os
 from typing import Dict, Any, List
 from dotenv import load_dotenv
+import uuid
 
 # Load environment variables
 load_dotenv("config/app.env", override=True)
@@ -77,13 +78,14 @@ generation_tools = [
 ]
 
 
-def create_tools(project_short_id: str, database_information: Dict[str, Any] = None) -> List[Any]:
+def create_tools(project_short_id: str, database_information: Dict[str, Any] = None, execution_id: str = None) -> List[Any]:
     """
     Create tools with proper storage handling for the EvoAgentX server.
     
     Args:
         project_short_id: Project short ID for storage path configuration
         database_information: Database configuration information (optional)
+        execution_id: Optional execution ID for consistent storage paths (if None, will generate new one)
         
     Returns:
         List of configured tools
@@ -91,7 +93,7 @@ def create_tools(project_short_id: str, database_information: Dict[str, Any] = N
     tools = []
     
     # Create storage handler for tools that need it
-    storage_handler = _create_storage_handler(project_short_id)
+    storage_handler = _create_storage_handler(project_short_id, execution_id)
     
     # Add default tools (no storage needed)
     tools.extend(_create_default_tools())
@@ -106,12 +108,13 @@ def create_tools(project_short_id: str, database_information: Dict[str, Any] = N
     return tools
 
 
-def _create_storage_handler(project_short_id: str) -> SupabaseStorageHandler:
+def _create_storage_handler(project_short_id: str, execution_id: str = None) -> SupabaseStorageHandler:
     """
     Create a Supabase storage handler for the project.
     
     Args:
         project_short_id: Project short ID
+        execution_id: Optional execution ID for consistent storage paths
         
     Returns:
         Configured SupabaseStorageHandler or None if configuration missing
@@ -128,11 +131,16 @@ def _create_storage_handler(project_short_id: str) -> SupabaseStorageHandler:
         return None
     
     try:
+        # Generate UUID4 for this execution to create individual folders
+        if execution_id is None:
+            execution_id = str(uuid.uuid4())
+        base_path = f"/projects/{project_short_id}/executions/{execution_id}"
+        
         storage_handler = SupabaseStorageHandler(
             bucket_name=supabase_bucket,
-            base_path=f"/projects/{project_short_id}/files"
+            base_path=base_path
         )
-        print(f"✅ Storage handler created for project {project_short_id}")
+        print(f"✅ Storage handler created for project {project_short_id} with execution ID {execution_id}")
         return storage_handler
     except Exception as e:
         print(f"❌ Failed to create storage handler: {e}")

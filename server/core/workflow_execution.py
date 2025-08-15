@@ -12,6 +12,7 @@ import sys
 import threading
 import time
 import re
+import requests
 from datetime import datetime
 from typing import Dict, Any, List, Optional, Callable, Type
 from io import StringIO
@@ -56,11 +57,11 @@ default_llm_config = {
 sudo_execution_result = None
 
 
-def _create_supabase_public_url(project_short_id: str, file_path: str) -> str:
+def _create_supabase_public_url(project_short_id: str, file_path: str, execution_id: str = None) -> str:
     """Create Supabase signed URL for file access."""
     try:
         from ..utils.tool_creator import _create_storage_handler
-        storage_handler = _create_storage_handler(project_short_id)
+        storage_handler = _create_storage_handler(project_short_id, execution_id)
         if storage_handler and hasattr(storage_handler, 'supabase'):
             # Combine base_path with file_path for full storage path
             full_path = storage_handler.translate_in(file_path.strip())
@@ -76,19 +77,89 @@ def _create_supabase_public_url(project_short_id: str, file_path: str) -> str:
     ## Not a path, return the original content
     return file_path
 
-def _scan_and_replace_file_paths(data: Any, project_short_id: str) -> Any:
+def _scan_and_replace_file_paths(data: Any, project_short_id: str, execution_id: str = None) -> Any:
     """Recursively scan data structure and replace file paths with Supabase signed URLs."""
     if isinstance(data, dict):
-        return {k: _scan_and_replace_file_paths(v, project_short_id) for k, v in data.items()}
+        return {k: _scan_and_replace_file_paths(v, project_short_id, execution_id) for k, v in data.items()}
     elif isinstance(data, list):
-        return [_scan_and_replace_file_paths(item, project_short_id) for item in data]
+        return [_scan_and_replace_file_paths(item, project_short_id, execution_id) for item in data]
     elif isinstance(data, str):
         # Match common file path patterns: /path/to/file.ext, C:\path\to\file.ext, ./file.ext
         file_path_pattern = r'^([A-Za-z]:\\)?([\/\\]?[^\/\\]+[\/\\])*[^\/\\]+\.[a-zA-Z0-9]+$'
         if re.match(file_path_pattern, data.strip()):
-            return _create_supabase_public_url(project_short_id, data.strip())
+            return _create_supabase_public_url(project_short_id, data.strip(), execution_id)
         return data
     return data
+
+
+def _replace_urls_with_paths(data: Any, project_short_id: str, execution_id: str) -> Any:
+    """
+    Recursively scan data structure and replace URLs with Supabase storage paths.
+    Downloads files from URLs and uploads them directly to Supabase storage.
+    """
+    if isinstance(data, dict):
+        return {k: _replace_urls_with_paths(v, project_short_id, execution_id) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [_replace_urls_with_paths(item, project_short_id, execution_id) for item in data]
+    elif isinstance(data, str):
+        # Match URL patterns: http://, https://, ftp://, etc.
+        url_pattern = r'^https?://[^\s]+'
+        if re.match(url_pattern, data.strip()):
+            return _upload_url_to_supabase(data.strip(), project_short_id, execution_id)
+        return data
+    return data
+
+
+def _upload_url_to_supabase(url: str, project_short_id: str, execution_id: str) -> str:
+    """
+    Download file from URL and upload directly to Supabase storage.
+    Returns the Supabase storage path.
+    """
+    try:
+        from ..utils.tool_creator import _create_storage_handler
+        
+        # Create storage handler for this execution
+        storage_handler = _create_storage_handler(project_short_id, execution_id)
+        if not storage_handler or not hasattr(storage_handler, 'supabase'):
+            print(f"⚠️  No storage handler available for {project_short_id}, keeping original URL")
+            return url
+        
+        # Download file content from URL
+        response = requests.get(url, stream=True, timeout=30)
+        response.raise_for_status()
+        
+        # Extract filename from URL or use a default
+        filename = url.split('/')[-1] if '/' in url else 'downloaded_file'
+        if '?' in filename:  # Remove query parameters
+            filename = filename.split('?')[0]
+        if not filename or '.' not in filename:
+            filename = f"downloaded_file_{execution_id[:8]}.txt"
+        
+        # Create storage path in inputs folder
+        storage_path = f"inputs/{filename}"
+        
+        # Upload directly to Supabase
+        try:
+            # Get file content as bytes
+            file_content = response.content
+            
+            # Upload to Supabase storage
+            upload_response = storage_handler.supabase.storage.from_(storage_handler.bucket_name).upload(
+                path=storage_path,
+                file=file_content,
+                file_options={"upsert": True}
+            )
+            
+            print(f"✅ Uploaded {url} to Supabase as {storage_path}")
+            return storage_path
+            
+        except Exception as e:
+            print(f"❌ Failed to upload {url} to Supabase: {e}")
+            return url
+            
+    except Exception as e:
+        print(f"❌ Failed to process URL {url}: {e}")
+        return url
 
 
 async def get_workflow(workflow_id: str) -> Dict[str, Any]:
@@ -194,12 +265,21 @@ async def execute_workflow_from_config(workflow: Dict[str, Any], llm_config_dict
             mcp_toolkit = MCPToolkit(config=mcp_config)
             tools = mcp_toolkit.get_tools()
         
-        # Create tools with project_short_id for storage configuration
+        # Generate execution ID for consistent storage paths
+        execution_id = str(uuid.uuid4())
+        print(f"🚀 Starting workflow execution with execution ID {execution_id}")
+        
+        # Process inputs: replace URLs with Supabase storage paths
+        if inputs and project_short_id:
+            print(f"🔄 Processing inputs for URL replacement...")
+            inputs = _replace_urls_with_paths(inputs, project_short_id, execution_id)
+        
+        # Create tools with project_short_id and execution_id for storage configuration
         if project_short_id:
-            tools += create_tools(project_short_id, database_information)
+            tools += create_tools(project_short_id, database_information, execution_id)
         else:
             print("⚠️  No project_short_id found, creating tools without storage support")
-            tools += create_tools("default", database_information)
+            tools += create_tools("default", database_information, execution_id)
         
         agent_manager = AgentManager(tools=tools)
         agent_manager.add_agents_from_workflow(workflow_graph, llm_config=llm_config)
@@ -269,7 +349,7 @@ async def execute_workflow_from_config(workflow: Dict[str, Any], llm_config_dict
         
         # Scan and replace file paths with URLs if we have parsed_json and project_short_id
         if parsed_json and project_short_id:
-            parsed_json = _scan_and_replace_file_paths(parsed_json, project_short_id)
+            parsed_json = _scan_and_replace_file_paths(parsed_json, project_short_id, execution_id)
         
         return {
             "original_message": output,
