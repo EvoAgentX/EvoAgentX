@@ -66,12 +66,15 @@ class VectorIndexing(BaseIndexWrapper):
         """
         try:
             filtered_nodes = []
-            # only add the unique node
             for node in nodes:
-                converted = node.to_llama_node() if isinstance(node, Chunk) else node
-                if converted.id_ in self.id_to_node:
-                    continue
-                filtered_nodes.extend([converted])
+                llama_node = node.to_llama_node() if isinstance(node, Chunk) else node 
+                node_id = llama_node.id if hasattr(llama_node, "id") else llama_node.id_
+                if node_id in self.id_to_node:
+                    # Delete the node
+                    self.delete_nodes([node_id])
+                    logger.info(f"Find the same node in vector database: {node_id}. Update it.")
+
+                filtered_nodes.extend([llama_node])
 
             # TODO: find a better way to manage the node
             # Caching the node 
@@ -102,7 +105,9 @@ class VectorIndexing(BaseIndexWrapper):
             if node_ids:
                 for node_id in node_ids:
                     if node_id in self.id_to_node:
-                        self.index.delete_nodes([node_id], delete_from_docstore=True)
+                        self.index.delete_nodes([node_id], delete_from_docstore=False)
+                        if self.index.storage_context.docstore._kvstore._collections_mappings.get(node_id, None) is not None:
+                            self.index.storage_context.docstore._kvstore._collections_mappings.pop(node_id)
                         self.id_to_node.pop(node_id)
                         logger.info(f"Deleted node {node_id} from VectorStoreIndex")
 
@@ -123,7 +128,7 @@ class VectorIndexing(BaseIndexWrapper):
             logger.error(f"Failed to delete nodes: {str(e)}")
             raise
 
-    async def aload(self, nodes: List[Union[Chunk, BaseNode]]) -> None:
+    async def aload(self, nodes: List[Union[Chunk, BaseNode]]) -> Sequence[str]:
         """
         Asynchronously load nodes into the vector index and its backend store.
 
@@ -132,34 +137,26 @@ class VectorIndexing(BaseIndexWrapper):
 
         Args:
             nodes (List[Union[Chunk, BaseNode]]): The nodes to load.
+
+        Returns:
+            chunk_ids (List[str]): The id of loaded chunk.
         """
         try:
-            filtered_nodes = [node.to_llama_node() if isinstance(node, Chunk) else node for node in nodes]
+            node_ids = self.insert_nodes(nodes)
 
-            tasks = []
-            for node in filtered_nodes:
-                node_id = node.id if hasattr(node, "id") else node.id_
-                self.id_to_node[node_id] = node.model_copy()
-
-                if self.storage_handler.vector_store is not None:
-                    tasks.append(self.storage_handler.vector_store.aload(node))
-
-            # Execute all vector store loading tasks concurrently
-            await asyncio.gather(*tasks, return_exceptions=True)
-            logger.info(f"Loaded {len(filtered_nodes)} nodes into cache and vector store.")
-
+            return node_ids
         except Exception as e:
             logger.error(f"Failed to load nodes into VectorStoreIndex: {str(e)}")
             raise
 
-    def load(self, nodes: List[Union[Chunk, BaseNode]]) -> None:
+    def load(self, nodes: List[Union[Chunk, BaseNode]]) -> Sequence[str]:
         """
         Synchronously load nodes into the vector index.
 
         Args:
             nodes (List[Union[Chunk, BaseNode]]): The nodes to load.
         """
-        asyncio.run(self.aload(nodes))
+        return asyncio.run(self.aload(nodes))
 
     def clear(self) -> None:
         """
@@ -177,3 +174,30 @@ class VectorIndexing(BaseIndexWrapper):
         except Exception as e:
             logger.error(f"Failed to clear index: {str(e)}")
             raise
+
+    async def _get(self, node_id: str) -> Optional[Chunk]:
+        """Get a node by node_id from cache or vector store."""
+        try:
+            # Check cache first
+            node = self.id_to_node.get(node_id, None)
+            if node:
+                if isinstance(node, Chunk):
+                    return node.model_copy()
+                return Chunk.from_llama_node(node)
+
+            logger.warning(f"Node with ID {node_id} not found in cache or vector store")
+            return None
+        except Exception as e:
+            logger.error(f"Failed to get node {node_id}: {str(e)}")
+            return None
+
+    async def get(self, node_ids: Sequence[str]) -> List[Chunk]:
+        """Get nodes by node_ids from cache or vector store."""
+        try:
+            nodes = await asyncio.gather(*[self._get(node) for node in node_ids])
+            nodes = [node for node in nodes if node is not None]
+            logger.info(f"Retrieved {len(nodes)} nodes for node_ids: {node_ids}")
+            return nodes
+        except Exception as e:
+            logger.error(f"Failed to get nodes: {str(e)}")
+            return []
