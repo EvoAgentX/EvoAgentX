@@ -29,5 +29,5 @@ primary_region = 'sea'
 
 [[vm]]
   memory = '2gb'
-  cpu_kind = 'performance'
+  cpu_kind = 'shared'
   cpus = 2

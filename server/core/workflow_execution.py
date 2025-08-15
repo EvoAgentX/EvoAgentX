@@ -56,6 +56,41 @@ default_llm_config = {
 sudo_execution_result = None
 
 
+def _create_supabase_public_url(project_short_id: str, file_path: str) -> str:
+    """Create Supabase signed URL for file access."""
+    try:
+        from ..utils.tool_creator import _create_storage_handler
+        storage_handler = _create_storage_handler(project_short_id)
+        if storage_handler and hasattr(storage_handler, 'supabase'):
+            # Combine base_path with file_path for full storage path
+            full_path = storage_handler.translate_in(file_path.strip())
+            # Create signed URL with 60 seconds expiry
+            try:
+                public_url = storage_handler.supabase.storage.from_(storage_handler.bucket_name).get_public_url(full_path, 60)
+                return public_url["publicURL"]
+            except Exception as e:
+                print(f"⚠️  Failed to create signed URL for {file_path}: {e}")
+                return file_path
+    except Exception as e:
+        print(f"⚠️  Failed to create signed URL for {file_path}: {e}")
+    ## Not a path, return the original content
+    return file_path
+
+def _scan_and_replace_file_paths(data: Any, project_short_id: str) -> Any:
+    """Recursively scan data structure and replace file paths with Supabase signed URLs."""
+    if isinstance(data, dict):
+        return {k: _scan_and_replace_file_paths(v, project_short_id) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [_scan_and_replace_file_paths(item, project_short_id) for item in data]
+    elif isinstance(data, str):
+        # Match common file path patterns: /path/to/file.ext, C:\path\to\file.ext, ./file.ext
+        file_path_pattern = r'^([A-Za-z]:\\)?([\/\\]?[^\/\\]+[\/\\])*[^\/\\]+\.[a-zA-Z0-9]+$'
+        if re.match(file_path_pattern, data.strip()):
+            return _create_supabase_public_url(project_short_id, data.strip())
+        return data
+    return data
+
+
 async def get_workflow(workflow_id: str) -> Dict[str, Any]:
     """Retrieve workflow information from the database"""
     workflow = await database.find_one("workflows", {"id": workflow_id})
@@ -104,7 +139,7 @@ async def execute_workflow_from_config(workflow: Dict[str, Any], llm_config_dict
     Execute a workflow with the given configuration.
     
     Args:
-        workflow: The workflow definition/configuration to execute
+        workflow: The complete workflow document from database (must contain project_short_id and workflow_graph)
         llm_config_dict: LLM configuration dictionary
         mcp_config: Optional MCP configuration dictionary
         inputs: Optional inputs dictionary to pass to async_execute
@@ -131,18 +166,27 @@ async def execute_workflow_from_config(workflow: Dict[str, Any], llm_config_dict
         llm_config = create_llm_config(llm_config_dict)
         llm = create_llm_instance(llm_config)
         
-        # Handle both WorkFlowGraph objects and dictionaries
-        if isinstance(workflow, WorkFlowGraph):
-            workflow_graph = workflow
-        else:
-            workflow_graph: WorkFlowGraph = WorkFlowGraph.from_dict(workflow)
-        
         # Extract project_short_id from workflow data
         project_short_id = None
         if isinstance(workflow, dict) and "project_short_id" in workflow:
             project_short_id = workflow["project_short_id"]
         elif hasattr(workflow, "project_short_id"):
             project_short_id = workflow.project_short_id
+        
+        # Handle workflow graph extraction from the workflow document
+        if isinstance(workflow, dict) and "workflow_graph" in workflow:
+            # Extract workflow graph from the workflow document
+            workflow_graph_data = workflow["workflow_graph"]
+            if isinstance(workflow_graph_data, WorkFlowGraph):
+                workflow_graph = workflow_graph_data
+            else:
+                workflow_graph: WorkFlowGraph = WorkFlowGraph.from_dict(workflow_graph_data)
+        elif isinstance(workflow, WorkFlowGraph):
+            # Direct WorkFlowGraph object (fallback for backward compatibility)
+            workflow_graph = workflow
+        else:
+            # Try to treat the entire workflow as a workflow graph (fallback)
+            workflow_graph: WorkFlowGraph = WorkFlowGraph.from_dict(workflow)
         
         # Create tools with proper storage handling
         tools = []
@@ -223,6 +267,10 @@ async def execute_workflow_from_config(workflow: Dict[str, Any], llm_config_dict
         else:
             parsed_json = None
         
+        # Scan and replace file paths with URLs if we have parsed_json and project_short_id
+        if parsed_json and project_short_id:
+            parsed_json = _scan_and_replace_file_paths(parsed_json, project_short_id)
+        
         return {
             "original_message": output,
             "parsed_json": parsed_json
@@ -270,7 +318,7 @@ async def execute_workflow(workflow_id: str, inputs: Dict[str, Any]) -> Dict[str
         
         # Execute the workflow with database information
         execution_result = await execute_workflow_from_config(
-            workflow_graph, 
+            workflow,  # Pass the whole workflow document instead of just workflow_graph
             default_llm_config, 
             mcp_config={}, 
             inputs=inputs,
@@ -385,7 +433,7 @@ async def execute_workflow_with_websocket(
             
             # Execute the workflow (database tools disabled)
             execution_result = await execute_workflow_from_config(
-                workflow_graph, 
+                workflow,  # Pass the whole workflow document instead of just workflow_graph
                 default_llm_config, 
                 mcp_config={}, 
                 inputs=inputs,

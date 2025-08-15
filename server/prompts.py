@@ -144,6 +144,13 @@ Please carefully analyze the following requirement documentation and generate a 
 - You should never create any new inputs/outputs, you should strictly follow the given inputs/outputs.
 - You should assign tools to agents that are needed for the workflow.
 
+## Generation Instructions
+- We do not support audio or video generation, you should just return None for the output if those sections are required.
+- We do support image generation with some tools, you should use them if needed.
+- You should interpret links in the inputs and outputs as local paths, though they still called links or urls
+- When you required to pass out image, you should just pass out the local path to the image (the server will do the conversion)
+- Images are passed in and out as local paths
+
 ## Requirement documentation:
 {requirement}
 

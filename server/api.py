@@ -195,15 +195,6 @@ async def execute_workflow_websocket(
 ):
     """
     WebSocket endpoint for executing workflows with real-time progress updates.
-    
-    Expected message format:
-    {
-        "inputs": {
-            "key1": "value1",
-            "key2": "value2"
-        }
-    }
-    
     Returns real-time progress updates and log messages via WebSocket.
     """
     try:
@@ -321,63 +312,110 @@ async def parallel_workflow_setup(
         
         # Start workflow extraction and generation directly
         try:
+            logger.info(f"Starting parallel workflow generation for project {project_short_id}")
             from .core.workflow_setup import setup_project_parallel_with_status_messages
             
             async def send_websocket_message(message: str):
-                await websocket.send_text(message)
+                try:
+                    await websocket.send_text(message)
+                except Exception as e:
+                    logger.error(f"Failed to send WebSocket message: {str(e)}")
+                    # If we can't send messages, the connection might be broken
+                    raise e
             
-            # Run the parallel setup with WebSocket status messages
-            workflow_results = await setup_project_parallel_with_status_messages(project_short_id, send_websocket_message)
+            # Run the parallel setup with WebSocket status messages and timeout protection
+            try:
+                workflow_results = await asyncio.wait_for(
+                    setup_project_parallel_with_status_messages(project_short_id, send_websocket_message),
+                    timeout=300.0  # 5 minute timeout
+                )
+            except asyncio.TimeoutError:
+                logger.error(f"Parallel generation timed out for project {project_short_id} after 5 minutes")
+                await websocket.send_text(json.dumps({
+                    "type": "error",
+                    "data": {
+                        "status": "error",
+                        "workflow_id": None,
+                        "content": "Parallel generation timed out after 5 minutes",
+                        "result": None
+                    }
+                }))
+                await websocket.close(code=1011, reason="Timeout occurred")
+                return
             
             # Extract just the workflow_graphs from the results
+            logger.info(f"Processing {len(workflow_results)} workflow results for project {project_short_id}")
             workflow_graphs = []
-            for workflow in workflow_results:
+            for i, workflow in enumerate(workflow_results):
                 if "workflow_graph" in workflow:
                     workflow_graphs.append(workflow["workflow_graph"])
+                    logger.debug(f"Added workflow {i+1} graph to results")
+                else:
+                    logger.warning(f"Workflow {i+1} missing workflow_graph field: {workflow.keys()}")
+            
+            logger.info(f"Extracted {len(workflow_graphs)} workflow graphs from {len(workflow_results)} results")
             
             # Send setup_complete message with workflow graph dicts
-            await websocket.send_text(json.dumps({
-                "type": "setup_complete",
-                "data": {
-                    "status": "complete",
-                    "workflow_id": None,
-                    "content": "setup successful",
-                    "result": workflow_graphs
-                }
-            }))
-            
-            # Close the WebSocket connection after completion
-            await websocket.close(code=1000, reason="Setup completed successfully")
+            try:
+                await websocket.send_text(json.dumps({
+                    "type": "setup_complete",
+                    "data": {
+                        "status": "complete",
+                        "workflow_id": None,
+                        "content": "setup successful",
+                        "result": workflow_graphs
+                    }
+                }))
+                
+                logger.info(f"Successfully sent setup_complete message for project {project_short_id} with {len(workflow_graphs)} workflow graphs")
+                
+                # Close the WebSocket connection after completion
+                await websocket.close(code=1000, reason="Setup completed successfully")
+                logger.info(f"WebSocket connection closed successfully for project {project_short_id}")
+                
+            except Exception as e:
+                logger.error(f"Failed to send setup_complete message or close WebSocket for project {project_short_id}: {str(e)}")
+                # Force close if we can't send the completion message
+                try:
+                    await websocket.close(code=1011, reason="Error during completion")
+                except:
+                    pass
             
         except Exception as e:
-            await websocket.send_text(json.dumps({
-                "type": "error",
-                "data": {
-                    "status": "error",
-                    "workflow_id": None,
-                    "content": f"Error during parallel generation: {str(e)}",
-                    "result": None
-                }
-            }))
+            logger.error(f"Error during parallel generation for project {project_short_id}: {str(e)}")
+            logger.error(f"Exception type: {type(e).__name__}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             
-            # Close the WebSocket connection after error
-            await websocket.close(code=1011, reason=f"Error occurred: {str(e)}")
-                        
-        except Exception as e:
-            await websocket.send_text(json.dumps({
-                "type": "error",
-                "data": {
-                    "status": "error",
-                    "workflow_id": None,
-                    "content": f"Error in parallel generation progress: {str(e)}",
-                    "result": None
-                }
-            }))
+            try:
+                await websocket.send_text(json.dumps({
+                    "type": "error",
+                    "data": {
+                        "status": "error",
+                        "workflow_id": None,
+                        "content": f"Error during parallel generation: {str(e)}",
+                        "result": None
+                    }
+                }))
+                
+                # Close the WebSocket connection after error
+                await websocket.close(code=1011, reason=f"Error occurred: {str(e)}")
+            except Exception as close_error:
+                logger.error(f"Failed to send error message or close WebSocket: {str(close_error)}")
+                # Force close if we can't send the error message
+                try:
+                    await websocket.close(code=1011, reason="Error occurred")
+                except:
+                    pass
     
     except WebSocketDisconnect:
-        print(f"Parallel generation progress WebSocket disconnected for project {project_short_id}")
+        logger.info(f"Parallel generation progress WebSocket disconnected for project {project_short_id}")
     except Exception as e:
-        print(f"Parallel generation progress WebSocket error for project {project_short_id}: {e}")
+        logger.error(f"Parallel generation progress WebSocket error for project {project_short_id}: {e}")
+        logger.error(f"Exception type: {type(e).__name__}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        
         try:
             await websocket.send_text(json.dumps({
                 "type": "error",
@@ -388,8 +426,9 @@ async def parallel_workflow_setup(
                     "result": None
                 }
             }))
-        except:
-            pass  # Connection might be closed
+        except Exception as send_error:
+            logger.error(f"Failed to send error message: {str(send_error)}")
+            # Connection might be closed, can't send error message
 
 ### _____________________________________________
 ### User Query Router API
@@ -439,17 +478,5 @@ async def analyze_user_query_endpoint(
         # Handle unexpected errors
         logger.error(f"Internal server error during user query analysis for project_short_id {project_short_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}") 
-
-
-
-
-
-
-
-
-
-
-
-
 
 

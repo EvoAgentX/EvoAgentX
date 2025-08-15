@@ -251,7 +251,7 @@ HEADERS = {
 }
 # Fixed test data for consistent testing
 test_workflow_id_1 = "550e8400-e29b-41d4-a716-446655440001"
-test_workflow_id_2 = "550e8400-e29b-41d4-a716-446655440001"
+test_workflow_id_2 = "ac011346-13cc-4b2d-afa0-f731aa62d68c"
 
 # Fixed test inputs for consistent results - Updated for treatment recommendation workflow
 TEST_INPUTS = {
@@ -264,7 +264,7 @@ TEST_INPUTS = {
 
 # Fixed test configuration
 TEST_CONFIG = {
-    "project_short_id": "9mshbju",
+    "project_short_id": "xf35dy4",
     "test_workflow_ids": [test_workflow_id_1, test_workflow_id_2]
 }
 def generate_test_ids() -> str:
@@ -981,7 +981,13 @@ def test_parallel_generation_websocket(project_short_id: str) -> Tuple[bool, Dic
             uri = f"{WS_BASE_URL}/project/{project_short_id}/parallel-setup"
             print(f"Connecting to: {uri}")
             
-            async with websockets.connect(uri) as websocket:
+            # Configure WebSocket with longer keepalive settings to prevent premature disconnection
+            async with websockets.connect(
+                uri,
+                ping_interval=300,      # Send ping every 300 seconds
+                ping_timeout=300,      # Wait 300 seconds for pong response
+                close_timeout=300      # Wait 300 seconds for close handshake
+            ) as websocket:
                 print("✅ WebSocket connected successfully")
                 print("📝 Note: Messages now use 'data' field instead of 'content' field")
                 print("📋 Expected flow: connection → status updates → success (with workflow_graph list)")
@@ -992,7 +998,7 @@ def test_parallel_generation_websocket(project_short_id: str) -> Tuple[bool, Dic
                 
                 while message_count < max_messages:
                     try:
-                        message = await asyncio.wait_for(websocket.recv(), timeout=1000.0)
+                        message = await asyncio.wait_for(websocket.recv(), timeout=300.0)
                         message_data = json.loads(message)
                         result["messages"].append(message_data)
                         
@@ -1092,7 +1098,7 @@ def run_complete_test() -> Dict[str, Any]:
     #     "result": execution_result
     # }
     
-    # # Phase 5: Parallel Workflow Generation Test __________________________________________
+    # # Phase 5: Parallel Workflow Generation Test _______________
     # parallel_setup_passed, parallel_setup_result, parallel_workflow_ids = test_parallel_workflow_generation(project_short_id)
     # test_results["phases"]["parallel_workflow_generation"] = {
     #     "passed": parallel_setup_passed,
@@ -1101,13 +1107,13 @@ def run_complete_test() -> Dict[str, Any]:
     #     "result": parallel_setup_result
     # }
     
-    # Phase 7: Parallel Generation WebSocket Test __________________________________________
-    parallel_websocket_passed, parallel_websocket_result = test_parallel_generation_websocket(project_short_id)
-    test_results["phases"]["parallel_generation_websocket"] = {
-        "passed": parallel_websocket_passed,
-        "timestamp": datetime.now().isoformat(),
-        "result": parallel_websocket_result
-    }
+    # # Phase 7: Parallel Generation WebSocket Test __________________________________________
+    # parallel_websocket_passed, parallel_websocket_result = test_parallel_generation_websocket(project_short_id)
+    # test_results["phases"]["parallel_generation_websocket"] = {
+    #     "passed": parallel_websocket_passed,
+    #     "timestamp": datetime.now().isoformat(),
+    #     "result": parallel_websocket_result
+    # }
     
     # # Phase 5: Status Check
     # status_passed, status_result = test_workflow_status(workflow_ids)
@@ -1117,13 +1123,13 @@ def run_complete_test() -> Dict[str, Any]:
     #     "result": status_result
     # }
     
-    # # Phase 5: WebSocket Streaming Test -- execution __________________________________________
-    # streaming_passed, streaming_result = test_websocket_streaming(workflow_ids)
-    # test_results["phases"]["websocket_streaming"] = {
-    #     "passed": streaming_passed,
-    #     "timestamp": datetime.now().isoformat(),
-    #     "result": streaming_result
-    # }
+    # Phase 5: WebSocket Streaming Test -- execution __________________________________________
+    streaming_passed, streaming_result = test_websocket_streaming(workflow_ids)
+    test_results["phases"]["websocket_streaming"] = {
+        "passed": streaming_passed,
+        "timestamp": datetime.now().isoformat(),
+        "result": streaming_result
+    }
     
     # # Phase 6: Status Check
     # status_passed, status_result = test_workflow_status(workflow_ids)
