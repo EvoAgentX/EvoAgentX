@@ -1,17 +1,24 @@
-from pydantic import Field
-from typing import Optional, Any, Callable, List, Union
-import re
 import json
+import re
+from collections.abc import Callable
+from typing import Any, List, Optional, Union
+
+from pydantic import Field
 
 from ..core.logging import logger
-from ..models.base_model import BaseLLM
-from .action import Action
 from ..core.message import Message
-from ..prompts.template import StringTemplate, ChatTemplate
-from ..prompts.tool_calling import OUTPUT_EXTRACTION_PROMPT, TOOL_CALLING_TEMPLATE, TOOL_CALLING_HISTORY_PROMPT
-from ..tools.tool import Toolkit
-from ..models.base_model import LLMOutputParser
 from ..core.module_utils import parse_json_from_llm_output, parse_json_from_text
+from ..models.base_model import BaseLLM, LLMOutputParser
+from ..prompts.template import ChatTemplate, StringTemplate
+from ..prompts.tool_calling import (
+    OUTPUT_EXTRACTION_PROMPT,
+    TOOL_CALLING_HISTORY_PROMPT,
+    TOOL_CALLING_TEMPLATE,
+)
+from ..tools.tool import Toolkit
+from ..utils.utils import fix_json_booleans
+from .action import Action
+
 
 class CustomizeAction(Action):
 
@@ -195,8 +202,9 @@ class CustomizeAction(Action):
                 if not json_list:
                     logger.warning("No valid JSON found in ToolCalling block")
                     continue
+                tool_call_json = fix_json_booleans(json_list[0])
                 # Only use the first JSON string from each block
-                parsed_tool_call = json.loads(json_list[0])
+                parsed_tool_call = json.loads(tool_call_json)
                 if isinstance(parsed_tool_call, dict):
                     parsed_tool_calls.append(parsed_tool_call)
                 elif isinstance(parsed_tool_call, list):
