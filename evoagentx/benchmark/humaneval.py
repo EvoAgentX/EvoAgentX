@@ -109,6 +109,7 @@ class HumanEval(CodingBenchmark):
         prediction, label = self._check_evaluation_inputs(prediction, label)
 
         results = []
+        failed_cases = []
         for solution in prediction:
             solution_states = []
             for label_data in label:
@@ -123,15 +124,19 @@ class HumanEval(CodingBenchmark):
                     entry_point=entry_point
                 )
                 if state != self.SUCCESS:
+                    failed_cases.append(f"Message: {message}\nUnit Test: {unit_test}\nEntry Point: {entry_point}")
                     break 
                 solution_states.append(state)
             results.append(len(solution_states)==len(label) and all(state==self.SUCCESS for state in solution_states))
         
         k_list = [self.k] if isinstance(self.k, int) else self.k
         pass_at_k = self.compute_pass_at_k(results, k_list)
-        
+
+        if self.trace_back:
+            return "\n\n".join(failed_cases) if failed_cases else "All tests passed."
+
         return pass_at_k
-    
+
 
 class HumanEvaluPlus(HumanEval):
 
