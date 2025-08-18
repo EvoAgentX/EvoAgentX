@@ -337,7 +337,7 @@ def recursive_to_dict(object: Any, exclude_none: bool = True, ignore: List[str] 
     from .module import BaseModule
     if isinstance(object, BaseModule):
         data = dict()
-        for field_name, _ in object.model_fields.items():
+        for field_name, _ in type(object).model_fields.items():
             if field_name in ignore:
                 continue
             field_value = getattr(object, field_name, None)
