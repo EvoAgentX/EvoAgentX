@@ -23,7 +23,6 @@ from dotenv import load_dotenv
 from evoagentx.workflow import WorkFlowGenerator, WorkFlowGraph, WorkFlow
 from evoagentx.models import LLMConfig
 from evoagentx.models.model_configs import OpenAILLMConfig, OpenRouterConfig
-from evoagentx.models.model_utils import create_llm_instance
 from evoagentx.agents.agent_manager import AgentManager
 from evoagentx.core.module_utils import parse_json_from_text
 from evoagentx.tools import MCPToolkit
