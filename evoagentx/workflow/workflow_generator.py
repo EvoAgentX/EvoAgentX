@@ -282,7 +282,15 @@ class WorkFlowGenerator(BaseModule):
         Returns:
             WorkFlowGraph: The workflow graph with generated/prebuilt agents
         """
-        workflow = asyncio.run(self.async_generate_agents(workflow, examples))
+        try:
+            loop = asyncio.get_running_loop()
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(asyncio.run, self.async_generate_agents(workflow, examples))
+                workflow = future.result()
+        except RuntimeError:
+            workflow = asyncio.run(self.async_generate_agents(workflow, examples))
+        
         logger.info("Validating workflow after agent generation...")
         workflow._validate_workflow_structure()
         # Validate that all nodes have agents

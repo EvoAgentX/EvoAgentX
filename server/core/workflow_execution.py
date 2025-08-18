@@ -23,6 +23,7 @@ from dotenv import load_dotenv
 from evoagentx.workflow import WorkFlowGenerator, WorkFlowGraph, WorkFlow
 from evoagentx.models import LLMConfig
 from evoagentx.models.model_configs import OpenAILLMConfig, OpenRouterConfig
+from evoagentx.models.model_utils import create_llm_instance
 from evoagentx.agents.agent_manager import AgentManager
 from evoagentx.core.module_utils import parse_json_from_text
 from evoagentx.tools import MCPToolkit
@@ -243,27 +244,6 @@ async def execute_workflow_from_config(workflow: Dict[str, Any], llm_config_dict
         elif hasattr(workflow, "project_short_id"):
             project_short_id = workflow.project_short_id
         
-        # Handle workflow graph extraction from the workflow document
-        if isinstance(workflow, dict) and "workflow_graph" in workflow:
-            # Extract workflow graph from the workflow document
-            workflow_graph_data = workflow["workflow_graph"]
-            if isinstance(workflow_graph_data, WorkFlowGraph):
-                workflow_graph = workflow_graph_data
-            else:
-                workflow_graph: WorkFlowGraph = WorkFlowGraph.from_dict(workflow_graph_data)
-        elif isinstance(workflow, WorkFlowGraph):
-            # Direct WorkFlowGraph object (fallback for backward compatibility)
-            workflow_graph = workflow
-        else:
-            # Try to treat the entire workflow as a workflow graph (fallback)
-            workflow_graph: WorkFlowGraph = WorkFlowGraph.from_dict(workflow)
-        
-        # Create tools with proper storage handling
-        tools = []
-        if mcp_config:
-            mcp_toolkit = MCPToolkit(config=mcp_config)
-            tools = mcp_toolkit.get_tools()
-        
         # Generate execution ID for consistent storage paths
         execution_id = str(uuid.uuid4())
         print(f"🚀 Starting workflow execution with execution ID {execution_id}")
@@ -273,19 +253,39 @@ async def execute_workflow_from_config(workflow: Dict[str, Any], llm_config_dict
             print(f"🔄 Processing inputs for URL replacement...")
             inputs = _replace_urls_with_paths(inputs, project_short_id, execution_id)
         
+        # Create tools with proper storage handling first
+        execution_tools = []
+        if mcp_config:
+            mcp_toolkit = MCPToolkit(config=mcp_config)
+            execution_tools = mcp_toolkit.get_tools()
+        
         # Create tools with project_short_id and execution_id for storage configuration
         if project_short_id:
-            tools += create_tools(project_short_id, database_information, execution_id)
+            execution_tools += create_tools(project_short_id, database_information, execution_id)
         else:
             print("⚠️  No project_short_id found, creating tools without storage support")
-            tools += create_tools("default", database_information, execution_id)
+            execution_tools += create_tools("default", database_information, execution_id)
         
-        agent_manager = AgentManager(tools=tools)
+        # Extract and reconstruct workflow graph from the workflow document (after tools are ready)
+        if isinstance(workflow, dict) and "workflow_graph" in workflow:
+            workflow_graph_data = workflow["workflow_graph"]
+            if isinstance(workflow_graph_data, WorkFlowGraph):
+                workflow_graph = workflow_graph_data
+            else:
+                workflow_graph: WorkFlowGraph = WorkFlowGraph.from_dict(workflow_graph_data, llm_config=llm_config, tools=execution_tools)
+        elif isinstance(workflow, WorkFlowGraph):
+            workflow_graph = workflow
+        else:
+            workflow_graph: WorkFlowGraph = WorkFlowGraph.from_dict(workflow, llm_config=llm_config, tools=execution_tools)
+        
+        # Create agent manager and add agents from workflow
+        agent_manager = AgentManager(tools=execution_tools)
         agent_manager.add_agents_from_workflow(workflow_graph, llm_config=llm_config)
 
-        workflow = WorkFlow(graph=workflow_graph, agent_manager=agent_manager, llm=llm)
-        workflow.init_module()
-        output = await workflow.async_execute(inputs=inputs)
+        # Create and execute workflow
+        workflow_instance = WorkFlow(graph=workflow_graph, agent_manager=agent_manager, llm=llm)
+        workflow_instance.init_module()
+        output = await workflow_instance.async_execute(inputs=inputs)
         
         # Use custom prompt to process the output and generate structured results
         if task_info and "workflow_outputs" in task_info:

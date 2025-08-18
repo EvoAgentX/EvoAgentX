@@ -134,12 +134,6 @@ WORKFLOW_GENERATION_GOAL_PROMPT = """
 ## Background
 You are an experienced workflow designer. You are given a workflow requirement and you should generate a workflow with given inputs and outputs formats.
 
-## Workflow Inputs:
-{workflow_inputs}
-
-## Workflow Outputs:
-{workflow_outputs}
-
 ## Instructions
 Please carefully analyze the following requirement documentation and generate a workflow with given inputs and outputs formats.
 

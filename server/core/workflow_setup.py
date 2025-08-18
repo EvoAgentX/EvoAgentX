@@ -17,6 +17,7 @@ from evoagentx.models.model_utils import create_llm_instance
 from evoagentx.core.module_utils import parse_json_from_text
 from evoagentx.tools import MCPToolkit
 from evoagentx.tools import GoogleFreeSearchToolkit, DDGSSearchToolkit, WikipediaSearchToolkit, ArxivToolkit, StorageToolkit, CMDToolkit, RSSToolkit
+from evoagentx.core.base_config import Parameter
 
 from ..prompts import WORKFLOW_GENERATION_GOAL_PROMPT, WORKFLOW_REQUIREMENT_PROMPT
 from ..database.db import database, requirement_database
@@ -79,6 +80,21 @@ async def retrieve_requirement_from_storage(project_short_id: str) -> str:
         raise Exception(f"Failed to retrieve requirement document: {str(e)}")
 
 
+def _dicts_to_parameters(params: List[Dict[str, Any]]) -> List[Parameter]:
+    """Convert list of dicts to Parameter objects."""
+    if not params:
+        return []
+    result = []
+    for p in params:
+        result.append(Parameter(
+            name=p.get("name", ""),
+            type=p.get("type", "string"),
+            description=p.get("description", ""),
+            required=bool(p.get("required", True))
+        ))
+    return result
+
+
 def create_llm_config(llm_config_dict: Dict[str, Any]) -> LLMConfig:
     """
     Convert a dictionary to the appropriate LLM config object based on the API key provided,
@@ -138,9 +154,18 @@ async def extract_workflow_requirements(detailed_requirements: str) -> Dict[str,
         raise ValueError(f"Error extracting workflow requirements: {str(e)}")
 
 
-async def generate_workflow_from_goal(goal: str, llm_config_dict: Dict[str, Any], mcp_config: dict = None) -> str:
+async def generate_workflow_from_goal(payload, llm_config_dict: Dict[str, Any], mcp_config: dict = None) -> WorkFlowGraph:
     """
-    Generate a workflow from a goal using the WorkFlowGenerator with tools.
+    Generate a workflow using the WorkFlowGenerator with tools.
+    
+    Args:
+        payload: Dict with keys "goal", "workflow_inputs", "workflow_outputs" 
+                 OR str (legacy support)
+        llm_config_dict: LLM configuration dictionary
+        mcp_config: Optional MCP configuration dictionary
+        
+    Returns:
+        WorkFlowGraph: The generated workflow graph
     """
     # Start with the predefined generation tools
     tools = generation_tools.copy()
@@ -167,10 +192,27 @@ async def generate_workflow_from_goal(goal: str, llm_config_dict: Dict[str, Any]
         print(f"Error initializing components: {e}")
         return None
     
+    # Extract parameters from payload
+    if isinstance(payload, str):
+        # Legacy support - treat as goal only
+        goal = payload
+        workflow_inputs = []
+        workflow_outputs = []
+    else:
+        # New dict format
+        goal = payload.get("goal")
+        workflow_inputs = _dicts_to_parameters(payload.get("workflow_inputs", []))
+        workflow_outputs = _dicts_to_parameters(payload.get("workflow_outputs", []))
+    
+    # Initialize and generate workflow
     workflow_generator = WorkFlowGenerator(llm=llm, tools=tools)
     
-    # Generate the workflow
-    workflow_graph: WorkFlowGraph = workflow_generator.generate_workflow(goal=goal)
+    # Generate the workflow with proper parameters
+    workflow_graph: WorkFlowGraph = workflow_generator.generate_workflow(
+        goal=goal,
+        workflow_inputs=workflow_inputs,
+        workflow_outputs=workflow_outputs
+    )
     return workflow_graph
 
 
@@ -220,31 +262,23 @@ async def setup_project(project_short_id: str) -> List[Dict[str, Any]]:
     for extracted_workflow in extracted_data["workflows"]:
         print(f"   Generating workflow: {extracted_workflow['workflow_name']}")
         
-        # Use WORKFLOW_GENERATION_GOAL_PROMPT with proper structure
-        formatted_goal = WORKFLOW_GENERATION_GOAL_PROMPT.format(
-            workflow_inputs=extracted_workflow["workflow_inputs"],
-            workflow_outputs=extracted_workflow["workflow_outputs"],
-            requirement=extracted_workflow["workflow_requirement"]
-        )
+        # Create payload dict with goal and parameters
+        payload = {
+            "goal": extracted_workflow["workflow_requirement"],
+            "workflow_inputs": extracted_workflow["workflow_inputs"],
+            "workflow_outputs": extracted_workflow["workflow_outputs"]
+        }
         
         # Generate workflow
         workflow_graph = await generate_workflow_from_goal(
-            formatted_goal, 
+            payload, 
             default_llm_config, 
             mcp_config={}
         )
         
         
         try:
-            if hasattr(workflow_graph, 'get_config'):
-                workflow_dict = workflow_graph.get_config()
-            elif hasattr(workflow_graph, 'get_workflow_description'):
-                workflow_dict = {
-                    "goal": workflow_graph.goal,
-                    "description": workflow_graph.get_workflow_description()
-                }
-            else:
-                workflow_dict = str(workflow_graph)
+            workflow_dict = workflow_graph.get_config()
         except Exception as e:
             workflow_dict = f"Workflow generated successfully (serialization error: {str(e)})"
         
@@ -358,16 +392,16 @@ async def setup_project_parallel(project_short_id: str) -> List[Dict[str, Any]]:
                     else:
                         print(f"   Generating workflow: {workflow_name}")
                     
-                    # Use WORKFLOW_GENERATION_GOAL_PROMPT with proper structure
-                    formatted_goal = WORKFLOW_GENERATION_GOAL_PROMPT.format(
-                        workflow_inputs=extracted_workflow["workflow_inputs"],
-                        workflow_outputs=extracted_workflow["workflow_outputs"],
-                        requirement=extracted_workflow["workflow_requirement"]
-                    )
+                    # Create payload dict with goal and parameters
+                    payload = {
+                        "goal": extracted_workflow["workflow_requirement"],
+                        "workflow_inputs": extracted_workflow["workflow_inputs"],
+                        "workflow_outputs": extracted_workflow["workflow_outputs"]
+                    }
                     
                     # Generate workflow
                     workflow_graph = await generate_workflow_from_goal(
-                        formatted_goal, 
+                        payload, 
                         default_llm_config, 
                         mcp_config={}
                     )
@@ -567,16 +601,16 @@ async def setup_project_parallel_with_status_messages(project_short_id: str, web
                     else:
                         print(f"   Generating workflow: {workflow_name}")
                     
-                    # Use WORKFLOW_GENERATION_GOAL_PROMPT with proper structure
-                    formatted_goal = WORKFLOW_GENERATION_GOAL_PROMPT.format(
-                        workflow_inputs=extracted_workflow["workflow_inputs"],
-                        workflow_outputs=extracted_workflow["workflow_outputs"],
-                        requirement=extracted_workflow["workflow_requirement"]
-                    )
+                    # Create payload dict with goal and parameters
+                    payload = {
+                        "goal": extracted_workflow["workflow_requirement"],
+                        "workflow_inputs": extracted_workflow["workflow_inputs"],
+                        "workflow_outputs": extracted_workflow["workflow_outputs"]
+                    }
                     
                     # Generate workflow
                     workflow_graph = await generate_workflow_from_goal(
-                        formatted_goal, 
+                        payload, 
                         default_llm_config, 
                         mcp_config={}
                     )
@@ -970,15 +1004,15 @@ async def generate_single_workflow_with_websocket(
             f"Generating workflow: {workflow_name}"
         )
         
-        # Use the existing generation logic
-        formatted_goal = WORKFLOW_GENERATION_GOAL_PROMPT.format(
-            workflow_inputs=extracted_workflow["workflow_inputs"],
-            workflow_outputs=extracted_workflow["workflow_outputs"],
-            requirement=extracted_workflow["workflow_requirement"]
-        )
+        # Create payload dict with goal and parameters
+        payload = {
+            "goal": extracted_workflow["workflow_requirement"],
+            "workflow_inputs": extracted_workflow["workflow_inputs"],
+            "workflow_outputs": extracted_workflow["workflow_outputs"]
+        }
         
         workflow_graph = await generate_workflow_from_goal(
-            formatted_goal, 
+            payload, 
             default_llm_config, 
             mcp_config={}
         )
@@ -993,15 +1027,7 @@ async def generate_single_workflow_with_websocket(
         
         # Format the result
         try:
-            if hasattr(workflow_graph, 'get_config'):
-                workflow_dict = workflow_graph.get_config()
-            elif hasattr(workflow_graph, 'get_workflow_description'):
-                workflow_dict = {
-                    "goal": workflow_graph.goal,
-                    "description": workflow_graph.get_workflow_description()
-                }
-            else:
-                workflow_dict = str(workflow_graph)
+            workflow_dict = workflow_graph.get_config()
         except Exception as e:
             workflow_dict = f"Workflow generated successfully (serialization error: {str(e)})"
         
