@@ -1,0 +1,379 @@
+{
+    "class_name": "WorkFlowGraph",
+    "goal": "  User chooses what they are interested in and what websites they want to subscribe to. Fetch articles and select ones that user might be interested in. Generate a nicely formatted newsletter and save it to file. \n  - Input: user interests (string) and optional list of websites they want to source articles from (list of strings); optional output path for the newsletter (string), dont save if we dont have it.\n  - Output: boolean indicating if newsletter was successfully generated and saved\n1） Use RSS feeds to fetch articles if available. Otherwise use web search. Only get articles published today.\n2) Generate the newsletter and save it directly to the specified file path.\n\nKey things to note:\n- If RSS urls are available, use tools to fetch the articles.\n- You may also search for new RSS urls and relevant articles through tools.\n- You MUST ensure all information is real, retirable, and correct. They can be collected using the websearch toolkit or the rss toolkit\n- You must collect information through tools only instead of making up or guessing.\n- You should use the file toolkit to save the newsletter to the given path.\n- Return TRUE if newsletter was successfully generated and saved, FALSE otherwise.\n",
+    "nodes": [
+        {
+            "class_name": "WorkFlowNode",
+            "name": "input_validation",
+            "description": "Validate user inputs including interests, websites, and optional output path.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "goal",
+                    "type": "string",
+                    "description": "The user's goal in textual format.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "validated_inputs",
+                    "type": "object",
+                    "description": "A structured object containing validated user interests, websites, and output path.",
+                    "required": true
+                }
+            ],
+            "reason": "This sub-task ensures that all required inputs are properly formatted and usable in the subsequent steps.",
+            "agents": [
+                {
+                    "name": "input_validation_agent",
+                    "description": "This agent validates the user's goal input, ensuring it meets the required format and can be used in later tasks.",
+                    "inputs": [
+                        {
+                            "name": "goal",
+                            "type": "string",
+                            "description": "The user's goal in textual format.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "validated_inputs",
+                            "type": "object",
+                            "description": "A structured object containing validated user interests, websites, and output path.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": null,
+                    "prompt_template": {
+                        "class_name": "ChatTemplate",
+                        "instruction": "### Objective\nValidate the user's goal input to ensure it is properly formatted and usable for the next steps in the workflow.\n\n### Instructions\n1. Read and analyze the user's input.\n2. Check if the input is a non-empty string representing the user's interests and preferences.\n3. If the goal is valid, construct a structured object that includes placeholders for validated user interests, websites, and an optional output path.\n4. If the input is invalid, flag it for review or indicate an error message.\n5. Produce the validated structured object as the output.\n\n### Output Format\nYour final output should be a valid JSON object with the following structure:\n\n```json\n{\n  \"thought\": \"Briefly explain the reasoning process for validating the user's goal input.\",\n  \"validated_inputs\": {\n    \"interests\": \"user interests\",\n    \"websites\": [\"list of websites\"],\n    \"output_path\": \"optional output path\"\n  }\n}\n```"
+                    },
+                    "parse_mode": "json"
+                }
+            ],
+            "status": "pending"
+        },
+        {
+            "class_name": "WorkFlowNode",
+            "name": "rss_source_filtering",
+            "description": "Filter and select only the most relevant RSS sources based on user interests to minimize token usage and cost.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "goal",
+                    "type": "string",
+                    "description": "The user's goal in textual format.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "validated_inputs",
+                    "type": "object",
+                    "description": "A structured object containing validated user interests, websites, and output path.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "filtered_rss_sources",
+                    "type": "array",
+                    "description": "A curated list of RSS URLs that are most relevant to the user's interests.",
+                    "required": true
+                }
+            ],
+            "reason": "This stage optimizes cost and efficiency by selecting only relevant RSS sources before fetching any content.",
+            "agents": [
+                {
+                    "name": "rss_filtering_agent",
+                    "description": "This agent analyzes user interests and selects only the most relevant RSS sources to minimize token usage and maximize relevance.",
+                    "inputs": [
+                        {
+                            "name": "goal",
+                            "type": "string",
+                            "description": "The user's goal in textual format.",
+                            "required": true
+                        },
+                        {
+                            "name": "validated_inputs",
+                            "type": "object",
+                            "description": "A structured object containing validated user interests, websites, and output path.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "filtered_rss_sources",
+                            "type": "array",
+                            "description": "A curated list of RSS URLs that are most relevant to the user's interests.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": null,
+                    "prompt_template": {
+                        "class_name": "ChatTemplate",
+                        "instruction": "### Objective\nSelect only the most relevant RSS sources based on user interests to minimize token usage and maximize content relevance.\n\n### Instructions\n1. Review the user's goal.\n2. Analyze the validated inputs to understand user interests.\n3. From the available RSS sources, select ONLY the most relevant ones based on:\n   - **Direct relevance**: Sources that frequently cover the user's topic of interest\n   - **Content quality**: Reputable sources with high-quality content\n   - **Update frequency**: Sources that publish regularly\n   - **Topic alignment**: Sources that match the user's specific interests\n\n### Available RSS Sources\n**Technology & AI:**\n- https://www.theverge.com/rss/index.xml (Tech news and reviews)\n- https://techcrunch.com/feed/ (Startup and tech news)\n- https://www.wired.com/feed/rss (Technology and culture)\n- https://www.engadget.com/rss.xml (Consumer electronics)\n- https://www.zdnet.com/news/rss.xml (Business technology)\n\n**Business & Finance:**\n- https://feeds.bloomberg.com/markets/news.rss (Financial markets)\n- https://www.cnbc.com/id/100003114/device/rss/rss.html (Business news)\n- https://feeds.reuters.com/reuters/businessNews (Business news)\n- https://www.ft.com/rss/home (Global business)\n\n**Science & Research:**\n- https://www.nature.com/nature.rss (Scientific research)\n- https://www.science.org/rss/news_current.xml (Science news)\n- https://www.technologyreview.com/feed/ (Technology insights)\n- https://www.quantamagazine.org/feed/ (Science and math)\n\n**General News:**\n- https://feeds.bbci.co.uk/news/rss.xml (International news)\n- https://rss.cnn.com/rss/edition.rss (Breaking news)\n- https://feeds.reuters.com/Reuters/worldNews (World news)\n- https://www.theguardian.com/world/rss (International news)\n\n### Selection Criteria\n1. **Topic Match**: Select sources that directly relate to user interests\n2. **Quality Priority**: Choose reputable, well-established sources\n3. **Efficiency**: Limit to 3-5 most relevant sources to minimize token usage\n4. **Diversity**: Include different perspectives if multiple sources are relevant\n5. **Recency**: Prefer sources that publish frequently\n\n### Cost Optimization Strategy\n- **Limit selection**: Choose only 3-5 most relevant sources\n- **Avoid overlap**: Don't select multiple sources covering the same niche\n- **Prioritize quality**: Better to have fewer high-quality sources than many mediocre ones\n- **Consider user preferences**: If user specified particular websites, prioritize those\n\n### Output Format\nYour final output should be a valid JSON object with the following structure:\n\n```json\n{\n  \"thought\": \"Explain your selection process: which sources you chose, why they're relevant to the user's interests, and how this selection optimizes for cost and relevance.\",\n  \"filtered_rss_sources\": [\n    {\n      \"url\": \"RSS URL\",\n      \"reason\": \"Brief explanation of why this source was selected\"\n    }\n  ]\n}\n```"
+                    },
+                    "parse_mode": "json"
+                }
+            ],
+            "status": "pending"
+        },
+        {
+            "class_name": "WorkFlowNode",
+            "name": "news_url_collection",
+            "description": "Collect useful URL links and titles from RSS feeds using RSS fetch function.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "goal",
+                    "type": "string",
+                    "description": "The user's goal in textual format.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "filtered_rss_sources",
+                    "type": "array",
+                    "description": "A curated list of RSS URLs that are most relevant to the user's interests.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "article_metadata",
+                    "type": "array",
+                    "description": "A list of useful URL links and titles collected from RSS feeds.",
+                    "required": true
+                }
+            ],
+            "reason": "This stage collects useful URL links and titles from RSS feeds for further filtering and content fetching.",
+            "agents": [
+                {
+                    "name": "news_url_collection_agent",
+                    "description": "This agent collects useful URL links and titles from RSS feeds using RSS fetch function.",
+                    "inputs": [
+                        {
+                            "name": "goal",
+                            "type": "string",
+                            "description": "The user's goal in textual format.",
+                            "required": true
+                        },
+                        {
+                            "name": "filtered_rss_sources",
+                            "type": "array",
+                            "description": "A curated list of RSS URLs that are most relevant to the user's interests.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "article_metadata",
+                            "type": "array",
+                            "description": "A list of useful URL links and titles collected from RSS feeds.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": null,
+                    "prompt_template": {
+                        "class_name": "ChatTemplate",
+                        "instruction": "### Objective\nCollect useful URL links and titles from RSS feeds using RSS fetch function. Do NOT make up or invent any URLs or titles.\n\n### Instructions\n1. Review the user's goal.\n2. Use the filtered RSS sources.\n3. **MUST use RSSToolkit fetch function** to get real URL links and titles from each RSS feed.\n4. **Set fetch_web_page to FALSE** - only collect RSS metadata, not full web page content.\n5. **Do NOT invent or make up any URLs or titles** - only collect what RSS feeds actually provide.\n6. For each RSS feed, collect ONLY:\n   - Real URL links (from RSS feed)\n   - Real titles (from RSS feed)\n   - Publication date (if available in RSS)\n   - Brief summary (if available in RSS)\n   - Source name\n7. **Strictly filter out any articles or URLs that are not directly relevant to the user's topic or interests. Do not include general, off-topic, or unrelated news.**\n8. **Focus on recent articles**: Prioritize articles published today or recently.\n9. **Only collect what RSS feeds actually contain** - do not add or modify any information.\n\n### RSS Fetch Process\n1. **Call RSSToolkit for each RSS source**: Use the actual RSS fetch function with fetch_web_page=FALSE\n2. **Extract real URLs and titles**: Get only what the RSS feed provides (rough titles and URLs)\n3. **Filter by topic**: Select only articles relevant to user interests. **If the article's title or summary does not clearly match the user's topic, exclude it.**\n4. **Collect real data**: Only include URLs and titles that actually exist in RSS feeds\n\n### Critical Requirements\n- **Use RSSToolkit**: Must call RSS fetch function for each source\n- **fetch_web_page=FALSE**: Only collect RSS metadata, not full web page content\n- **Real URLs only**: Do not invent or modify any URLs\n- **Real titles only**: Do not invent or modify any titles\n- **RSS data only**: Only collect what RSS feeds actually provide\n- **Rough titles and URLs**: Collect basic RSS metadata, not detailed content\n- **Strict topic filtering**: Exclude any off-topic or unrelated news\n\n### Tool Usage\n- **RSSToolkit**: Use fetch function with fetch_web_page=FALSE to get rough titles and URLs from RSS feeds\n- **GoogleFreeSearchToolkit**: Use as backup if RSS feeds don't provide enough relevant articles\n\n### Output Structure\nFor each relevant article, include ONLY real data from RSS:\n- Real URL (from RSS feed)\n- Real title (from RSS feed)\n- Publication date (if available in RSS)\n- Brief summary (if available in RSS)\n- Source name\n\n### Output Format\nYour final output should be a valid JSON object with the following structure:\n\n```json\n{\n  \"thought\": \"Explain your RSS fetch process: which RSS sources you actually fetched from using RSSToolkit with fetch_web_page=FALSE, how many real URLs and titles you collected, and emphasize that you only collected rough titles and URLs from RSS feeds (no full web page content, no made-up information). Also explain how you strictly filtered out any off-topic or unrelated news.\",\n  \"article_metadata\": [\n    {\n      \"url\": \"Real URL from RSS feed\",\n      \"title\": \"Real title from RSS feed\",\n      \"publication_date\": \"Date if available\",\n      \"summary\": \"Brief summary if available\",\n      \"source\": \"Source name\"\n    }\n  ]\n}\n```"
+                    },
+                    "tool_names": [
+                        "RSSToolkit",
+                        "GoogleFreeSearchToolkit"
+                    ],
+                    "parse_mode": "json"
+                }
+            ],
+            "status": "pending"
+        },
+        {
+            "class_name": "WorkFlowNode",
+            "name": "content_filtering_and_fetching",
+            "description": "Filter the most relevant articles from metadata and fetch their full content using RequestToolkit.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "goal",
+                    "type": "string",
+                    "description": "The user's goal in textual format.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "article_metadata",
+                    "type": "array",
+                    "description": "A list of article metadata from filtered RSS feeds.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "fetched_articles",
+                    "type": "array",
+                    "description": "A list of exactly 10 articles with both metadata and full content.",
+                    "required": true
+                }
+            ],
+            "reason": "This stage filters the most relevant articles and fetches their full content for detailed analysis.",
+            "agents": [
+                {
+                    "name": "content_fetching_agent",
+                    "description": "This agent filters the most relevant articles from metadata and fetches their full content using RequestToolkit.",
+                    "inputs": [
+                        {
+                            "name": "goal",
+                            "type": "string",
+                            "description": "The user's goal in textual format.",
+                            "required": true
+                        },
+                        {
+                            "name": "article_metadata",
+                            "type": "array",
+                            "description": "A list of article metadata from filtered RSS feeds.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "fetched_articles",
+                            "type": "array",
+                            "description": "A list of exactly 5 articles with both metadata and full content.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": null,
+                    "prompt_template": {
+                        "class_name": "ChatTemplate",
+                        "instruction": "### Objective\nFilter the most relevant articles from metadata and fetch their full content using the http_request tool from RequestToolkit. This is Stage 2 of the two-stage process.\n\n### Two-Stage Process Context\n- **Stage 1 (Completed)**: Lightweight metadata was collected from filtered RSS sources\n- **Stage 2 (Current)**: Now fetch full content only for the most relevant articles using tools\n\n### Instructions\n1. Review the user's goal.\n2. Analyze the article metadata (this contains only titles, summaries, URLs - no full content).\n3. Apply selection criteria to identify the 5 most relevant articles:\n   - **Relevance**: Must directly relate to user interests\n   - **Quality**: From reputable sources with good content\n   - **Diversity**: Mix of different topics and perspectives\n   - **Recency**: Published today or very recently\n   - **Impact**: Articles that matter to the target audience\n4. **CRITICAL: For each of the selected 5 articles, you MUST use the http_request tool to fetch the full content.**\n   - Call the http_request tool with the article URL\n   - Use method='GET' to fetch the webpage\n   - Set return_raw=False to get processed content (HTML converted to text)\n   - Extract the complete article text, not just the summary\n   - Get all the details, quotes, statistics, and context\n5. Extract key information from the full content: main points, quotes, statistics, etc.\n6. Compile the final list with both metadata and full content for the 5 selected articles.\n\n### Selection Process\n1. **Initial Filtering**: Remove articles that don't match user interests\n2. **Quality Assessment**: Prioritize articles from reputable sources\n3. **Diversity Check**: Ensure variety in topics and perspectives\n4. **Final Selection**: Choose exactly 5 articles that best meet all criteria\n\n### Content Fetching Process (MANDATORY)\n**You MUST follow these steps for each selected article:**\n1. **Use http_request tool**: Call the http_request tool with the article's URL\n   - Parameter: url = the article URL\n   - Parameter: method = 'GET'\n   - Parameter: return_raw = False (to get processed text content)\n2. **Fetch Full Content**: Get the complete article text, not just metadata\n3. **Extract Key Information**:\n   - Main arguments and conclusions\n   - Important quotes and statistics\n   - Key insights and context\n   - Supporting evidence and data\n4. **Verify Content**: Ensure you have the full article, not just a summary\n\n### Output Structure\nEach final article should include:\n- Title and URL (from metadata)\n- Publication date and source (from metadata)\n- Brief summary (from RSS metadata)\n- **Full content analysis** (from http_request tool fetch)\n- Key points from full content (fetched in this stage)\n- Why it's relevant to the user's interests\n- Important quotes or statistics (if any)\n\n### Cost Efficiency Reminder\n- You already have lightweight metadata from Stage 1\n- Only fetch full content for the 5 most relevant articles\n- This two-stage approach saves significant tokens and cost\n\n### Output Format\nYour final output should be a valid JSON object with the following structure:\n\n```json\n{\n  \"thought\": \"Explain your filtering process: how you selected the 5 articles from the metadata, what criteria you applied, and emphasize that you used the http_request tool to fetch full content for each selected article. Detail the fetching process and what content you extracted.\",\n  \"fetched_articles\": [\n    {\n      \"title\": \"Article title\",\n      \"url\": \"Article URL\",\n      \"publication_date\": \"Publication date\",\n      \"source\": \"Source name\",\n      \"summary\": \"Brief summary from RSS\",\n      \"full_content_analysis\": \"Detailed analysis from full content\",\n      \"key_points\": [\"Key point 1\", \"Key point 2\"],\n      \"quotes\": [\"Important quote 1\", \"Important quote 2\"],\n      \"relevance\": \"Why this article is relevant to user interests\"\n    }\n  ]\n}\n```"
+                    },
+                    "tool_names": [
+                        "RequestToolkit"
+                    ],
+                    "parse_mode": "json"
+                }
+            ],
+            "status": "pending"
+        },
+        {
+            "class_name": "WorkFlowNode",
+            "name": "article_summarization",
+            "description": "Summarize the fetched articles into a structured format for the newsletter and save it directly.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "goal",
+                    "type": "string",
+                    "description": "The user's goal in textual format.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "fetched_articles",
+                    "type": "array",
+                    "description": "A list of articles that have been fetched for summarization.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "validated_inputs",
+                    "type": "object",
+                    "description": "A structured object containing validated user interests and optional output path.",
+                    "required": false
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "success",
+                    "type": "boolean",
+                    "description": "Indicates whether the newsletter was successfully generated and saved.",
+                    "required": true
+                }
+            ],
+            "reason": "This step condenses the content, creates the newsletter, and saves it directly to avoid multiple writes.",
+            "agents": [
+                {
+                    "name": "article_summarizer_agent",
+                    "description": "This agent summarizes the fetched articles, generates the newsletter, and saves it directly to file.",
+                    "inputs": [
+                        {
+                            "name": "goal",
+                            "type": "string",
+                            "description": "The user's goal in textual format.",
+                            "required": true
+                        },
+                        {
+                            "name": "fetched_articles",
+                            "type": "array",
+                            "description": "A list of articles that have been fetched for summarization.",
+                            "required": true
+                        },
+                        {
+                            "name": "validated_inputs",
+                            "type": "object",
+                            "description": "A structured object containing validated user interests and optional output path.",
+                            "required": false
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "success",
+                            "type": "boolean",
+                            "description": "Indicates whether the newsletter was successfully generated and saved.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": null,
+                    "prompt_template": {
+                        "class_name": "ChatTemplate",
+                        "instruction": "### Objective\nCreate a comprehensive newsletter (5-10 minute read) from the fetched articles and save it to file. You need to firstly save the newsletter with tools, after that, return TRUE if file is saved successful, FALSE if failed.\n\n### Instructions\n1. Analyze the fetched articles thoroughly\n2. Create a detailed newsletter with original content (not just quotes)\n3. Extract output path from validated_inputs (default: 'newsletter.md')\n4. Write the complete newsletter to file using FileToolkit.write_file()\n5. Return TRUE if successful, FALSE if failed\n\n### Newsletter Requirements\n- **Length**: 5-10 minutes to read (comprehensive but not overwhelming)\n- **Content**: Original analysis and insights, not just quotes\n- **Structure**: Clear sections with proper formatting\n- **Links**: Include direct links to original articles\n\n### Newsletter Structure\n```markdown\n# [Newsletter Title]\n\n## Executive Summary\n[2-3 paragraphs summarizing key themes and insights]\n\n## Article Analysis\n\n### [Article 1 Title](link)\n*Source: [Name] | Date: [Date]*\n\n**Overview**: [2-3 sentences on main topic]\n\n**Key Developments**: [3-4 bullet points with detailed analysis]\n\n**Our Analysis**: [2-3 paragraphs with original insights and implications]\n\n**Why This Matters**: [1-2 paragraphs on significance and impact]\n\n---\n\n### [Article 2 Title](link)\n*Source: [Name] | Date: [Date]*\n\n**Overview**: [2-3 sentences on main topic]\n\n**Key Developments**: [3-4 bullet points with detailed analysis]\n\n**Our Analysis**: [2-3 paragraphs with original insights and implications]\n\n**Why This Matters**: [1-2 paragraphs on significance and impact]\n\n---\n\n[Repeat for all 5 articles]\n\n## Cross-Article Insights\n\n### Emerging Trends\n[2-3 paragraphs on patterns across articles]\n\n### Industry Implications\n[2-3 paragraphs on broader industry impact]\n\n## Key Takeaways\n- [3-5 bullet points with actionable insights]\n\n## What to Watch\n[1-2 paragraphs on future developments to monitor]\n\n---\n*Newsletter prepared by [Name] | [Date]*\n```\n\n### Content Guidelines\n- Write original analysis, not just summaries\n- Provide detailed insights and implications\n- Include specific data and examples when available\n- Make it engaging and informative\n- Ensure proper markdown formatting\n\n### Output Format\nYour final output should be a valid JSON object with the following structure:\n\n```json\n{\n  \"thought\": \"Briefly explain your newsletter creation process and save status.\",\n  \"success\": true\n}\n```\n\nNote: The success field should be true if the newsletter was successfully created and saved, false otherwise."
+                    },
+                    "tool_names": [
+                        "FileToolkit"
+                    ],
+                    "parse_mode": "json"
+                }
+            ],
+            "status": "pending"
+        }
+    ],
+    "edges": [
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "input_validation",
+            "target": "rss_source_filtering",
+            "priority": 0
+        },
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "input_validation",
+            "target": "article_summarization",
+            "priority": 0
+        },
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "rss_source_filtering",
+            "target": "news_url_collection",
+            "priority": 0
+        },
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "news_url_collection",
+            "target": "content_filtering_and_fetching",
+            "priority": 0
+        },
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "content_filtering_and_fetching",
+            "target": "article_summarization",
+            "priority": 0
+        }
+    ],
+    "graph": null
+}

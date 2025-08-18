@@ -3,6 +3,7 @@ import inspect
 from typing import Dict, List, Optional, Any
 
 from ..core.module import BaseModule
+from ..utils.utils import json_to_python_type
 
 ALLOWED_TYPES = ["string", "number", "integer", "boolean", "object", "array"]
 
@@ -42,15 +43,6 @@ class Tool(BaseModule):
             "description": str,
             "inputs": dict
         }
-
-        json_to_python = {
-            "string": str,
-            "integer": int,
-            "number": float,
-            "boolean": bool,
-            "object": dict,
-            "array": list,
-        }
         
         for attr, attr_type in required_attributes.items():
             if not hasattr(cls, attr):
@@ -69,7 +61,7 @@ class Tool(BaseModule):
             call_signature = inspect.signature(cls.__call__)
             if input_name not in call_signature.parameters:
                 raise ValueError(f"Input '{input_name}' is not found in __call__")
-            if call_signature.parameters[input_name].annotation != json_to_python[input_content["type"]]:
+            if call_signature.parameters[input_name].annotation != json_to_python_type[input_content["type"]]:
                 raise ValueError(f"Input '{input_name}' has a type mismatch in __call__")
 
         if cls.required:

@@ -1,20 +1,22 @@
 import asyncio
-import inspect 
-from pydantic import Field
-from typing import Type, Optional, Union, Tuple, List, Any, Coroutine
+import inspect
+from collections.abc import Coroutine
+from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
+from pydantic import Field
+
+from ..actions.action import Action, ContextExtraction
+from ..core.message import Message, MessageType
 from ..core.module import BaseModule
 from ..core.module_utils import generate_id
-from ..core.message import Message, MessageType
 from ..core.registry import MODEL_REGISTRY
-from ..models.model_configs import LLMConfig
-from ..models.base_model import BaseLLM
-from ..memory.memory import ShortTermMemory
 from ..memory.long_term_memory import LongTermMemory
+from ..memory.memory import ShortTermMemory
 from ..memory.memory_manager import MemoryManager
+from ..models.base_model import BaseLLM
+from ..models.model_configs import LLMConfig
 from ..storages.base import StorageHandler
-from ..actions.action import Action
-from ..actions.action import ContextExtraction
+from ..utils.utils import add_llm_config_to_agent_dict
 
 
 class Agent(BaseModule):
@@ -502,24 +504,25 @@ class Agent(BaseModule):
         ignore_fields = self._save_ignore_fields + ignore
         super().save_module(path=path, ignore=ignore_fields, **kwargs)
 
+
     @classmethod
-    def load_module(cls, path: str, llm_config: LLMConfig = None, **kwargs) -> "Agent":
+    def from_dict(cls, data: Dict, llm_config: Optional[LLMConfig] = None, **kwargs) -> 'Agent':
         """
-        load the agent from local storage. Must provide `llm_config` when loading the agent from local storage. 
+        Create an agent instance from a dictionary.
 
         Args:
-            path: The path of the file
+            data: The dictionary containing all necessary configuration to recreate this agent
             llm_config: The LLMConfig instance
         
         Returns:
-            Agent: The loaded agent instance
+            Agent: The agent instance
         """
-        agent = super().load_module(path=path, **kwargs)
-        if llm_config is not None:
-            agent["llm_config"] = llm_config.to_dict()
+        data = add_llm_config_to_agent_dict(data, llm_config)
+        agent = cls._create_instance(data)
         return agent 
-    
-    def get_config(self) -> dict:
+
+
+    def get_config(self) -> Dict:
         """
         Get a dictionary containing all necessary configuration to recreate this agent.
         

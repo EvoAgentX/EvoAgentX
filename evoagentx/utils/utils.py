@@ -1,12 +1,15 @@
-import os 
-import re 
+import os
+import re
 import time
+from typing import Any, Dict, List, Optional, Set, Union
+
 import regex
 import requests
 from tqdm import tqdm
-from typing import Union, Any, List, Set
 
 from ..core.logging import logger
+from ..core.registry import MODULE_REGISTRY
+
 
 def make_parent_folder(path: str):
     """Checks if the parent folder of a given path exists, and creates it if not.
@@ -34,6 +37,24 @@ def generate_dynamic_class_name(base_name: str) -> str:
     class_name = ''.join(x.capitalize() for x in components)
 
     return class_name if class_name else 'DefaultClassName'
+
+
+def get_unique_class_name(candidate_name: str) -> str:
+    """
+    Get a unique class name by checking if it already exists in the registry.
+    If it does, append "Vx" to make it unique.
+    """
+    if not MODULE_REGISTRY.has_module(candidate_name):
+        return candidate_name 
+    
+    i = 1 
+    while True:
+        unique_name = f"{candidate_name}V{i}"
+        if not MODULE_REGISTRY.has_module(unique_name):
+            break
+        i += 1 
+    return unique_name 
+
 
 def normalize_text(s: str) -> str:
 
@@ -102,3 +123,107 @@ def download_file(url: str, save_file: str, max_retries=3, timeout=10):
         error_message = "Exceeded maximum retries. Download failed."
         logger.error(error_message)
         raise RuntimeError(error_message)
+
+
+def recursive_remove(data: Any, keys: List[str]) -> Any:
+    """
+    Recursively removes specified keys from dictionaries and their nested structures within a
+    dictionary or list, if an object is not a list or dictionary return as is.
+
+    Args:
+        data (Any): Specified keys will be removed from `data` if it is a dictionary or a list containing dictionaries.
+        keys (List[str]): A list of string keys to be removed.
+    """
+    if isinstance(data, dict):
+        new_dict = {}
+        for k, v in data.items():
+            if k not in keys:
+                new_dict[k] = recursive_remove(v, keys)
+        return new_dict
+    elif isinstance(data, list):
+        new_list = [recursive_remove(item, keys) for item in data]
+        return new_list
+    else:
+        return data
+
+
+def tool_names_to_tools(
+    tool_names: Optional[List[str]] = None, 
+    tools: Optional[List] = None,
+) -> Optional[List]:
+
+    if tool_names is None:
+        return None
+
+    if len(tool_names) == 0:
+        return None
+
+    if tools is None:
+        raise ValueError(f"Must provide the following tools: {tool_names}")
+
+    tool_map = {tool.name: tool for tool in tools}
+    
+    tool_list = []
+    for tool_name in tool_names:
+        if tool_name not in tool_map:
+            raise ValueError(f"'{tool_name}' not found in provided tools")
+        tool_list.append(tool_map[tool_name])
+    return tool_list
+
+
+def add_llm_config_to_agent_dict(agent_dict: Dict, llm_config: Optional['LLMConfig'] = None) -> Dict:
+    """Add llm_config to agent_dict if it is not present and converts llm_config dict to LLMConfig
+    If `is_human` is True, llm_config will not be added.
+    """
+    from ..models import LLMConfig
+
+    if agent_dict.get("is_human", False):
+        return agent_dict
+
+    data_llm_config = agent_dict.get("llm_config", None)
+
+    if data_llm_config is None:
+        if llm_config is None:
+            raise ValueError("Must provide `llm_config` for agent")
+        agent_dict["llm_config"] = llm_config
+    else:
+        if isinstance(data_llm_config, dict):
+            agent_dict["llm_config"] = LLMConfig.from_dict(data_llm_config)
+    
+    return agent_dict
+
+
+def create_agent_from_dict(
+    agent_dict: Dict, 
+    llm_config: Optional['LLMConfig'] = None,
+    tools: Optional[List] = None,
+    agents: Optional[List] = None,
+) -> 'Agent':
+
+    agent_class_name = agent_dict.get("class_name", None)
+
+    if agent_class_name is None:
+        agent_class_name = "CustomizeAgent"
+    
+    cls = MODULE_REGISTRY.get_module(agent_class_name)
+    agent = cls.from_dict(data=agent_dict, llm_config=llm_config, tools=tools, agents=agents)
+    return agent
+
+
+json_to_python_type = {
+    "string": str,
+    "integer": int,
+    "number": float,
+    "boolean": bool,
+    "object": dict,
+    "array": list,
+}
+
+python_to_json_type = {
+    str: "string",
+    int: "integer",
+    float: "number",
+    bool: "boolean",
+    dict: "object",
+    list: "array",
+}

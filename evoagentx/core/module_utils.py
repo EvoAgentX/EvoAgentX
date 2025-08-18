@@ -150,10 +150,8 @@ def parse_data_from_text(text: str, datatype: str):
         data = float(text)
     elif datatype == "bool":
         data = text.lower() in ("true", "yes", "1", "on", "True")
-    elif datatype == "list":
-        data = eval(text)
-    elif datatype == "dict":
-        data = eval(text)
+    elif datatype in ["list", "dict"]:
+        data = yaml.safe_load(text)
     else:
         # raise ValueError(
         #     f"Invalid value '{datatype}' is detected for `datatype`. "
@@ -332,3 +330,40 @@ def get_base_module_init_error_message(cls, data: Dict[str, Any], errors: List[U
     message += "\n\n" + get_error_message(errors)
     return message
 
+def recursive_to_dict(object: Any, exclude_none: bool = True, ignore: List[str] = []) -> Any:
+    """
+    Recursively convert a BaseModule to a dictionary until all BaseModules are converted.
+    """
+    from .module import BaseModule
+    if isinstance(object, BaseModule):
+        data = dict()
+        for field_name, _ in object.model_fields.items():
+            if field_name in ignore:
+                continue
+            field_value = getattr(object, field_name, None)
+            if exclude_none and field_value is None:
+                continue
+            if isinstance(field_value, BaseModule):
+                data[field_name] = field_value.to_dict(exclude_none=exclude_none, ignore=ignore)
+            else:
+                data[field_name] = recursive_to_dict(field_value, exclude_none=exclude_none, ignore=ignore)
+        return data
+
+    elif isinstance(object, list):
+        data = []
+        for item in object:
+            if isinstance(item, BaseModule):
+                data.append(item.to_dict(exclude_none=exclude_none, ignore=ignore))
+            else:
+                data.append(recursive_to_dict(item, exclude_none=exclude_none, ignore=ignore))
+        return data
+    elif isinstance(object, dict):
+        data = dict()
+        for key, value in object.items():
+            if isinstance(value, BaseModule):
+                data[key] = value.to_dict(exclude_none=exclude_none, ignore=ignore)
+            else:
+                data[key] = recursive_to_dict(value, exclude_none=exclude_none, ignore=ignore)
+        return data
+    else:
+        return object

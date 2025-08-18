@@ -94,18 +94,8 @@ class HITLBaseAgent(Agent):
     """
     Include all Agent classes for hitl use case
     """
-    def _get_unique_class_name(self, candidate_name: str) -> str:
-        
-        if not MODULE_REGISTRY.has_module(candidate_name):
-            return candidate_name 
-        
-        i = 1 
-        while True:
-            unique_name = f"{candidate_name}V{i}"
-            if not MODULE_REGISTRY.has_module(unique_name):
-                break
-            i += 1 
-        return unique_name
+    pass
+
 
 class HITLInterceptorAgent(HITLBaseAgent):
     """HITL Interceptor Agent - Intercept the execution of other agents"""

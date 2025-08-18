@@ -1,23 +1,27 @@
-import inspect
 import asyncio
+import inspect
 from copy import deepcopy
+from typing import List, Optional, Union
+
 from pydantic import Field, create_model
-from typing import Optional, List
-from ..core.logging import logger
-from ..core.module import BaseModule
-from ..core.message import Message, MessageType
-from ..core.module_utils import generate_id
-from ..models.base_model import BaseLLM
+from tenacity import retry, stop_after_attempt
+
+from ..actions import ActionInput, ActionOutput
 from ..agents.agent import Agent
 from ..agents.agent_manager import AgentManager, AgentState
+from ..core.logging import logger
+from ..core.message import Message, MessageType
+from ..core.module import BaseModule
+from ..core.module_utils import generate_id
+from ..hitl import HITLBaseAgent, HITLManager
+from ..models.base_model import BaseLLM
 from ..storages.base import StorageHandler
-from .environment import Environment, TrajectoryState
-from .workflow_manager import WorkFlowManager, NextAction
-from .workflow_graph import WorkFlowNode, WorkFlowGraph
+from ..utils.utils import generate_dynamic_class_name, get_unique_class_name
 from .action_graph import ActionGraph
-from ..hitl import HITLManager, HITLBaseAgent
-from ..utils.utils import generate_dynamic_class_name
-from ..actions import ActionInput, ActionOutput
+from .environment import Environment, TrajectoryState
+from .workflow_graph import WorkFlowGraph, WorkFlowNode
+from .workflow_manager import NextAction, WorkFlowManager
+
 
 class WorkFlow(BaseModule):
 
@@ -40,12 +44,14 @@ class WorkFlow(BaseModule):
         if self.agent_manager is None:
             logger.warning("agent_manager is NoneType when initializing a WorkFlow instance")
 
-    def execute(self, inputs: dict = {}, **kwargs) -> str:
+    @retry(stop=stop_after_attempt(3))
+    def execute(self, inputs: dict = {}, extract_output: bool = False, **kwargs) -> Union[dict, str]:
         """
         Synchronous wrapper for async_execute. Creates a new event loop and runs the async method.
         
         Args:
             inputs: Dictionary of inputs for workflow execution
+            extract_output: Use LLM to extract the workflow output
             **kwargs (Any): Additional keyword arguments
             
         Returns:
@@ -54,16 +60,17 @@ class WorkFlow(BaseModule):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
-            return loop.run_until_complete(self.async_execute(inputs, **kwargs))
+            return loop.run_until_complete(self.async_execute(inputs, extract_output, **kwargs))
         finally:
             loop.close()
 
-    async def async_execute(self, inputs: dict = {}, **kwargs) -> str:
+    async def async_execute(self, inputs: dict = {}, extract_output: bool = False, **kwargs) -> Union[dict, str]:
         """
         Asynchronously execute the workflow.
         
         Args:
             inputs: Dictionary of inputs for workflow execution
+            extract_output: Use LLM to extract the final workflow output
             **kwargs (Any): Additional keyword arguments
             
         Returns:
@@ -92,9 +99,10 @@ class WorkFlow(BaseModule):
                 logger.info(f"Executing subtask: {task.name}")
                 await self.execute_task(task=task)
             except Exception as e:
+                logger.exception(e)
                 failed = True
                 error_message = Message(
-                    content=f"An Error occurs when executing the workflow: {e}",
+                    content=f"An Error occurs when executing task {task.name}: {e}",
                     msg_type=MessageType.ERROR, 
                     wf_goal=goal
                 )
@@ -105,8 +113,22 @@ class WorkFlow(BaseModule):
             return "Workflow Execution Failed"
         
         logger.info("Extracting WorkFlow Output ...")
-        output: str = await self.workflow_manager.extract_output(graph=self.graph, env=self.environment)
+
+        if extract_output:
+            output: str = await self.workflow_manager.extract_output(graph=self.graph, env=self.environment)
+        else:
+            output: dict = self._get_workflow_outputs()
         return output
+
+
+    def _get_workflow_outputs(self) -> dict:
+        end_tasks = self.graph.find_end_nodes()
+        output_names = []
+        for task in end_tasks:
+            output_names.extend(self.graph.get_node(task).get_output_names())
+
+        return self.environment.get_execution_data(output_names)
+
     
     def _prepare_inputs(self, inputs: dict) -> dict:
         """
@@ -131,7 +153,8 @@ class WorkFlow(BaseModule):
         task: WorkFlowNode = await self.workflow_manager.schedule_next_task(graph=self.graph, env=self.environment)
         logger.info(f"The next subtask to be executed is: {task.name}")
         return task
-        
+    
+    @retry(stop=stop_after_attempt(3))
     async def execute_task(self, task: WorkFlowNode):
         """
         Asynchronously execute a workflow task.
@@ -362,7 +385,7 @@ class WorkFlow(BaseModule):
                 else:
                     hitl_inputs_data_fields[param.name] = (Optional[str], Field(description=param.description))
         inputs_format = create_model(
-            agent._get_unique_class_name(
+            get_unique_class_name(
                 generate_dynamic_class_name(hitl_action.class_name+" action_input")
             ),
             **(hitl_inputs_data_fields or {}),
@@ -382,7 +405,7 @@ class WorkFlow(BaseModule):
                 else:
                     hitl_outputs_data_fields[param.name] = (Optional[str], Field(description=param.description))
         outputs_format = create_model(
-            agent._get_unique_class_name(
+            get_unique_class_name(
                 generate_dynamic_class_name(hitl_action.class_name+" action_output")
             ),
             **(hitl_outputs_data_fields or {}),

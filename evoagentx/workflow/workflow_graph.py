@@ -1,24 +1,31 @@
-import json
 import inspect
+import json
 import threading
-from enum import Enum
-import networkx as nx 
-from copy import deepcopy
-from networkx import MultiDiGraph
 from collections import defaultdict
-from pydantic import Field, field_validator, model_validator
-from typing import Union, Optional, Tuple, Callable, Dict, List
+from collections.abc import Callable
+from copy import deepcopy
+from enum import Enum
 from functools import wraps
+from typing import Dict, List, Optional, Tuple, Union
 
+import networkx as nx
+from networkx import MultiDiGraph
+from pydantic import Field, field_validator, model_validator
+
+from ..agents import Agent
+from ..core.base_config import Parameter
 from ..core.logging import logger
 from ..core.module import BaseModule
-from ..core.base_config import Parameter
-from .action_graph import ActionGraph
-from ..agents.agent import Agent 
-from ..utils.utils import generate_dynamic_class_name, make_parent_folder
-from ..prompts.workflow.sew_workflow import SEW_WORKFLOW
+from ..models import LLMConfig
 from ..prompts.utils import DEFAULT_SYSTEM_PROMPT
-# from ..tools.tool import Toolkit, Tool
+from ..prompts.workflow.sew_workflow import SEW_WORKFLOW
+from ..tools.tool import Tool, Toolkit
+from ..utils.utils import (
+    create_agent_from_dict,
+    generate_dynamic_class_name,
+    make_parent_folder,
+)
+from .action_graph import ActionGraph
 
 
 class WorkFlowNodeState(str, Enum):
@@ -61,13 +68,13 @@ class WorkFlowNode(BaseModule):
     inputs: List[Parameter] # inputs for the task
     outputs: List[Parameter] # outputs of the task
     reason: Optional[str] = None
-    agents: Optional[List[Union[str, dict]]] = None
+    agents: Optional[List] = None
     action_graph: Optional[ActionGraph] = None
     status: Optional[WorkFlowNodeState] = WorkFlowNodeState.PENDING
 
     @field_validator('agents', mode="before")
     @classmethod
-    def check_agent_format(cls, agents: List[Union[str, dict, Agent]]):
+    def check_agent_format(cls, agents: List[Union[str, Dict, Agent]]):
         if agents is None:
             return None
 
@@ -76,11 +83,13 @@ class WorkFlowNode(BaseModule):
             if isinstance(agent, str):
                 validated_agents.append(agent)
             elif isinstance(agent, Agent):
-                validated_agents.append(agent.get_config())
+                validated_agents.append(agent)
             elif isinstance(agent, dict):
                 assert "name" in agent and "description" in agent, \
                     "must provide the name and description of an agent when specifying an agent with a dict."
                 validated_agents.append(agent)
+            else:
+                raise TypeError(f"'{type(agent)}' is an unknown agent type!")
         return validated_agents
 
     @model_validator(mode="after")
@@ -179,11 +188,13 @@ class WorkFlowNode(BaseModule):
                 agent_names.append(agent)
             elif isinstance(agent, dict):
                 agent_names.append(agent["name"])
+            elif isinstance(agent, Agent):
+                agent_names.append(agent.name)
             else:
                 raise TypeError(f"{type(agent)} is an unknown agent type!")
         return agent_names
     
-    def set_agents(self, agents: List[Union[str, dict]]):
+    def set_agents(self, agents: List[Union[str, Dict, Agent]]):
         self.agents = agents
 
     def get_status(self) -> WorkFlowNodeState:
@@ -1074,6 +1085,32 @@ class WorkFlowGraph(BaseModule):
         return config
 
 
+    @classmethod
+    def from_dict(
+        cls, 
+        data: Dict, 
+        llm_config: Optional[LLMConfig] = None, 
+        tools: Optional[Union[Tool, Toolkit]] = None, 
+        agents: Optional[List[Agent]] = None,
+        **kwargs
+    ) -> 'WorkFlowGraph':
+
+        for node in data["nodes"]:
+            node_agents = []
+
+            for agent_dict in node["agents"]:
+                agent = create_agent_from_dict(
+                    agent_dict=agent_dict, 
+                    llm_config=llm_config, 
+                    tools=tools, 
+                    agents=agents
+                )
+                node_agents.append(agent)
+            node["agents"] = node_agents
+                
+        return cls._create_instance(data)
+
+
 class SequentialWorkFlowGraph(WorkFlowGraph):
 
     """
@@ -1215,6 +1252,10 @@ class SequentialWorkFlowGraph(WorkFlowGraph):
             with the same properties as this one.
         """
         return self.get_graph_info()
+
+    @classmethod
+    def from_dict(cls, data: Dict, **kwargs) -> 'SequentialWorkFlowGraph':
+        return cls._create_instance(data)
     
 
 class SEWWorkFlowGraph(SequentialWorkFlowGraph):

@@ -1,21 +1,29 @@
-import json
 import inspect
-from pydantic import create_model, Field
-from typing import Optional, Callable, Type, List, Any, Union, Dict
+import json
+from collections.abc import Callable
+from typing import Any, Dict, List, Optional, Type, Union
 
-from .agent import Agent
-from ..core.logging import logger
-from ..core.registry import MODULE_REGISTRY, PARSE_FUNCTION_REGISTRY
-from ..core.message import Message, MessageType
-from ..models.model_configs import LLMConfig 
-from ..models.base_model import PARSER_VALID_MODE
-from ..prompts.utils import DEFAULT_SYSTEM_PROMPT
-from ..prompts.template import PromptTemplate
-from ..actions.action import Action, ActionOutput
-from ..utils.utils import generate_dynamic_class_name, make_parent_folder
+from pydantic import Field, create_model
+
+from ..actions.action import Action, ActionInput, ActionOutput
 from ..actions.customize_action import CustomizeAction
-from ..actions.action import ActionInput
-from ..tools.tool import Toolkit, Tool
+from ..core.logging import logger
+from ..core.message import Message, MessageType
+from ..core.registry import MODULE_REGISTRY, PARSE_FUNCTION_REGISTRY
+from ..models.base_model import PARSER_VALID_MODE
+from ..models.model_configs import LLMConfig
+from ..prompts.template import PromptTemplate
+from ..prompts.utils import DEFAULT_SYSTEM_PROMPT
+from ..tools.tool import Tool, Toolkit
+from ..utils.utils import (
+    add_llm_config_to_agent_dict,
+    generate_dynamic_class_name,
+    get_unique_class_name,
+    json_to_python_type,
+    make_parent_folder,
+    tool_names_to_tools,
+)
+from .agent import Agent
 
 
 class CustomizeAgent(Agent):
@@ -241,8 +249,8 @@ class CustomizeAgent(Agent):
             if r'{title}' not in title_format:
                 raise ValueError(r"`title_format` must contain the placeholder `{title}`.")
             
+    @staticmethod
     def create_customize_action(
-        self, 
         name: str, 
         desc: str, 
         prompt: str, 
@@ -282,46 +290,14 @@ class CustomizeAgent(Agent):
         """
         assert prompt is not None or prompt_template is not None, "must provide `prompt` or `prompt_template` when creating CustomizeAgent"
 
-        # create the action input type
-        action_input_fields = {}
-        for field in inputs:
-            required = field.get("required", True)
-            if required:
-                action_input_fields[field["name"]] = (str, Field(description=field["description"]))
-            else:
-                action_input_fields[field["name"]] = (Optional[str], Field(default=None, description=field["description"]))
-
-        action_input_type = create_model(
-            self._get_unique_class_name(
-                generate_dynamic_class_name(name+" action_input")
-            ),
-            **action_input_fields, 
-            __base__=ActionInput
-        )
+        action_input_type = CustomizeAgent.create_action_input(inputs, name)
         
-        # create the action output type
         if output_parser is None:
-            action_output_fields = {}
-            for field in outputs:
-                required = field.get("required", True)
-                if required:
-                    action_output_fields[field["name"]] = (Any, Field(description=field["description"]))
-                else:
-                    action_output_fields[field["name"]] = (Optional[Any], Field(default=None, description=field["description"]))
-            action_output_type = create_model(
-                self._get_unique_class_name(
-                    generate_dynamic_class_name(name+" action_output")
-                ),
-                **action_output_fields, 
-                __base__=ActionOutput,
-                # get_content_data=customize_get_content_data,
-                # to_str=customize_to_str
-            )
+            action_output_type = CustomizeAgent.create_action_output(outputs, name)
         else:
-            # self._check_output_parser(outputs, output_parser)
             action_output_type = output_parser
         
-        action_cls_name = self._get_unique_class_name(
+        action_cls_name = get_unique_class_name(
             generate_dynamic_class_name(name+" action")
         )
 
@@ -330,7 +306,7 @@ class CustomizeAgent(Agent):
             action_cls_name,
             __base__=CustomizeAction
         )
-
+        
         customize_action = customize_action_cls(
             name=action_cls_name,
             description=desc, 
@@ -347,6 +323,52 @@ class CustomizeAgent(Agent):
         )
 
         return customize_action
+
+    @staticmethod
+    def create_action_input(inputs: List[Dict], action_name: str) -> ActionInput:
+        action_input_fields = {}
+        for field in inputs:
+            required = field.get("required", True)
+            
+            try:
+                field_type = json_to_python_type[field["type"]]
+            except KeyError:
+                field_type = Any
+
+            if required:                
+                action_input_fields[field["name"]] = (field_type, Field(description=field["description"]))
+            else:
+                action_input_fields[field["name"]] = (Optional[field_type], Field(default=None, description=field["description"]))
+
+        action_input_type = create_model(
+            get_unique_class_name(
+                generate_dynamic_class_name(action_name+" action_input")
+            ),
+            **action_input_fields, 
+            __base__=ActionInput
+        )
+        return action_input_type
+
+    @staticmethod
+    def create_action_output(outputs: List[Dict], action_name: str) -> ActionOutput:
+        action_output_fields = {}
+        for field in outputs:
+            required = field.get("required", True)
+            field_type = json_to_python_type[field["type"]]
+            if required:
+                action_output_fields[field["name"]] = (field_type, Field(description=field["description"]))
+            else:
+                action_output_fields[field["name"]] = (Optional[field_type], Field(default=None, description=field["description"]))
+        action_output_type = create_model(
+            get_unique_class_name(
+                generate_dynamic_class_name(action_name+" action_output")
+            ),
+            **action_output_fields, 
+            __base__=ActionOutput,
+            # get_content_data=customize_get_content_data,
+            # to_str=customize_to_str
+        )
+        return action_output_type
     
     def _check_output_parser(self, outputs: List[dict], output_parser: Type[ActionOutput]):
 
@@ -440,31 +462,7 @@ class CustomizeAgent(Agent):
             "custom_output_format": self.custom_output_format
         }
         return config
-    
-    @classmethod
-    def load_module(cls, path: str, llm_config: LLMConfig = None, tools: List[Union[Toolkit, Tool]] = None, **kwargs) -> "CustomizeAgent":
-        """
-        load the agent from local storage. Must provide `llm_config` when loading the agent from local storage. 
-            If tools is provided, tool_names must also be provided. 
 
-        Args:
-            path: The path of the file
-            llm_config: The LLMConfig instance
-            tool_names: List of tool names to be used by the agent. If provided,
-            tool_dict: Dictionary mapping tool names to Tool instances. Required when tool_names is provided.
-
-        Returns:
-            CustomizeAgent: The loaded agent instance
-        """
-        match_dict = {}
-        agent = super().load_module(path=path, llm_config=llm_config, **kwargs)
-        if tools:
-            match_dict = {tool.name:tool for tool in tools}
-        if agent.get("tool_names", None):
-            assert tools is not None, "must provide `tools: List[Union[Toolkit, Tool]]` when using `load_module` or `from_file` to load the agent from local storage and `tool_names` is not None or empty"
-            added_tools = [match_dict[tool_name] for tool_name in agent["tool_names"]]
-            agent["tools"] = [tool if isinstance(tool, Toolkit) else Toolkit(name=tool.name, tools=[tool]) for tool in added_tools]
-        return agent 
     
     def save_module(self, path: str, ignore: List[str] = [], **kwargs)-> str:
         """Save the customize agent's configuration to a JSON file.
@@ -489,21 +487,6 @@ class CustomizeAgent(Agent):
 
         return path
     
-    def _get_unique_class_name(self, candidate_name: str) -> str:
-        """
-        Get a unique class name by checking if it already exists in the registry.
-        If it does, append "Vx" to make it unique.
-        """
-        if not MODULE_REGISTRY.has_module(candidate_name):
-            return candidate_name 
-        
-        i = 1 
-        while True:
-            unique_name = f"{candidate_name}V{i}"
-            if not MODULE_REGISTRY.has_module(unique_name):
-                break
-            i += 1 
-        return unique_name 
     
     def get_config(self) -> dict:
         """
@@ -516,4 +499,26 @@ class CustomizeAgent(Agent):
         config = self.get_customize_agent_info()
         config["llm_config"] = self.llm_config.to_dict()
         return config
+
     
+    @classmethod
+    def from_dict(
+        cls, 
+        data: Dict[str, Any], 
+        llm_config: Optional[LLMConfig] = None, 
+        tools: Optional[List[Union[Toolkit, Tool]]] = None, 
+        **kwargs
+    ) -> 'CustomizeAgent':
+
+        class_name = data.pop("class_name", None)
+        if class_name is not None and class_name != "CustomizeAgent":
+            raise ValueError(f"Expected class name 'CustomizeAgent', but got '{class_name}'")
+
+        data = add_llm_config_to_agent_dict(data, llm_config)
+        tool_names = data.pop("tool_names", None)
+        
+        if tool_names is not None:
+            data["tools"] = tool_names_to_tools(tool_names, tools)
+            
+        return cls(**data)
+
