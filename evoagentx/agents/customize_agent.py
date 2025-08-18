@@ -354,7 +354,11 @@ class CustomizeAgent(Agent):
         action_output_fields = {}
         for field in outputs:
             required = field.get("required", True)
-            field_type = json_to_python_type[field["type"]]
+            try:
+                field_type = json_to_python_type[field["type"]]
+            except KeyError:
+                logger.warning(f'Could not find Python type for "{field["type"]}" (field: "{field["name"]}"), falling back to `Any`.')
+                field_type = Any
             if required:
                 action_output_fields[field["name"]] = (field_type, Field(description=field["description"]))
             else:
