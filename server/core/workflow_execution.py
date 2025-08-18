@@ -285,66 +285,16 @@ async def execute_workflow_from_config(workflow: Dict[str, Any], llm_config_dict
         # Create and execute workflow
         workflow_instance = WorkFlow(graph=workflow_graph, agent_manager=agent_manager, llm=llm)
         workflow_instance.init_module()
-        output = await workflow_instance.async_execute(inputs=inputs)
         
-        # Use custom prompt to process the output and generate structured results
-        if task_info and "workflow_outputs" in task_info:
-            # Get expected outputs for the prompt
-            
-            # Get workflow goal
-            goal = workflow_graph.goal if hasattr(workflow_graph, 'goal') else "Process the workflow execution results"
-            
-            # Format expected outputs for the prompt
-            expected_outputs_formatted = []
-            for output_param in task_info["workflow_outputs"]:
-                expected_outputs_formatted.append({
-                    "name": output_param["name"],
-                    "type": output_param["type"],
-                    "description": output_param["description"]
-                })
-            
-            # Use custom prompt to generate structured output
-            custom_prompt = CUSTOM_OUTPUT_EXTRACTION_PROMPT.format(
-                expected_outputs=json.dumps(expected_outputs_formatted, indent=2),
-                workflow_execution_results=output
-            )
-            
-            # Generate structured output using the custom prompt
-            try:
-                structured_output = await llm.async_generate(prompt=custom_prompt)
-                parsed_json = None
-                
-                if hasattr(structured_output, 'content'):
-                    output_content = structured_output.content
-                else:
-                    output_content = str(structured_output)
-                
-                # Try to parse the structured output as JSON
-                try:
-                    # First, try to extract JSON from code blocks if present
-                    import re
-                    code_block_pattern = r'```(?:json)?\s*\n(.*?)\n\s*```'
-                    matches = re.findall(code_block_pattern, output_content, re.DOTALL)
-                    
-                    if matches:
-                        # Use the first code block match
-                        json_content = matches[0].strip()
-                        parsed_json = json.loads(json_content)
-                    else:
-                        # Try to parse the entire content as JSON
-                        parsed_json = json.loads(output_content)
-                        
-                except json.JSONDecodeError as e:
-                    print(f"Warning: Failed to parse JSON from structured output: {e}")
-                    print(f"Raw output content: {output_content}")
-                    # If JSON parsing fails, create a simple structure
-                    parsed_json = {"workflow_output": output_content}
-                    
-            except Exception as e:
-                print(f"Warning: Failed to generate structured output: {e}")
-                parsed_json = None
+        # Execute workflow - it returns a structured dict with all output parameters
+        output = await workflow_instance.async_execute(inputs=inputs, extract_output=False)
+        
+        # The workflow already returns structured output as a dict
+        if isinstance(output, dict):
+            parsed_json = output
         else:
-            parsed_json = None
+            # Fallback for string output (shouldn't happen with extract_output=False)
+            parsed_json = {"workflow_output": str(output)}
         
         # Scan and replace file paths with URLs if we have parsed_json and project_short_id
         if parsed_json and project_short_id:
