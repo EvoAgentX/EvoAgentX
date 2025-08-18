@@ -7,7 +7,7 @@ from typing import Union, Optional, List, Any, Type
 from ..core.logging import logger 
 from ..core.module import BaseModule 
 from ..models.base_model import LLMOutputParser, PARSER_VALID_MODE 
-from ..tools import Toolkit
+from ..tools.tool import Toolkit
 from ..prompts.tool_calling import TOOL_CALLING_TEMPLATE
 
 class PromptTemplate(BaseModule):

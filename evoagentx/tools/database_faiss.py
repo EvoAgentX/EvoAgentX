@@ -50,9 +50,6 @@ from .tool import Tool, Toolkit
 from .storage_file import LocalStorageHandler
 from ..core.module import BaseModule
 from ..core.logging import logger
-from ..rag.rag import RAGEngine
-from ..rag.rag_config import RAGConfig
-from ..rag.schema import Query, Document, Chunk, Corpus, DocumentMetadata
 from ..storages.base import StorageHandler
 from ..storages.storages_config import StoreConfig
 from .storage_handler import FileStorageHandler
@@ -154,12 +151,12 @@ def _create_default_storage_config(db_path: Optional[str] = None) -> StoreConfig
     return storage_config
 
 
-def _create_default_rag_config() -> RAGConfig:
+def _create_default_rag_config():
     """
     Create a default RAG configuration.
     
     Returns:
-        RAGConfig: Configured RAG configuration
+        Configured RAG configuration
     """
     from ..rag.rag_config import RAGConfig, EmbeddingConfig, ChunkerConfig
     
@@ -193,7 +190,7 @@ class FaissDatabase(BaseModule):
     def __init__(
         self,
         storage_config: StoreConfig,
-        rag_config: RAGConfig,
+        rag_config: "RAGConfig",
         default_corpus_id: str = "default",
         default_index_type: str = "vector",
         storage_handler: StorageHandler = None,
@@ -217,6 +214,7 @@ class FaissDatabase(BaseModule):
         self.storage_handler = StorageHandler(storageConfig=storage_config)
         
         # Initialize RAG engine
+        from ..rag.rag import RAGEngine
         self.rag_engine = RAGEngine(config=rag_config, storage_handler=self.storage_handler)
         
         # Initialize file storage handler for external file operations
@@ -305,6 +303,7 @@ class FaissDatabase(BaseModule):
                 }}
             
             # Create query object
+            from ..rag.schema import Query
             query_obj = Query(
                 query_str=query,
                 top_k=top_k,
@@ -365,7 +364,7 @@ class FaissDatabase(BaseModule):
         path_indicators = ['/', '\\', '.txt', '.pdf', '.md', '.doc', '.docx', '.csv', '.json', '.xml', '.html', '.htm']
         return any(indicator in text for indicator in path_indicators) and os.path.exists(text)
     
-    def _process_file_path(self, file_path: str, doc_index: int, metadata: Optional[Dict[str, Any]] = None) -> List[Document]:
+    def _process_file_path(self, file_path: str, doc_index: int, metadata: Optional[Dict[str, Any]] = None) -> List["Document"]:
         """
         Process a file path and return Document objects.
         
@@ -409,7 +408,7 @@ class FaissDatabase(BaseModule):
                 doc_id=str(uuid4())
             )]
 
-    def _process_file_path_sync(self, file_path: str, doc_index: int, metadata: Optional[Dict[str, Any]] = None) -> List[Document]:
+    def _process_file_path_sync(self, file_path: str, doc_index: int, metadata: Optional[Dict[str, Any]] = None) -> List["Document"]:
         """
         Synchronous version of file processing that can be safely called from a thread.
         
@@ -942,7 +941,7 @@ class FaissToolkit(Toolkit):
         self,
         name: str = "FaissToolkit",
         storage_config: Optional[StoreConfig] = None,
-        rag_config: Optional[RAGConfig] = None,
+        rag_config: Optional["RAGConfig"] = None,
         default_corpus_id: str = "default",
         default_index_type: str = "vector",
         db_path: Optional[str] = None,

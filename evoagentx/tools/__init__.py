@@ -21,7 +21,8 @@ from .image_analysis import ImageAnalysisToolkit
 from .cmd_toolkit import CMDToolkit
 from .rss_feed import RSSToolkit
 from .file_tool import FileToolkit
-
+from .search_serpapi import SerpAPIToolkit
+from .search_serperapi import SerperAPIToolkit
 
 __all__ = [
     "Tool", 
@@ -49,6 +50,8 @@ __all__ = [
     "ImageAnalysisToolkit",
     "CMDToolkit",
     "RSSToolkit",
-    "FileToolkit"
+    "FileToolkit",
+    "SerpAPIToolkit",
+    "SerperAPIToolkit"
 ]
 
