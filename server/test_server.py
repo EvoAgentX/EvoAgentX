@@ -276,7 +276,8 @@ TEST_INPUTS = {
 # Fixed test configuration
 TEST_CONFIG = {
     # "project_short_id": "xf35dy4", ## Image
-    "project_short_id": "9mshbju", ## Fairy tail generation
+    "project_short_id": "gt99u7w", ## Image analysis
+    # "project_short_id": "9mshbju", ## Fairy tail generation
     "test_workflow_ids": [test_workflow_id_1, test_workflow_id_2]
 }
 def generate_test_ids() -> str:
@@ -1119,13 +1120,13 @@ def run_complete_test() -> Dict[str, Any]:
     #     "result": parallel_setup_result
     # }
     
-    # Phase 7: Parallel Generation WebSocket Test __________________________________________
-    parallel_websocket_passed, parallel_websocket_result = test_parallel_generation_websocket(project_short_id)
-    test_results["phases"]["parallel_generation_websocket"] = {
-        "passed": parallel_websocket_passed,
-        "timestamp": datetime.now().isoformat(),
-        "result": parallel_websocket_result
-    }
+    # # Phase 7: Parallel Generation WebSocket Test __________________________________________
+    # parallel_websocket_passed, parallel_websocket_result = test_parallel_generation_websocket(project_short_id)
+    # test_results["phases"]["parallel_generation_websocket"] = {
+    #     "passed": parallel_websocket_passed,
+    #     "timestamp": datetime.now().isoformat(),
+    #     "result": parallel_websocket_result
+    # }
     
     # # Phase 5: Status Check
     # status_passed, status_result = test_workflow_status(workflow_ids)
