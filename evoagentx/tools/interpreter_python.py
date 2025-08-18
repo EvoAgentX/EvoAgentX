@@ -47,7 +47,8 @@ class PythonInterpreter(BaseInterpreter):
             **kwargs
         )
         self.allowed_imports = allowed_imports or set()
-        self.storage_handler = storage_handler
+        self.namespace = {}
+        self.visited_modules = {}
 
     def _get_file_and_folder_names(self, target_path: str) -> List[str]:
         """Retrieves the names of files and folders (without extensions) in a given directory.
@@ -458,5 +459,4 @@ class PythonInterpreterToolkit(Toolkit):
         
         # Store python_interpreter as instance variable
         self.python_interpreter = python_interpreter
-        self.storage_handler = storage_handler
     

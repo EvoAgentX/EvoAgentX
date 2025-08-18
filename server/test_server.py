@@ -251,20 +251,32 @@ HEADERS = {
 }
 # Fixed test data for consistent testing
 test_workflow_id_1 = "550e8400-e29b-41d4-a716-446655440001"
-test_workflow_id_2 = "ac011346-13cc-4b2d-afa0-f731aa62d68c"
+# test_workflow_id_2 = "ac011346-13cc-4b2d-afa0-f731aa62d68c" # image generation
+test_workflow_id_2 = "1c184cc8-4495-471c-b3fe-0ffe0c7ee315" # fairy tail generation
 
-# Fixed test inputs for consistent results - Updated for treatment recommendation workflow
+## Fairy tail generation
 TEST_INPUTS = {
-    "prompt": "A beautiful sunset over a calm ocean, with a small boat in the foreground. The sky is painted with soft, warm colors, and the water reflects the sunset's glow. The boat is a simple wooden vessel with a sail, gently rocking on the water. The scene is peaceful and serene, with a sense of tranquility and calm.",
-    "negative_prompt": "No text, no watermark, no logo",
-    "style": "realistic",
-    "dimensions": {"width": 1024, "height": 1024},
-    "quality": "high"
+    "theme": "A beautiful sunset over a calm ocean, with a small boat in the foreground. The sky is painted with soft, warm colors, and the water reflects the sunset's glow. The boat is a simple wooden vessel with a sail, gently rocking on the water. The scene is peaceful and serene, with a sense of tranquility and calm.",
+    "characters": ["A beautiful sunset over a calm ocean, with a small boat in the foreground. The sky is painted with soft, warm colors, and the water reflects the sunset's glow. The boat is a simple wooden vessel with a sail, gently rocking on the water. The scene is peaceful and serene, with a sense of tranquility and calm."],
+    "age_group": "3-5",
+    "story_length": "short",
+    "moral_lesson": "A beautiful sunset over a calm ocean, with a small boat in the foreground. The sky is painted with soft, warm colors, and the water reflects the sunset's glow. The boat is a simple wooden vessel with a sail, gently rocking on the water. The scene is peaceful and serene, with a sense of tranquility and calm.",
+    "setting": "A beautiful sunset over a calm ocean, with a small boat in the foreground. The sky is painted with soft, warm colors, and the water reflects the sunset's glow. The boat is a simple wooden vessel with a sail, gently rocking on the water. The scene is peaceful and serene, with a sense of tranquility and calm."
 }
+
+# # Image generation
+# TEST_INPUTS = {
+#     "prompt": "A beautiful sunset over a calm ocean, with a small boat in the foreground. The sky is painted with soft, warm colors, and the water reflects the sunset's glow. The boat is a simple wooden vessel with a sail, gently rocking on the water. The scene is peaceful and serene, with a sense of tranquility and calm.",
+#     "negative_prompt": "No text, no watermark, no logo",
+#     "style": "realistic",
+#     "dimensions": {"width": 1024, "height": 1024},
+#     "quality": "high"
+# }
 
 # Fixed test configuration
 TEST_CONFIG = {
-    "project_short_id": "xf35dy4",
+    # "project_short_id": "xf35dy4", ## Image
+    "project_short_id": "9mshbju", ## Fairy tail generation
     "test_workflow_ids": [test_workflow_id_1, test_workflow_id_2]
 }
 def generate_test_ids() -> str:
@@ -1107,13 +1119,13 @@ def run_complete_test() -> Dict[str, Any]:
     #     "result": parallel_setup_result
     # }
     
-    # # Phase 7: Parallel Generation WebSocket Test __________________________________________
-    # parallel_websocket_passed, parallel_websocket_result = test_parallel_generation_websocket(project_short_id)
-    # test_results["phases"]["parallel_generation_websocket"] = {
-    #     "passed": parallel_websocket_passed,
-    #     "timestamp": datetime.now().isoformat(),
-    #     "result": parallel_websocket_result
-    # }
+    # Phase 7: Parallel Generation WebSocket Test __________________________________________
+    parallel_websocket_passed, parallel_websocket_result = test_parallel_generation_websocket(project_short_id)
+    test_results["phases"]["parallel_generation_websocket"] = {
+        "passed": parallel_websocket_passed,
+        "timestamp": datetime.now().isoformat(),
+        "result": parallel_websocket_result
+    }
     
     # # Phase 5: Status Check
     # status_passed, status_result = test_workflow_status(workflow_ids)
