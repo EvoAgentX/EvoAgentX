@@ -24,6 +24,8 @@ from ..utils.utils import (
     create_agent_from_dict,
     generate_dynamic_class_name,
     make_parent_folder,
+    pydantic_to_parameters,
+    validate_params,
 )
 from .action_graph import ActionGraph
 
@@ -234,6 +236,40 @@ class WorkFlowNode(BaseModule):
         else:
             return [param.name for param in self.outputs]
 
+    def check_agents(self):
+        """
+        Checks if any agent assigned to this node accept the node inputs and if any agent outputs the node outputs.
+        """
+        if self.agents is None:
+            raise ValueError(f"No agents assigned to node '{self.name}'")
+        elif len(self.agents)==0:
+            raise ValueError(f"No agents assigned to node '{self.name}'")
+
+        agent_inputs = []
+        agent_outputs = []
+
+        for agent in self.agents:
+            if isinstance(agent, Agent):
+                agent_actions = [
+                    action for action in agent.actions if action.name != "ContextExtraction"
+                ]
+                for action in agent_actions:
+                    agent_inputs.extend(pydantic_to_parameters(action.inputs_format))
+                    agent_outputs.extend(pydantic_to_parameters(action.outputs_format))
+            elif isinstance(agent, dict):
+                input_parameters = [Parameter.from_dict(input) for input in agent["inputs"]]
+                output_parameters = [Parameter.from_dict(output) for output in agent["outputs"]]
+                agent_inputs.extend(input_parameters)
+                agent_outputs.extend(output_parameters)
+            elif isinstance(agent, str):
+                logger.warning(f"Agent '{agent}' at node '{self.name}' is not an instance of Agent or dict. Cannot check agent inputs/outputs, skipping.")
+            else:
+                raise TypeError(f"{type(agent)} is an unknown agent type!")
+
+        validate_params(self.inputs, agent_inputs, f"node '{self.name}' input", "agent input")
+        validate_params(self.outputs, agent_outputs, f"node '{self.name}' output", "agent output")
+
+
 class WorkFlowEdge(BaseModule):
     """
     Represents a directed edge in a workflow graph.
@@ -311,12 +347,16 @@ class WorkFlowGraph(BaseModule):
         nodes: List of WorkFlowNode instances representing tasks
         edges: List of WorkFlowEdge instances representing dependencies
         graph: Internal NetworkX MultiDiGraph or another WorkFlowGraph
+        workflow_inputs: List of inputs that the workflow accepts. If not provided, inputs from initial nodes are used.
+        workflow_outputs: The final outputs of the workflow. If not provided, outputs from end nodes are used.
     """
 
     goal: str
     nodes: Optional[List[WorkFlowNode]] = []
     edges: Optional[List[WorkFlowEdge]] = []
     graph: Optional[Union[MultiDiGraph, "WorkFlowGraph"]] = Field(default=None, exclude=True)
+    workflow_inputs: Optional[List[Parameter]] = None
+    workflow_outputs: Optional[List[Parameter]] = None
 
     def init_module(self):
         self._lock = threading.Lock()
@@ -328,7 +368,24 @@ class WorkFlowGraph(BaseModule):
             self._init_from_workflowgraph(self.graph, self.nodes, self.edges)
         else:
             raise TypeError(f"{type(self.graph)} is an unknown type for graph. Supported types: [MultiDiGraph, WorkFlowGraph]")
+        
         self._validate_workflow_structure()
+
+        if self.workflow_inputs is None:
+            initial_nodes = self.find_initial_nodes()
+            workflow_inputs = []
+            for node_name in initial_nodes:
+                workflow_inputs.extend(self.get_node(node_name).inputs)
+            self.workflow_inputs = workflow_inputs
+
+        if self.workflow_outputs is None:
+            end_nodes = self.find_end_nodes()
+            workflow_outputs = []
+            for node_name in end_nodes:
+                workflow_outputs.extend(self.get_node(node_name).outputs)
+            self.workflow_outputs = workflow_outputs
+        
+        self._check_workflow_inputs_outputs()
         self.update_graph()
     
     def update_graph(self):
@@ -1071,7 +1128,35 @@ class WorkFlowGraph(BaseModule):
                 if any([param in another_node_input_params for param in node_output_params]):
                     edges.append(WorkFlowEdge(edge_tuple=(node.name, another_node.name)))
         return edges
+
+
+    def _check_workflow_inputs_outputs(self):
+        """Checks if the workflow inputs and outputs can be satisfied by the nodes in the workflow graph.
+        Raises error If any workflow input is not used by a node, or if any workflow output cannot be found from a node's output.
+        """
+        graph_inputs = []
+        graph_outputs = []
+
+        for node in self.nodes:
+            graph_inputs.extend(node.inputs)
+            graph_outputs.extend(node.outputs)
+
+        validate_params(self.workflow_inputs, graph_inputs, "required input", "actual workflow input")
+        validate_params(self.workflow_outputs, graph_outputs, "required output", "actual workflow output")
+
+
+    def _check_agents(self):
+        """Checks if each node's inputs and outputs can be satisfied by the agents assigned to the node."""
+        for node in self.nodes:
+            node.check_agents()
     
+
+    def _validate_workflow_graph(self):
+        self._validate_workflow_structure()
+        self._check_workflow_inputs_outputs()
+        self._check_agents()
+
+
     def get_config(self) -> dict:
         """
         Get a dictionary containing all necessary configuration to recreate this workflow graph.
@@ -1107,8 +1192,10 @@ class WorkFlowGraph(BaseModule):
                 )
                 node_agents.append(agent)
             node["agents"] = node_agents
-                
-        return cls._create_instance(data)
+
+        workflow_graph: WorkFlowGraph = cls._create_instance(data)
+        workflow_graph._validate_workflow_graph()
+        return workflow_graph
 
 
 class SequentialWorkFlowGraph(WorkFlowGraph):
