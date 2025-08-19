@@ -24,6 +24,8 @@ from ..utils.utils import (
     create_agent_from_dict,
     generate_dynamic_class_name,
     make_parent_folder,
+    pydantic_to_parameters,
+    validate_params,
 )
 from .action_graph import ActionGraph
 
@@ -233,6 +235,40 @@ class WorkFlowNode(BaseModule):
             return [param.name for param in self.outputs if param.required]
         else:
             return [param.name for param in self.outputs]
+
+    def check_agents(self):
+        """
+        Checks if any agent assigned to this node accept the node inputs and if any agent outputs the node outputs.
+        """
+        if self.agents is None:
+            raise ValueError(f"No agents assigned to node '{self.name}'")
+        elif len(self.agents)==0:
+            raise ValueError(f"No agents assigned to node '{self.name}'")
+
+        agent_inputs = []
+        agent_outputs = []
+
+        for agent in self.agents:
+            if isinstance(agent, Agent):
+                agent_actions = [
+                    action for action in agent.actions if action.name != "ContextExtraction"
+                ]
+                for action in agent_actions:
+                    agent_inputs.extend(pydantic_to_parameters(action.inputs_format))
+                    agent_outputs.extend(pydantic_to_parameters(action.outputs_format))
+            elif isinstance(agent, dict):
+                input_parameters = [Parameter.from_dict(input) for input in agent["inputs"]]
+                output_parameters = [Parameter.from_dict(output) for output in agent["outputs"]]
+                agent_inputs.extend(input_parameters)
+                agent_outputs.extend(output_parameters)
+            elif isinstance(agent, str):
+                logger.warning(f"Agent '{agent}' at node '{self.name}' is not an instance of Agent or dict. Cannot check agent inputs/outputs, skipping.")
+            else:
+                raise TypeError(f"{type(agent)} is an unknown agent type!")
+
+        validate_params(self.inputs, agent_inputs, f"node '{self.name}' input", "agent input")
+        validate_params(self.outputs, agent_outputs, f"node '{self.name}' output", "agent output")
+
 
 class WorkFlowEdge(BaseModule):
     """
