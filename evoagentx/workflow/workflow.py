@@ -43,8 +43,11 @@ class WorkFlow(BaseModule):
             self.workflow_manager = WorkFlowManager(llm=self.llm)
         if self.agent_manager is None:
             logger.warning("agent_manager is NoneType when initializing a WorkFlow instance")
+        
+        self.output_names = [output.name for output in self.graph.workflow_outputs]
 
-    @retry(stop=stop_after_attempt(3))
+
+    @retry(stop=stop_after_attempt(3), reraise=True)
     def execute(self, inputs: dict = {}, extract_output: bool = False, **kwargs) -> Union[dict, str]:
         """
         Synchronous wrapper for async_execute. Creates a new event loop and runs the async method.
@@ -117,17 +120,8 @@ class WorkFlow(BaseModule):
         if extract_output:
             output: str = await self.workflow_manager.extract_output(graph=self.graph, env=self.environment)
         else:
-            output: dict = self._get_workflow_outputs()
+            output: dict = self.environment.get_execution_data(self.output_names)
         return output
-
-
-    def _get_workflow_outputs(self) -> dict:
-        end_tasks = self.graph.find_end_nodes()
-        output_names = []
-        for task in end_tasks:
-            output_names.extend(self.graph.get_node(task).get_output_names())
-
-        return self.environment.get_execution_data(output_names)
 
     
     def _prepare_inputs(self, inputs: dict) -> dict:
@@ -154,7 +148,7 @@ class WorkFlow(BaseModule):
         logger.info(f"The next subtask to be executed is: {task.name}")
         return task
     
-    @retry(stop=stop_after_attempt(3))
+    @retry(stop=stop_after_attempt(3), reraise=True)
     async def execute_task(self, task: WorkFlowNode):
         """
         Asynchronously execute a workflow task.
