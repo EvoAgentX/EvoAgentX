@@ -84,8 +84,10 @@ class CustomizeAction(Action):
             elif isinstance(value, (dict, list)):
                 prompt_params_values[param] = json.dumps(value, indent=4)
             else:
-                raise TypeError(f"The input type {type(value)} is invalid! Valid types: [str, dict, list].")
-        
+                try:
+                    prompt_params_values[param] = str(value)
+                except:
+                    raise TypeError(f"Invalid input type {type(value)}. Expected a type that can be converted to a string.")
         if self.prompt:
             prompt = self.prompt.format(**prompt_params_values) if prompt_params_values else self.prompt
             if self.tools:
