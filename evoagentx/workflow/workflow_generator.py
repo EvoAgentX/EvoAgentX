@@ -7,6 +7,7 @@ from copy import deepcopy
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from pydantic import Field, PositiveInt
+from tenacity import retry, stop_after_attempt
 
 from ..actions.agent_generation import (
     AgentGenerationOutput,
@@ -195,8 +196,8 @@ class WorkFlowGenerator(BaseModule):
     def generate_workflow_plan(
         self, 
         goal: str, 
-        workflow_inputs: List[Parameter] = [Parameter(name="workflow_input", type="string", description="workflow input")], 
-        workflow_outputs: List[Parameter] = [Parameter(name="workflow_output", type="string", description="workflow output")], 
+        workflow_inputs: List[Parameter], 
+        workflow_outputs: List[Parameter], 
         **kwargs
     ) -> WorkFlowGraph:
         """
@@ -216,58 +217,8 @@ class WorkFlowGenerator(BaseModule):
         logger.info("Generating workflow plan...")
         plan = self.generate_plan(goal=goal, workflow_inputs=workflow_inputs, workflow_outputs=workflow_outputs, **kwargs)
         logger.info("Building workflow from plan...")
-        workflow = self.build_workflow_from_plan(goal=goal, plan=plan)
-        logger.info("Validating workflow structure...")
-        workflow._validate_workflow_structure()
-        logger.info("Checking workflow inputs and outputs...")
-        self._check_workflow_inputs_outputs(workflow, workflow_inputs, workflow_outputs)
-        logger.info(f"Successfully generated the following workflow:\n{workflow.get_workflow_description()}")
+        workflow = self.build_workflow_from_plan(goal=goal, plan=plan, workflow_inputs=workflow_inputs, workflow_outputs=workflow_outputs)
         return workflow
-
-
-    def _check_workflow_inputs_outputs(
-        self, 
-        workflow_graph: WorkFlowGraph, 
-        workflow_inputs: List[Parameter], 
-        workflow_outputs: List[Parameter]
-    ):
-
-        initial_nodes = workflow_graph.find_initial_nodes()
-        graph_inputs = []
-
-        for node_name in initial_nodes:
-            graph_inputs.extend(workflow_graph.get_node(node_name).inputs)
-
-        graph_inputs_dict = {input.name: input for input in graph_inputs}
-
-        for workflow_input in workflow_inputs:
-            if workflow_input.name not in graph_inputs_dict:
-                raise ValueError(f"Workflow input '{workflow_input.name}' is not found in the workflow graph")
-            
-            if workflow_input.type != graph_inputs_dict[workflow_input.name].type:
-                raise ValueError(f"Workflow input '{workflow_input.name}' type does not match the type specified by the user")
-
-            if workflow_input.required != graph_inputs_dict[workflow_input.name].required:
-                raise ValueError(f"Workflow input '{workflow_input.name}' required status does not match the required status specified by the user")
-
-        end_nodes = workflow_graph.find_end_nodes()
-        graph_outputs = []
-
-        for node_name in end_nodes:
-            graph_outputs.extend(workflow_graph.get_node(node_name).outputs)
-
-        graph_outputs_dict = {output.name: output for output in graph_outputs}
-
-        for workflow_output in workflow_outputs:
-            if workflow_output.name not in graph_outputs_dict:
-                raise ValueError(f"Workflow output '{workflow_output.name}' is not found in the workflow graph")
-            
-            if workflow_output.type != graph_outputs_dict[workflow_output.name].type:
-                raise ValueError(f"Workflow output '{workflow_output.name}' type does not match the type specified by the user")
-
-            if workflow_output.required != graph_outputs_dict[workflow_output.name].required:
-                raise ValueError(f"Workflow output '{workflow_output.name}' required status does not match the required status specified by the user")
-
 
 
     def generate_plan(
@@ -330,10 +281,7 @@ class WorkFlowGenerator(BaseModule):
             WorkFlowGraph: The workflow graph with generated/prebuilt agents
         """
         workflow = asyncio.run(self.async_generate_agents(workflow, examples))
-        # Validate that all nodes have agents
-        for node in workflow.nodes:
-            if not node.agents:
-                raise ValueError(f"Node '{node.name}' has no agents assigned after agent generation")
+        workflow._validate_workflow_graph()
         return workflow
 
 
@@ -354,7 +302,8 @@ class WorkFlowGenerator(BaseModule):
         workflow.nodes = processed_nodes
         return workflow
     
-
+    
+    @retry(stop=stop_after_attempt(2), reraise=True)
     async def _generate_agents_for_node(self, node: WorkFlowNode, goal: str, workflow_desc: str) -> WorkFlowNode:
         if self.agents_rag_engine is not None:
             rag_results = await self.agents_rag_engine.query_async(node.description)
@@ -384,11 +333,12 @@ class WorkFlowGenerator(BaseModule):
         
         agents = self._process_agent_generator_output(agent_generator_output.content)
         node.set_agents(agents=agents)
+        node.check_agents()
         return node
 
 
     # def review_plan(self, goal: str, )
-    def build_workflow_from_plan(self, goal: str, plan: TaskPlanningOutput) -> WorkFlowGraph:
+    def build_workflow_from_plan(self, goal: str, plan: TaskPlanningOutput, workflow_inputs: List[Parameter], workflow_outputs: List[Parameter]) -> WorkFlowGraph:
         """
         Builds a workflow graph from task planner agent's output by setting sub-tasks as nodes
         and infer edges between nodes based on their inputs and outputs.
@@ -396,6 +346,8 @@ class WorkFlowGenerator(BaseModule):
         Args:
             goal (str): The goal of the workflow
             plan (TaskPlanningOutput): The task planner agent's output
+            workflow_inputs (List[Parameter]): List of inputs that the workflow accepts
+            workflow_outputs (List[Parameter]): The final outputs of the workflow
         
         Returns:
             WorkFlowGraph: The workflow graph
@@ -411,7 +363,13 @@ class WorkFlowGenerator(BaseModule):
                 another_node_input_params = [param.name for param in another_node.inputs]
                 if any([param in another_node_input_params for param in node_output_params]):
                     edges.append(WorkFlowEdge(edge_tuple=(node.name, another_node.name)))
-        workflow = WorkFlowGraph(goal=goal, nodes=nodes, edges=edges)
+        workflow = WorkFlowGraph(
+            goal=goal, 
+            nodes=nodes, 
+            edges=edges, 
+            workflow_inputs=workflow_inputs, 
+            workflow_outputs=workflow_outputs
+        )
         return workflow
 
 
