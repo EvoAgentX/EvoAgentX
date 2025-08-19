@@ -249,6 +249,34 @@ def pydantic_to_parameters(base_model: BaseModel) -> List[Parameter]:
         parameters.append(param)
     return parameters
 
+
+def validate_params(
+    required_params: List[Parameter], 
+    actual_params: List[Parameter], 
+    required_params_name: str, 
+    actual_params_name: str
+):
+    """
+    Checks if `actual_params` have `required_params` and if the `required_params` in `actual_params` have the same type and required value.
+
+    Args:
+        required_params: A list of parameters that are required. Raises error if `actual_params` doesn't contain these parameters.
+        actual_params: A list of parameters to check if `required_params` exist.
+        required_params_name: A name for `required params` to be shown in error messages.
+        actual_params_name: A name for `actual_params` to be shown in error messages.
+    """
+
+    actual_params_dict = {param.name: param for param in actual_params}
+    for param in required_params:
+        if param.name not in actual_params_dict:
+            raise ValueError(f"{required_params_name} '{param.name}' is not found in {actual_params_name}")
+            
+        actual_type = actual_params_dict[param.name].type
+        actual_required = actual_params_dict[param.name].required
+        if param.type != actual_type or param.required != actual_required:
+            raise ValueError(f"Mismatch for '{param.name}': {required_params_name} (type={param.type}, required={param.required}) vs. {actual_params_name} (type={actual_type}, required={actual_required})")
+
+
 def fix_json_booleans(json_string: str) -> str:
     """
     Finds and replaces isolated "True" and "False" with "true" and "false".
