@@ -19,8 +19,8 @@ from ..utils.utils import (
     add_llm_config_to_agent_dict,
     generate_dynamic_class_name,
     get_unique_class_name,
-    json_to_python_type,
     make_parent_folder,
+    string_to_python_type,
     tool_names_to_tools,
 )
 from .agent import Agent
@@ -331,7 +331,7 @@ class CustomizeAgent(Agent):
             required = field.get("required", True)
             
             try:
-                field_type = json_to_python_type[field["type"]]
+                field_type = string_to_python_type[field["type"]]
             except KeyError:
                 field_type = Any
 
@@ -355,7 +355,7 @@ class CustomizeAgent(Agent):
         for field in outputs:
             required = field.get("required", True)
             try:
-                field_type = json_to_python_type[field["type"]]
+                field_type = string_to_python_type[field["type"]]
             except KeyError:
                 logger.warning(f'Could not find Python type for "{field["type"]}" (field: "{field["name"]}"), falling back to `Any`.')
                 field_type = Any
