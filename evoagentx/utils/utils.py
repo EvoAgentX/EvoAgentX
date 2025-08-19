@@ -5,8 +5,10 @@ from typing import Any, Dict, List, Optional, Set, Union
 
 import regex
 import requests
+from pydantic import BaseModel
 from tqdm import tqdm
 
+from ..core.base_config import Parameter
 from ..core.logging import logger
 from ..core.registry import MODULE_REGISTRY
 
@@ -208,6 +210,44 @@ def create_agent_from_dict(
     cls = MODULE_REGISTRY.get_module(agent_class_name)
     agent = cls.from_dict(data=agent_dict, llm_config=llm_config, tools=tools, agents=agents)
     return agent
+
+
+def pydantic_to_parameters(base_model: BaseModel) -> List[Parameter]:
+    """
+    Converts a Pydantic BaseModel class into a list of Parameter instances.
+
+    Args:
+        model: A Pydantic BaseModel class.
+
+    Returns:
+        A list of Parameter objects, where each object corresponds to a field
+        in the input BaseModel.
+    """
+    parameters = []
+    for field_name, field_info in base_model.model_fields.items():
+        # Get the field type as a json type
+        try:
+            field_type = python_to_json_type[field_info.annotation]
+        except KeyError:
+            field_type = "string"
+
+        # Determine the description
+        description = field_info.description if field_info.description else field_name
+
+        # Determine if the field is required
+        # A field is considered required if it doesn't have a default value
+        # and isn't Optional.
+        required = field_info.is_required()
+
+        # Create the Parameter instance
+        param = Parameter(
+            name=field_name,
+            type=field_type,
+            description=description,
+            required=required
+        )
+        parameters.append(param)
+    return parameters
 
 def fix_json_booleans(json_string: str) -> str:
     """
