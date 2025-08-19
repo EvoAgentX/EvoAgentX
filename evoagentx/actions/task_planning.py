@@ -148,8 +148,8 @@ class TaskPlanning(Action):
             Example 2:
             ...
         """
-        if len(examples) == 0:
-            return ""
+        if len(examples) == 0 or examples is None:
+            return "None"
 
         prompt = []
 
