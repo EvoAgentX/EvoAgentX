@@ -136,7 +136,6 @@ TOOL_CALLING_TEMPLATE = """
 **Important Notes**
 - All content within the `ToolCalling` code block must be valid JSON. Do not include any text, explanations or comments within these code blocks.
 - Only use tools listed in Available Tools
-- Never write comments in tool calls
 - Stop generating after the tool call JSON
 - Each tool call must include both function_name and function_args
 
