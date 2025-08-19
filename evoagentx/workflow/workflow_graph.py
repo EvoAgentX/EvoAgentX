@@ -347,12 +347,16 @@ class WorkFlowGraph(BaseModule):
         nodes: List of WorkFlowNode instances representing tasks
         edges: List of WorkFlowEdge instances representing dependencies
         graph: Internal NetworkX MultiDiGraph or another WorkFlowGraph
+        workflow_inputs: List of inputs that the workflow accepts
+        workflow_outputs: The final outputs of the workflow
     """
 
     goal: str
     nodes: Optional[List[WorkFlowNode]] = []
     edges: Optional[List[WorkFlowEdge]] = []
     graph: Optional[Union[MultiDiGraph, "WorkFlowGraph"]] = Field(default=None, exclude=True)
+    workflow_inputs: List[Parameter] = [Parameter(name="workflow_input", type="string", description="workflow input")]
+    workflow_outputs: List[Parameter] = [Parameter(name="workflow_output", type="string", description="workflow output")]
 
     def init_module(self):
         self._lock = threading.Lock()
@@ -365,6 +369,7 @@ class WorkFlowGraph(BaseModule):
         else:
             raise TypeError(f"{type(self.graph)} is an unknown type for graph. Supported types: [MultiDiGraph, WorkFlowGraph]")
         self._validate_workflow_structure()
+        self._check_workflow_inputs_outputs()
         self.update_graph()
     
     def update_graph(self):
@@ -1107,7 +1112,35 @@ class WorkFlowGraph(BaseModule):
                 if any([param in another_node_input_params for param in node_output_params]):
                     edges.append(WorkFlowEdge(edge_tuple=(node.name, another_node.name)))
         return edges
+
+
+    def _check_workflow_inputs_outputs(self):
+        """Checks if the workflow inputs and outputs can be satisfied by the nodes in the workflow graph.
+        Raises error If any workflow input is not used by a node, or if any workflow output cannot be found from a node's output.
+        """
+        graph_inputs = []
+        graph_outputs = []
+
+        for node in self.nodes:
+            graph_inputs.extend(node.inputs)
+            graph_outputs.extend(node.outputs)
+
+        validate_params(self.workflow_inputs, graph_inputs, "required input", "actual workflow input")
+        validate_params(self.workflow_outputs, graph_outputs, "required output", "actual workflow output")
+
+
+    def _check_agents(self):
+        """Checks if each node's inputs and outputs can be satisfied by the agents assigned to the node."""
+        for node in self.nodes:
+            node.check_agents()
     
+
+    def _validate_workflow_graph(self):
+        self._validate_workflow_structure()
+        self._check_workflow_inputs_outputs()
+        self._check_agents()
+
+
     def get_config(self) -> dict:
         """
         Get a dictionary containing all necessary configuration to recreate this workflow graph.
@@ -1143,8 +1176,10 @@ class WorkFlowGraph(BaseModule):
                 )
                 node_agents.append(agent)
             node["agents"] = node_agents
-                
-        return cls._create_instance(data)
+
+        workflow_graph: WorkFlowGraph = cls._create_instance(data)
+        workflow_graph._validate_workflow_graph()
+        return workflow_graph
 
 
 class SequentialWorkFlowGraph(WorkFlowGraph):
