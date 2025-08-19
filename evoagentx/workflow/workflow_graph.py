@@ -347,16 +347,16 @@ class WorkFlowGraph(BaseModule):
         nodes: List of WorkFlowNode instances representing tasks
         edges: List of WorkFlowEdge instances representing dependencies
         graph: Internal NetworkX MultiDiGraph or another WorkFlowGraph
-        workflow_inputs: List of inputs that the workflow accepts
-        workflow_outputs: The final outputs of the workflow
+        workflow_inputs: List of inputs that the workflow accepts. If not provided, inputs from initial nodes are used.
+        workflow_outputs: The final outputs of the workflow. If not provided, outputs from end nodes are used.
     """
 
     goal: str
     nodes: Optional[List[WorkFlowNode]] = []
     edges: Optional[List[WorkFlowEdge]] = []
     graph: Optional[Union[MultiDiGraph, "WorkFlowGraph"]] = Field(default=None, exclude=True)
-    workflow_inputs: List[Parameter] = [Parameter(name="workflow_input", type="string", description="workflow input")]
-    workflow_outputs: List[Parameter] = [Parameter(name="workflow_output", type="string", description="workflow output")]
+    workflow_inputs: Optional[List[Parameter]] = None
+    workflow_outputs: Optional[List[Parameter]] = None
 
     def init_module(self):
         self._lock = threading.Lock()
@@ -368,7 +368,23 @@ class WorkFlowGraph(BaseModule):
             self._init_from_workflowgraph(self.graph, self.nodes, self.edges)
         else:
             raise TypeError(f"{type(self.graph)} is an unknown type for graph. Supported types: [MultiDiGraph, WorkFlowGraph]")
+        
         self._validate_workflow_structure()
+
+        if self.workflow_inputs is None:
+            initial_nodes = self.find_initial_nodes()
+            workflow_inputs = []
+            for node_name in initial_nodes:
+                workflow_inputs.extend(self.get_node(node_name).inputs)
+            self.workflow_inputs = workflow_inputs
+
+        if self.workflow_outputs is None:
+            end_nodes = self.find_end_nodes()
+            workflow_outputs = []
+            for node_name in end_nodes:
+                workflow_outputs.extend(self.get_node(node_name).outputs)
+            self.workflow_outputs = workflow_outputs
+        
         self._check_workflow_inputs_outputs()
         self.update_graph()
     
