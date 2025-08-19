@@ -229,6 +229,22 @@ def fix_json_booleans(json_string: str) -> str:
     return modified_string
 
 
+string_to_python_type = {
+    "string": str,
+    "integer": int,
+    "number": float,
+    "boolean": bool,
+    "object": dict,
+    "array": list,
+
+    "str": str,
+    "int": int,
+    "float": float,
+    "bool": bool,
+    "dict": dict,
+    "list": list,
+}
+
 json_to_python_type = {
     "string": str,
     "integer": int,
