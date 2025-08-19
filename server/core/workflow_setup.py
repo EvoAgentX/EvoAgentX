@@ -23,6 +23,7 @@ from ..prompts import WORKFLOW_GENERATION_GOAL_PROMPT, WORKFLOW_REQUIREMENT_PROM
 from ..database.db import database, requirement_database
 from ..utils.websocket_utils import WebSocketProgressTracker, send_progress_message, send_log_message, send_error_message
 from ..utils import generation_tools
+from ..core.workflow_logging import isolated_workflow_process
 
 load_dotenv(os.path.join(os.path.dirname(__file__), '../config/app.env'))
 
@@ -49,10 +50,10 @@ async def retrieve_requirement_from_storage(project_short_id: str) -> str:
     Raises:
         Exception: If the requirement document cannot be retrieved
     """
-    # sample_requirement_path = os.path.join('./debug/server/sample_requirement.md')
-    # with open(sample_requirement_path, 'r') as file:
-    #     requirement_content = file.read()
-    # return requirement_content
+    sample_requirement_path = os.path.join('./debug/server/sample_requirement.md')
+    with open(sample_requirement_path, 'r') as file:
+        requirement_content = file.read()
+    return requirement_content
     
     try:
         # Use the existing requirement_database client
@@ -154,6 +155,97 @@ async def extract_workflow_requirements(detailed_requirements: str) -> Dict[str,
         raise ValueError(f"Error extracting workflow requirements: {str(e)}")
 
 
+async def generate_workflow_from_goal_with_logging(payload, llm_config_dict: Dict[str, Any], mcp_config: dict = None, workflow_id: str = None, websocket_send_func: Callable = None) -> WorkFlowGraph:
+    """
+    Generate a workflow using the WorkFlowGenerator with tools and isolated logging.
+    
+    Args:
+        payload: Dict with keys "goal", "workflow_inputs", "workflow_outputs" 
+                 OR str (legacy support)
+        llm_config_dict: LLM configuration dictionary
+        mcp_config: Optional MCP configuration dictionary
+        workflow_id: Workflow ID for isolated logging
+        websocket_send_func: Optional WebSocket send function for logs
+        
+    Returns:
+        WorkFlowGraph: The generated workflow graph
+    """
+    if workflow_id and websocket_send_func:
+        # Use isolated logging
+        with isolated_workflow_process(workflow_id, "generation", websocket_send_func) as (bound_logger, process_id):
+            bound_logger.info(f"🏗️ Starting workflow generation with isolated logging")
+            return await _generate_workflow_core(payload, llm_config_dict, mcp_config, bound_logger)
+    else:
+        # Fallback to original function without logging
+        return await _generate_workflow_core(payload, llm_config_dict, mcp_config)
+
+async def _generate_workflow_core(payload, llm_config_dict: Dict[str, Any], mcp_config: dict = None, logger_instance=None):
+    """Core workflow generation logic."""
+    # Use provided logger or print fallback
+    def log_info(message):
+        if logger_instance:
+            logger_instance.info(message)
+        else:
+            print(message)
+    
+    def log_error(message):
+        if logger_instance:
+            logger_instance.error(message)
+        else:
+            print(f"ERROR: {message}")
+    
+    # Start with the predefined generation tools
+    tools = generation_tools.copy()
+    
+    try:
+        # Convert dictionary to appropriate LLM config object and create LLM instance
+        llm_config = create_llm_config(llm_config_dict)
+        llm = create_llm_instance(llm_config)
+        
+        # Add MCP tools if config is provided
+        if mcp_config:
+            try:
+                from evoagentx.tools import MCPToolkit
+                mcp_toolkit = MCPToolkit(config=mcp_config)
+                mcp_tools = mcp_toolkit.get_toolkits()
+                tools.extend(mcp_tools)
+                log_info(f"🔧 Added {len(mcp_tools)} MCP tools to generation tools")
+            except Exception as e:
+                log_error(f"⚠️  Failed to load MCP tools: {e}, proceeding with generation tools only")
+        
+        log_info(f"🔧 Using {len(tools)} total tools for workflow generation")
+        
+    except Exception as e:
+        log_error(f"Error initializing components: {e}")
+        return None
+    
+    # Extract parameters from payload
+    if isinstance(payload, str):
+        # Legacy support - treat as goal only
+        goal = payload
+        workflow_inputs = []
+        workflow_outputs = []
+    else:
+        # New dict format
+        goal = payload.get("goal")
+        workflow_inputs = _dicts_to_parameters(payload.get("workflow_inputs", []))
+        workflow_outputs = _dicts_to_parameters(payload.get("workflow_outputs", []))
+    
+    log_info(f"📝 Generating workflow for goal: {goal[:100]}...")
+    
+    # Initialize and generate workflow
+    workflow_generator = WorkFlowGenerator(llm=llm, tools=tools)
+    
+    # Generate the workflow with proper parameters
+    workflow_graph: WorkFlowGraph = workflow_generator.generate_workflow(
+        goal=goal,
+        workflow_inputs=workflow_inputs,
+        workflow_outputs=workflow_outputs
+    )
+    
+    log_info(f"✅ Workflow generation completed successfully")
+    return workflow_graph
+
 async def generate_workflow_from_goal(payload, llm_config_dict: Dict[str, Any], mcp_config: dict = None) -> WorkFlowGraph:
     """
     Generate a workflow using the WorkFlowGenerator with tools.
@@ -216,10 +308,14 @@ async def generate_workflow_from_goal(payload, llm_config_dict: Dict[str, Any], 
     return workflow_graph
 
 
-async def setup_project(project_short_id: str) -> List[Dict[str, Any]]:
+async def setup_project(project_short_id: str, websocket_send_func: Callable = None) -> List[Dict[str, Any]]:
     """
     Phase 1: Setup workflow with extraction AND generation.
     Returns a list of workflow configurations.
+    
+    Args:
+        project_short_id: The project identifier
+        websocket_send_func: Optional WebSocket send function for real-time updates
     """
     # Retrieve requirement document from storage
     print(f"📥 Retrieving requirement document for project {project_short_id}...")
@@ -269,11 +365,13 @@ async def setup_project(project_short_id: str) -> List[Dict[str, Any]]:
             "workflow_outputs": extracted_workflow["workflow_outputs"]
         }
         
-        # Generate workflow
-        workflow_graph = await generate_workflow_from_goal(
+        # Generate workflow with isolated logging
+        workflow_graph = await generate_workflow_from_goal_with_logging(
             payload, 
             default_llm_config, 
-            mcp_config={}
+            mcp_config={},
+            workflow_id=workflow_id,
+            websocket_send_func=websocket_send_func
         )
         
         
@@ -324,12 +422,17 @@ async def setup_project(project_short_id: str) -> List[Dict[str, Any]]:
     
     return workflow_configs
 
-async def setup_project_parallel(project_short_id: str) -> List[Dict[str, Any]]:
+async def setup_project_parallel(project_short_id: str, websocket_send_func: Callable = None) -> List[Dict[str, Any]]:
     """
     Phase 1: Setup workflow with extraction AND parallel generation with retry logic.
     This is an enhanced version with parallel execution and automatic retries.
-    Takes the same input as setup_project: project_short_id
-    Returns a list of workflow configurations.
+    
+    Args:
+        project_short_id: The project identifier
+        websocket_send_func: Optional WebSocket send function for real-time updates
+        
+    Returns:
+        List of workflow configurations.
     """
     # Retrieve requirement document from storage
     print(f"📥 Retrieving requirement document for project {project_short_id}...")
@@ -399,11 +502,13 @@ async def setup_project_parallel(project_short_id: str) -> List[Dict[str, Any]]:
                         "workflow_outputs": extracted_workflow["workflow_outputs"]
                     }
                     
-                    # Generate workflow
-                    workflow_graph = await generate_workflow_from_goal(
+                    # Generate workflow with isolated logging
+                    workflow_graph = await generate_workflow_from_goal_with_logging(
                         payload, 
                         default_llm_config, 
-                        mcp_config={}
+                        mcp_config={},
+                        workflow_id=workflow_id,
+                        websocket_send_func=websocket_send_func
                     )
                     
                     try:
@@ -570,15 +675,13 @@ async def setup_project_parallel_with_status_messages(project_short_id: str, web
         
         # Send status update: uninitialized after workflow is extracted and added to database
         if websocket_send_func:
-            await websocket_send_func(json.dumps({
-                "type": "workflow_status",
-                "data": {
-                    "status": "uninitialized",
-                    "workflow_id": workflow_id,
-                    "content": "workflow extracted",
-                    "result": None
-                }
-            }))
+            from ..socket_management.protocols import create_setup_log_message
+            status_message = create_setup_log_message(
+                workflow_id=workflow_id,
+                content=f"{workflow_id} updates database status to: uninitialized",
+                result=None
+            )
+            await websocket_send_func(json.dumps(status_message))
     
     # Generate workflows for each extracted workflow in parallel with retry logic
     print(f"🏗️ Generating workflows in parallel with retry logic...")
@@ -608,11 +711,13 @@ async def setup_project_parallel_with_status_messages(project_short_id: str, web
                         "workflow_outputs": extracted_workflow["workflow_outputs"]
                     }
                     
-                    # Generate workflow
-                    workflow_graph = await generate_workflow_from_goal(
+                    # Generate workflow with isolated logging
+                    workflow_graph = await generate_workflow_from_goal_with_logging(
                         payload, 
                         default_llm_config, 
-                        mcp_config={}
+                        mcp_config={},
+                        workflow_id=workflow_id,
+                        websocket_send_func=websocket_send_func
                     )
                     
                     try:
@@ -723,15 +828,13 @@ async def setup_project_parallel_with_status_messages(project_short_id: str, web
         
         # Send status update: pending after successful generation
         if websocket_send_func and workflow_data.get("success", True):
-            await websocket_send_func(json.dumps({
-                "type": "workflow_status",
-                "data": {
-                    "status": "pending",
-                    "workflow_id": workflow_id,
-                    "content": "workflow generated",
-                    "result": workflow_data
-                }
-            }))
+            from ..socket_management.protocols import create_setup_log_message
+            status_message = create_setup_log_message(
+                workflow_id=workflow_id,
+                content=f"{workflow_id} updates database status to: pending",
+                result=None
+            )
+            await websocket_send_func(json.dumps(status_message))
         
         # Create workflow config for response
         workflow_config = {

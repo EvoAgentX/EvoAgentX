@@ -10,3 +10,4 @@ supabase
 websocket-client
 websockets>=11.0
 httpx>=0.24.1
+psutil>=5.9.0

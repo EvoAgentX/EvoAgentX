@@ -1094,15 +1094,6 @@ def run_complete_test() -> Dict[str, Any]:
     #     return test_results
     workflow_ids = [test_workflow_id_2]  # Use the treatment recommendation workflow
     
-    # # Phase 3: Workflow Generation
-    # generation_passed, generation_result = test_workflow_generation(workflow_ids)
-    # test_results["phases"]["generation"] = {
-    #     "passed": generation_passed,
-    #     "timestamp": datetime.now().isoformat(),
-    #     "result": generation_result
-    # }
-    
-    
     # # Phase 4: Workflow Execution
     # execution_passed, execution_result = test_workflow_execution(workflow_ids)
     # test_results["phases"]["execution"] = {

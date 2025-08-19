@@ -36,7 +36,7 @@ except ImportError:
     logger = logging.getLogger(__name__)
 
 from ..prompts import WORKFLOW_REQUIREMENT_PROMPT, CUSTOM_OUTPUT_EXTRACTION_PROMPT
-from ..db import database
+from ..database.db import database
 
 from ..utils.output_parser import parse_workflow_output
 from ..utils.tool_creator import create_tools
@@ -46,7 +46,7 @@ load_dotenv(os.path.join(os.path.dirname(__file__), '../config/app.env'))
 
 # Default LLM configuration
 default_llm_config = {
-    "model": "gpt-4o",
+    "model": "gpt-4o-mini",
     "openai_key": os.getenv("OPENAI_API_KEY"),
     # "stream": True,
     "output_response": True,
@@ -446,19 +446,24 @@ async def execute_workflow_with_websocket(
         # Get database information (currently ignored - database tools disabled)
         database_information = task_info.get("database_information")
         
-        # Setup WebSocket enhanced sink
-        websocket_sink = WebSocketEnhancedSink(websocket_send_func, workflow_id, "workflow")
+        # Setup isolated workflow execution logging using the new system
+        from ..core.workflow_logging import IsolatedWorkflowLogger
         
-        # Add custom sink to loguru
+        isolated_logger = IsolatedWorkflowLogger(workflow_id, "execution")
+        bound_logger = isolated_logger.setup_isolated_logging(websocket_send_func)
+        execution_id = isolated_logger.process_id
+        
+        # Keep WebSocket enhanced sink for backward compatibility
+        websocket_sink = WebSocketEnhancedSink(websocket_send_func, workflow_id, "workflow")
         sink_id = None
-        try:
-            sink_id = logger.add(websocket_sink.write, level="INFO", format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}")
-        except Exception as e:
-            print(f"Warning: Could not add loguru sink: {e}")
         
         try:
             # Send progress for workflow initialization
             await progress_tracker.send_progress_update("initializing", 0.5, "Initializing workflow components...")
+            
+            # Log workflow execution start with bound logger for isolation
+            bound_logger.info(f"Starting workflow execution: {workflow_name}")
+            bound_logger.info(f"Workflow inputs: {inputs}")
             
             # Execute the workflow (database tools disabled)
             execution_result = await execute_workflow_from_config(
@@ -470,9 +475,14 @@ async def execute_workflow_with_websocket(
                 task_info=task_info
             )
             
+            # Log execution completion with bound logger
+            bound_logger.info(f"Workflow execution completed successfully")
+            bound_logger.info(f"Execution result keys: {list(execution_result.keys()) if execution_result else 'None'}")
+            
             await progress_tracker.send_progress_update("finalizing", 0.9, "Finalizing execution results...")
             
             if execution_result is None:
+                bound_logger.error(f"Failed to execute workflow: {workflow_name}")
                 await progress_tracker.send_error(f"Failed to execute workflow: {workflow_name}")
                 await update_workflow_status(workflow_id, "failed")
                 return {
@@ -526,6 +536,8 @@ async def execute_workflow_with_websocket(
             return final_result
             
         except Exception as e:
+            # Log execution error with bound logger for isolation
+            bound_logger.error(f"Workflow execution failed: {str(e)}")
             # Send execution error
             await progress_tracker.send_error(f"Workflow execution failed: {str(e)}")
             await update_workflow_status(workflow_id, "failed")
@@ -540,6 +552,14 @@ async def execute_workflow_with_websocket(
                     logger.remove(sink_id)
                 except Exception as e:
                     print(f"Warning: Could not remove loguru sink: {e}")
+            
+            # Get captured workflow engine logs before cleanup
+            captured_logs = isolated_logger.get_captured_logs()
+            if captured_logs:
+                print(f"📊 Workflow {workflow_id} captured {len(captured_logs)} engine logs during execution")
+            
+            # Cleanup isolated logging
+            isolated_logger.cleanup()
     
     except Exception as e:
         # Send connection error for unexpected failures

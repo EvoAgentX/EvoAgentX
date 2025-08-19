@@ -10,38 +10,12 @@ from typing import Dict, Any, List, Optional
 from dotenv import load_dotenv
 
 from ..database.db import database, requirement_database
-from ..models.models import WorkflowCreate, WorkflowUpdate, WorkflowResponse
 
 load_dotenv(os.path.join(os.path.dirname(__file__), '../config/app.env'))
 
 
 class DatabaseService:
     """Service class for database operations and business logic"""
-    
-    @staticmethod
-    async def create_workflow(workflow_data: WorkflowCreate) -> Dict[str, Any]:
-        """Create a new workflow in the database"""
-        try:
-            # Create workflow document
-            workflow_doc = {
-                "id": workflow_data.id,
-                "task_info": workflow_data.task_info.dict(),
-                "status": "created",
-                "created_at": datetime.now(),
-                "updated_at": datetime.now()
-            }
-            
-            # Insert into database
-            await database.insert("workflows", workflow_doc)
-            
-            return {
-                "id": workflow_data.id,
-                "status": "created",
-                "message": "Workflow created successfully"
-            }
-            
-        except Exception as e:
-            raise Exception(f"Failed to create workflow: {str(e)}")
     
     @staticmethod
     async def get_workflow(workflow_id: str) -> Optional[Dict[str, Any]]:
