@@ -357,14 +357,24 @@ class CustomizeAction(Action):
         return results
     
     def execute(self, llm: Optional[BaseLLM] = None, inputs: Optional[dict] = None, sys_msg: Optional[str]=None, return_prompt: bool = False, time_out = 0, **kwargs):
-        # Allow empty inputs if the action has no required input attributes
         input_attributes: dict = self.inputs_format.get_attr_descriptions()
-        if not inputs and input_attributes:
-            logger.error("CustomizeAction action received invalid `inputs`: None or empty.")
-            raise ValueError('The `inputs` to CustomizeAction action is None or empty.')
-        # Set inputs to empty dict if None and no inputs are required
+        required_inputs = self.inputs_format.get_required_input_names()
+
         if inputs is None:
+            if len(required_inputs)>0:
+                logger.error(f"CustomizeAction '{self.name}' requires the following inputs: {required_inputs} but received 'None' instead.")
+                raise ValueError(f"CustomizeAction '{self.name}' requires the following inputs: {required_inputs} but received 'None' instead.")
+            
+            # Set inputs to empty dict if None and no inputs are required
             inputs = {}
+        
+        elif len(required_inputs)>0:
+            # Check if all required inputs are provided
+            for required_input in required_inputs:
+                if required_input not in inputs:
+                    logger.error(f"Required input '{required_input}' not found in inputs provided to CustomizeAction '{self.name}'.")
+                    raise ValueError(f"Required input '{required_input}' not found in inputs provided to CustomizeAction '{self.name}'.")
+   
         final_llm_response = None
         
         if self.prompt_template:
@@ -429,14 +439,24 @@ class CustomizeAction(Action):
         
 
     async def async_execute(self, llm: Optional[BaseLLM] = None, inputs: Optional[dict] = None, sys_msg: Optional[str]=None, return_prompt: bool = False, time_out = 0, **kwargs):
-        # Allow empty inputs if the action has no required input attributes
         input_attributes: dict = self.inputs_format.get_attr_descriptions()
-        if not inputs and input_attributes:
-            logger.error("CustomizeAction action received invalid `inputs`: None or empty.")
-            raise ValueError('The `inputs` to CustomizeAction action is None or empty.')
-        # Set inputs to empty dict if None and no inputs are required
+        required_inputs = self.inputs_format.get_required_input_names()
+
         if inputs is None:
+            if len(required_inputs)>0:
+                logger.error(f"CustomizeAction '{self.name}' requires the following inputs: {required_inputs} but received 'None' instead.")
+                raise ValueError(f"CustomizeAction '{self.name}' requires the following inputs: {required_inputs} but received 'None' instead.")
+            
+            # Set inputs to empty dict if None and no inputs are required
             inputs = {}
+        
+        elif len(required_inputs)>0:
+            # Check if all required inputs are provided
+            for required_input in required_inputs:
+                if required_input not in inputs:
+                    logger.error(f"Required input '{required_input}' not found in inputs provided to CustomizeAction '{self.name}'.")
+                    raise ValueError(f"Required input '{required_input}' not found in inputs provided to CustomizeAction '{self.name}'.")
+        
         final_llm_response = None
         
         if self.prompt_template:
