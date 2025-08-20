@@ -141,7 +141,6 @@ def parse_xml_from_text(text: str, label: str) -> List[str]:
     return values
 
 def parse_data_from_text(text: str, datatype: str):
-
     if datatype == "str":
         data = text
     elif datatype == "int":
@@ -151,7 +150,7 @@ def parse_data_from_text(text: str, datatype: str):
     elif datatype == "bool":
         data = text.lower() in ("true", "yes", "1", "on", "True")
     elif datatype in ["list", "dict"]:
-        data = yaml.safe_load(text)
+        data = json.loads(text)
     else:
         # raise ValueError(
         #     f"Invalid value '{datatype}' is detected for `datatype`. "
