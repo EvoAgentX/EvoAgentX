@@ -67,6 +67,9 @@ sentence-transformers
 docx2txt
 python-pptx 
 Pillow
+pdf2image
+torch
+colpali-engine
 
 # tools
 docker>=6.0.0
