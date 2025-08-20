@@ -58,6 +58,7 @@ class RetrievalConfig(BaseModule):
 
 class RAGConfig(BaseConfig):
     """Configuration for the RAG pipeline."""
+    modality: str = Field(default="text", description="RAG modality: 'text' for text-only, 'multimodal' for images.")
     num_workers: Optional[int] = Field(default=None, description="Number of workers for parallel processing (e.g., reading, retrieval).")
     reader: ReaderConfig = Field(default_factory=ReaderConfig, description="Configuration for document reading.")
     chunker: ChunkerConfig = Field(default_factory=ChunkerConfig, description="Configuration for document chunking.")

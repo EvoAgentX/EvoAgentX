@@ -6,10 +6,10 @@ from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Union, Optional, Sequence, Dict, Any, Tuple
 
-from llama_index.core.schema import NodeWithScore, TextNode, RelatedNodeInfo
+from llama_index.core.schema import NodeWithScore, TextNode, ImageNode, RelatedNodeInfo
 
 from .rag_config import RAGConfig
-from .readers import LLamaIndexReader
+from .readers import LLamaIndexReader, MultimodalReader
 from .indexings import IndexFactory, BaseIndexWrapper
 from .chunkers import ChunkFactory
 from .embeddings import EmbeddingFactory, EmbeddingProvider
@@ -33,17 +33,25 @@ class RAGEngine:
         self.retriever_factory = RetrieverFactory()
         self.postprocessor_factory = PostprocessorFactory()
 
-        # Initialize reader
-        self.reader = LLamaIndexReader(
-            recursive=self.config.reader.recursive,
-            exclude_hidden=self.config.reader.exclude_hidden,
-            num_workers=self.config.num_workers,
-            num_files_limits=self.config.reader.num_files_limit,
-            custom_metadata_function=self.config.reader.custom_metadata_function,
-            extern_file_extractor=self.config.reader.extern_file_extractor,
-            errors=self.config.reader.errors,
-            encoding=self.config.reader.encoding
-        )
+        # Initialize reader based on modality
+        if self.config.modality == "multimodal":
+            self.reader = MultimodalReader(
+                recursive=self.config.reader.recursive,
+                exclude_hidden=self.config.reader.exclude_hidden,
+                num_files_limits=self.config.reader.num_files_limit,
+                errors=self.config.reader.errors
+            )
+        else:
+            self.reader = LLamaIndexReader(
+                recursive=self.config.reader.recursive,
+                exclude_hidden=self.config.reader.exclude_hidden,
+                num_workers=self.config.num_workers,
+                num_files_limits=self.config.reader.num_files_limit,
+                custom_metadata_function=self.config.reader.custom_metadata_function,
+                extern_file_extractor=self.config.reader.extern_file_extractor,
+                errors=self.config.reader.errors,
+                encoding=self.config.reader.encoding
+            )
 
         # Initialize embedding model. 
         self.embed_model = self.embedding_factory.create(
@@ -58,16 +66,19 @@ class RAGEngine:
                 self.storage_handler.storageConfig.vectorConfig.dimensions = self.embed_model.dimensions
                 self.storage_handler._init_vector_store()
 
-        # Initialize chunker
-        self.chunker = self.chunk_factory.create(
-            strategy=self.config.chunker.strategy,
-            embed_model=self.embed_model.get_embedding_model(),
-            chunker_config={
-                "chunk_size": self.config.chunker.chunk_size,
-                "chunk_overlap": self.config.chunker.chunk_overlap,
-                "max_chunks": self.config.chunker.max_chunks
-            }
-        )
+        # Initialize chunker (skip for multimodal)
+        if self.config.modality == "multimodal":
+            self.chunker = None  # No chunking for images
+        else:
+            self.chunker = self.chunk_factory.create(
+                strategy=self.config.chunker.strategy,
+                embed_model=self.embed_model.get_embedding_model(),
+                chunker_config={
+                    "chunk_size": self.config.chunker.chunk_size,
+                    "chunk_overlap": self.config.chunker.chunk_overlap,
+                    "max_chunks": self.config.chunker.max_chunks
+                }
+            )
 
         # Initialize indices and retrievers
         self.indices: Dict[str, Dict[str, BaseIndexWrapper]] = {}  # Nested: {corpus_id: {index_type: index}}
@@ -106,15 +117,30 @@ class RAGEngine:
                 merge_by_file=merge_by_file,
                 show_progress=show_progress
             )
-            corpus = self.chunker.chunk(documents)
-            corpus.corpus_id = corpus_id
-            logger.info(f"Read {len(documents)} documents and created {len(corpus.chunks)} chunks for corpus {corpus_id}")
+            if self.config.modality == "multimodal":
+                image_nodes = []
+                for doc in documents:
+                    image_node = ImageNode(
+                        text=doc.text,
+                        image=doc.image,
+                        image_path=doc.image_path,
+                        image_mimetype=doc.image_mimetype,
+                        metadata=doc.metadata
+                    )
+                    image_nodes.append(image_node)
+                
+                logger.info(f"Created {len(image_nodes)} ImageNodes for corpus {corpus_id}")
+                return image_nodes
+            else:
+                corpus = self.chunker.chunk(documents)
+                corpus.corpus_id = corpus_id
+                logger.info(f"Read {len(documents)} documents and created {len(corpus.chunks)} chunks for corpus {corpus_id}")
             return corpus
         except Exception as e:
             logger.error(f"Failed to read documents for corpus {corpus_id}: {str(e)}")
             raise
 
-    def add(self, index_type: str, nodes: Union[Corpus, List[NodeWithScore], List[TextNode]], 
+    def add(self, index_type: str, nodes: Union[Corpus, List[NodeWithScore], List[TextNode], List[ImageNode]], 
             corpus_id: str = None) -> None:
         """Add nodes to an index for a specific corpus.
 
@@ -122,7 +148,7 @@ class RAGEngine:
 
         Args:
             index_type (str): Type of index (e.g., VECTOR, GRAPH).
-            nodes (Union[Corpus, List[NodeWithScore], List[TextNode]]): Nodes or Corpus to add.
+            nodes (Union[Corpus, List[NodeWithScore], List[TextNode], List[ImageNode]]): Nodes or Corpus to add.
             corpus_id (str, optional): Identifier for the corpus. Defaults to a UUID if None.
 
         Raises:
