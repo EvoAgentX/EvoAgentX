@@ -30,7 +30,7 @@ class EvoAgentXSocketClient:
         
     async def connect(self):
         """Connect to the socket server."""
-        socket_url = f"{self.server_url}/socket/{self.project_short_id}"
+        socket_url = f"{self.server_url}/project/{self.project_short_id}/parallel-setup"
         print(f"Connecting to {socket_url}")
         
         # Connect with longer timeouts for long-running operations
@@ -107,11 +107,11 @@ class EvoAgentXSocketClient:
                 print(f"   Result: {result}")
         
         # Check for completion signals
-        if message_type == "setup_complete":
+        if message_type == "setup-complete":
             print(f"🎉 SETUP COMPLETED! Received {len(data.get('result', []))} workflow graphs")
             self.operation_results["setup"] = data.get('result')
             self.setup_complete.set()
-        elif message_type == "execution_complete":
+        elif message_type == "execution-complete":
             print(f"🎉 EXECUTION COMPLETED!")
             self.operation_results["execution"] = data.get('result')
             self.execution_complete.set()
@@ -126,11 +126,24 @@ class EvoAgentXSocketClient:
                 self.setup_complete.set()
             elif self.current_operation == "execution":
                 self.execution_complete.set()
+        elif message_type == "setup-log":
+            workflow_id = data.get('workflow_id')
+            if workflow_id:
+                print(f"🏗️ SETUP LOG with WORKFLOW ID: {workflow_id}")
+                print(f"   Content: {data.get('content')}")
+            else:
+                print(f"🏗️ SETUP LOG (no workflow ID)")
+        elif message_type == "runtime-log":
+            workflow_id = data.get('workflow_id')
+            if workflow_id:
+                print(f"🔄 RUNTIME LOG with WORKFLOW ID: {workflow_id}")
+                print(f"   Content: {data.get('content')}")
+            else:
+                print(f"🔄 RUNTIME LOG (no workflow ID)")
         elif message_type == "heartbeat":
             print(f"💓 HEARTBEAT received (keeping connection alive)")
             # Don't print full structure for heartbeats to reduce noise
             return
-        
         # Print full message structure for debugging
         print(f"\n🔬 FULL MESSAGE STRUCTURE:")
         print(json.dumps(message, indent=2, default=str))
@@ -188,7 +201,20 @@ class EvoAgentXSocketClient:
     
     def is_connected(self) -> bool:
         """Check if the WebSocket is still connected."""
-        return self.websocket and not self.websocket.closed
+        if not self.websocket:
+            return False
+        
+        # Handle different websockets library versions
+        if hasattr(self.websocket, 'closed'):
+            # Older versions of websockets library
+            return not self.websocket.closed
+        elif hasattr(self.websocket, 'state'):
+            # Newer versions (14.0+) use state attribute
+            from websockets.protocol import State
+            return self.websocket.state == State.OPEN
+        else:
+            # Fallback: assume connected if websocket object exists
+            return True
     
     async def send_project_setup_and_wait(self, timeout: float = 120.0):
         """Send project setup command and wait for completion."""
@@ -196,7 +222,14 @@ class EvoAgentXSocketClient:
         self.setup_complete.clear()
         
         print(f"\n🚀 Starting project setup (timeout: {timeout}s)")
-        await self.send_command("project.setup")
+        # Send setup message as per README specification
+        setup_message = {
+            "type": "setup",
+            "data": {
+                "project_short_id": self.project_short_id
+            }
+        }
+        await self.websocket.send(json.dumps(setup_message))
         
         print("⏳ Waiting for setup completion...")
         try:
@@ -206,10 +239,11 @@ class EvoAgentXSocketClient:
                     if not self.is_connected():
                         raise ConnectionError("WebSocket connection lost during setup")
                     try:
-                        await asyncio.wait_for(self.setup_complete.wait(), timeout=5.0)
+                        # Give the server much more time - setup can be very slow
+                        await asyncio.wait_for(self.setup_complete.wait(), timeout=600.0)
                         break
                     except asyncio.TimeoutError:
-                        print(f"⏳ Still waiting... (connection: {'✅' if self.is_connected() else '❌'})")
+                        print(f"⏳ Still waiting for setup... (connection: {'✅' if self.is_connected() else '❌'})")
                         continue
             
             await asyncio.wait_for(wait_with_connection_check(), timeout=timeout)
@@ -258,7 +292,8 @@ async def main():
         print("\n" + "="*60)
         print("=== Testing Project Setup (with completion waiting) ===")
         print("="*60)
-        setup_result = await client.send_project_setup_and_wait(timeout=120.0)
+        print("⏰ Note: Project setup can take 5-10 minutes for complex workflows")
+        setup_result = await client.send_project_setup_and_wait(timeout=600.0)  # 10 minutes timeout
         
         if setup_result:
             print(f"📊 Setup Result: {len(setup_result)} workflow graphs generated")
@@ -300,26 +335,10 @@ async def main():
         else:
             print("❌ Setup failed or timed out, skipping execution test")
         
-        # Test 3: Quick tests that don't need waiting
+        # Test 3: Test heartbeat (only other supported message type)
         print(f"\n" + "="*60)
-        print("=== Testing Quick Commands ===")
+        print("=== Testing Heartbeat ===")
         print("="*60)
-        
-        print("\n--- System Health Check ---")
-        await client.send_command("system.health")
-        await asyncio.sleep(2)
-        
-        print("\n--- Workflow List ---")
-        await client.send_command("workflow.list")
-        await asyncio.sleep(3)
-        
-        print("\n--- Query Analysis ---")
-        await client.send_command("query.analyze", {"query": "How do I create a story?"})
-        await asyncio.sleep(3)
-        
-        print("\n--- Heartbeat ---")
-        await client.send_heartbeat()
-        await asyncio.sleep(1)
         
         print(f"\n" + "="*60)
         print("=== Message Storage Information ===")

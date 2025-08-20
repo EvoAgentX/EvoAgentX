@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional, Set
 from fastapi import WebSocket, WebSocketDisconnect
 
-from .protocols import create_connection_message, create_error_message
+from .protocols import create_error_message
 from .message_store import message_store
 
 logger = logging.getLogger(__name__)
@@ -98,14 +98,27 @@ class SocketService:
             
             logger.info(f"Project {project_short_id} connected successfully")
             
-            # Send connection confirmation using existing format
-            connection_message = create_connection_message(project_short_id)
-            success = await self.send_to_project(project_short_id, connection_message)
+            # Wait a moment for WebSocket to be fully ready, then send connection confirmation
+            await asyncio.sleep(0.1)  # Small delay to ensure connection is stable
             
-            if success:
-                logger.info(f"Connection confirmation sent to {project_short_id}")
-            else:
-                logger.error(f"Failed to send connection confirmation to {project_short_id}")
+            try:
+                # Send connection confirmation as per README
+                from .protocols import create_message, MessageType
+                connection_message = create_message(
+                    MessageType.SETUP_LOG,
+                    status=None,
+                    workflow_id=None,
+                    content="WebSocket connection established",
+                    result=None
+                )
+                success = await self.send_to_project(project_short_id, connection_message)
+                
+                if success:
+                    logger.info(f"Connection confirmation sent to {project_short_id}")
+                else:
+                    logger.warning(f"Failed to send connection confirmation to {project_short_id}")
+            except Exception as e:
+                logger.warning(f"Could not send connection confirmation to {project_short_id}: {e}")
                 
         except Exception as e:
             logger.error(f"Error connecting project {project_short_id}: {e}")
@@ -136,10 +149,17 @@ class SocketService:
             socket = self.active_connections[project_short_id]["socket"]
             
             # Check if socket is still connected
-            if socket.client_state.name != 'CONNECTED':
-                logger.warning(f"Socket not connected for project {project_short_id}, state: {socket.client_state.name}")
-                await self.disconnect_project(project_short_id)
-                return False
+            try:
+                # Try to check the connection state - different approaches for different FastAPI versions
+                if hasattr(socket, 'client_state'):
+                    if socket.client_state.name not in ['CONNECTED', 'CONNECTING']:
+                        logger.warning(f"Socket not connected for project {project_short_id}, state: {socket.client_state.name}")
+                        await self.disconnect_project(project_short_id)
+                        return False
+                # If we can't check state, we'll rely on the send operation to fail if disconnected
+            except AttributeError:
+                # Ignore state checking if not available
+                pass
             
             await socket.send_text(json.dumps(message, default=str))
             logger.debug(f"Successfully sent {message.get('type', 'unknown')} message to {project_short_id}")

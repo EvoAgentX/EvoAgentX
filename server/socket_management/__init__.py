@@ -6,8 +6,8 @@ Provides real-time socket connections for project monitoring using the existing 
 from .socket_service import SocketService, socket_service
 from .message_handler import MessageHandler
 from .process_monitor import ProcessMonitor
-from .protocols import MessageType, CommandType, WorkflowStatus
 from .message_store import MessageStore, message_store
+from .protocols import MessageType
 
 __all__ = [
     'SocketService',
@@ -15,8 +15,6 @@ __all__ = [
     'MessageHandler', 
     'ProcessMonitor',
     'MessageType',
-    'CommandType',
-    'WorkflowStatus',
     'MessageStore',
     'message_store'  # Global instance
 ]

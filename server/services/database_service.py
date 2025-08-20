@@ -66,12 +66,14 @@ class DatabaseService:
             if status:
                 query["status"] = status
             
-            workflows = await database.find(
+            workflows = await database.find_many(
                 "workflows", 
                 query, 
-                skip=skip, 
                 limit=limit
             )
+            # Apply skip manually since find_many doesn't support skip parameter
+            if skip > 0:
+                workflows = workflows[skip:]
             return workflows
         except Exception as e:
             raise Exception(f"Failed to list workflows: {str(e)}")

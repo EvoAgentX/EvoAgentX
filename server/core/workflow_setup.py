@@ -170,6 +170,16 @@ async def generate_workflow_from_goal_with_logging(payload, llm_config_dict: Dic
     Returns:
         WorkFlowGraph: The generated workflow graph
     """
+    if websocket_send_func:
+            from ..socket_management.protocols import create_message, MessageType
+            status_message = create_message(
+                MessageType.SETUP_LOG,
+                status=None,
+                workflow_id=workflow_id,
+                content=f"Test loggings, starting workflow generation -1",
+                result=None
+            )
+            await websocket_send_func(json.dumps(status_message))
     if workflow_id and websocket_send_func:
         # Use isolated logging
         with isolated_workflow_process(workflow_id, "generation", websocket_send_func) as (bound_logger, process_id):
@@ -675,8 +685,10 @@ async def setup_project_parallel_with_status_messages(project_short_id: str, web
         
         # Send status update: uninitialized after workflow is extracted and added to database
         if websocket_send_func:
-            from ..socket_management.protocols import create_setup_log_message
-            status_message = create_setup_log_message(
+            from ..socket_management.protocols import create_message, MessageType
+            status_message = create_message(
+                MessageType.SETUP_LOG,
+                status=None,
                 workflow_id=workflow_id,
                 content=f"{workflow_id} updates database status to: uninitialized",
                 result=None
@@ -691,10 +703,29 @@ async def setup_project_parallel_with_status_messages(project_short_id: str, web
     semaphore = asyncio.Semaphore(concurrency_level)  # Use configurable concurrency level
     print(f"   Using concurrency level: {concurrency_level}")
     
+    if websocket_send_func:
+        from ..socket_management.protocols import create_message, MessageType
+    status_message = create_message(
+        MessageType.SETUP_LOG,
+        status=None,
+        workflow_id=workflow_id,
+        content=f"Test loggings, starting workflow generation 12",
+        result=None
+    )
+    await websocket_send_func(json.dumps(status_message))
+    
     async def generate_single_workflow_with_retry(extracted_workflow: Dict[str, Any], max_retries: int = 2) -> Dict[str, Any]:
         """Generate a single workflow with retry logic and rate limiting"""
         workflow_id = extracted_workflow["workflow_id"]
         workflow_name = extracted_workflow["workflow_name"]
+        
+        status_message = create_message(
+            MessageType.SETUP_LOG,
+            status=None,
+            workflow_id=workflow_id,
+            content=f"Start function generate_single_workflow_with_retry",
+            result=None
+        )
         
         for attempt in range(max_retries + 1):
             try:
@@ -828,8 +859,9 @@ async def setup_project_parallel_with_status_messages(project_short_id: str, web
         
         # Send status update: pending after successful generation
         if websocket_send_func and workflow_data.get("success", True):
-            from ..socket_management.protocols import create_setup_log_message
-            status_message = create_setup_log_message(
+            status_message = create_message(
+                MessageType.SETUP_LOG,
+                status=None,
                 workflow_id=workflow_id,
                 content=f"{workflow_id} updates database status to: pending",
                 result=None

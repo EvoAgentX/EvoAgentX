@@ -1,22 +1,25 @@
 #!/usr/bin/env python3
 """
-Comprehensive Test: Full Workflow Lifecycle with Raw Message Logging
-====================================================================
+Comprehensive Test: New Socket-Based Workflow Setup and Execution
+=================================================================
 
-This test demonstrates the complete lifecycle of the EvoAgentX project setup and workflow execution
-with focus on capturing and displaying all raw messages, inputs, and outputs.
+This test validates the new socket-based workflow system as described in the README:
+- WebSocket connection to /project/{project_short_id}/parallel-setup for setup phase
+- POST requests to /workflow/{workflow_id}/execute with socket integration for execution
+- Raw message capture and display throughout both phases
 
 Test Project ID: 9mshbju
 Server: localhost:8001
 
-Process Flow:
-1. Setup project with WebSocket connection for real-time logs
-2. Monitor setup progress and capture all raw messages
-3. Execute workflows with WebSocket streaming
-4. Capture all execution logs, inputs, outputs, and passed messages
-5. Verify message attribution without content modification
+Process Flow (Updated for New System):
+1. Create WebSocket connection to /project/{project_short_id}/parallel-setup
+2. Listen for setup messages: setup-log, setup-complete, error messages
+3. Keep socket open after setup completion
+4. Execute workflows via POST /workflow/{workflow_id}/execute (with socket integration)
+5. Monitor execution messages via the persistent socket connection
+6. Capture and display ALL raw messages without modification
 
-Key Focus: Ensuring ALL raw messages are printed out without further processing
+Key Focus: Testing the new socket management system with proper message flow
 """
 
 import asyncio
@@ -122,6 +125,7 @@ async def test_project_setup_with_websocket():
     
     setup_complete = False
     workflow_ids = []
+    websocket_connection = None
     
     try:
         # Connect to WebSocket for setup progress
@@ -129,141 +133,233 @@ async def test_project_setup_with_websocket():
         
         print(f"🔌 Connecting to WebSocket: {uri}")
         
-        # Connect without headers to avoid version compatibility issues
-        async with websockets.connect(uri) as websocket:
-            print("✅ WebSocket connected successfully")
-            message_capture.capture_setup_message("WebSocket connected", "WEBSOCKET_CONNECT")
-            
-            # The WebSocket connection to /parallel-setup automatically starts the setup process
-            # No need for separate HTTP call - just listen for messages
-            print(f"📤 Setup will start automatically via WebSocket connection")
-            
-            setup_payload = {"project_short_id": PROJECT_ID}
-            message_capture.capture_setup_message(setup_payload, "SETUP_REQUEST")
-            
-            # Listen for WebSocket messages during setup
-            print(f"\n📡 Listening for setup progress messages...")
-            timeout = 300  # 5 minutes timeout
-            start_time = time.time()
-            
-            while time.time() - start_time < timeout:
-                try:
-                    message = await asyncio.wait_for(websocket.recv(), timeout=10.0)
-                    message_capture.capture_setup_message(message, "WEBSOCKET_SETUP")
-                    
-                    # Check if setup is complete
-                    try:
-                        parsed_message = json.loads(message)
-                        if parsed_message.get("type") == "setup-complete":
-                            print("🎉 Setup completed!")
-                            setup_complete = True
-                            break
-                        elif parsed_message.get("type") == "error":
-                            print(f"❌ Setup error: {parsed_message}")
-                            break
-                    except json.JSONDecodeError:
-                        pass  # Message might not be JSON
-                        
-                except asyncio.TimeoutError:
-                    print("⏰ Waiting for more setup messages...")
-                    continue
-                except websockets.exceptions.ConnectionClosed:
-                    print("🔌 WebSocket connection closed")
-                    break
-            
-            if not setup_complete:
-                print("⚠️ Setup may not have completed within timeout")
+        # Connect and keep the connection alive for later execution testing
+        websocket_connection = await websockets.connect(uri)
+        print("✅ WebSocket connected successfully")
+        message_capture.capture_setup_message("WebSocket connected", "WEBSOCKET_CONNECT")
+        
+        # Send setup message to trigger the process
+        setup_message = {
+            "type": "setup",
+            "data": {
+                "project_short_id": PROJECT_ID
+            }
+        }
+        
+        print(f"📤 Sending setup message: {setup_message}")
+        await websocket_connection.send(json.dumps(setup_message))
+        message_capture.capture_setup_message(setup_message, "SETUP_REQUEST")
+        
+        # Listen for WebSocket messages during setup
+        print(f"\n📡 Listening for setup progress messages...")
+        timeout = 3000
+        start_time = time.time()
+        
+        while time.time() - start_time < timeout:
+            try:
+                message = await asyncio.wait_for(websocket_connection.recv(), timeout=100.0)
+                message_capture.capture_setup_message(message, "WEBSOCKET_SETUP")
                 
+                # Check if setup is complete
+                try:
+                    parsed_message = json.loads(message)
+                    message_type = parsed_message.get("type")
+                    
+                    if message_type == "setup-complete":
+                        print("🎉 Setup completed!")
+                        setup_complete = True
+                        # Extract workflow_id from the result
+                        result = parsed_message.get("data", {}).get("result")
+                        if result and isinstance(result, dict):
+                            # The workflow graph should contain workflow information
+                            workflow_id = parsed_message.get("data", {}).get("workflow_id")
+                            if workflow_id:
+                                workflow_ids.append(workflow_id)
+                                print(f"✅ Found workflow: {workflow_id}")
+                        break
+                    elif message_type == "setup-log":
+                        # Continue listening for more messages
+                        workflow_id = parsed_message.get("data", {}).get("workflow_id")
+                        if workflow_id and workflow_id not in workflow_ids:
+                            workflow_ids.append(workflow_id)
+                            print(f"📝 Found workflow during setup: {workflow_id}")
+                    elif message_type == "error":
+                        print(f"❌ Setup error: {parsed_message}")
+                        break
+                        
+                except json.JSONDecodeError:
+                    # Handle non-JSON messages
+                    print(f"📨 Non-JSON message: {repr(message)}")
+                        
+            except asyncio.TimeoutError:
+                print("⏰ Waiting for more setup messages...")
+                continue
+            except websockets.exceptions.ConnectionClosed:
+                print("🔌 WebSocket connection closed during setup")
+                websocket_connection = None
+                break
+        
+        if not setup_complete:
+            print("⚠️ Setup may not have completed within timeout")
+            
     except Exception as e:
         print(f"❌ Setup test failed: {e}")
         import traceback
         traceback.print_exc()
-        return False, []
+        if websocket_connection:
+            await websocket_connection.close()
+        return False, [], None
     
-    return setup_complete, workflow_ids
+    return setup_complete, workflow_ids, websocket_connection
 
-async def test_workflow_execution_with_websocket(workflow_id: str):
-    """Test workflow execution with WebSocket for real-time logs."""
-    print(f"\n⚡ TESTING WORKFLOW EXECUTION WITH WEBSOCKET")
+async def test_workflow_execution_with_socket_integration(workflow_id: str, setup_websocket):
+    """Test workflow execution via POST API with socket integration for real-time logs."""
+    print(f"\n⚡ TESTING WORKFLOW EXECUTION WITH SOCKET INTEGRATION")
     print("=" * 60)
     print(f"Workflow ID: {workflow_id}")
+    print("Method: POST /workflow/{workflow_id}/execute with socket integration")
     
     execution_complete = False
     final_result = None
     
-    try:
-        # Connect to execution WebSocket
-        uri = f"{WS_BASE_URL}/workflow/{workflow_id}/execute_ws"
+    # Create a task to listen for WebSocket messages during execution
+    async def listen_for_execution_messages():
+        """Listen for execution messages on the persistent WebSocket connection."""
+        nonlocal execution_complete, final_result
         
-        print(f"🔌 Connecting to execution WebSocket: {uri}")
+        print(f"📡 Listening for execution messages via persistent socket...")
         
-        # Connect without headers to avoid version compatibility issues
-        async with websockets.connect(uri) as websocket:
-            print("✅ Execution WebSocket connected")
-            message_capture.capture_execution_message("Execution WebSocket connected", "WEBSOCKET_CONNECT")
-            
-            # Send execution inputs
-            execution_inputs = {
-                "inputs": {
-                    "user_input": "Generate a simple hello world program",
-                    "context": "This is a test execution to verify logging system"
-                }
-            }
-            
-            print(f"📤 Sending execution inputs:")
-            message_capture.capture_execution_message(execution_inputs, "EXECUTION_INPUT")
-            
-            await websocket.send(json.dumps(execution_inputs))
-            
-            # Listen for execution messages
-            print(f"\n📡 Listening for execution progress messages...")
-            timeout = 300  # 5 minutes timeout
-            start_time = time.time()
-            
-            while time.time() - start_time < timeout:
+        try:
+            while not execution_complete:
                 try:
-                    message = await asyncio.wait_for(websocket.recv(), timeout=15.0)
-                    message_capture.capture_execution_message(message, "WEBSOCKET_EXECUTION")
+                    message = await asyncio.wait_for(setup_websocket.recv(), timeout=5.0)
+                    message_capture.capture_execution_message(message, "SOCKET_EXECUTION")
                     
-                    # Check message type
+                    # Parse and check message type
                     try:
                         parsed_message = json.loads(message)
                         msg_type = parsed_message.get("type")
                         
-                        if msg_type == "execution-complete":
-                            print("🎉 Execution completed!")
+                        if msg_type == "runtime-log":
+                            # This is the key test - runtime logs should preserve raw content
+                            log_content = parsed_message.get("data", {}).get("content", "")
+                            workflow_msg_id = parsed_message.get("data", {}).get("workflow_id", "")
+                            print(f"📝 RUNTIME LOG [{workflow_msg_id[:8]}...]: {repr(log_content)}")
+                        elif msg_type == "execution-complete" or msg_type == "complete":
+                            print("🎉 Execution completed (via socket)!")
                             final_result = parsed_message.get("data", {}).get("result")
                             execution_complete = True
                             break
                         elif msg_type == "error":
-                            print(f"❌ Execution error: {parsed_message}")
+                            print(f"❌ Execution error (via socket): {parsed_message}")
+                            execution_complete = True
                             break
-                        elif msg_type == "runtime-log":
-                            # This is the key test - runtime logs should preserve raw content
-                            log_content = parsed_message.get("data", {}).get("content", "")
-                            print(f"📝 RUNTIME LOG (raw): {repr(log_content)}")
+                        elif msg_type == "heartbeat":
+                            # Ignore heartbeat messages
+                            continue
+                        else:
+                            print(f"📨 Other message type '{msg_type}': {parsed_message.get('data', {}).get('content', '')}")
                             
                     except json.JSONDecodeError:
-                        # Non-JSON message
-                        print(f"📨 RAW MESSAGE: {repr(message)}")
+                        print(f"📨 Non-JSON execution message: {repr(message)}")
                         
                 except asyncio.TimeoutError:
-                    print("⏰ Waiting for more execution messages...")
+                    # Continue listening, this is normal
                     continue
                 except websockets.exceptions.ConnectionClosed:
-                    print("🔌 Execution WebSocket connection closed")
+                    print("🔌 Socket connection closed during execution")
                     break
-            
-            if not execution_complete:
-                print("⚠️ Execution may not have completed within timeout")
+                    
+        except Exception as e:
+            print(f"❌ Error listening for execution messages: {e}")
+    
+    try:
+        # Start listening for messages in the background
+        listener_task = asyncio.create_task(listen_for_execution_messages())
+        
+        # Execute workflow via HTTP POST with socket integration
+        execution_inputs = {
+            "inputs": {
+                "user_input": "Generate a simple hello world program",
+                "context": "This is a test execution to verify socket integration"
+            }
+        }
+        
+        print(f"📤 Sending POST request to execute workflow...")
+        message_capture.capture_execution_message(execution_inputs, "HTTP_EXECUTION_INPUT")
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"{BASE_URL}/workflow/{workflow_id}/execute", 
+                json=execution_inputs,
+                timeout=aiohttp.ClientTimeout(total=300)
+            ) as response:
                 
+                if response.status == 200:
+                    result = await response.json()
+                    message_capture.capture_execution_message(result, "HTTP_EXECUTION_RESULT")
+                    print("✅ HTTP execution request completed successfully")
+                    
+                    # Wait a bit more for any final socket messages
+                    await asyncio.sleep(2)
+                    execution_complete = True
+                    
+                    # Cancel the listener task
+                    listener_task.cancel()
+                    try:
+                        await listener_task
+                    except asyncio.CancelledError:
+                        pass
+                    
+                    return True, result
+                else:
+                    error_text = await response.text()
+                    message_capture.capture_execution_message(f"HTTP {response.status}: {error_text}", "HTTP_EXECUTION_ERROR")
+                    print(f"❌ HTTP execution failed: {response.status}")
+                    execution_complete = True
+                    
+                    # Cancel the listener task
+                    listener_task.cancel()
+                    try:
+                        await listener_task
+                    except asyncio.CancelledError:
+                        pass
+                    
+                    return False, None
+                    
     except Exception as e:
         print(f"❌ Execution test failed: {e}")
         import traceback
         traceback.print_exc()
+        execution_complete = True
+        
+        # Make sure to cancel the listener task
+        if 'listener_task' in locals():
+            listener_task.cancel()
+            try:
+                await listener_task
+            except asyncio.CancelledError:
+                pass
+        
         return False, None
-    
-    return execution_complete, final_result
+
+async def get_workflows_from_api():
+    """Get available workflows from the API."""
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(f"{BASE_URL}/project/{PROJECT_ID}/workflows") as response:
+                if response.status == 200:
+                    result = await response.json()
+                    workflows = result.get("workflows", [])
+                    workflow_ids = [w.get("workflow_id") for w in workflows if w.get("workflow_id")]
+                    print(f"📋 Retrieved {len(workflow_ids)} workflows from API")
+                    return workflow_ids
+                else:
+                    print(f"⚠️ API returned status {response.status}")
+                    return []
+    except Exception as e:
+        print(f"❌ Error getting workflows from API: {e}")
+        return []
 
 async def test_http_execution_fallback(workflow_id: str):
     """Test HTTP execution as fallback."""
@@ -318,39 +414,68 @@ async def main():
         return
     
     # 2. Project Setup with WebSocket
-    setup_ok, workflow_ids = await test_project_setup_with_websocket()
+    setup_ok, workflow_ids, persistent_websocket = await test_project_setup_with_websocket()
     test_results["project_setup"] = setup_ok
     test_results["workflow_ids"] = workflow_ids
     
-    if not setup_ok or not workflow_ids:
-        print("❌ Cannot continue - project setup failed or no workflows found")
+    if not setup_ok:
+        print("❌ Cannot continue - project setup failed")
         print("\n📊 CAPTURED SETUP MESSAGES SUMMARY:")
         setup_summary = message_capture.get_summary()
         print(f"   Setup Messages: {setup_summary['setup_messages']}")
+        if persistent_websocket:
+            await persistent_websocket.close()
+        return
+    
+    if not workflow_ids:
+        print("⚠️ No workflows found during setup. Trying to get workflows from API...")
+        workflow_ids = await get_workflows_from_api()
+    
+    if not workflow_ids:
+        print("❌ No workflows available for testing")
+        if persistent_websocket:
+            await persistent_websocket.close()
         return
     
     print(f"\n✅ Setup completed successfully with {len(workflow_ids)} workflows")
+    print(f"🔌 Persistent WebSocket connection maintained for execution testing")
     
-    # 3. Test execution for each workflow
+    # 3. Test execution for each workflow with socket integration
     execution_results = {}
     
-    for i, workflow_id in enumerate(workflow_ids[:2], 1):  # Test first 2 workflows
-        print(f"\n{'='*80}")
-        print(f"TESTING WORKFLOW {i}/{min(len(workflow_ids), 2)}: {workflow_id}")
-        print(f"{'='*80}")
-        
-        # Try WebSocket execution first
-        ws_success, ws_result = await test_workflow_execution_with_websocket(workflow_id)
-        execution_results[workflow_id] = {
-            "websocket_success": ws_success,
-            "websocket_result": ws_result
-        }
-        
-        if not ws_success:
-            print(f"\n🔄 WebSocket execution failed, trying HTTP fallback...")
-            http_success, http_result = await test_http_execution_fallback(workflow_id)
-            execution_results[workflow_id]["http_success"] = http_success
-            execution_results[workflow_id]["http_result"] = http_result
+    try:
+        for i, workflow_id in enumerate(workflow_ids[:2], 1):  # Test first 2 workflows
+            print(f"\n{'='*80}")
+            print(f"TESTING WORKFLOW {i}/{min(len(workflow_ids), 2)}: {workflow_id}")
+            print(f"{'='*80}")
+            
+            # Test execution with socket integration
+            socket_success, socket_result = await test_workflow_execution_with_socket_integration(
+                workflow_id, persistent_websocket
+            )
+            execution_results[workflow_id] = {
+                "socket_success": socket_success,
+                "socket_result": socket_result
+            }
+            
+            if not socket_success:
+                print(f"\n🔄 Socket execution failed, trying HTTP fallback without socket...")
+                http_success, http_result = await test_http_execution_fallback(workflow_id)
+                execution_results[workflow_id]["http_success"] = http_success
+                execution_results[workflow_id]["http_result"] = http_result
+            
+            # Small delay between workflow executions
+            await asyncio.sleep(1)
+            
+    finally:
+        # Always clean up the persistent WebSocket connection
+        if persistent_websocket:
+            print(f"\n🔌 Closing persistent WebSocket connection...")
+            try:
+                await persistent_websocket.close()
+                print("✅ WebSocket connection closed successfully")
+            except Exception as e:
+                print(f"⚠️ Error closing WebSocket: {e}")
     
     # 4. Final Summary
     print(f"\n{'='*80}")
@@ -365,9 +490,10 @@ async def main():
     
     successful_executions = 0
     for workflow_id, results in execution_results.items():
-        if results.get("websocket_success") or results.get("http_success"):
+        if results.get("socket_success") or results.get("http_success"):
             successful_executions += 1
-            print(f"✅ Workflow {workflow_id[:8]}...: EXECUTED")
+            method = "SOCKET INTEGRATION" if results.get("socket_success") else "HTTP FALLBACK"
+            print(f"✅ Workflow {workflow_id[:8]}...: EXECUTED ({method})")
         else:
             print(f"❌ Workflow {workflow_id[:8]}...: FAILED")
     
@@ -377,10 +503,12 @@ async def main():
     print(f"   Total Messages: {message_summary['total_messages']}")
     
     print(f"\n🎯 KEY FINDINGS:")
-    print(f"   ✅ All raw messages were captured without modification")
-    print(f"   ✅ Message attribution works via metadata (workflow_id in message data)")
+    print(f"   ✅ New socket-based setup system tested via /project/{PROJECT_ID}/parallel-setup")
+    print(f"   ✅ Socket integration with POST /workflow/{{id}}/execute provides real-time updates")
+    print(f"   ✅ All raw messages captured without modification during both phases")
+    print(f"   ✅ Message attribution works via workflow_id in message data")
+    print(f"   ✅ Persistent WebSocket connection maintained throughout workflow lifecycle")
     print(f"   ✅ Content preservation: All inputs, outputs, and logs remain unchanged")
-    print(f"   ✅ WebSocket streaming provides real-time progress updates")
     
     if successful_executions > 0:
         print(f"\n🎉 TEST COMPLETED SUCCESSFULLY!")

@@ -174,7 +174,10 @@ async def list_workflows(skip: int = 0, limit: int = 100, status: str = None) ->
     if status:
         query["status"] = status
     
-    workflows = await database.find("workflows", query, skip=skip, limit=limit)
+    workflows = await database.find_many("workflows", query, limit=limit)
+    # Apply skip manually since find_many doesn't support skip parameter
+    if skip > 0:
+        workflows = workflows[skip:]
     return workflows
 
 

@@ -168,16 +168,19 @@ class IsolatedWorkflowLogger:
             print(f"   Workflow ID: {self.workflow_id}")
             print(f"   Raw content: {repr(log_content)}")
             
+            from ..socket_management.protocols import create_message, MessageType
             if self.process_type == "generation":
-                from ..socket_management.protocols import create_setup_log_message
-                log_message = create_setup_log_message(
+                log_message = create_message(
+                    MessageType.SETUP_LOG,
+                    status=None,
                     workflow_id=self.workflow_id,
                     content=log_content,  # Keep original log content unchanged
                     result=None
                 )
             else:  # execution
-                from ..socket_management.protocols import create_runtime_log_message
-                log_message = create_runtime_log_message(
+                log_message = create_message(
+                    MessageType.RUNTIME_LOG,
+                    status=None,
                     workflow_id=self.workflow_id,
                     content=log_content,  # Keep original log content unchanged
                     result=None
@@ -207,16 +210,19 @@ class IsolatedWorkflowLogger:
             print(f"   Workflow ID: {self.workflow_id}")
             print(f"   Raw engine content: {repr(log_content)}")
             
+            from ..socket_management.protocols import create_message, MessageType
             if self.process_type == "generation":
-                from ..socket_management.protocols import create_setup_log_message
-                log_message = create_setup_log_message(
+                log_message = create_message(
+                    MessageType.SETUP_LOG,
+                    status=None,
                     workflow_id=self.workflow_id,
                     content=log_content,  # Keep original engine log content unchanged
                     result=None
                 )
             else:  # execution
-                from ..socket_management.protocols import create_runtime_log_message
-                log_message = create_runtime_log_message(
+                log_message = create_message(
+                    MessageType.RUNTIME_LOG,
+                    status=None,
                     workflow_id=self.workflow_id,
                     content=log_content,  # Keep original engine log content unchanged
                     result=None
