@@ -21,19 +21,43 @@ def download_real_mm_rag_data(save_dir: str = "./data/real_mm_rag") -> str:
     try:
         os.makedirs(save_dir, exist_ok=True)
         
+        # Check if dataset already exists
+        dataset_path = os.path.join(save_dir, "real_mm_rag_finreport.json")
+        images_dir = os.path.join(save_dir, "images")
+        
+        if os.path.exists(dataset_path) and os.path.exists(images_dir):
+            # Quick check if images directory has content
+            image_files = [f for f in os.listdir(images_dir) if f.endswith(('.png', '.jpg', '.jpeg'))]
+            if len(image_files) > 0:
+                logger.info(f"Dataset already exists at {save_dir} with {len(image_files)} images")
+                return save_dir
+        
         logger.info("Downloading REAL-MM-RAG FinReport dataset...")
         dataset = load_dataset("ibm-research/REAL-MM-RAG_FinReport", split="test")
-        
-        # Save dataset as JSON
-        dataset_path = os.path.join(save_dir, "real_mm_rag_finreport.json")
-        dataset.to_json(dataset_path)
         
         # Create images directory
         images_dir = os.path.join(save_dir, "images")
         os.makedirs(images_dir, exist_ok=True)
         
-        # Save images
+        # Process dataset: save images and create metadata
+        metadata_list = []
         for i, example in enumerate(dataset):
+            # Create metadata entry (without the image object)
+            metadata = {
+                'id': example['id'],
+                'query': example['query'],
+                'answer': example['answer'],
+                'image_filename': example['image_filename']
+            }
+            
+            # Add rephrase levels if they exist
+            for level in ['rephrase_level_1', 'rephrase_level_2', 'rephrase_level_3']:
+                if level in example and example[level]:
+                    metadata[level] = example[level]
+            
+            metadata_list.append(metadata)
+            
+            # Save PIL Image if it exists
             if example['image'] is not None:
                 image_filename = example['image_filename']
                 image_path = os.path.join(images_dir, image_filename)
@@ -43,6 +67,11 @@ def download_real_mm_rag_data(save_dir: str = "./data/real_mm_rag") -> str:
                 
                 if i % 100 == 0:
                     logger.info(f"Saved {i+1}/{len(dataset)} images...")
+        
+        # Save metadata as JSON (without image objects)
+        dataset_path = os.path.join(save_dir, "real_mm_rag_finreport.json")
+        with open(dataset_path, 'w') as f:
+            json.dump(metadata_list, f, indent=2)
         
         logger.info(f"Dataset downloaded to {save_dir}")
         logger.info(f"Total samples: {len(dataset)}")
@@ -64,10 +93,12 @@ class RealMMRAG(Benchmark):
     
     def __init__(self, path: str = None, mode: str = "test", **kwargs):
         path = os.path.expanduser(path or "~/.evoagentx/data/real_mm_rag")
-        super().__init__(name=type(self).__name__, path=path, mode=mode, **kwargs)
         
-        self.dataset_file = Path(self.path) / "real_mm_rag_finreport.json"
-        self.images_dir = Path(self.path) / "images"
+        # Set up file paths before calling super().__init__ which calls _load_data
+        self.dataset_file = Path(path) / "real_mm_rag_finreport.json"
+        self.images_dir = Path(path) / "images"
+        
+        super().__init__(name=type(self).__name__, path=path, mode=mode, **kwargs)
     
     def _load_data(self):
         """Load the dataset from JSON file."""

@@ -15,8 +15,7 @@ from evoagentx.benchmark.real_mm_rag import RealMMRAG, download_real_mm_rag_data
 # Load environment
 load_dotenv()
 
-# Download datasets
-download_real_mm_rag_data(save_dir="./debug/data/real_mm_rag")
+# Initialize dataset (will download automatically if not present)
 datasets = RealMMRAG("./debug/data/real_mm_rag")
 
 # Initialize StorageHandler
@@ -67,7 +66,7 @@ search_engine = RAGEngine(config=rag_config, storage_handler=storage_handler)
 def evaluate_multimodal_retrieval(retrieved_chunks: List, target_image: str, top_k: int) -> Dict[str, float]:
     """Evaluate retrieved images against target image."""
     # Check if target image is in top-k results
-    retrieved_images = [chunk.metadata.get('file_name', '') for chunk in retrieved_chunks[:top_k]]
+    retrieved_images = [getattr(chunk.metadata, 'file_name', '') for chunk in retrieved_chunks[:top_k]]
     
     # Hit@K: whether target image is in top-k
     hit = 1.0 if target_image in retrieved_images else 0.0
@@ -80,7 +79,7 @@ def evaluate_multimodal_retrieval(retrieved_chunks: List, target_image: str, top
             break
     
     # Average similarity score
-    avg_score = sum(chunk.metadata.similarity_score for chunk in retrieved_chunks[:top_k]) / min(top_k, len(retrieved_chunks)) if retrieved_chunks else 0.0
+    avg_score = sum(getattr(chunk.metadata, 'similarity_score', 0.0) for chunk in retrieved_chunks[:top_k]) / min(top_k, len(retrieved_chunks)) if retrieved_chunks else 0.0
     
     return {
         "hit@k": hit,
@@ -97,6 +96,11 @@ def run_evaluation(samples: List[Dict], top_k: int = 5) -> Dict[str, float]:
         target_image = sample["image_filename"]
         image_path = sample["image_path"]
         corpus_id = sample["id"]
+        
+        # Skip samples with null/empty queries
+        if not query_text or query_text.strip() == "":
+            logger.warning(f"Skipping sample {corpus_id} with empty query")
+            continue
         
         logger.info(f"Processing sample: {corpus_id}, query: {query_text}")
         
@@ -119,6 +123,13 @@ def run_evaluation(samples: List[Dict], top_k: int = 5) -> Dict[str, float]:
         for metric_name, value in sample_metrics.items():
             metrics[metric_name].append(value)
         logger.info(f"Metrics for sample {corpus_id}: {sample_metrics}")
+        
+        # Save index to database for debugging (before clearing)
+        try:
+            search_engine.save(corpus_id=str(corpus_id))  # Save to database, not file
+            logger.info(f"Saved index for corpus {corpus_id} to database")
+        except Exception as e:
+            logger.warning(f"Failed to save index for corpus {corpus_id}: {str(e)}")
         
         # Clear index to avoid memory issues
         search_engine.clear(corpus_id=str(corpus_id))

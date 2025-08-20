@@ -1,4 +1,5 @@
 import asyncio
+import io
 from pathlib import Path
 from typing import Union, List, Tuple, Optional
 
@@ -84,6 +85,7 @@ class MultimodalReader:
         file_paths: Union[str, List, Tuple],
         exclude_files: Optional[Union[str, List, Tuple]] = None,
         filter_file_by_suffix: Optional[Union[str, List, Tuple]] = None,
+        merge_by_file: bool = False,
         show_progress: bool = False,
     ) -> List[ImageDocument]:
         """Load images from files or directories.
@@ -92,6 +94,7 @@ class MultimodalReader:
             file_paths: A string, list, or tuple of file paths or a directory path.
             exclude_files: Files to exclude from loading.
             filter_file_by_suffix: File extensions to include (e.g., ['.png', '.jpg', '.pdf']).
+            merge_by_file: Whether to merge documents by file (unused for images, kept for compatibility).
 
         Returns:
             List[ImageDocument]: List of loaded ImageDocuments.
@@ -188,11 +191,16 @@ class MultimodalReader:
                 pil_image = img.copy()
                 width, height = img.size
                 format_name = img.format or 'Unknown'
+                
+                # Convert PIL Image to bytes for ImageDocument
+                img_bytes = io.BytesIO()
+                pil_image.save(img_bytes, format='PNG')
+                img_bytes = img_bytes.getvalue()
 
             # Create ImageDocument with same metadata as LlamaIndex SimpleDirectoryReader
             document = ImageDocument(
                 text="",
-                image=pil_image,
+                image=img_bytes,
                 image_path=str(file_path),
                 image_mimetype=f"image/{format_name.lower()}",
                 metadata={
@@ -222,10 +230,15 @@ class MultimodalReader:
                 try:
                     width, height = img.size
                     
+                    # Convert PIL Image to bytes for ImageDocument
+                    img_bytes = io.BytesIO()
+                    img.save(img_bytes, format='PNG')
+                    img_bytes = img_bytes.getvalue()
+                    
                     # Create ImageDocument with same metadata as LlamaIndex SimpleDirectoryReader
                     document = ImageDocument(
                         text="",
-                        image=img,
+                        image=img_bytes,
                         image_path=str(file_path),
                         image_mimetype="image/png",
                         metadata={

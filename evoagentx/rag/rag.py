@@ -120,12 +120,17 @@ class RAGEngine:
             if self.config.modality == "multimodal":
                 image_nodes = []
                 for doc in documents:
+                    # Ensure metadata has doc_id
+                    metadata = doc.metadata.copy()
+                    if 'doc_id' not in metadata:
+                        metadata['doc_id'] = metadata.get('file_name', f'doc_{len(image_nodes)}')
+                    
                     image_node = ImageNode(
                         text=doc.text,
                         image=doc.image,
                         image_path=doc.image_path,
                         image_mimetype=doc.image_mimetype,
-                        metadata=doc.metadata
+                        metadata=metadata
                     )
                     image_nodes.append(image_node)
                 
