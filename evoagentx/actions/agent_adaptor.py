@@ -56,16 +56,18 @@ class AgentAdaptorAction(Action):
             parse_mode="json"
         )
 
-        prompt.append("Input transform output:\n" + transformed_input.to_json(use_indent=True, ignore=["class_name", "content"]))
+        transformed_input_dict = transformed_input.get_structured_data()
+        prompt.append("Input transform output:\n" + json.dumps(transformed_input_dict, indent=4, ensure_ascii=False))
 
         agent_output = self.agent.execute(
             action_name=self.agent.actions[0].name,
-            action_input_data=transformed_input.to_dict(ignore=["class_name", "content"])
+            action_input_data=transformed_input_dict
         )
 
         prompt.append(f"{self.agent.name} prompt:\n" + str(agent_output.prompt))
 
-        agent_output_json = agent_output.content.to_json(use_indent=True, ignore=["class_name", "content"])
+        agent_output_dict = agent_output.content.get_structured_data()
+        agent_output_json = json.dumps(agent_output_dict, indent=4, ensure_ascii=False)
         prompt.append(f"{self.agent.name} output:\n" + agent_output_json)
 
         output_transform_prompt = DATA_TRANSFORM_PROMPT.format(
@@ -104,16 +106,18 @@ class AgentAdaptorAction(Action):
             parse_mode="json"
         )
 
-        prompt.append("Input transform output:\n" + transformed_input.to_json(use_indent=True, ignore=["class_name", "content"]))
+        transformed_input_dict = transformed_input.get_structured_data()
+        prompt.append("Input transform output:\n" + json.dumps(transformed_input_dict, indent=4, ensure_ascii=False))
 
         agent_output = await self.agent.async_execute(
             action_name=self.agent.actions[0].name,
-            action_input_data=transformed_input.to_dict(ignore=["class_name", "content"])
+            action_input_data=transformed_input_dict
         )
 
         prompt.append(f"{self.agent.name} prompt:\n" + str(agent_output.prompt))
 
-        agent_output_json = agent_output.content.to_json(use_indent=True, ignore=["class_name", "content"])
+        agent_output_dict = agent_output.content.get_structured_data()
+        agent_output_json = json.dumps(agent_output_dict, indent=4, ensure_ascii=False)
         prompt.append(f"{self.agent.name} output:\n" + agent_output_json)
 
         output_transform_prompt = DATA_TRANSFORM_PROMPT.format(
