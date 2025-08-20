@@ -5,8 +5,10 @@ from typing import Any, Dict, List, Optional, Set, Union
 
 import regex
 import requests
+from pydantic import BaseModel
 from tqdm import tqdm
 
+from ..core.base_config import Parameter
 from ..core.logging import logger
 from ..core.registry import MODULE_REGISTRY
 
@@ -209,6 +211,107 @@ def create_agent_from_dict(
     agent = cls.from_dict(data=agent_dict, llm_config=llm_config, tools=tools, agents=agents)
     return agent
 
+
+def pydantic_to_parameters(base_model: BaseModel) -> List[Parameter]:
+    """
+    Converts a Pydantic BaseModel class into a list of Parameter instances.
+
+    Args:
+        model: A Pydantic BaseModel class.
+
+    Returns:
+        A list of Parameter objects, where each object corresponds to a field
+        in the input BaseModel.
+    """
+    parameters = []
+    for field_name, field_info in base_model.model_fields.items():
+        # Get the field type as a json type
+        try:
+            field_type = python_to_json_type[field_info.annotation]
+        except KeyError:
+            field_type = "string"
+
+        # Determine the description
+        description = field_info.description if field_info.description else field_name
+
+        # Determine if the field is required
+        # A field is considered required if it doesn't have a default value
+        # and isn't Optional.
+        required = field_info.is_required()
+
+        # Create the Parameter instance
+        param = Parameter(
+            name=field_name,
+            type=field_type,
+            description=description,
+            required=required
+        )
+        parameters.append(param)
+    return parameters
+
+
+def validate_params(
+    required_params: List[Parameter], 
+    actual_params: List[Parameter], 
+    required_params_name: str, 
+    actual_params_name: str
+):
+    """
+    Checks if `actual_params` have `required_params` and if the `required_params` in `actual_params` have the same type and required value.
+
+    Args:
+        required_params: A list of parameters that are required. Raises error if `actual_params` doesn't contain these parameters.
+        actual_params: A list of parameters to check if `required_params` exist.
+        required_params_name: A name for `required params` to be shown in error messages.
+        actual_params_name: A name for `actual_params` to be shown in error messages.
+    """
+
+    actual_params_dict = {param.name: param for param in actual_params}
+    for param in required_params:
+        if param.name not in actual_params_dict:
+            raise ValueError(f"{required_params_name} '{param.name}' is not found in {actual_params_name}")
+            
+        actual_type = actual_params_dict[param.name].type
+        actual_required = actual_params_dict[param.name].required
+        if param.type != actual_type or param.required != actual_required:
+            raise ValueError(f"Mismatch for '{param.name}': {required_params_name} (type={param.type}, required={param.required}) vs. {actual_params_name} (type={actual_type}, required={actual_required})")
+
+
+def fix_json_booleans(json_string: str) -> str:
+    """
+    Finds and replaces isolated "True" and "False" with "true" and "false".
+
+    The '\b' in the regex stands for a "word boundary", which ensures that
+    we only match the full words and not substrings like "True" in "IsTrue".
+
+    Args:
+        json_string (str): The input JSON string.
+
+    Returns:
+        str: The modified JSON string with booleans in lowercase.
+    """
+    # Use re.sub() with a word boundary (\b) to ensure we only match
+    # the isolated words 'True' and 'False' and not substrings like "True" in "IsTrue"
+    modified_string = re.sub(r'\bTrue\b', 'true', json_string)
+    modified_string = re.sub(r'\bFalse\b', 'false', modified_string)
+    return modified_string
+
+
+string_to_python_type = {
+    "string": str,
+    "integer": int,
+    "number": float,
+    "boolean": bool,
+    "object": dict,
+    "array": list,
+
+    "str": str,
+    "int": int,
+    "float": float,
+    "bool": bool,
+    "dict": dict,
+    "list": list,
+}
 
 json_to_python_type = {
     "string": str,

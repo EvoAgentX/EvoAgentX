@@ -120,14 +120,29 @@ You are tasked with generating agents to complete a sub-task within a workflow. 
 5.3 **Determine the Number of Agents**: Decide how many agents are needed based on the task's complexity and requirements. 
 - **Sequential WorkFlow**: Agents should work sequentially, where the outputs of an agent can serve as inputs for the following agents. 
 - **Distinct Responsibilities**: Ensure each agent has a distinct, non-overlapping responsibility. 
-5.4 **Validation**: Make sure the result can be correctly parsed as a JSON object.
+5.4 **Clear and Detailed Instructions**: 
+- Provide clear and detailed instructions for each agent to ensure they understand their responsibilities and can perform their tasks effectively. 
+- Be as explicit as possible and quantify requirements as much as possible instead of using vague terms. For example, instead of "find some articles", you should say "find 5 articles". 
+- Provide rich detail for the task, specifying every possible detail such as format, structure, content, tone, and style. The instructions must be highly specific and leave no room for ambiguity.
+For example, instead of a vague instruction like "find some articles, summarize them, write a newsletter", provide a detailed, step-by-step instruction like this:
+"1. **Article Curation**: Find five articles published within the last 30 days that are relevant to the user's specified interests.
+2. **Summary Creation**: For each article, write a summary of less than 100 words. The tone of the summaries should be objective and informative, avoiding any personal opinions or commentary.
+3. **Newsletter Compilation**: Compile the summaries into a single newsletter using Markdown format.
+4. **Newsletter Structure**: The newsletter must include the following sections in this exact order:
+    * **Title**: Must contain the current date (e.g., 'Weekly Tech News - November 20, 2025').
+    * **Introduction**: A paragraph of approximately 100 words that introduces the articles and highlights their key themes or main takeaways. The tone should be engaging and professional.
+    * **Article Summaries**: A dedicated section for the five article summaries. Each entry must follow this precise format:
+        * The article title, formatted as a hyperlink that links directly to the article's URL.
+        * The summary of less than 100 words, written in the objective tone.
+    * **Conclusion**: A concluding section of around 200 words that synthesizes the information from all five articles, discussing emerging trends, insights, or future implications. The tone of this section should be analytical and insightful."
+-  If an agent needs to use a specific tool to complete its task, explicitly state this in the instruction. You must use a commanding and unambiguous tone. Don't use suggestions like "you can use" or "it would be helpful to use." Instead, give a direct order e.g. "YOU MUST USE THE `FileTool` to save the newsletter". This ensures the agent knows that using the specified tool is a mandatory part of the task.
 
 
 ### Notes:
 - Use concise, meaningful names for agents, inputs, and outputs. 
-- Ensure that ALL `inputs` defined in the sub-task are used by at least one created agent. 
-- Ensure that ALL `outputs` defined in the sub-task can be derived from the `outputs` of the created agents.
-- Ensure that the generated agent's input and output strictly follow the input and output names defined in the sub-task description. Do not replace the task's expected input and output with internal function parameters or return values.  
+- Ensure that ALL `inputs` defined in the sub-task are used by at least one agent. 
+- Ensure that ALL `outputs` defined in the sub-task can be derived from the `outputs` of the agents.
+- Ensure that the agent's input and output strictly follow the input and output names defined in the sub-task description. Do not replace the task's expected input and output with internal function parameters or return values.  
 
 ### Output Format
 Your final output should ALWAYS in the following format:
