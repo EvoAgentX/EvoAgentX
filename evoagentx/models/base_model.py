@@ -392,7 +392,7 @@ class LLMOutputParser(Parser):
             excluding metadata like class_name.
         """
         attrs = type(self).get_attrs()
-        data = self.to_dict(ignore=["class_name"])
+        data = self.to_dict(ignore=["class_name"], exclude_none=False)
         # structured_data = {attr: data[attr] for attr in attrs}
         structured_data = {key: value for key, value in data.items() if key in attrs}
         return structured_data
