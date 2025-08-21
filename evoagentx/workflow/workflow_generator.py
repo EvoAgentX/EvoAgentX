@@ -425,6 +425,24 @@ class WorkFlowGenerator(BaseModule):
         tasks example:
             {
                 "goal": "...",
+                "workflow_inputs": [
+                    {
+                        "name": "...",
+                        "type": "...",
+                        "description": "...",
+                        "required": True/False
+                    },
+                    ...
+                ],
+                "workflow_outputs": [
+                    {
+                        "name": "...",
+                        "type": "...",
+                        "description": "...",
+                        "required": True
+                    },
+                    ...
+                ]
                 "sub_tasks": [
                     {
                         "name": "...",
@@ -433,7 +451,8 @@ class WorkFlowGenerator(BaseModule):
                             {
                                 "name": "...",
                                 "description": "...",
-                                "type": "..."
+                                "type": "...",
+                                "required": True/False
                             }
                         ],
                         "outputs": [
@@ -441,6 +460,7 @@ class WorkFlowGenerator(BaseModule):
                                 "name": "...",
                                 "description": "...",
                                 "type": "..."
+                                "required": True
                             }
                         ]
                     },
@@ -462,14 +482,16 @@ class WorkFlowGenerator(BaseModule):
                                 {
                                     "name": "...",
                                     "description": "...",
-                                    "type": "..."
+                                    "type": "...",
+                                    "required": True/False
                                 }
                             ],
                             "outputs": [
                                 {
                                     "name": "...",
                                     "description": "...",
-                                    "type": "..."
+                                    "type": "...",
+                                    "required": True/False
                                 }
                             ],
                             "prompt_template": {
@@ -486,7 +508,6 @@ class WorkFlowGenerator(BaseModule):
         """
         keys_to_remove = [
             "class_name",
-            "required",
             "status"
         ]
         nodes = workflow_dict["nodes"]
@@ -520,7 +541,18 @@ class WorkFlowGenerator(BaseModule):
             })
             tasks.append(subtask)
 
-        tasks = {"goal": workflow_dict["goal"], "sub_tasks": tasks}
+        workflow_inputs = workflow_dict["workflow_inputs"]
+        workflow_inputs = recursive_remove(workflow_inputs, ["class_name"])
+
+        workflow_outputs = workflow_dict["workflow_outputs"]
+        workflow_outputs = recursive_remove(workflow_outputs, ["class_name"])
+
+        tasks = {
+            "goal": workflow_dict["goal"], 
+            "workflow_inputs": workflow_inputs,
+            "workflow_outputs": workflow_outputs,
+            "sub_tasks": tasks
+        }
         return tasks, agents
 
 
