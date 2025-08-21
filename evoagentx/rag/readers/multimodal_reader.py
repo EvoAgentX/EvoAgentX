@@ -1,20 +1,14 @@
-import asyncio
-import io
 from pathlib import Path
 from typing import Union, List, Tuple, Optional
-
-from pdf2image import convert_from_path
 from PIL import Image
 from llama_index.core.schema import ImageDocument
-
 from evoagentx.core.logging import logger
 
-
 class MultimodalReader:
-    """A multimodal file reader for images and PDFs.
+    """An efficient image file reader for multimodal RAG.
 
     This class provides interface for loading images from files or directories,
-    supporting various image formats and PDF conversion with pdf2image.
+    supporting various image formats with path-based lazy loading.
 
     Attributes:
         recursive (bool): Whether to recursively read directories.
@@ -93,7 +87,7 @@ class MultimodalReader:
         Args:
             file_paths: A string, list, or tuple of file paths or a directory path.
             exclude_files: Files to exclude from loading.
-            filter_file_by_suffix: File extensions to include (e.g., ['.png', '.jpg', '.pdf']).
+            filter_file_by_suffix: File extensions to include (e.g., ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff', '.webp']).
             merge_by_file: Whether to merge documents by file (unused for images, kept for compatibility).
 
         Returns:
@@ -159,11 +153,7 @@ class MultimodalReader:
                     logger.info(f"Processing: {file_path.name}")
                 
                 try:
-                    if file_path.suffix.lower() == '.pdf':
-                        # Convert PDF to images
-                        pdf_docs = self._process_pdf(file_path)
-                        documents.extend(pdf_docs)
-                    elif file_path.suffix.lower() in ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff', '.webp']:
+                    if file_path.suffix.lower() in ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff', '.webp']:
                         # Process image file
                         img_doc = self._process_image(file_path)
                         if img_doc:
@@ -183,24 +173,16 @@ class MultimodalReader:
     def _process_image(self, file_path: Path) -> ImageDocument:
         """Process a single image file."""
         try:
+            # Just validate image can be opened and get basic metadata
             with Image.open(file_path) as img:
-                # Convert to RGB for consistency
-                if img.mode in ('RGBA', 'LA', 'P'):
-                    img = img.convert('RGB')
-                
-                pil_image = img.copy()
                 width, height = img.size
                 format_name = img.format or 'Unknown'
                 
-                # Convert PIL Image to bytes for ImageDocument
-                img_bytes = io.BytesIO()
-                pil_image.save(img_bytes, format='PNG')
-                img_bytes = img_bytes.getvalue()
-
-            # Create ImageDocument with same metadata as LlamaIndex SimpleDirectoryReader
+            # Create ImageDocument with path reference only - no image bytes
+            # This avoids unnecessary memory usage and processing
             document = ImageDocument(
-                text="",
-                image=img_bytes,
+                text="",  # No text content for pure images
+                image=None,  # No image bytes - load on demand
                 image_path=str(file_path),
                 image_mimetype=f"image/{format_name.lower()}",
                 metadata={
@@ -220,47 +202,3 @@ class MultimodalReader:
                 raise
             return None
 
-    def _process_pdf(self, file_path: Path) -> List[ImageDocument]:
-        """Convert PDF pages to ImageDocuments."""
-        documents = []
-        try:
-            images = convert_from_path(file_path, dpi=200)
-            
-            for page_num, img in enumerate(images, 1):
-                try:
-                    width, height = img.size
-                    
-                    # Convert PIL Image to bytes for ImageDocument
-                    img_bytes = io.BytesIO()
-                    img.save(img_bytes, format='PNG')
-                    img_bytes = img_bytes.getvalue()
-                    
-                    # Create ImageDocument with same metadata as LlamaIndex SimpleDirectoryReader
-                    document = ImageDocument(
-                        text="",
-                        image=img_bytes,
-                        image_path=str(file_path),
-                        image_mimetype="image/png",
-                        metadata={
-                            "file_path": str(file_path),
-                            "file_name": f"{file_path.stem}_page_{page_num}.png",
-                            "file_type": file_path.suffix,
-                            "file_size": file_path.stat().st_size,
-                            "creation_date": str(file_path.stat().st_ctime),
-                            "last_modified_date": str(file_path.stat().st_mtime),
-                            "page_label": str(page_num)
-                        }
-                    )
-                    documents.append(document)
-                    
-                except Exception as e:
-                    logger.warning(f"Failed to process page {page_num} of {file_path}: {str(e)}")
-                    continue
-            
-            logger.info(f"Converted {len(documents)} pages from PDF: {file_path.name}")
-        except Exception as e:
-            logger.error(f"Failed to convert PDF {file_path}: {str(e)}")
-            if self.errors == "strict":
-                raise
-                
-        return documents
