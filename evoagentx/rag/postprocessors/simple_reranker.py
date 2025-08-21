@@ -36,9 +36,25 @@ class SimpleReranker(BasePostprocessor):
             corpus = Corpus()
             scores = []
             for score_node in nodes:
-                chunk = Chunk.from_llama_node(score_node.node)
-                chunk.metadata.similarity_score = score_node.score or 0.0
-                corpus.add_chunk(chunk)
+                # Preserve original chunk type from the result
+                original_chunk = None
+                for result in results:
+                    for orig_chunk in result.corpus.chunks:
+                        if orig_chunk.chunk_id == score_node.node.id_:
+                            original_chunk = orig_chunk
+                            break
+                    if original_chunk:
+                        break
+                
+                if original_chunk:
+                    # Use the original chunk and update its similarity score
+                    original_chunk.metadata.similarity_score = score_node.score or 0.0
+                    corpus.add_chunk(original_chunk)
+                else:
+                    # Fallback to creating from node (shouldn't happen)
+                    chunk = Chunk.from_llama_node(score_node.node)
+                    chunk.metadata.similarity_score = score_node.score or 0.0
+                    corpus.add_chunk(chunk)
                 scores.extend([score_node.score or 0.0])
             
             result = RagResult(

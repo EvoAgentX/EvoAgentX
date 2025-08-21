@@ -184,23 +184,7 @@ class Document(BaseModule):
 
 
 class BaseChunk(BaseModule, ABC):
-    """Abstract base class for all chunk types.
-    
-    Provides common interface and functionality shared by text and image chunks.
-    Subclasses implement specific data access patterns.
-    """
-    
-    @property
-    @abstractmethod
-    def chunk_id(self) -> str:
-        """Unique identifier for the chunk."""
-        pass
-    
-    @property
-    @abstractmethod
-    def metadata(self):
-        """Chunk metadata."""
-        pass
+    """Abstract base class for all chunk types."""
     
     @abstractmethod
     def to_llama_node(self) -> BaseNode:
@@ -217,10 +201,6 @@ class BaseChunk(BaseModule, ABC):
     def get_fragment(self, max_length: int = 100) -> str:
         """Return a fragment for display."""
         pass
-
-
-# Backward compatibility alias
-Chunk = TextChunk
 
 
 class TextChunk(BaseChunk):
@@ -347,8 +327,12 @@ class ImageChunk(BaseChunk):
         if self._cached_image is None:
             from PIL import Image
             try:
+                logger.debug(f"Loading image from path: {self.image_path}")
+                if not self.image_path:
+                    logger.error("Image path is None or empty!")
+                    return None
                 self._cached_image = Image.open(self.image_path)
-                logger.debug(f"Loaded image from {self.image_path}")
+                logger.debug(f"Successfully loaded image from {self.image_path}")
             except Exception as e:
                 logger.error(f"Failed to load image from {self.image_path}: {str(e)}")
                 return None
@@ -371,12 +355,10 @@ class ImageChunk(BaseChunk):
         for k, v in self.relationships.items():
             relationships[k] = v if isinstance(v, RelatedNodeInfo) else RelatedNodeInfo.from_dict(v)
         
-        # Load image data on-demand for LlamaIndex compatibility
-        image_data = self.get_image_bytes() if self.image_path else None
-        
+        # Don't load image data - just use path for LlamaIndex compatibility
         return ImageNode(
             text="",  # No text content for pure image chunks
-            image=image_data,       # Loaded on-demand
+            image=None,  # No image data - efficient approach
             image_path=self.image_path,
             image_mimetype=self.image_mimetype,
             metadata=self.metadata.model_dump(),
@@ -392,6 +374,8 @@ class ImageChunk(BaseChunk):
     def from_llama_node(cls, node: ImageNode) -> "ImageChunk":
         """Create ImageChunk from LlamaIndex ImageNode."""
         metadata = ChunkMetadata.model_validate(node.metadata)
+        
+        logger.debug(f"Creating ImageChunk from ImageNode - image_path: {node.image_path}")
         
         return cls(
             chunk_id=node.id_,
@@ -409,6 +393,10 @@ class ImageChunk(BaseChunk):
         """Return a fragment representing the image."""
         filename = Path(self.image_path).name
         return f"[Image: {filename}]"
+
+
+# Backward compatibility alias
+Chunk = TextChunk
 
 
 class Corpus(BaseModule, Generic[ChunkType]):

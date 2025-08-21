@@ -17,7 +17,7 @@ from .retrievers import RetrieverFactory, BaseRetrieverWrapper
 from .postprocessors import PostprocessorFactory
 from .indexings.base import IndexType
 from .retrievers.base import RetrieverType
-from .schema import Chunk, Corpus, ChunkMetadata, IndexMetadata, Query, RagResult
+from .schema import Chunk, Corpus, ChunkMetadata, IndexMetadata, Query, RagResult, ImageChunk, TextChunk
 from evoagentx.storages.base import StorageHandler
 from evoagentx.storages.schema import IndexStore
 from evoagentx.core.logging import logger
@@ -34,10 +34,14 @@ class RAGEngine:
         self.postprocessor_factory = PostprocessorFactory()
         
         # Set chunk class based on modality config
+        logger.info(f"RAGEngine modality config: {self.config.modality}")
         if self.config.modality == "multimodal":
             self.chunk_class = ImageChunk
+            logger.info(f"RAGEngine configured for multimodal mode - using ImageChunk")
         else:
             self.chunk_class = TextChunk
+            logger.info(f"RAGEngine configured for text mode - using TextChunk")
+        logger.info(f"RAGEngine chunk_class set to: {self.chunk_class}")
 
         # Initialize reader based on modality
         if self.config.modality == "multimodal":
@@ -58,6 +62,7 @@ class RAGEngine:
                 errors=self.config.reader.errors,
                 encoding=self.config.reader.encoding
             )
+
 
         # Initialize embedding model. 
         self.embed_model = self.embedding_factory.create(
@@ -124,24 +129,26 @@ class RAGEngine:
                 show_progress=show_progress
             )
             if self.config.modality == "multimodal":
-                image_nodes = []
+                # No chunking - convert ImageDocuments directly to ImageChunks
+                image_chunks = []
                 for doc in documents:
-                    # Ensure metadata has doc_id
-                    metadata = doc.metadata.copy()
-                    if 'doc_id' not in metadata:
-                        metadata['doc_id'] = metadata.get('file_name', f'doc_{len(image_nodes)}')
+                    # Get image path from document - try multiple possible attributes
+                    image_path = getattr(doc, 'image_path', None) or doc.metadata.get('file_path')
+                    image_mimetype = getattr(doc, 'image_mimetype', None)
                     
-                    image_node = ImageNode(
-                        text=doc.text,
-                        image=doc.image,
-                        image_path=doc.image_path,
-                        image_mimetype=doc.image_mimetype,
-                        metadata=metadata
+                    image_chunk = self.chunk_class(
+                        image_path=image_path,
+                        image_mimetype=image_mimetype,
+                        chunk_id=doc.metadata.get('file_name', f'img_{len(image_chunks)}'),
+                        metadata=ChunkMetadata(
+                            doc_id=doc.metadata.get('file_name', f'doc_{len(image_chunks)}'),
+                            corpus_id=corpus_id,
+                            **doc.metadata
+                        )
                     )
-                    image_nodes.append(image_node)
-                
-                logger.info(f"Created {len(image_nodes)} ImageNodes for corpus {corpus_id}")
-                return image_nodes
+                    image_chunks.append(image_chunk)
+                corpus = Corpus(chunks=image_chunks, corpus_id=corpus_id)
+                logger.info(f"Read {len(documents)} multimodal documents (no chunking) for corpus {corpus_id}")
             else:
                 corpus = self.chunker.chunk(documents)
                 corpus.corpus_id = corpus_id
@@ -151,7 +158,7 @@ class RAGEngine:
             logger.error(f"Failed to read documents for corpus {corpus_id}: {str(e)}")
             raise
 
-    def add(self, index_type: str, nodes: Union[Corpus, List[NodeWithScore], List[TextNode], List[ImageNode]], 
+    def add(self, index_type: str, nodes: Union[Corpus, List[NodeWithScore], List[TextNode], List[ImageNode], List[ImageChunk]], 
             corpus_id: str = None) -> None:
         """Add nodes to an index for a specific corpus.
 
@@ -179,13 +186,14 @@ class RAGEngine:
                     index_config=self.config.index.model_dump(exclude_unset=True) if self.config.index else {}
                 )
                 self.indices[corpus_id][index_type] = index
+                logger.info(f"Creating retriever with chunk_class: {self.chunk_class}")
                 self.retrievers[corpus_id][index_type] = self.retriever_factory.create(
                     retriever_type=self.config.retrieval.retrivel_type,
                     index=index.get_index(),
                     graph_store=index.get_index().storage_context.graph_store,
                     embed_model=self.embed_model.get_embedding_model(),
                     query=Query(query_str="", top_k=self.config.retrieval.top_k if self.config.retrieval else 5),
-                    chunk_class=self.chunk_class  # Pass chunk class based on modality
+                    chunk_class=self.chunk_class  
                 )
 
             nodes_to_insert = nodes.to_llama_nodes() if isinstance(nodes, Corpus) else nodes
@@ -468,7 +476,6 @@ class RAGEngine:
                                 chunk_id=chunk_data["chunk_id"],
                                 image_path=chunk_data["image_path"],
                                 image_mimetype=chunk_data.get("image_mimetype"),
-                                description=chunk_data.get("description", ""),
                                 metadata=metadata,
                                 embedding=chunk_data["embedding"],
                                 excluded_embed_metadata_keys=chunk_data["excluded_embed_metadata_keys"],

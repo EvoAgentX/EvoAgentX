@@ -3,6 +3,7 @@ import json
 from typing import List, Dict
 from collections import defaultdict
 from dotenv import load_dotenv
+import random
 
 from evoagentx.core.logging import logger
 from evoagentx.storages.base import StorageHandler
@@ -26,7 +27,7 @@ store_config = StoreConfig(
     ),
     vectorConfig=VectorStoreConfig(
         vector_name="faiss",
-        dimensions=4096,    
+        dimensions=3584,    
         index_type="flat_l2",
     ),
     graphConfig=None,
@@ -142,34 +143,55 @@ def run_evaluation(samples: List[Dict], top_k: int = 5) -> Dict[str, float]:
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
     from PIL import Image
+    from pathlib import Path
     
-    # Run on just 1 sample for visualization
-    samples = datasets.get_random_samples(1)
+    # Index 20 samples first
+    samples = datasets.get_random_samples(5, seed=129)
     print(f"Dataset size: {len(datasets.data)}")
+    logger.info(f"Indexing {len(samples)} samples...")
     
-    sample = samples[0]
-    query_text = sample["query"]
-    target_image = sample["image_filename"]
-    image_path = sample["image_path"]
-    corpus_id = sample["id"]
+    # Index all 20 samples
+    all_image_paths = []
+    corpus_id = "multimodal_corpus"
     
-    logger.info(f"Processing sample: {corpus_id}")
+    for sample in samples:
+        image_path = sample["image_path"]
+        if os.path.exists(image_path):
+            all_image_paths.append(image_path)
+    
+    logger.info(f"Found {len(all_image_paths)} valid image paths")
+    
+    # Index all images at once
+    corpus = search_engine.read(
+        file_paths=all_image_paths,
+        corpus_id=corpus_id
+    )
+    logger.info(f"Indexed {len(corpus.chunks)} image chunks")
+    search_engine.add(index_type="vector", nodes=corpus, corpus_id=corpus_id)
+    
+    # Find a sample with non-None query for visualization
+    query_sample = None
+    for sample in samples:
+        if sample["query"] and sample["query"].strip():
+            query_sample = sample
+            break
+    
+    if not query_sample:
+        logger.error("No samples with valid queries found!")
+        exit(1)
+    
+    query_text = query_sample["query"]
+    target_image = query_sample["image_filename"]
+    
+    logger.info(f"Query sample found:")
     logger.info(f"Query: {query_text}")
     logger.info(f"Target image: {target_image}")
     
-    # Index single image
-    corpus = search_engine.read(
-        file_paths=[image_path],
-        corpus_id=str(corpus_id)
-    )
-    logger.info(f"Indexed {len(corpus.chunks)} image chunks")
-    search_engine.add(index_type="vector", nodes=corpus, corpus_id=str(corpus_id))
-    
-    # Query
-    query = Query(query_str=query_text, top_k=5)
-    result = search_engine.query(query, corpus_id=str(corpus_id))
+    # Query across all indexed images
+    query = Query(query_str=query_text, top_k=1)
+    result = search_engine.query(query, corpus_id=corpus_id)
     retrieved_chunks = result.corpus.chunks
-    logger.info(f"Retrieved {len(retrieved_chunks)} image chunks")
+    logger.info(f"Retrieved {len(retrieved_chunks)} image chunks from {len(corpus.chunks)} total images")
     
     # Get the top retrieved image
     if retrieved_chunks:
@@ -180,12 +202,12 @@ if __name__ == "__main__":
         retrieved_image = top_chunk.get_image()
         
         # Create visualization
-        fig, ax = plt.subplots(1, 1, figsize=(10, 8))
+        fig, ax = plt.subplots(1, 1, figsize=(12, 8))
         
         if retrieved_image:
             ax.imshow(retrieved_image)
-            ax.set_title(f"Query: '{query_text}'\nRetrieved: {target_image}\nSimilarity: {similarity_score:.4f}", 
-                        fontsize=12, pad=20)
+            ax.set_title(f"Multimodal RAG Result\n\nQuery: '{query_text}'\n\nTop Retrieved Image: {Path(top_chunk.image_path).name}\nSimilarity Score: {similarity_score:.4f}\n\n(Searched across {len(corpus.chunks)} indexed images)", 
+                        fontsize=14, pad=20)
             ax.axis('off')
             
             # Save the plot
@@ -197,12 +219,14 @@ if __name__ == "__main__":
             
             logger.info(f"✅ Visualization saved to ./debug/data/real_mm_rag/multimodal_rag_result.png")
             logger.info(f"Query: {query_text}")
-            logger.info(f"Retrieved image: {target_image}")
+            logger.info(f"Retrieved image: {Path(top_chunk.image_path).name}")
+            logger.info(f"Target image: {target_image}")
             logger.info(f"Similarity score: {similarity_score:.4f}")
+            logger.info(f"Searched across {len(corpus.chunks)} total indexed images")
         else:
             logger.error("Failed to load retrieved image")
     else:
         logger.warning("No images retrieved")
     
     # Clean up
-    search_engine.clear(corpus_id=str(corpus_id))
+    search_engine.clear(corpus_id=corpus_id)
