@@ -32,6 +32,12 @@ class RAGEngine:
         self.chunk_factory = ChunkFactory()
         self.retriever_factory = RetrieverFactory()
         self.postprocessor_factory = PostprocessorFactory()
+        
+        # Set chunk class based on modality config
+        if self.config.modality == "multimodal":
+            self.chunk_class = ImageChunk
+        else:
+            self.chunk_class = TextChunk
 
         # Initialize reader based on modality
         if self.config.modality == "multimodal":
@@ -178,7 +184,8 @@ class RAGEngine:
                     index=index.get_index(),
                     graph_store=index.get_index().storage_context.graph_store,
                     embed_model=self.embed_model.get_embedding_model(),
-                    query=Query(query_str="", top_k=self.config.retrieval.top_k if self.config.retrieval else 5)
+                    query=Query(query_str="", top_k=self.config.retrieval.top_k if self.config.retrieval else 5),
+                    chunk_class=self.chunk_class  # Pass chunk class based on modality
                 )
 
             nodes_to_insert = nodes.to_llama_nodes() if isinstance(nodes, Corpus) else nodes
@@ -301,9 +308,9 @@ class RAGEngine:
                 for idx_type in target_indices:
                     index = self.indices[cid][idx_type]
 
-                    # Convert index nodes to Corpus
+                    # Convert index nodes to Corpus using config-determined chunk type
                     chunks = [
-                        Chunk.from_llama_node(node_data)
+                        self.chunk_class.from_llama_node(node_data)
                         for node_id, node_data in index.id_to_node.items()
                     ]
                     corpus = Corpus(chunks=chunks, corpus_id=cid)
@@ -450,21 +457,41 @@ class RAGEngine:
                     if (corpus_id and corpus_id != cid) or (index_type and index_type != idx_type):
                         continue
 
-                    # Reconstruct corpus
+                    # Reconstruct corpus using config-determined chunk type
+                    chunks = []
+                    for chunk_data in parsed["content"]["chunks"]:
+                        metadata = ChunkMetadata.model_validate(chunk_data["metadata"])
+                        
+                        if self.config.modality == "multimodal":
+                            # Create ImageChunk for multimodal mode
+                            chunk = ImageChunk(
+                                chunk_id=chunk_data["chunk_id"],
+                                image_path=chunk_data["image_path"],
+                                image_mimetype=chunk_data.get("image_mimetype"),
+                                description=chunk_data.get("description", ""),
+                                metadata=metadata,
+                                embedding=chunk_data["embedding"],
+                                excluded_embed_metadata_keys=chunk_data["excluded_embed_metadata_keys"],
+                                excluded_llm_metadata_keys=chunk_data["excluded_llm_metadata_keys"],
+                                relationships={k: RelatedNodeInfo(**v) for k, v in chunk_data["relationships"].items()}
+                            )
+                        else:
+                            # Create TextChunk for text mode
+                            chunk = TextChunk(
+                                chunk_id=chunk_data["chunk_id"],
+                                text=chunk_data["text"],
+                                metadata=metadata,
+                                embedding=chunk_data["embedding"],
+                                start_char_idx=chunk_data["start_char_idx"],
+                                end_char_idx=chunk_data["end_char_idx"],
+                                excluded_embed_metadata_keys=chunk_data["excluded_embed_metadata_keys"],
+                                excluded_llm_metadata_keys=chunk_data["excluded_llm_metadata_keys"],
+                                relationships={k: RelatedNodeInfo(**v) for k, v in chunk_data["relationships"].items()}
+                            )
+                        chunks.append(chunk)
+                    
                     corpus = Corpus(
-                        chunks=[
-                            Chunk(
-                                chunk_id=chunk["chunk_id"],
-                                text=chunk["text"],
-                                metadata=ChunkMetadata.model_validate(chunk["metadata"]),
-                                embedding=chunk["embedding"],
-                                start_char_idx=chunk["start_char_idx"],
-                                end_char_idx=chunk["end_char_idx"],
-                                excluded_embed_metadata_keys=chunk["excluded_embed_metadata_keys"],
-                                excluded_llm_metadata_keys=chunk["excluded_llm_metadata_keys"],
-                                relationships={k: RelatedNodeInfo(**v) for k, v in chunk["relationships"].items()}
-                            ) for chunk in parsed["content"]["chunks"]
-                        ],
+                        chunks=chunks,
                         corpus_id=cid,
                         metadata=IndexMetadata.model_validate(parsed["metadata"])
                     )

@@ -140,22 +140,69 @@ def run_evaluation(samples: List[Dict], top_k: int = 5) -> Dict[str, float]:
 
 
 if __name__ == "__main__":
-    # Run evaluation on a subset of samples
-    samples = datasets.get_random_samples(20)  # Limit to 20 samples for testing
+    import matplotlib.pyplot as plt
+    from PIL import Image
+    
+    # Run on just 1 sample for visualization
+    samples = datasets.get_random_samples(1)
     print(f"Dataset size: {len(datasets.data)}")
-
-    avg_metrics = run_evaluation(samples, top_k=5)
-
-    logger.info("Average Metrics:")
-    for metric_name, value in avg_metrics.items():
-        logger.info(f"{metric_name}: {value:.4f}")
-
-    # Save results
-    with open("./debug/data/real_mm_rag/evaluation_results.json", "w") as f:
-        json.dump(avg_metrics, f, indent=2)
-
-    """
-    Results using 20 samples:
-        multimodal-embedding:
-            hit@k: 0.8500, mrr: 0.7250, avg_similarity_score: 0.6800
-    """
+    
+    sample = samples[0]
+    query_text = sample["query"]
+    target_image = sample["image_filename"]
+    image_path = sample["image_path"]
+    corpus_id = sample["id"]
+    
+    logger.info(f"Processing sample: {corpus_id}")
+    logger.info(f"Query: {query_text}")
+    logger.info(f"Target image: {target_image}")
+    
+    # Index single image
+    corpus = search_engine.read(
+        file_paths=[image_path],
+        corpus_id=str(corpus_id)
+    )
+    logger.info(f"Indexed {len(corpus.chunks)} image chunks")
+    search_engine.add(index_type="vector", nodes=corpus, corpus_id=str(corpus_id))
+    
+    # Query
+    query = Query(query_str=query_text, top_k=5)
+    result = search_engine.query(query, corpus_id=str(corpus_id))
+    retrieved_chunks = result.corpus.chunks
+    logger.info(f"Retrieved {len(retrieved_chunks)} image chunks")
+    
+    # Get the top retrieved image
+    if retrieved_chunks:
+        top_chunk = retrieved_chunks[0]  # Best match
+        similarity_score = getattr(top_chunk.metadata, 'similarity_score', 0.0)
+        
+        # Load and display the image
+        retrieved_image = top_chunk.get_image()
+        
+        # Create visualization
+        fig, ax = plt.subplots(1, 1, figsize=(10, 8))
+        
+        if retrieved_image:
+            ax.imshow(retrieved_image)
+            ax.set_title(f"Query: '{query_text}'\nRetrieved: {target_image}\nSimilarity: {similarity_score:.4f}", 
+                        fontsize=12, pad=20)
+            ax.axis('off')
+            
+            # Save the plot
+            os.makedirs("./debug/data/real_mm_rag/", exist_ok=True)
+            plt.tight_layout()
+            plt.savefig("./debug/data/real_mm_rag/multimodal_rag_result.png", 
+                       dpi=150, bbox_inches='tight')
+            plt.show()
+            
+            logger.info(f"✅ Visualization saved to ./debug/data/real_mm_rag/multimodal_rag_result.png")
+            logger.info(f"Query: {query_text}")
+            logger.info(f"Retrieved image: {target_image}")
+            logger.info(f"Similarity score: {similarity_score:.4f}")
+        else:
+            logger.error("Failed to load retrieved image")
+    else:
+        logger.warning("No images retrieved")
+    
+    # Clean up
+    search_engine.clear(corpus_id=str(corpus_id))
