@@ -3,8 +3,7 @@ from llama_index.core.retrievers import VectorIndexRetriever
 
 from .base import BaseRetrieverWrapper
 from evoagentx.core.logging import logger
-from evoagentx.rag.schema import Query, RagResult, Corpus, Chunk
-
+from evoagentx.rag.schema import Query, RagResult, Corpus
 
 class VectorRetriever(BaseRetrieverWrapper):
     """Wrapper for vector-based retrieval."""
@@ -35,9 +34,7 @@ class VectorRetriever(BaseRetrieverWrapper):
             for score_node in nodes:
                 if self.chunk_class is None:
                     raise ValueError("chunk_class not set - RAGEngine must pass chunk class based on config")
-                logger.debug(f"Creating chunk using class: {self.chunk_class}")
                 chunk = self.chunk_class.from_llama_node(score_node.node)
-                logger.debug(f"Created chunk type: {type(chunk)}")
                 chunk.metadata.similarity_score = score_node.score or 0.0
                 corpus.add_chunk(chunk)
                 scores.extend([score_node.score or 0.0])
@@ -67,9 +64,7 @@ class VectorRetriever(BaseRetrieverWrapper):
             for score_node in nodes:
                 if self.chunk_class is None:
                     raise ValueError("chunk_class not set - RAGEngine must pass chunk class based on config")
-                logger.debug(f"Creating chunk using class: {self.chunk_class}")
                 chunk = self.chunk_class.from_llama_node(score_node.node)
-                logger.debug(f"Created chunk type: {type(chunk)}")
                 chunk.metadata.similarity_score = score_node.score or 0.0
                 corpus.add_chunk(chunk)
                 scores.extend([score_node.score or 0.0])

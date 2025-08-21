@@ -17,7 +17,7 @@ from .retrievers import RetrieverFactory, BaseRetrieverWrapper
 from .postprocessors import PostprocessorFactory
 from .indexings.base import IndexType
 from .retrievers.base import RetrieverType
-from .schema import Chunk, Corpus, ChunkMetadata, IndexMetadata, Query, RagResult, ImageChunk, TextChunk
+from .schema import Corpus, ChunkMetadata, IndexMetadata, Query, RagResult, ImageChunk, TextChunk
 from evoagentx.storages.base import StorageHandler
 from evoagentx.storages.schema import IndexStore
 from evoagentx.core.logging import logger
@@ -62,7 +62,6 @@ class RAGEngine:
                 errors=self.config.reader.errors,
                 encoding=self.config.reader.encoding
             )
-
 
         # Initialize embedding model. 
         self.embed_model = self.embedding_factory.create(

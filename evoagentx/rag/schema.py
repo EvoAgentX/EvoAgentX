@@ -1,25 +1,28 @@
-
 import json
 import hashlib
-from abc import ABC, abstractmethod
 from uuid import uuid4
-from typing import List, Dict, Optional, Union, Any, TypeVar, Generic
 from pathlib import Path
-
+from typing import List, Dict, Optional, Union, Any
 from pydantic import Field
+
+from llama_index.core.schema import ImageNode
 from llama_index.core.schema import QueryBundle
 from llama_index.core import Document as LlamaIndexDocument
-from llama_index.core.schema import BaseNode, TextNode, ImageNode, RelatedNodeInfo
+from llama_index.core.schema import BaseNode, TextNode, RelatedNodeInfo
+from llama_index.core.graph_stores.types import (
+    Relation,
+    EntityNode,
+    ChunkNode,
+)
 
 from evoagentx.core.base_config import BaseModule
 from evoagentx.core.logging import logger
 
 
 DEAFULT_EXCLUDED = ['file_name', 'file_type', 'file_size', 'page_count', 'creation_date', 
-                        'last_modified_date', 'language', 'word_count', 'custom_fields', 'hash_doc']
-
-# Generic type for chunk types
-ChunkType = TypeVar('ChunkType', bound='BaseChunk')
+                        'last_modified_date', 'language', 'word_count', 'custom_fields', 'hash_doc', 
+                        'graph_node', # for graph store 
+                    ]
 class DocumentMetadata(BaseModule):
     """
     This class ensures type safety and validation for metadata associated with a document,
@@ -39,20 +42,52 @@ class DocumentMetadata(BaseModule):
     hash_doc: Optional[str] = Field(default=None, description="The hash code of this Document for deduplication")
 
 
+class GraphNodeData(BaseModule):
+    # graph support
+    # Basic
+    label: Optional[str] = Field(default="entity", description="The label name of the 'LabelNode', 'EntityNode', 'Relation' in llama_index node.")
+    
+    # Relation
+    node_class_name: Optional[str] = Field(default=None, description="The class name of the source llama_index node.")
+    properties: Optional[Dict] = Field(default_factory=dict, description="Represents all information from the Node.")
+    
+    # Entity Node
+    node_name: Optional[str] = Field(default=None, description="Entity name of each node.")
+    source_id: Optional[str] = Field(default=None, description="Source node ID.")
+    target_id: Optional[str] = Field(default=None, description="Target node ID.")
+
+    # Chunk Node
+    text: Optional[str] = Field(default=None, description="The text stored in the ChunkNode.")
+    id_: Optional[str] = Field(default=None, description="ChunkNode id.")
+
 class ChunkMetadata(DocumentMetadata):
     """
     This class holds metadata for a chunk, including its relationship to the parent document,
     chunking parameters, and retrieval-related information.
     """
 
-    doc_id: str = Field(description="The unique identifier of the parent document.")
+    doc_id: Optional[str] = Field(default=None, description="The unique identifier of the parent document.")
     corpus_id: Optional[str] = Field(default=None, description="The unique identifier of the Corpus(Indexing).")
     chunk_size: Optional[int] = Field(default=None, description="The size of the chunk in characters, if applicable.")
     chunk_overlap: Optional[int] = Field(default=None, description="The number of overlapping characters between adjacent chunks.")
     chunk_index: Optional[int] = Field(default=None, description="The index of the chunk within the parent document.")
     chunking_strategy: Optional[str] = Field(default=None, description="The strategy used to create the chunk (e.g., 'simple', 'semantic', 'tree').")
     similarity_score: Optional[float] = Field(default=None, description="Similarity score from retrieval.")
-
+    # graph support
+    graph_node: Optional[GraphNodeData] = Field(default=None, description="The properties of all types of graph nodes.")
+    # LongTermMemory
+    content: Optional[str] = Field(default=None, description="the content of the message, will be dumps by 'dumps' from json lib.")
+    memory_id: Optional[str] = Field(default=None, description="Unique identifier for memory entries.")
+    agent: Optional[str] = Field(default=None, description="The sender of the message.")
+    msg_type: Optional[str] = Field(default=None, description="The type of the message (e.g., 'request', 'response').")
+    prompt: Optional[Union[str, List[dict]]] = Field(default=None, description="The prompt used to generate the message.")
+    next_actions: Optional[List[str]] = Field(default=None, description="The following actions after the message.")
+    wf_task: Optional[str] = Field(default=None, description="The name of a task in the workflow.")
+    wf_task_desc: Optional[str] = Field(default=None, description="The description of a task in the workflow.")
+    message_id: Optional[str] = Field(default=None, description="Unique identifier for the message.")
+    action: Optional[str] = Field(default=None, description="the trigger of the message, normally set as the action name.")
+    wf_goal: Optional[str] = Field(default=None, description="the goal of the whole workflow.")
+    timestamp: Optional[str] = Field(default=None, description="the timestame of the message. ")
 
 class IndexMetadata(BaseModule):
     corpus_id: str = Field(..., description="Identifier for the corpus")
@@ -182,39 +217,16 @@ class Document(BaseModule):
             f"fragment={self.get_fragment(max_length=300)})"
         )
 
-
-class BaseChunk(BaseModule, ABC):
-    """Abstract base class for all chunk types."""
-    
-    @abstractmethod
-    def to_llama_node(self) -> BaseNode:
-        """Convert to appropriate LlamaIndex Node."""
-        pass
-    
-    @classmethod
-    @abstractmethod
-    def from_llama_node(cls, node: BaseNode) -> "BaseChunk":
-        """Create chunk from LlamaIndex Node."""
-        pass
-    
-    @abstractmethod
-    def get_fragment(self, max_length: int = 100) -> str:
-        """Return a fragment for display."""
-        pass
-
-
-class TextChunk(BaseChunk):
+class TextChunk(BaseModule):
     """A text-based chunk implementing BaseChunk interface.
     
-    Attributes:
+    Extra Attributes:
         text (str): The text content of the chunk.
-        chunk_id (str): Unique identifier for the chunk.
-        metadata (ChunkMetadata): Metadata including chunk size, embedding, etc.
     """
 
     def __init__(
         self,
-        text: str,
+        text: str = "",
         chunk_id: Optional[str] = None,
         embedding: Optional[List[float]] = None,
         start_char_idx: Optional[int] = None,
@@ -222,7 +234,7 @@ class TextChunk(BaseChunk):
         excluded_embed_metadata_keys: List[str] = DEAFULT_EXCLUDED,
         excluded_llm_metadata_keys: List[str] = DEAFULT_EXCLUDED,
         text_template: str = '{metadata_str}\n\n{content}',
-        relationships: Dict[str, RelatedNodeInfo] = {},
+        relationships: Dict[str, RelatedNodeInfo] = {}, 
         metadata: Optional[Union[Dict, ChunkMetadata]] = None,
     ):
         metadata = (
@@ -242,47 +254,161 @@ class TextChunk(BaseChunk):
         )
         self.metadata.word_count = len(self.text.split())
 
-    def to_llama_node(self) -> TextNode:
-        """Convert to LlamaIndex TextNode."""
-        relationships = dict()
+    def to_llama_node(self) -> Union[TextNode, Relation, EntityNode, ChunkNode]:
+        """Convert to LlamaIndex Node."""
+        relatiuonships = dict() 
         for k, v in self.relationships.items():
-            relationships[k] = v if isinstance(v, RelatedNodeInfo) else RelatedNodeInfo.from_dict(v)
-        return TextNode(
-            text=self.text,
-            metadata=self.metadata.model_dump(),
-            id_=self.chunk_id,
-            embedding=self.embedding,
-            start_char_idx=self.start_char_idx,
-            end_char_idx=self.end_char_idx,
-            excluded_llm_metadata_keys=self.excluded_llm_metadata_keys,
-            excluded_embed_metadata_keys=self.excluded_embed_metadata_keys,
-            text_template=self.text_template,
-            relationships=relationships
-        )
+            relatiuonships[k] = v if isinstance(v, RelatedNodeInfo) else RelatedNodeInfo.from_dict(v)
+
+        cls = TextNode
+        if self.metadata.graph_node is not None:
+            class_name = self.metadata.graph_node.node_class_name.lower()
+            if class_name == "relation":
+                cls = Relation(
+                    label=self.metadata.graph_node.label,
+                    source_id=self.metadata.graph_node.source_id,
+                    target_id=self.metadata.graph_node.target_id,
+                    properties={"metadata": json.dumps(self.metadata.graph_node.properties["metadata"])},
+                )
+            
+            elif class_name == "entity":
+                cls = EntityNode(
+                    label=self.metadata.graph_node.label,
+                    embedding=self.embedding,
+                    name=self.metadata.graph_node.node_name,
+                    properties={"triplet_source_id": self.metadata.graph_node.properties["triplet_source_id"]}
+                )
+                # cls.triplet_source_id
+
+            else:
+                NotImplementedError()
+            return cls
+        else:
+            metadata = self.metadata.model_dump()
+            if "class_name" in metadata:
+                metadata.pop("class_name")
+    
+            return cls(
+                text=self.text,
+                metadata=metadata,
+                id_=self.chunk_id,
+                embedding=self.embedding,
+                start_char_idx=self.start_char_idx,
+                end_char_idx=self.end_char_idx,
+                excluded_llm_metadata_keys=self.excluded_llm_metadata_keys,
+                excluded_embed_metadata_keys=self.excluded_embed_metadata_keys,
+                text_template=self.text_template,
+                relationships=relatiuonships
+            )
 
     @classmethod
-    def from_llama_node(cls, node: TextNode) -> "TextChunk":
-        """Create TextChunk from LlamaIndex TextNode."""
-        metadata = ChunkMetadata.model_validate(node.metadata)
-        return cls(
-            chunk_id=node.id_,
-            text=node.text,
-            metadata=metadata,
-            embedding=node.embedding,
-            start_char_idx=getattr(node, "start_char_idx", None),
-            end_char_idx=getattr(node, "end_char_idx", None),
-            excluded_embed_metadata_keys=node.excluded_embed_metadata_keys,
-            excluded_llm_metadata_keys=node.excluded_llm_metadata_keys,
-            text_template=node.text_template,
-            relationships=node.relationships
-        )
+    def from_llama_node(cls, node: Union[TextNode, Relation, EntityNode, ChunkNode]) -> "Chunk":
+        """Create Chunk from LlamaIndex Node."""
+        
+        if isinstance(node, TextNode):
+            return cls(
+                chunk_id=node.id_,
+                text=node.text,
+                metadata=ChunkMetadata.model_validate(node.metadata),
+                embedding=node.embedding,
+                start_char_idx=getattr(node, "start_char_idx", None),
+                end_char_idx=getattr(node, "end_char_idx", None),
+                excluded_embed_metadata_keys=node.excluded_embed_metadata_keys,
+                excluded_llm_metadata_keys=node.excluded_llm_metadata_keys,
+                text_template=node.text_template,
+                relationships=node.relationships
+            )
+        
+        elif isinstance(node, Relation):
+            if 'class_name' in node.properties:
+                node.properties.pop('class_name')
+            properties = node.properties if isinstance(node.properties, dict) else node.properties.model_dump()
+            graph_node = GraphNodeData(
+                node_class_name="relation",
+                label=node.label,
+                source_id=node.source_id,
+                target_id=node.target_id,
+                properties={"metadata": properties}
+            )
+            metadata= {"graph_node": graph_node}
+            return cls(
+                metadata=ChunkMetadata.model_validate(metadata)
+            )
+        
+        elif isinstance(node, EntityNode):
+            graph_node = GraphNodeData(
+                node_class_name="entity",
+                label=node.label,
+                node_name=node.name,
+                properties={"triplet_source_id": node.properties["triplet_source_id"]}
+                # triplet_source_id=node.triplet_source_id
+            )
+            metadata= {"graph_node": graph_node}
+            return cls(
+                embedding=node.embedding,
+                metadata=ChunkMetadata.model_validate(metadata)
+            )
+
+        elif isinstance(node, ChunkNode):
+            graph_node = GraphNodeData(
+                node_class_name="chunk",
+                text=node.text,
+                properties=node.properties,
+                id_=node.id_,
+            )
+            metadata= {"graph_node": graph_node}
+            return cls(
+                embedding=node.embedding,
+                metadata=ChunkMetadata.model_validate(metadata)
+            )
 
     def get_fragment(self, max_length: int = 100) -> str:
-        """Return a fragment of the text content."""
+        """Return a fragment of the chunk text."""
         return (self.text[:max_length] + "...") if len(self.text) > max_length else self.text
 
+    def to_dict(self) -> Dict:
+        """Convert chunk to dictionary for serialization."""
+        relationships = dict() 
+        for k, v in self.relationships.items():
+            relationships[k] = v.to_dict() if isinstance(v, RelatedNodeInfo) else v
+        self.relationships = relationships
+        # return {"chunk_id": self.chunk_id,"text": self.text,"metadata": self.metadata.model_dump(),"embedding": self.embedding,"start_char_idx": self.start_char_idx,"end_char_idx": self.end_char_idx,"excluded_embed_metadata_keys": self.excluded_embed_metadata_keys,"excluded_llm_metadata_keys": self.excluded_llm_metadata_keys,"relationships": relatiuonships}
+        return self.model_dump()
+    
+    def to_json(self, indent: int = 2) -> str:
+        """Convert chunk to JSON string."""
+        return self.model_dump_json(indent=indent).strip()
 
-class ImageChunk(BaseChunk):
+    def __str__(self) -> str:
+        return (
+            f"Chunk(id={self.chunk_id}, text={self.text}, "
+            f"chunking_strategy={self.metadata.chunking_strategy}, "
+            f"embedding={self.embedding}), "
+            f"start_char_idx={self.start_char_idx}, "
+            f"end_char_idx={self.end_char_idx}, "
+            f"excluded_embed_metadata_keys={self.excluded_embed_metadata_keys},"
+            f"excluded_llm_metadata_keys={self.excluded_llm_metadata_keys},"
+            f"text_template={self.text_template},"
+            f"metadata={self.metadata.model_dump()}"
+        )
+
+    def __repr__(self) -> str:
+        return (
+            f"Chunk(id={self.chunk_id}, text={self.text}, "
+            f"chunking_strategy={self.metadata.chunking_strategy}, "
+            f"embedding={self.embedding}), "
+            f"start_char_idx={self.start_char_idx}, "
+            f"end_char_idx={self.end_char_idx}, "
+            f"excluded_embed_metadata_keys={self.excluded_embed_metadata_keys},"
+            f"excluded_llm_metadata_keys={self.excluded_llm_metadata_keys},"
+            f"text_template={self.text_template},"
+            f"metadata={self.metadata.model_dump()}"
+        )
+    
+# Backward compatibility alias
+Chunk = TextChunk
+
+class ImageChunk(BaseModule):
     """An image-based chunk with lazy loading.
     
     Attributes:
@@ -395,22 +521,20 @@ class ImageChunk(BaseChunk):
         return f"[Image: {filename}]"
 
 
-# Backward compatibility alias
-Chunk = TextChunk
 
 
-class Corpus(BaseModule, Generic[ChunkType]):
+class Corpus(BaseModule):
     """A generic collection of document chunks for RAG processing.
 
     Attributes:
         corpus_id (str): The unique id for corpus.
-        chunks (List[ChunkType]): List of chunks in the corpus.
-        chunk_index (Dict[str, ChunkType]): Index of chunks by chunk_id for fast lookup.
+        chunks (List[Union[TextChunk, ImageChunk]]): List of chunks in the corpus.
+        chunk_index (Dict[str, Union[TextChunk, ImageChunk]]): Index of chunks by chunk_id for fast lookup.
         metadata (Optional[IndexMetadata]): the metadata for this corpus.
     """
 
-    def __init__(self, chunks: List[ChunkType] = None, corpus_id: str = None, 
-                 metadata:Optional[Union[IndexMetadata, Dict]]=None):
+    def __init__(self, chunks: Optional[List[Union[TextChunk, ImageChunk]]] = None, corpus_id: Optional[str] = None, 
+                 metadata: Optional[Union[IndexMetadata, Dict]] = None):
         corpus_id = uuid4() if corpus_id is None else corpus_id
         chunks = [] if chunks is None else chunks
         chunk_index = {} if chunks is None else {chunk.chunk_id: chunk for chunk in chunks}
@@ -438,14 +562,20 @@ class Corpus(BaseModule, Generic[ChunkType]):
 
         Args:
             nodes (List[BaseNode]): The LlamaIndex Nodes to convert.
-            doc_id (str): The ID of the parent document.
 
         Returns:
             Corpus: A new Corpus instance.
         """
-        return cls([Chunk.from_llama_node(node) for node in nodes])
+        chunks = []
+        for node in nodes:
+            if isinstance(node, ImageNode):
+                chunks.append(ImageChunk.from_llama_node(node))
+            else:
+                # Default to TextChunk for TextNode and other node types
+                chunks.append(TextChunk.from_llama_node(node))
+        return cls(chunks)
 
-    def add_chunk(self, batch_chunk: Union[ChunkType, List[ChunkType]]):
+    def add_chunk(self, batch_chunk: Union[TextChunk, ImageChunk, List[Union[TextChunk, ImageChunk]]]):
         """Add a batch chunk to the corpus and update index."""
         if not isinstance(batch_chunk, list):
             batch_chunk = [batch_chunk]
@@ -454,7 +584,7 @@ class Corpus(BaseModule, Generic[ChunkType]):
             self.chunks.append(chunk)
             self.chunk_index[chunk.chunk_id] = chunk
 
-    def get_chunk(self, chunk_id: str) -> Optional[ChunkType]:
+    def get_chunk(self, chunk_id: str) -> Optional[Union[TextChunk, ImageChunk]]:
         """Retrieve a chunk by its ID."""
         return self.chunk_index.get(chunk_id)
 
@@ -463,15 +593,15 @@ class Corpus(BaseModule, Generic[ChunkType]):
         self.chunks = [chunk for chunk in self.chunks if chunk.chunk_id != chunk_id]
         self.chunk_index.pop(chunk_id, None)
 
-    def filter_by_doc_id(self, doc_id: str) -> List[ChunkType]:
+    def filter_by_doc_id(self, doc_id: str) -> List[Union[TextChunk, ImageChunk]]:
         """Filter chunks by parent document ID."""
-        return [chunk for chunk in self.chunks if hasattr(chunk, 'doc_id') and chunk.doc_id == doc_id]
+        return [chunk for chunk in self.chunks if hasattr(chunk.metadata, 'doc_id') and chunk.metadata.doc_id == doc_id]
 
-    def filter_by_similarity(self, threshold: float) -> List[ChunkType]:
+    def filter_by_similarity(self, threshold: float) -> List[Union[TextChunk, ImageChunk]]:
         """Filter chunks by similarity score."""
         return [chunk for chunk in self.chunks if chunk.metadata.similarity_score and chunk.metadata.similarity_score >= threshold]
 
-    def sort_by_similarity(self, reverse: bool = True) -> List[ChunkType]:
+    def sort_by_similarity(self, reverse: bool = True) -> List[Union[TextChunk, ImageChunk]]:
         """Sort chunks by similarity score (descending by default)."""
         return sorted(
             [chunk for chunk in self.chunks if chunk.metadata.similarity_score is not None],
@@ -591,15 +721,26 @@ class Query(BaseModule):
             custom_embedding_strs=self.custom_embedding_strs
         )
 
-class RagResult(BaseModule, Generic[ChunkType]):
+class RagResult(BaseModule):
     """Represents a generic retrieval result."""
     
-    corpus: Corpus[ChunkType] = Field(description="Retrieved chunks.")
+    corpus: Corpus = Field(description="Retrieved chunks.")
     scores: List[float] = Field(description="Similarity scores for each chunk.")
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional result metadata.")
     
-    def get_top_chunks(self, limit: int = None) -> List[ChunkType]:
+    def get_top_chunks(self, limit: int = None) -> List[Union[TextChunk, ImageChunk]]:
         """Get top chunks sorted by similarity score."""
         chunks = self.corpus.sort_by_similarity(reverse=True)
         return chunks[:limit] if limit else chunks
+
+
+
+
+
+
+
+
+
+
+
 
