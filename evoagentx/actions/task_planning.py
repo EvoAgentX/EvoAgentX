@@ -40,7 +40,6 @@ class TaskPlanning(Action):
     """
 
     def __init__(self, **kwargs):
-
         name = kwargs.pop("name") if "name" in kwargs else TASK_PLANNING_ACTION["name"]
         description = kwargs.pop("description") if "description" in kwargs else TASK_PLANNING_ACTION["description"]
         prompt = kwargs.pop("prompt") if "prompt" in kwargs else TASK_PLANNING_ACTION["prompt"]
@@ -50,27 +49,9 @@ class TaskPlanning(Action):
         outputs_format = kwargs.pop("outputs_format", None) or TaskPlanningOutput
         super().__init__(name=name, description=description, prompt=prompt, inputs_format=inputs_format, outputs_format=outputs_format, **kwargs)
     
-    def execute(self, llm: Optional[BaseLLM] = None, inputs: Optional[dict] = None, sys_msg: Optional[str]=None, return_prompt: bool = False, **kwargs) -> TaskPlanningOutput:
-        """Execute the task planning process.
-        
-        This method uses the provided language model to generate a structured
-        plan of sub-tasks based on the user's goal and any additional context.
-        
-        Args:
-            llm: The language model to use for planning.
-            inputs: Input data containing the goal and optional context.
-            sys_msg: Optional system message for the language model.
-            return_prompt: Whether to return both the task plan and the prompt used.
-            **kwargs: Additional keyword arguments.
-            
-        Returns:
-            If return_prompt is False (default): The generated task plan.
-            If return_prompt is True: A tuple of (task plan, prompt used).
-            
-        Raises:
-            ValueError: If the inputs are None or empty.
-        """
-        if not inputs:
+
+    def _prepare_prompt(self, inputs: Dict) -> str:
+        if inputs is None:
             logger.error("TaskPlanning action received invalid `inputs`: None or empty.")
             raise ValueError('The `inputs` to TaskPlanning action is None or empty.')
         
@@ -100,6 +81,37 @@ class TaskPlanning(Action):
         prompt_params_values["workflow_outputs"] = workflow_outputs_json
 
         prompt = self.prompt.format(**prompt_params_values)
+        return prompt
+
+
+    def execute(
+        self, 
+        llm: Optional[BaseLLM] = None, 
+        inputs: Optional[dict] = None, 
+        sys_msg: Optional[str]=None, 
+        return_prompt: bool = False, 
+        **kwargs
+    ) -> TaskPlanningOutput:
+        """Execute the task planning process.
+        
+        This method uses the provided language model to generate a structured
+        plan of sub-tasks based on the user's goal and any additional context.
+        
+        Args:
+            llm: The language model to use for planning.
+            inputs: Input data containing the goal and optional context.
+            sys_msg: Optional system message for the language model.
+            return_prompt: Whether to return both the task plan and the prompt used.
+            **kwargs: Additional keyword arguments.
+            
+        Returns:
+            If return_prompt is False (default): The generated task plan.
+            If return_prompt is True: A tuple of (task plan, prompt used).
+            
+        Raises:
+            ValueError: If the inputs are None or empty.
+        """
+        prompt = self._prepare_prompt(inputs)
 
         task_plan = llm.generate(
             prompt = prompt, 
@@ -112,6 +124,50 @@ class TaskPlanning(Action):
             return task_plan, prompt
         
         return task_plan
+
+
+    async def async_execute(
+        self, 
+        llm: Optional[BaseLLM] = None, 
+        inputs: Optional[dict] = None, 
+        sys_msg: Optional[str]=None, 
+        return_prompt: bool = False, 
+        **kwargs
+    ) -> TaskPlanningOutput:
+        """Execute the task planning process asynchronously.
+        
+        This method uses the provided language model to generate a structured
+        plan of sub-tasks based on the user's goal and any additional context.
+        
+        Args:
+            llm: The language model to use for planning.
+            inputs: Input data containing the goal and optional context.
+            sys_msg: Optional system message for the language model.
+            return_prompt: Whether to return both the task plan and the prompt used.
+            **kwargs: Additional keyword arguments.
+            
+        Returns:
+            If return_prompt is False (default): The generated task plan.
+            If return_prompt is True: A tuple of (task plan, prompt used).
+            
+        Raises:
+            ValueError: If the inputs are None or empty.
+        """
+
+        prompt = self._prepare_prompt(inputs)
+
+        task_plan = await llm.async_generate(
+            prompt = prompt, 
+            system_message = sys_msg, 
+            parser=self.outputs_format,
+            parse_mode="json"
+        )
+        
+        if return_prompt:
+            return task_plan, prompt
+        
+        return task_plan
+
 
     @staticmethod
     def format_task_planning_examples(examples: List[Dict]) -> str:
