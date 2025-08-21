@@ -166,8 +166,16 @@ if __name__ == "__main__":
         file_paths=all_image_paths,
         corpus_id=corpus_id
     )
-    logger.info(f"Indexed {len(corpus.chunks)} image chunks")
+    logger.info(f"Created corpus with {len(corpus.chunks)} image chunks")
+    
+    # Print all chunk filenames
+    logger.info(f"Corpus contains the following {len(corpus.chunks)} image chunks:")
+    for i, chunk in enumerate(corpus.chunks):
+        filename = Path(chunk.image_path).name if chunk.image_path else "Unknown"
+        logger.info(f"  [{i+1}] {filename} (path: {chunk.image_path})")
+    
     search_engine.add(index_type="vector", nodes=corpus, corpus_id=corpus_id)
+    logger.info(f"Successfully indexed {len(corpus.chunks)} image chunks into vector store")
     
     # Find a sample with non-None query for visualization
     query_sample = None
@@ -191,7 +199,9 @@ if __name__ == "__main__":
     query = Query(query_str=query_text, top_k=1)
     result = search_engine.query(query, corpus_id=corpus_id)
     retrieved_chunks = result.corpus.chunks
-    logger.info(f"Retrieved {len(retrieved_chunks)} image chunks from {len(corpus.chunks)} total images")
+    logger.info(f"Query executed successfully!")
+    logger.info(f"Retrieved {len(retrieved_chunks)} image chunks from corpus containing {len(corpus.chunks)} total images")
+    logger.info(f"Result corpus has {len(result.corpus.chunks)} chunks")
     
     # Get the top retrieved image
     if retrieved_chunks:
@@ -229,4 +239,5 @@ if __name__ == "__main__":
         logger.warning("No images retrieved")
     
     # Clean up
+    search_engine.save(corpus_id=corpus_id)
     search_engine.clear(corpus_id=corpus_id)

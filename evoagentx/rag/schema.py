@@ -532,6 +532,38 @@ class Corpus(BaseModule, Generic[ChunkType]):
     def __len__(self) -> int:
         return len(self.chunks)
     
+    def get_stats(self) -> Dict[str, Any]:
+        """Get statistics about the corpus."""
+        if not self.chunks:
+            return {
+                'chunk_count': 0,
+                'unique_docs': 0,
+                'avg_word_count': 0.0,
+                'strategies': set()
+            }
+        
+        # Count unique documents
+        unique_docs = set()
+        total_word_count = 0
+        strategies = set()
+        
+        for chunk in self.chunks:
+            if hasattr(chunk.metadata, 'doc_id') and chunk.metadata.doc_id:
+                unique_docs.add(chunk.metadata.doc_id)
+            if hasattr(chunk.metadata, 'word_count') and chunk.metadata.word_count:
+                total_word_count += chunk.metadata.word_count
+            if hasattr(chunk.metadata, 'chunking_strategy') and chunk.metadata.chunking_strategy:
+                strategies.add(chunk.metadata.chunking_strategy)
+        
+        avg_word_count = total_word_count / len(self.chunks) if self.chunks else 0.0
+        
+        return {
+            'chunk_count': len(self.chunks),
+            'unique_docs': len(unique_docs),
+            'avg_word_count': avg_word_count,
+            'strategies': strategies
+        }
+    
 
 class Query(BaseModule):
     """Represents a retrieval query."""
