@@ -224,7 +224,7 @@ class MultimodalReader:
         """Convert PDF pages to ImageDocuments."""
         documents = []
         try:
-            images = convert_from_path(file_path, dpi=200)
+            images = convert_from_path(file_path, dpi=72)
             
             for page_num, img in enumerate(images, 1):
                 try:

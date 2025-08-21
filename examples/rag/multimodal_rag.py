@@ -38,7 +38,7 @@ storage_handler = StorageHandler(storageConfig=store_config)
 embedding=EmbeddingConfig(
         provider="multimodal",
         model_name="nomic-ai/nomic-embed-multimodal-7b",
-        device="cpu"
+        device="cuda"
     )
 
 rag_config = RAGConfig(
@@ -143,7 +143,7 @@ if __name__ == "__main__":
     from pathlib import Path
     
     # Index 20 samples first
-    samples = datasets.get_random_samples(5, seed=129)
+    samples = datasets.get_random_samples(5, seed=32)
     print(f"Dataset size: {len(datasets.data)}")
     logger.info(f"Indexing {len(samples)} samples...")
     
