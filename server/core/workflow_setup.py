@@ -29,7 +29,7 @@ load_dotenv(os.path.join(os.path.dirname(__file__), '../config/app.env'))
 # Default LLM configuration
 default_llm_config = {
     "openai_key": os.getenv("OPENAI_API_KEY"),
-    "model": "gpt-4o-mini",
+    "model": "gpt-4o",
     "temperature": 0.1
 }
 

@@ -9,7 +9,7 @@ import asyncio
 from dotenv import load_dotenv
 
 # 导入更新后的workflow
-from xhs_workflow import create_social_media_workflow
+from examples.xhs_workflow import create_social_media_workflow
 
 load_dotenv()
 

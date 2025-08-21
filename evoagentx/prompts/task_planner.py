@@ -70,7 +70,8 @@ Each sub-task should follow the structure below:
 - The inputs of a sub-task can ONLY be chosen from the workflow's inputs and any outputs from its preceding sub-tasks. 
 - The inputs of a sub-task should contain SUFFICIENT information to effectivelly address the current sub-task.
 - If a sub-task require feedback from a later sub-task (for feedback or refinement), include the later sub-task's output and the current sub-task's output in the current sub-task's inputs and set `"required": false`. 
-- You will be provided with the inputs and outputs requirements of the workflow in the "### Workflow Inputs" and "### Workflow Outputs" sections. The first sub-task should only include the workflow inputs as its inputs. The final sub-task should only include the workflow outputs as its outputs.
+- You will be provided with the inputs and outputs requirements of the workflow in the "### Workflow Inputs" and "### Workflow Outputs" sections. You must incorporate all inputs in "### Workflow Inputs". All outputs in "### Workflow Outputs" must be the direct results of the sub-tasks.
+- You MUST NOT alter the provided workflow inputs or outputs in any way. Use them exactly as they are in your sub-tasks.
 """
 
 TASK_PLANNING_ACTION_DEMOS = """
