@@ -1,3 +1,8 @@
+<<<<<<< HEAD
+=======
+# Main function to run
+
+>>>>>>> afda1368dac6a538209e7ab5b8f1fe679c3c0272
 import sys
 import os
 from datetime import datetime
@@ -10,8 +15,13 @@ import matplotlib
 matplotlib.use('Agg')
 
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
+<<<<<<< HEAD
 from .catl_data_functions import fetch_stock_data
 from .stock_chart_tools import generate_stock_charts
+=======
+from catl_data_functions import fetch_stock_data
+from stock_chart_tools import generate_stock_charts
+>>>>>>> afda1368dac6a538209e7ab5b8f1fe679c3c0272
 # EvoAgentX imports
 from evoagentx.models import OpenAILLMConfig, OpenAILLM, OpenRouterConfig, OpenRouterLLM
 from evoagentx.workflow import WorkFlowGraph, WorkFlow, WorkFlowGenerator
@@ -19,8 +29,22 @@ from evoagentx.agents import AgentManager
 from evoagentx.tools import StorageToolkit, CMDToolkit
 
 load_dotenv()
+<<<<<<< HEAD
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPEN_ROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+=======
+
+# Read API keys from files
+def read_api_key(filename):
+    try:
+        with open(filename, 'r', encoding='utf-8') as f:
+            return f.read().strip()
+    except FileNotFoundError:
+        return None
+
+OPENAI_API_KEY = read_api_key("openai_api_key.txt") or os.getenv("OPENAI_API_KEY")
+OPEN_ROUTER_API_KEY = read_api_key("openrouter_api_key.txt") or os.getenv("OPENROUTER_API_KEY")
+>>>>>>> afda1368dac6a538209e7ab5b8f1fe679c3c0272
 
 # Fixed variables and paths
 available_funds = 100000
@@ -32,7 +56,11 @@ llm = OpenAILLM(config=OpenAILLMConfig(model="gpt-4o-mini", openai_key=OPENAI_AP
 tools = [StorageToolkit(), CMDToolkit()]
 
 # Path to the workflow module (should be pre-generated)
+<<<<<<< HEAD
 module_save_path = "examples/workflow/invest/invest_demo_4o_mini.json"
+=======
+module_save_path = "invest_demo_4o_mini_v1.json"
+>>>>>>> afda1368dac6a538209e7ab5b8f1fe679c3c0272
 
 # Workflow generation goal (commented out for future use)
 WORKFLOW_GOAL = """Create a daily trading decision workflow for A-share stocks.
@@ -88,10 +116,16 @@ The final report should include:
 
 def get_directories(stock_code, timestamp):
     """Get directory paths for a given stock code and timestamp"""
+<<<<<<< HEAD
     # Use the output directory under examples/workflow/invest/
     base_dir = Path(f"./examples/workflow/invest/output/{stock_code}")
     data_dir = base_dir / timestamp / "data"
     report_dir = base_dir / "reports"
+=======
+    base_dir = Path(f"./{stock_code}")
+    data_dir = base_dir / timestamp / "data"
+    report_dir = base_dir  / "reports"
+>>>>>>> afda1368dac6a538209e7ab5b8f1fe679c3c0272
     graphs_dir = base_dir / timestamp / "graphs"
     return base_dir, data_dir, report_dir, graphs_dir
 
@@ -157,6 +191,7 @@ def execute_workflow(stock_code, data_dir, report_dir, timestamp):
         # Load workflow graph
         workflow_graph: WorkFlowGraph = WorkFlowGraph.from_file(module_save_path)
         agent_manager = AgentManager(tools=tools)
+<<<<<<< HEAD
         
         # Override any placeholder LLM configs in the workflow with our actual config
         for node in workflow_graph.nodes:
@@ -166,13 +201,20 @@ def execute_workflow(stock_code, data_dir, report_dir, timestamp):
                         # Replace any placeholder API keys with our actual config
                         agent["llm_config"] = llm.config.to_dict()
         
+=======
+>>>>>>> afda1368dac6a538209e7ab5b8f1fe679c3c0272
         agent_manager.add_agents_from_workflow(workflow_graph, llm_config=llm.config)
         workflow = WorkFlow(graph=workflow_graph, agent_manager=agent_manager, llm=llm)
         workflow.init_module()
 
         # Construct the goal string
+<<<<<<< HEAD
         comprehensive_report_file = report_dir / f"comprehensive_report_{stock_code}_{timestamp}.md"
         past_report = report_dir / f"comprehensive_report_{stock_code}_{timestamp}_previous.md"
+=======
+        output_file = report_dir / f"text_report_{stock_code}_{timestamp}.md"
+        past_report = report_dir / f"text_report_{stock_code}_{timestamp}_previous.md"
+>>>>>>> afda1368dac6a538209e7ab5b8f1fe679c3c0272
         
         goal = f"""I need a daily trading decision for stock {stock_code}.
 Available funds: {available_funds} RMB
@@ -185,6 +227,7 @@ Past report folder: {past_report}
 Please read ALL files in the data folder and generate a comprehensive trading decision report in Chinese based on real data. Return the complete content.
 """
 
+<<<<<<< HEAD
         # Execute the workflow
         workflow.execute({"goal": goal})
         
@@ -272,6 +315,18 @@ Please read ALL files in the data folder and generate a comprehensive trading de
             import traceback
             traceback.print_exc()
             
+=======
+        output = workflow.execute({"goal": goal})
+        try:
+            with open(output_file, "w", encoding="utf-8") as f:
+                f.write(output)
+            print(f"Trading decision report saved to: {output_file}")
+            # # Also save a backup
+            # with open(report_dir / f"text_report_{stock_code}_{timestamp}_back.md", "w", encoding="utf-8") as f:
+            #     f.write(output)
+        except Exception as e:
+            print(f"Error saving report: {e}")
+>>>>>>> afda1368dac6a538209e7ab5b8f1fe679c3c0272
     except Exception as e:
         print(f"Error executing workflow: {e}")
         import traceback
@@ -279,22 +334,37 @@ Please read ALL files in the data folder and generate a comprehensive trading de
 
 
 def generate_html_report(stock_code, base_dir, report_dir, graphs_dir, timestamp):
+<<<<<<< HEAD
     """Generate HTML report from comprehensive markdown and charts"""
+=======
+    """Generate HTML report from markdown and charts"""
+>>>>>>> afda1368dac6a538209e7ab5b8f1fe679c3c0272
     try:
         # Import the HTML generator
         from html_report_generator import HTMLGenerator
         
+<<<<<<< HEAD
         # Define file paths - use comprehensive report as primary
         comprehensive_report_file = report_dir / f"comprehensive_report_{stock_code}_{timestamp}.md"
+=======
+        # Define file paths
+        md_file = report_dir / f"text_report_{stock_code}_{timestamp}.md"
+>>>>>>> afda1368dac6a538209e7ab5b8f1fe679c3c0272
         html_output = base_dir/ datetime.now().strftime('%Y%m%d') / "html_report" / f"report_{stock_code}_{timestamp}.html"
         
         # Find chart files
         technical_chart = graphs_dir / f"{stock_code}_technical_charts.png"
         price_volume_chart = graphs_dir / f"{stock_code}_candlestick_chart.png"
         
+<<<<<<< HEAD
         # Check if comprehensive report exists (primary file)
         if not comprehensive_report_file.exists():
             print(f"❌ Comprehensive report file not found: {comprehensive_report_file}")
+=======
+        # Check if markdown file exists
+        if not md_file.exists():
+            print(f"❌ Markdown file not found: {md_file}")
+>>>>>>> afda1368dac6a538209e7ab5b8f1fe679c3c0272
             return False
         
         # Check if charts exist
@@ -306,11 +376,19 @@ def generate_html_report(stock_code, base_dir, report_dir, graphs_dir, timestamp
             print(f"⚠️  Price/volume chart not found: {price_volume_chart}")
             price_volume_chart = ""
         
+<<<<<<< HEAD
         # Generate HTML report with comprehensive report
         print(f"[4] 生成HTML报告: {html_output}")
         generator = HTMLGenerator(str(html_output))
         output_file = generator.generate_report(
             str(comprehensive_report_file), 
+=======
+        # Generate HTML report
+        print(f"[4] 生成HTML报告: {html_output}")
+        generator = HTMLGenerator(str(html_output))
+        output_file = generator.generate_report(
+            str(md_file), 
+>>>>>>> afda1368dac6a538209e7ab5b8f1fe679c3c0272
             str(technical_chart) if technical_chart else "", 
             str(price_volume_chart) if price_volume_chart else ""
         )
@@ -328,6 +406,7 @@ def generate_html_report(stock_code, base_dir, report_dir, graphs_dir, timestamp
         return False
 
 
+<<<<<<< HEAD
 def check_reports_exist(stock_code, report_dir, timestamp):
     """Check if comprehensive report exists"""
     comprehensive_report_file = report_dir / f"comprehensive_report_{stock_code}_{timestamp}.md"
@@ -343,6 +422,8 @@ def check_reports_exist(stock_code, report_dir, timestamp):
     return comprehensive_exists
 
 
+=======
+>>>>>>> afda1368dac6a538209e7ab5b8f1fe679c3c0272
 def generate_html_from_existing_files(stock_code, timestamp=None):
     """Generate HTML report from existing markdown and chart files"""
     if timestamp is None:
@@ -363,6 +444,7 @@ def generate_html_from_existing_files(stock_code, timestamp=None):
         print(f"⚠️  图表目录不存在: {graphs_dir}")
         graphs_dir = None
     
+<<<<<<< HEAD
     # Check for comprehensive report
     comprehensive_report_file = report_dir / f"comprehensive_report_{stock_code}_{timestamp}.md"
     
@@ -371,6 +453,8 @@ def generate_html_from_existing_files(stock_code, timestamp=None):
     else:
         print(f"❌ 未找到综合分析报告: {comprehensive_report_file}")
     
+=======
+>>>>>>> afda1368dac6a538209e7ab5b8f1fe679c3c0272
     return generate_html_report(stock_code, base_dir, report_dir, graphs_dir, timestamp)
 
 
@@ -406,6 +490,7 @@ def main():
     
     # === Workflow logic from workflow_invest.py ===
     print(f"[3] 生成报告到: {report_dir}")
+<<<<<<< HEAD
     print(f"   将生成一个文件:")
     print(f"   - comprehensive_report_{stock_code}_{timestamp}.md (综合分析报告)")
     # generate_workflow(llm, tools)
@@ -414,12 +499,18 @@ def main():
     # Check if comprehensive report was generated successfully
     comprehensive_exists = check_reports_exist(stock_code, report_dir, timestamp)
     
+=======
+    # generate_workflow(llm, tools)
+    execute_workflow(stock_code, data_dir, report_dir, timestamp)
+    
+>>>>>>> afda1368dac6a538209e7ab5b8f1fe679c3c0272
     # === Generate HTML report ===
     print(f"\n[4] 生成HTML报告")
     html_success = generate_html_report(stock_code, base_dir, report_dir, graphs_dir, timestamp)
     
     if html_success:
         print("\n✅ 全部流程完成！包括HTML报告生成")
+<<<<<<< HEAD
         print(f"📁 报告文件位置:")
         print(f"   - 综合分析报告: {report_dir}/comprehensive_report_{stock_code}_{timestamp}.md")
         print(f"   - HTML报告: {base_dir}/{timestamp}/html_report/report_{stock_code}_{timestamp}.html")
@@ -427,6 +518,10 @@ def main():
         print("\n✅ 主要流程完成！(HTML报告生成失败)")
         print(f"📁 报告文件位置:")
         print(f"   - 综合分析报告: {report_dir}/comprehensive_report_{stock_code}_{timestamp}.md")
+=======
+    else:
+        print("\n✅ 主要流程完成！(HTML报告生成失败)")
+>>>>>>> afda1368dac6a538209e7ab5b8f1fe679c3c0272
 
 if __name__ == "__main__":
     main()

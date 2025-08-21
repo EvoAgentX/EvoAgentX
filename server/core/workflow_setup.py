@@ -810,9 +810,6 @@ async def setup_project_parallel_with_status_messages(project_short_id: str, web
     
     # Create concurrent tasks for all workflow generations
     
-    print(extracted_data["workflows"])
-    from pdb import set_trace; set_trace()
-    
     workflow_tasks = [
         _generate_single_workflow_with_retry(extracted_workflow, websocket_send_func=websocket_send_func, semaphore=semaphore) 
         for extracted_workflow in extracted_data["workflows"]
