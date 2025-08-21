@@ -7,7 +7,7 @@ from .retrievers import VectorRetriever
 from .postprocessors import SimpleReranker
 from .rag_config import RAGConfig
 from .schema import (
-    BaseChunk, TextChunk, ImageChunk, Chunk,
+    TextChunk, ImageChunk, Chunk,
     Corpus, RagResult, 
     ChunkMetadata, Query
 )
@@ -19,7 +19,7 @@ __all__ = ['RAGEngine', 'LLamaIndexReader', 'MultimodalReader',
            'VectorRetriever', 
            'SimpleReranker',
            'RAGConfig',
-           'BaseChunk', 'TextChunk', 'ImageChunk', 'Chunk',
+           'TextChunk', 'ImageChunk', 'Chunk',
            'Corpus', 'RagResult',
            'ChunkMetadata', 'Query'
         ]

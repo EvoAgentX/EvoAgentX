@@ -1,9 +1,7 @@
 import os
-import json
 from typing import List, Dict
 from collections import defaultdict
 from dotenv import load_dotenv
-import random
 
 from evoagentx.core.logging import logger
 from evoagentx.storages.base import StorageHandler
@@ -11,7 +9,7 @@ from evoagentx.rag.rag import RAGEngine
 from evoagentx.storages.storages_config import VectorStoreConfig, DBConfig, StoreConfig
 from evoagentx.rag.rag_config import RAGConfig, ReaderConfig, IndexConfig, EmbeddingConfig, RetrievalConfig
 from evoagentx.rag.schema import Query
-from evoagentx.benchmark.real_mm_rag import RealMMRAG, download_real_mm_rag_data
+from evoagentx.benchmark.real_mm_rag import RealMMRAG
 
 # Load environment
 load_dotenv()
@@ -40,7 +38,7 @@ storage_handler = StorageHandler(storageConfig=store_config)
 embedding=EmbeddingConfig(
         provider="multimodal",
         model_name="nomic-ai/nomic-embed-multimodal-7b",
-        device="cuda"
+        device="cpu"
     )
 
 rag_config = RAGConfig(
@@ -142,7 +140,6 @@ def run_evaluation(samples: List[Dict], top_k: int = 5) -> Dict[str, float]:
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
-    from PIL import Image
     from pathlib import Path
     
     # Index 20 samples first

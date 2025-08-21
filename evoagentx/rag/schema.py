@@ -18,11 +18,11 @@ from llama_index.core.graph_stores.types import (
 from evoagentx.core.base_config import BaseModule
 from evoagentx.core.logging import logger
 
-
 DEAFULT_EXCLUDED = ['file_name', 'file_type', 'file_size', 'page_count', 'creation_date', 
                         'last_modified_date', 'language', 'word_count', 'custom_fields', 'hash_doc', 
                         'graph_node', # for graph store 
                     ]
+
 class DocumentMetadata(BaseModule):
     """
     This class ensures type safety and validation for metadata associated with a document,
@@ -481,10 +481,8 @@ class ImageChunk(BaseModule):
         for k, v in self.relationships.items():
             relationships[k] = v if isinstance(v, RelatedNodeInfo) else RelatedNodeInfo.from_dict(v)
         
-        # Don't load image data - just use path for LlamaIndex compatibility
         return ImageNode(
-            text="",  # No text content for pure image chunks
-            image=None,  # No image data - efficient approach
+            image=None,
             image_path=self.image_path,
             image_mimetype=self.image_mimetype,
             metadata=self.metadata.model_dump(),
@@ -514,14 +512,6 @@ class ImageChunk(BaseModule):
             text_template=node.text_template,
             relationships=node.relationships
         )
-
-    def get_fragment(self, max_length: int = 100) -> str:
-        """Return a fragment representing the image."""
-        filename = Path(self.image_path).name
-        return f"[Image: {filename}]"
-
-
-
 
 class Corpus(BaseModule):
     """A generic collection of document chunks for RAG processing.

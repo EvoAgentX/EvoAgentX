@@ -41,7 +41,6 @@ class RAGEngine:
         else:
             self.chunk_class = TextChunk
             logger.info(f"RAGEngine configured for text mode - using TextChunk")
-        logger.info(f"RAGEngine chunk_class set to: {self.chunk_class}")
 
         # Initialize reader based on modality
         if self.config.modality == "multimodal":
@@ -157,7 +156,7 @@ class RAGEngine:
             logger.error(f"Failed to read documents for corpus {corpus_id}: {str(e)}")
             raise
 
-    def add(self, index_type: str, nodes: Union[Corpus, List[NodeWithScore], List[TextNode], List[ImageNode], List[ImageChunk]], 
+    def add(self, index_type: str, nodes: Union[Corpus, List[NodeWithScore], List[TextNode], List[ImageNode]], 
             corpus_id: str = None) -> None:
         """Add nodes to an index for a specific corpus.
 
