@@ -1,7 +1,7 @@
 import json
 from typing import Optional, Tuple, Type, Union
 
-from ..actions.action import Action, ActionInput
+from ..actions.action import Action, ActionInput, ActionOutput
 from ..agents import Agent
 from ..core.parser import Parser
 from ..models import BaseLLM, OpenAILLM, OpenAILLMConfig
@@ -18,7 +18,7 @@ class AgentAdaptorAction(Action):
         self, 
         agent: Agent, 
         inputs_format: Type[ActionInput], 
-        outputs_format: Type[Parser],
+        outputs_format: Type[ActionOutput],
         llm: Optional[BaseLLM] = None
     ):
 
