@@ -36,46 +36,64 @@ class ProcessMonitor:
         Create a websocket send function compatible with existing workflow execution.
         This allows existing workflow code to send messages through our socket service.
         """
-        async def websocket_send_func(message_str: str):
+        async def websocket_send_func(message_input):
             """
             Function that mimics the existing websocket send function.
-            Parses the message string and sends it via our socket service.
+            Accepts both JSON strings and already-formatted message objects.
             """
             try:
-                logger.debug(f"WebSocket send function called for project {project_short_id} with message: {message_str[:100]}...")
+                logger.debug(f"WebSocket send function called for project {project_short_id} with message: {str(message_input)[:100]}...")
                 
-                # Try to parse as JSON first
-                try:
-                    message_data = json.loads(message_str)
-                    
-                    # If it's already a properly formatted message, send it directly
-                    if isinstance(message_data, dict) and "type" in message_data:
-                        logger.debug(f"Sending formatted message to project {project_short_id}: {message_data.get('type')}")
-                        await self.socket_service.send_to_project(project_short_id, message_data)
-                    else:
-                        # If it's not properly formatted, wrap it in setup-log format
+                # Handle different input formats
+                if isinstance(message_input, dict):
+                    # Already a formatted message object - send directly
+                    logger.debug(f"Sending formatted message object to project {project_short_id}: {message_input.get('type', 'unknown')}")
+                    await self.socket_service.send_to_project(project_short_id, message_input)
+                elif isinstance(message_input, str):
+                    # Try to parse as JSON first
+                    try:
+                        message_data = json.loads(message_input)
+                        
+                        # If it's already a properly formatted message, send it directly
+                        if isinstance(message_data, dict) and "type" in message_data:
+                            logger.debug(f"Sending parsed JSON message to project {project_short_id}: {message_data.get('type')}")
+                            await self.socket_service.send_to_project(project_short_id, message_data)
+                        else:
+                            # If it's not properly formatted, wrap it in setup-log format
+                            log_message = {
+                                "type": "setup-log",
+                                "data": {
+                                    "workflow_id": None,
+                                    "content": str(message_data),
+                                    "result": None
+                                }
+                            }
+                            logger.debug(f"Sending wrapped message to project {project_short_id}: setup-log")
+                            await self.socket_service.send_to_project(project_short_id, log_message)
+                            
+                    except json.JSONDecodeError:
+                        # If not JSON, treat as plain text log message
                         log_message = {
                             "type": "setup-log",
                             "data": {
                                 "workflow_id": None,
-                                "content": str(message_data),
+                                "content": message_input,
                                 "result": None
                             }
                         }
-                        logger.debug(f"Sending wrapped message to project {project_short_id}: setup-log")
+                        logger.debug(f"Sending text message to project {project_short_id}: setup-log")
                         await self.socket_service.send_to_project(project_short_id, log_message)
-                        
-                except json.JSONDecodeError:
-                    # If not JSON, treat as plain text log message
+                else:
+                    # Convert other types to string and wrap
                     log_message = {
                         "type": "setup-log",
                         "data": {
                             "workflow_id": None,
-                            "content": message_str,
+                            "content": str(message_input),
                             "result": None
                         }
                     }
-                    logger.debug(f"Sending text message to project {project_short_id}: setup-log")
+                    logger.debug(f"Sending converted message to project {project_short_id}: setup-log")
                     await self.socket_service.send_to_project(project_short_id, log_message)
                     
             except Exception as e:

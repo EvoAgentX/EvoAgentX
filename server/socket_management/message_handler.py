@@ -110,6 +110,16 @@ class MessageHandler:
             # Start setup in background task (non-blocking)
             logger.info(f"Starting setup background task for project {project_short_id}")
             
+            heartbeat_response = create_message(
+                MessageType.SETUP_LOG,  # Use SETUP_LOG type for heartbeat responses
+                status="alive",
+                workflow_id=None,
+                content="Start creating setup worker",
+                result={"timestamp": datetime.now().isoformat()}
+            )
+            asyncio.create_task(self.socket_service.send_to_project(project_short_id, heartbeat_response))
+            
+            
             # Create and start the setup task that handles all async operations
             setup_task = asyncio.create_task(self._run_setup_worker_with_initialization(project_short_id, message_data))
             
@@ -148,6 +158,8 @@ class MessageHandler:
             websocket_send_func = self.process_monitor.create_websocket_send_function(project_short_id)
             logger.info(f"Created WebSocket send function for project {project_short_id}")
             
+            
+            
             # Now run the actual setup worker
             await self._run_setup_worker(project_short_id, websocket_send_func)
             
@@ -160,6 +172,15 @@ class MessageHandler:
     async def _run_setup_worker(self, project_short_id: str, websocket_send_func):
         """Background worker that runs the actual setup process."""
         try:
+            heartbeat_response = create_message(
+                MessageType.SETUP_LOG,  # Use SETUP_LOG type for heartbeat responses
+                status=None,
+                workflow_id=None,
+                content="In setup worker",
+                result={"timestamp": datetime.now().isoformat()}
+            )
+            asyncio.create_task(self.socket_service.send_to_project(project_short_id, heartbeat_response))
+            
             logger.info(f"Starting setup worker for project {project_short_id}")
             
             # Mark connection as actively processing to prevent timeout cleanup

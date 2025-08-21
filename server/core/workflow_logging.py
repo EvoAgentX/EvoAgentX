@@ -80,11 +80,16 @@ class IsolatedWorkflowLogger:
                 log_content = str(message).strip()
                 if log_content and self.websocket_send_func:
                     print(f"   📤 Sending isolated log: {repr(log_content)}")
-                    try:
-                        # Create task to send the log message
-                        asyncio.create_task(self._send_isolated_log(log_content))
-                    except Exception as e:
-                        print(f"   ❌ Error creating task for isolated log: {e}")
+                    # Store the log for later sending - we'll send it when the async context is available
+                    self.captured_logs.append({
+                        "timestamp": datetime.now().isoformat(),
+                        "workflow_id": self.workflow_id,
+                        "process_id": self.process_id,
+                        "content": log_content,
+                        "level": "INFO",
+                        "source": "isolated_logger",
+                        "pending": True
+                    })
                 else:
                     print(f"   ⏭️  Skipping - no content or websocket function")
             else:
@@ -143,8 +148,8 @@ class IsolatedWorkflowLogger:
                     print(f"   📤 Sending captured log: {repr(log_content)}")
                     print(f"   📊 Total captured logs: {len(self.captured_logs)}")
                     
-                    # Send immediately via WebSocket with workflow attribution
-                    asyncio.create_task(self._send_captured_log(log_content))
+                    # Store the captured log for later sending
+                    self.captured_logs.append(log_entry)
                 else:
                     print(f"   ⏭️  Skipping - no content or websocket function")
             
@@ -192,13 +197,11 @@ class IsolatedWorkflowLogger:
             
             print(f"   Created message: {json.dumps(log_message, indent=2)}")
             
-            message_json = json.dumps(log_message)
-            print(f"   JSON string: {repr(message_json)}")
-            
             if self.websocket_send_func is not None:
                 # Check if the WebSocket connection is still healthy before sending
                 try:
-                    await self.websocket_send_func(message_json)
+                    # Send the message object directly (not as JSON string)
+                    await self.websocket_send_func(log_message)
                     print(f"   ✅ Sent via WebSocket")
                 except Exception as send_error:
                     print(f"   ❌ WebSocket send failed: {send_error}")
@@ -240,13 +243,11 @@ class IsolatedWorkflowLogger:
             
             print(f"   Created message: {json.dumps(log_message, indent=2)}")
             
-            message_json = json.dumps(log_message)
-            print(f"   JSON string: {repr(message_json)}")
-            
             if self.websocket_send_func is not None:
                 # Check if the WebSocket connection is still healthy before sending
                 try:
-                    await self.websocket_send_func(message_json)
+                    # Send the message object directly (not as JSON string)
+                    await self.websocket_send_func(log_message)
                     print(f"   ✅ Sent captured log via WebSocket")
                 except Exception as send_error:
                     print(f"   ❌ WebSocket send failed: {send_error}")
@@ -263,6 +264,36 @@ class IsolatedWorkflowLogger:
     def get_captured_logs(self) -> List[Dict[str, Any]]:
         """Get all logs captured from the workflow engine."""
         return self.captured_logs.copy()
+    
+    async def flush_pending_logs(self):
+        """Flush all pending logs to the WebSocket."""
+        if not self.websocket_send_func:
+            print(f"⚠️  No WebSocket function available for flushing logs")
+            return
+        
+        pending_logs = [log for log in self.captured_logs if log.get("pending", False)]
+        if not pending_logs:
+            print(f"📭 No pending logs to flush for {self.workflow_id}")
+            return
+        
+        print(f"📤 Flushing {len(pending_logs)} pending logs for {self.workflow_id}")
+        
+        for log_entry in pending_logs:
+            try:
+                if log_entry["source"] == "isolated_logger":
+                    await self._send_isolated_log(log_entry["content"])
+                else:
+                    await self._send_captured_log(log_entry["content"])
+                
+                # Mark as sent
+                log_entry["pending"] = False
+                print(f"   ✅ Flushed log: {log_entry['content'][:50]}...")
+                
+            except Exception as e:
+                print(f"   ❌ Error flushing log: {e}")
+                # Keep it as pending for retry
+        
+        print(f"📊 Flushed {len([log for log in pending_logs if not log.get('pending', False)])} logs successfully")
     
     def cleanup(self):
         """Cleanup isolated logging resources."""
@@ -320,6 +351,28 @@ def isolated_workflow_process(workflow_id: str, process_type: str, websocket_sen
     try:
         yield bound_logger, isolated_logger.process_id
     finally:
+        # Flush all pending logs before cleanup
+        if websocket_send_func:
+            try:
+                # Create a simple async function to flush logs
+                async def flush_logs():
+                    await isolated_logger.flush_pending_logs()
+                
+                # Try to run the flush in the current event loop
+                import asyncio
+                try:
+                    loop = asyncio.get_event_loop()
+                    if loop.is_running():
+                        # Create a task to flush logs
+                        asyncio.create_task(flush_logs())
+                    else:
+                        # Run the coroutine directly
+                        loop.run_until_complete(flush_logs())
+                except Exception as e:
+                    print(f"⚠️  Could not flush pending logs: {e}")
+            except Exception as e:
+                print(f"⚠️  Error during log flushing: {e}")
+        
         isolated_logger.cleanup()
 
 
