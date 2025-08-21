@@ -1,17 +1,24 @@
-from pydantic import Field
-from typing import Optional, Any, Callable, List, Union
-import re
 import json
+import re
+from collections.abc import Callable
+from typing import Any, List, Optional, Union
+
+from pydantic import Field
 
 from ..core.logging import logger
-from ..models.base_model import BaseLLM
-from .action import Action
 from ..core.message import Message
-from ..prompts.template import StringTemplate, ChatTemplate
-from ..prompts.tool_calling import OUTPUT_EXTRACTION_PROMPT, TOOL_CALLING_TEMPLATE, TOOL_CALLING_HISTORY_PROMPT
-from ..tools.tool import Toolkit
-from ..models.base_model import LLMOutputParser
 from ..core.module_utils import parse_json_from_llm_output, parse_json_from_text
+from ..models.base_model import BaseLLM, LLMOutputParser
+from ..prompts.template import ChatTemplate, StringTemplate
+from ..prompts.tool_calling import (
+    OUTPUT_EXTRACTION_PROMPT,
+    TOOL_CALLING_HISTORY_PROMPT,
+    TOOL_CALLING_TEMPLATE,
+)
+from ..tools.tool import Toolkit
+from ..utils.utils import fix_json_booleans
+from .action import Action
+
 
 class CustomizeAction(Action):
 
@@ -77,8 +84,10 @@ class CustomizeAction(Action):
             elif isinstance(value, (dict, list)):
                 prompt_params_values[param] = json.dumps(value, indent=4)
             else:
-                raise TypeError(f"The input type {type(value)} is invalid! Valid types: [str, dict, list].")
-        
+                try:
+                    prompt_params_values[param] = str(value)
+                except:
+                    raise TypeError(f"Invalid input type {type(value)}. Expected a type that can be converted to a string.")
         if self.prompt:
             prompt = self.prompt.format(**prompt_params_values) if prompt_params_values else self.prompt
             if self.tools:
@@ -195,8 +204,9 @@ class CustomizeAction(Action):
                 if not json_list:
                     logger.warning("No valid JSON found in ToolCalling block")
                     continue
+                tool_call_json = fix_json_booleans(json_list[0])
                 # Only use the first JSON string from each block
-                parsed_tool_call = json.loads(json_list[0])
+                parsed_tool_call = json.loads(tool_call_json)
                 if isinstance(parsed_tool_call, dict):
                     parsed_tool_calls.append(parsed_tool_call)
                 elif isinstance(parsed_tool_call, list):
@@ -347,14 +357,24 @@ class CustomizeAction(Action):
         return results
     
     def execute(self, llm: Optional[BaseLLM] = None, inputs: Optional[dict] = None, sys_msg: Optional[str]=None, return_prompt: bool = False, time_out = 0, **kwargs):
-        # Allow empty inputs if the action has no required input attributes
         input_attributes: dict = self.inputs_format.get_attr_descriptions()
-        if not inputs and input_attributes:
-            logger.error("CustomizeAction action received invalid `inputs`: None or empty.")
-            raise ValueError('The `inputs` to CustomizeAction action is None or empty.')
-        # Set inputs to empty dict if None and no inputs are required
+        required_inputs = self.inputs_format.get_required_input_names()
+
         if inputs is None:
+            if len(required_inputs)>0:
+                logger.error(f"CustomizeAction '{self.name}' requires the following inputs: {required_inputs} but received 'None' instead.")
+                raise ValueError(f"CustomizeAction '{self.name}' requires the following inputs: {required_inputs} but received 'None' instead.")
+            
+            # Set inputs to empty dict if None and no inputs are required
             inputs = {}
+        
+        elif len(required_inputs)>0:
+            # Check if all required inputs are provided
+            for required_input in required_inputs:
+                if required_input not in inputs:
+                    logger.error(f"Required input '{required_input}' not found in inputs provided to CustomizeAction '{self.name}'.")
+                    raise ValueError(f"Required input '{required_input}' not found in inputs provided to CustomizeAction '{self.name}'.")
+   
         final_llm_response = None
         
         if self.prompt_template:
@@ -419,14 +439,24 @@ class CustomizeAction(Action):
         
 
     async def async_execute(self, llm: Optional[BaseLLM] = None, inputs: Optional[dict] = None, sys_msg: Optional[str]=None, return_prompt: bool = False, time_out = 0, **kwargs):
-        # Allow empty inputs if the action has no required input attributes
         input_attributes: dict = self.inputs_format.get_attr_descriptions()
-        if not inputs and input_attributes:
-            logger.error("CustomizeAction action received invalid `inputs`: None or empty.")
-            raise ValueError('The `inputs` to CustomizeAction action is None or empty.')
-        # Set inputs to empty dict if None and no inputs are required
+        required_inputs = self.inputs_format.get_required_input_names()
+
         if inputs is None:
+            if len(required_inputs)>0:
+                logger.error(f"CustomizeAction '{self.name}' requires the following inputs: {required_inputs} but received 'None' instead.")
+                raise ValueError(f"CustomizeAction '{self.name}' requires the following inputs: {required_inputs} but received 'None' instead.")
+            
+            # Set inputs to empty dict if None and no inputs are required
             inputs = {}
+        
+        elif len(required_inputs)>0:
+            # Check if all required inputs are provided
+            for required_input in required_inputs:
+                if required_input not in inputs:
+                    logger.error(f"Required input '{required_input}' not found in inputs provided to CustomizeAction '{self.name}'.")
+                    raise ValueError(f"Required input '{required_input}' not found in inputs provided to CustomizeAction '{self.name}'.")
+        
         final_llm_response = None
         
         if self.prompt_template:
