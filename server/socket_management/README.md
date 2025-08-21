@@ -1,7 +1,7 @@
 
 # Messages structure:
 ## Setup phase
-### Registed when {WS_BASE_URL}/project/{project_short_id}/parallel-setup
+### Registed when {WS_BASE_URL}/project/{project_short_id}/regist
 ### Message passing in
 ```json
 {
@@ -13,6 +13,15 @@
 ```
 
 ### Message passing out
+
+#### Regist API respond
+```json
+{
+  "success": "<true or false>",
+  "error": <not empty if not successful>
+  
+}
+```
 
 #### Connection Confirmation
 ```json
@@ -105,15 +114,14 @@ with {"inputs": <input_dictionary>}
 # Phases:
 ## Project Initialization
 ### Initial Project Registing
-- Triggered from FastAPI port {WS_BASE_URL}/project/{project_short_id}/parallel-setup
+- Triggered from FastAPI port {WS_BASE_URL}/project/{project_short_id}/regist
 - Passing in a socket and we store it with the project id
-- Followed by the project setup, which starts when notified
+- Return error messages 
 
 ### Project Setup
 - Triggered when the socket receives a signal
 - Keeps feeding back messages from the given socket
 - Sending the result through the socket 
-- Sending the result through the API
 
 ### Key notes:
 - The socket will not be closed after the setup, they will be stored with their short project id

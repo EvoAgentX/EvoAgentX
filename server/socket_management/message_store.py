@@ -9,7 +9,17 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 from collections import defaultdict, deque
 
+# Configure logging for this module
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)  # Set to DEBUG level for troubleshooting
+
+# Add console handler if none exists
+if not logger.handlers:
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.DEBUG)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
 
 class MessageStore:
     """
@@ -50,6 +60,7 @@ class MessageStore:
             message: Message data
             direction: Message direction ("outgoing" or "incoming")
         """
+        logger.debug(f"Storing outgoing message for project {project_short_id}: {message.get('type', 'unknown')}")
         self._store_message(project_short_id, message, direction)
     
     def store_incoming_message(self, project_short_id: str, message: Dict[str, Any], direction: str = "incoming"):
@@ -61,6 +72,7 @@ class MessageStore:
             message: Message data
             direction: Message direction ("outgoing" or "incoming")
         """
+        logger.debug(f"Storing incoming message for project {project_short_id}: {message.get('type', 'unknown')}")
         self._store_message(project_short_id, message, direction)
     
     def _store_message(self, project_short_id: str, message: Dict[str, Any], direction: str):
@@ -88,6 +100,8 @@ class MessageStore:
             # Track message types
             msg_type = message.get("type", "unknown")
             metadata["message_types"][msg_type] += 1
+            
+            logger.debug(f"Message stored successfully for project {project_short_id}: {direction} {msg_type}")
             
         except Exception as e:
             logger.error(f"Failed to store message for {project_short_id}: {e}")

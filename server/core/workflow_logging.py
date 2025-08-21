@@ -80,7 +80,11 @@ class IsolatedWorkflowLogger:
                 log_content = str(message).strip()
                 if log_content and self.websocket_send_func:
                     print(f"   📤 Sending isolated log: {repr(log_content)}")
-                    asyncio.create_task(self._send_isolated_log(log_content))
+                    try:
+                        # Create task to send the log message
+                        asyncio.create_task(self._send_isolated_log(log_content))
+                    except Exception as e:
+                        print(f"   ❌ Error creating task for isolated log: {e}")
                 else:
                     print(f"   ⏭️  Skipping - no content or websocket function")
             else:
@@ -161,7 +165,7 @@ class IsolatedWorkflowLogger:
         return self.bound_logger
     
     async def _send_isolated_log(self, log_content: str):
-        """Send isolated log message via WebSocket with proper message type and workflow attribution."""
+        """Send isolated log message via WebSocket with workflow attribution."""
         try:
             print(f"\n📤 [DEBUG] SENDING ISOLATED LOG:")
             print(f"   Process type: {self.process_type}")
@@ -192,8 +196,14 @@ class IsolatedWorkflowLogger:
             print(f"   JSON string: {repr(message_json)}")
             
             if self.websocket_send_func is not None:
-                await self.websocket_send_func(message_json)
-                print(f"   ✅ Sent via WebSocket")
+                # Check if the WebSocket connection is still healthy before sending
+                try:
+                    await self.websocket_send_func(message_json)
+                    print(f"   ✅ Sent via WebSocket")
+                except Exception as send_error:
+                    print(f"   ❌ WebSocket send failed: {send_error}")
+                    # Mark the websocket function as unavailable to prevent further failures
+                    self.websocket_send_func = None
             else:
                 print(f"   ⚠️  No WebSocket function available, skipping send")
             
@@ -234,8 +244,14 @@ class IsolatedWorkflowLogger:
             print(f"   JSON string: {repr(message_json)}")
             
             if self.websocket_send_func is not None:
-                await self.websocket_send_func(message_json)
-                print(f"   ✅ Sent captured log via WebSocket")
+                # Check if the WebSocket connection is still healthy before sending
+                try:
+                    await self.websocket_send_func(message_json)
+                    print(f"   ✅ Sent captured log via WebSocket")
+                except Exception as send_error:
+                    print(f"   ❌ WebSocket send failed: {send_error}")
+                    # Mark the websocket function as unavailable to prevent further failures
+                    self.websocket_send_func = None
             else:
                 print(f"   ⚠️  No WebSocket function available, skipping captured log send")
             
@@ -366,7 +382,12 @@ class WorkflowLogCapture:
                         "result": None
                     }
                 }
-                await self.websocket_send_func(json.dumps(websocket_message))
+                try:
+                    await self.websocket_send_func(json.dumps(websocket_message))
+                except Exception as send_error:
+                    print(f"WebSocket send failed for workflow {self.workflow_id}: {send_error}")
+                    # Mark the websocket function as unavailable to prevent further failures
+                    self.websocket_send_func = None
                 
         except Exception as e:
             print(f"Error processing log message for workflow {self.workflow_id}: {e}")

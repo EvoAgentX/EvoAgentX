@@ -184,25 +184,89 @@ async def generate_workflow_from_goal_with_logging(payload, llm_config_dict: Dic
         # Use isolated logging
         with isolated_workflow_process(workflow_id, "generation", websocket_send_func) as (bound_logger, process_id):
             bound_logger.info(f"🏗️ Starting workflow generation with isolated logging")
-            return await _generate_workflow_core(payload, llm_config_dict, mcp_config, bound_logger)
+            return await _generate_workflow_core(payload, llm_config_dict, mcp_config, bound_logger, workflow_id, websocket_send_func)
     else:
         # Fallback to original function without logging
         return await _generate_workflow_core(payload, llm_config_dict, mcp_config)
 
-async def _generate_workflow_core(payload, llm_config_dict: Dict[str, Any], mcp_config: dict = None, logger_instance=None):
+async def _generate_workflow_core(payload, llm_config_dict: Dict[str, Any], mcp_config: dict = None, logger_instance=None, workflow_id: str = None, websocket_send_func: Callable = None):
     """Core workflow generation logic."""
-    # Use provided logger or print fallback
-    def log_info(message):
+    
+    # Enhanced logging that sends both to bound logger AND directly to WebSocket
+    async def log_info(message):
+        # Send to bound logger (isolated logging system)
         if logger_instance:
             logger_instance.info(message)
         else:
             print(message)
+        
+        # ALSO send directly to WebSocket in real-time
+        if websocket_send_func and workflow_id:
+            try:
+                from ..socket_management.protocols import create_message, MessageType
+                log_message = create_message(
+                    MessageType.SETUP_LOG,
+                    status=None,
+                    workflow_id=workflow_id,
+                    content=message,
+                    result=None
+                )
+                message_json = json.dumps(log_message)
+                print(f"\n🔍 [DIRECT LOG DEBUG]")
+                print(f"   Workflow ID: {workflow_id}")
+                print(f"   Message content: {repr(message)}")
+                print(f"   Full JSON message: {message_json}")
+                print(f"   WebSocket function: {'Available' if websocket_send_func else 'None'}")
+                
+                # Send the JSON string (send_websocket_message expects JSON string)
+                await websocket_send_func(message_json)
+                print(f"   ✅ Successfully sent via WebSocket (JSON string: {len(message_json)} chars)")
+                
+            except Exception as e:
+                print(f"   ❌ Error sending direct workflow log: {e}")
+                import traceback
+                traceback.print_exc()
+                # Don't fail the entire workflow generation if logging fails
+                # Just continue with the process
     
-    def log_error(message):
+    async def log_error(message):
+        # Send to bound logger (isolated logging system)
         if logger_instance:
             logger_instance.error(message)
         else:
             print(f"ERROR: {message}")
+        
+        # ALSO send directly to WebSocket in real-time
+        if websocket_send_func and workflow_id:
+            try:
+                from ..socket_management.protocols import create_message, MessageType
+                error_content = f"ERROR: {message}"
+                log_message = create_message(
+                    MessageType.SETUP_LOG,
+                    status=None,
+                    workflow_id=workflow_id,
+                    content=error_content,
+                    result=None
+                )
+                message_json = json.dumps(log_message)
+                print(f"\n🔍 [DIRECT ERROR DEBUG]")
+                print(f"   Workflow ID: {workflow_id}")
+                print(f"   Error content: {repr(error_content)}")
+                print(f"   Full JSON message: {message_json}")
+                
+                await websocket_send_func(message_json)
+                print(f"   ✅ Successfully sent error via WebSocket")
+                
+            except Exception as e:
+                print(f"   ❌ Error sending direct workflow error: {e}")
+                import traceback
+                traceback.print_exc()
+                # Don't fail the entire workflow generation if error logging fails
+                # Just continue with the process
+    
+    # Send a test message to verify WebSocket connection is working
+    if websocket_send_func and workflow_id:
+        await log_info("🧪 TEST: Starting _generate_workflow_core function")
     
     # Start with the predefined generation tools
     tools = generation_tools.copy()
@@ -219,14 +283,14 @@ async def _generate_workflow_core(payload, llm_config_dict: Dict[str, Any], mcp_
                 mcp_toolkit = MCPToolkit(config=mcp_config)
                 mcp_tools = mcp_toolkit.get_toolkits()
                 tools.extend(mcp_tools)
-                log_info(f"🔧 Added {len(mcp_tools)} MCP tools to generation tools")
+                await log_info(f"🔧 Added {len(mcp_tools)} MCP tools to generation tools")
             except Exception as e:
-                log_error(f"⚠️  Failed to load MCP tools: {e}, proceeding with generation tools only")
+                await log_error(f"⚠️  Failed to load MCP tools: {e}, proceeding with generation tools only")
         
-        log_info(f"🔧 Using {len(tools)} total tools for workflow generation")
+        await log_info(f"🔧 Using {len(tools)} total tools for workflow generation")
         
     except Exception as e:
-        log_error(f"Error initializing components: {e}")
+        await log_error(f"Error initializing components: {e}")
         return None
     
     # Extract parameters from payload
@@ -241,11 +305,13 @@ async def _generate_workflow_core(payload, llm_config_dict: Dict[str, Any], mcp_
         workflow_inputs = _dicts_to_parameters(payload.get("workflow_inputs", []))
         workflow_outputs = _dicts_to_parameters(payload.get("workflow_outputs", []))
     
-    log_info(f"📝 Generating workflow for goal: {goal[:100]}...")
+    await log_info(f"📝 Generating workflow for goal: {goal[:100]}...")
     
     # Initialize and generate workflow
+    await log_info(f"🏭 Initializing WorkFlowGenerator with {len(tools)} tools")
     workflow_generator = WorkFlowGenerator(llm=llm, tools=tools)
     
+    await log_info(f"🚀 Starting workflow generation process...")
     # Generate the workflow with proper parameters
     workflow_graph: WorkFlowGraph = workflow_generator.generate_workflow(
         goal=goal,
@@ -253,7 +319,8 @@ async def _generate_workflow_core(payload, llm_config_dict: Dict[str, Any], mcp_
         workflow_outputs=workflow_outputs
     )
     
-    log_info(f"✅ Workflow generation completed successfully")
+    await log_info(f"📊 Workflow graph created with {len(workflow_graph.nodes) if hasattr(workflow_graph, 'nodes') else 'unknown'} nodes")
+    await log_info(f"✅ Workflow generation completed successfully")
     return workflow_graph
 
 async def generate_workflow_from_goal(payload, llm_config_dict: Dict[str, Any], mcp_config: dict = None) -> WorkFlowGraph:
@@ -432,6 +499,107 @@ async def setup_project(project_short_id: str, websocket_send_func: Callable = N
     
     return workflow_configs
 
+async def _generate_single_workflow_with_retry(extracted_workflow: Dict[str, Any], max_retries: int = 0, websocket_send_func: Callable = None, semaphore: asyncio.Semaphore = None) -> Dict[str, Any]:
+    """
+    Generate a single workflow with retry logic and rate limiting.
+    This is a shared utility function used by multiple parallel setup functions.
+    
+    Args:
+        extracted_workflow: Workflow data extracted from requirements
+        max_retries: Maximum number of retry attempts
+        websocket_send_func: Optional WebSocket send function for status updates
+        semaphore: Semaphore for rate limiting concurrent operations
+        
+    Returns:
+        Dict containing workflow generation result with success/failure status
+    """
+    workflow_id = extracted_workflow["workflow_id"]
+    workflow_name = extracted_workflow["workflow_name"]
+    
+    # Send status message when starting workflow generation
+    if websocket_send_func:
+        from ..socket_management.protocols import create_message, MessageType
+        status_message = create_message(
+            MessageType.SETUP_LOG,
+            status=None,
+            workflow_id=workflow_id,
+            content=f"Start function generate_single_workflow_with_retry",
+            result=None
+        )
+        await websocket_send_func(json.dumps(status_message))
+    
+    for attempt in range(max_retries + 1):
+        try:
+            # Use provided semaphore or create a no-op context
+            semaphore_context = semaphore if semaphore else asyncio.Semaphore(1)
+            async with semaphore_context:
+                if attempt > 0:
+                    print(f"   🔄 Retry {attempt} for workflow: {workflow_name}")
+                else:
+                    print(f"   Generating workflow: {workflow_name}")
+                
+                # Create payload dict with goal and parameters
+                payload = {
+                    "goal": extracted_workflow["workflow_requirement"],
+                    "workflow_inputs": extracted_workflow["workflow_inputs"],
+                    "workflow_outputs": extracted_workflow["workflow_outputs"]
+                }
+                
+                # Generate workflow with isolated logging
+                workflow_graph = await generate_workflow_from_goal_with_logging(
+                    payload, 
+                    default_llm_config, 
+                    mcp_config={},
+                    workflow_id=workflow_id,
+                    websocket_send_func=websocket_send_func
+                )
+                
+                try:
+                    if hasattr(workflow_graph, 'get_config'):
+                        workflow_dict = workflow_graph.get_config()
+                    elif hasattr(workflow_graph, 'get_workflow_description'):
+                        workflow_dict = {
+                            "goal": workflow_graph.goal,
+                            "description": workflow_graph.get_workflow_description()
+                        }
+                    else:
+                        workflow_dict = str(workflow_graph)
+                except Exception as e:
+                    workflow_dict = f"Workflow generated successfully (serialization error: {str(e)})"
+                
+                return {
+                    "workflow_name": workflow_name,
+                    "workflow_id": workflow_id,
+                    "workflow_requirement": extracted_workflow["workflow_requirement"],
+                    "workflow_inputs": extracted_workflow["workflow_inputs"],
+                    "workflow_outputs": extracted_workflow["workflow_outputs"],
+                    "workflow_graph": workflow_dict,
+                    "success": True
+                }
+                
+        except Exception as e:
+            error_msg = f"Attempt {attempt + 1} failed: {str(e)}"
+            print(f"   ❌ {error_msg}")
+            
+            if attempt < max_retries:
+                # Wait before retry (exponential backoff)
+                wait_time = 2 ** attempt
+                print(f"   ⏳ Waiting {wait_time}s before retry...")
+                await asyncio.sleep(wait_time)
+            else:
+                # Final failure - return error info
+                return {
+                    "workflow_name": workflow_name,
+                    "workflow_id": workflow_id,
+                    "workflow_requirement": extracted_workflow["workflow_requirement"],
+                    "workflow_inputs": extracted_workflow["workflow_inputs"],
+                    "workflow_outputs": extracted_workflow["workflow_outputs"],
+                    "workflow_graph": f"Workflow generation failed after {max_retries + 1} attempts. Last error: {str(e)}",
+                    "success": False,
+                    "error": str(e)
+                }
+
+
 async def setup_project_parallel(project_short_id: str, websocket_send_func: Callable = None) -> List[Dict[str, Any]]:
     """
     Phase 1: Setup workflow with extraction AND parallel generation with retry logic.
@@ -492,83 +660,9 @@ async def setup_project_parallel(project_short_id: str, websocket_send_func: Cal
     semaphore = asyncio.Semaphore(concurrency_level)  # Use configurable concurrency level
     print(f"   Using concurrency level: {concurrency_level}")
     
-    async def generate_single_workflow_with_retry(extracted_workflow: Dict[str, Any], max_retries: int = 2) -> Dict[str, Any]:
-        """Generate a single workflow with retry logic and rate limiting"""
-        workflow_id = extracted_workflow["workflow_id"]
-        workflow_name = extracted_workflow["workflow_name"]
-        
-        for attempt in range(max_retries + 1):
-            try:
-                async with semaphore:
-                    if attempt > 0:
-                        print(f"   🔄 Retry {attempt} for workflow: {workflow_name}")
-                    else:
-                        print(f"   Generating workflow: {workflow_name}")
-                    
-                    # Create payload dict with goal and parameters
-                    payload = {
-                        "goal": extracted_workflow["workflow_requirement"],
-                        "workflow_inputs": extracted_workflow["workflow_inputs"],
-                        "workflow_outputs": extracted_workflow["workflow_outputs"]
-                    }
-                    
-                    # Generate workflow with isolated logging
-                    workflow_graph = await generate_workflow_from_goal_with_logging(
-                        payload, 
-                        default_llm_config, 
-                        mcp_config={},
-                        workflow_id=workflow_id,
-                        websocket_send_func=websocket_send_func
-                    )
-                    
-                    try:
-                        if hasattr(workflow_graph, 'get_config'):
-                            workflow_dict = workflow_graph.get_config()
-                        elif hasattr(workflow_graph, 'get_workflow_description'):
-                            workflow_dict = {
-                                "goal": workflow_graph.goal,
-                                "description": workflow_graph.get_workflow_description()
-                            }
-                        else:
-                            workflow_dict = str(workflow_graph)
-                    except Exception as e:
-                        workflow_dict = f"Workflow generated successfully (serialization error: {str(e)})"
-                    
-                    return {
-                        "workflow_name": workflow_name,
-                        "workflow_id": workflow_id,
-                        "workflow_requirement": extracted_workflow["workflow_requirement"],
-                        "workflow_inputs": extracted_workflow["workflow_inputs"],
-                        "workflow_outputs": extracted_workflow["workflow_outputs"],
-                        "workflow_graph": workflow_dict,
-                        "success": True
-                    }
-                    
-            except Exception as e:
-                error_msg = f"Attempt {attempt + 1} failed: {str(e)}"
-                print(f"   ❌ {error_msg}")
-                
-                if attempt < max_retries:
-                    # Wait before retry (exponential backoff)
-                    wait_time = 2 ** attempt
-                    print(f"   ⏳ Waiting {wait_time}s before retry...")
-                    await asyncio.sleep(wait_time)
-                else:
-                    # Final failure - return error info instead of updating database
-                    return {
-                        "workflow_name": workflow_name,
-                        "workflow_id": workflow_id,
-                        "workflow_requirement": extracted_workflow["workflow_requirement"],
-                        "workflow_inputs": extracted_workflow["workflow_inputs"],
-                        "workflow_outputs": extracted_workflow["workflow_outputs"],
-                        "workflow_graph": f"Workflow generation failed after {max_retries + 1} attempts. Last error: {str(e)}",
-                        "success": False,
-                        "error": str(e)
-                    }
-    
     # Create concurrent tasks for all workflow generations
     workflow_tasks = [
-        generate_single_workflow_with_retry(extracted_workflow) 
+        _generate_single_workflow_with_retry(extracted_workflow, websocket_send_func=websocket_send_func, semaphore=semaphore) 
         for extracted_workflow in extracted_data["workflows"]
     ]
     
@@ -705,100 +799,18 @@ async def setup_project_parallel_with_status_messages(project_short_id: str, web
     
     if websocket_send_func:
         from ..socket_management.protocols import create_message, MessageType
-    status_message = create_message(
-        MessageType.SETUP_LOG,
-        status=None,
-        workflow_id=workflow_id,
-        content=f"Test loggings, starting workflow generation 12",
-        result=None
-    )
-    await websocket_send_func(json.dumps(status_message))
-    
-    async def generate_single_workflow_with_retry(extracted_workflow: Dict[str, Any], max_retries: int = 2) -> Dict[str, Any]:
-        """Generate a single workflow with retry logic and rate limiting"""
-        workflow_id = extracted_workflow["workflow_id"]
-        workflow_name = extracted_workflow["workflow_name"]
-        
         status_message = create_message(
             MessageType.SETUP_LOG,
             status=None,
-            workflow_id=workflow_id,
-            content=f"Start function generate_single_workflow_with_retry",
+            workflow_id=None,  # No specific workflow_id at this point
+            content=f"Test loggings, starting workflow generation in parallel",
             result=None
         )
-        
-        for attempt in range(max_retries + 1):
-            try:
-                async with semaphore:
-                    if attempt > 0:
-                        print(f"   🔄 Retry {attempt} for workflow: {workflow_name}")
-                    else:
-                        print(f"   Generating workflow: {workflow_name}")
-                    
-                    # Create payload dict with goal and parameters
-                    payload = {
-                        "goal": extracted_workflow["workflow_requirement"],
-                        "workflow_inputs": extracted_workflow["workflow_inputs"],
-                        "workflow_outputs": extracted_workflow["workflow_outputs"]
-                    }
-                    
-                    # Generate workflow with isolated logging
-                    workflow_graph = await generate_workflow_from_goal_with_logging(
-                        payload, 
-                        default_llm_config, 
-                        mcp_config={},
-                        workflow_id=workflow_id,
-                        websocket_send_func=websocket_send_func
-                    )
-                    
-                    try:
-                        if hasattr(workflow_graph, 'get_config'):
-                            workflow_dict = workflow_graph.get_config()
-                        elif hasattr(workflow_graph, 'get_workflow_description'):
-                            workflow_dict = {
-                                "goal": workflow_graph.goal,
-                                "description": workflow_graph.get_workflow_description()
-                            }
-                        else:
-                            workflow_dict = str(workflow_graph)
-                    except Exception as e:
-                        workflow_dict = f"Workflow generated successfully (serialization error: {str(e)})"
-                    
-                    return {
-                        "workflow_name": workflow_name,
-                        "workflow_id": workflow_id,
-                        "workflow_requirement": extracted_workflow["workflow_requirement"],
-                        "workflow_inputs": extracted_workflow["workflow_inputs"],
-                        "workflow_outputs": extracted_workflow["workflow_outputs"],
-                        "workflow_graph": workflow_dict,
-                        "success": True
-                    }
-                    
-            except Exception as e:
-                error_msg = f"Attempt {attempt + 1} failed: {str(e)}"
-                print(f"   ❌ {error_msg}")
-                
-                if attempt < max_retries:
-                    # Wait before retry (exponential backoff)
-                    wait_time = 2 ** attempt
-                    print(f"   ⏳ Waiting {wait_time}s before retry...")
-                    await asyncio.sleep(wait_time)
-                else:
-                    # Final failure - return error info instead of updating database
-                    return {
-                        "workflow_name": workflow_name,
-                        "workflow_id": workflow_id,
-                        "workflow_requirement": extracted_workflow["workflow_requirement"],
-                        "workflow_inputs": extracted_workflow["workflow_inputs"],
-                        "workflow_outputs": extracted_workflow["workflow_outputs"],
-                        "workflow_graph": f"Workflow generation failed after {max_retries + 1} attempts. Last error: {str(e)}",
-                        "success": False,
-                        "error": str(e)
-                    }
+        await websocket_send_func(json.dumps(status_message))
     
     # Create concurrent tasks for all workflow generations
     workflow_tasks = [
-        generate_single_workflow_with_retry(extracted_workflow) 
+        _generate_single_workflow_with_retry(extracted_workflow, websocket_send_func=websocket_send_func, semaphore=semaphore) 
         for extracted_workflow in extracted_data["workflows"]
     ]
     

@@ -181,9 +181,19 @@ class WorkFlowGenerator(BaseModule):
 
         # generate / assigns the initial agents
         logger.info("Generating agents for the workflow ...")
+        
+        # Check if we're already in an async context
+        try:
+            asyncio.get_running_loop()
+            # We're in an async context, use the async method
+            operation = self.async_generate_agents
+        except RuntimeError:
+            # Not in async context, use the sync method
+            operation = self.generate_agents
+            
         workflow, added_retries = self._execute_with_retry(
             operation_name="Generating agents for the workflow",
-            operation=self.generate_agents,
+            operation=operation,
             retries_left=retry - cur_retries,
             workflow=workflow,
             examples=agent_examples

@@ -8,6 +8,9 @@ import os
 from dotenv import load_dotenv
 from datetime import datetime
 from contextlib import asynccontextmanager
+import logging
+import sys
+from pathlib import Path
 
 from .models.models import (
     ProjectSetupRequest, ProjectSetupResponse, ProjectWorkflowGenerationRequest, ProjectWorkflowGenerationResponse,
@@ -19,7 +22,7 @@ from .core import (
     get_workflow, list_workflows
 )
 from .config.cors_config import get_cors_config
-from evoagentx.core.logging import logger
+from evoagentx.core.logging import logger as evo_logger
 
 # Import socket management service
 from .socket_management import socket_service
@@ -30,6 +33,19 @@ load_dotenv('config/app.env', override = True)
 
 
 app = FastAPI(title="Processing Server")
+
+# Configure logging for this module
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)  # Set to DEBUG level for troubleshooting
+
+# Add console handler if none exists
+if not logger.handlers:
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.DEBUG)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+
 
 # Add CORS middleware using structured configuration
 cors_config = get_cors_config()
@@ -278,140 +294,61 @@ async def execute_workflow_websocket(
         except:
             print("Connection might be closed")
 
-@app.websocket("/project/{project_short_id}/parallel-setup")
-async def parallel_workflow_setup(
+@app.websocket("/project/{project_short_id}/regist")
+async def register_project_socket(
     websocket: WebSocket,
     project_short_id: str
 ):
     """
-    WebSocket endpoint for parallel workflow setup with persistent connection.
-    Generates all workflows for a project in parallel and keeps socket open for execution.
+    WebSocket endpoint for project socket registration.
+    Creates a persistent socket connection and keeps it alive.
+    The socket will continuously listen for messages on a separate thread.
     """
     try:
-        # Connect via socket service for persistent management
-        await socket_service.connect_project(project_short_id, websocket)
-        logger.info(f"Parallel generation progress WebSocket connected for project {project_short_id} via socket service")
+        # Accept the WebSocket connection first
+        await websocket.accept()
+        logger.info(f"WebSocket accepted for project {project_short_id}")
         
-        # Send setup start message using README format
-        from .socket_management.protocols import create_message, MessageType
-        start_message = create_message(
-            MessageType.SETUP_LOG,
-            status=None,
-            workflow_id=None,
-            content="Setup start...",
-            result=None
-        )
-        await socket_service.send_to_project(project_short_id, start_message)
+        # Register the socket with the socket service
+        # This will create a new thread for continuous listening
+        success = await socket_service.register_project_socket(project_short_id, websocket)
         
-        # Start workflow extraction and generation directly
-        try:
-            logger.info(f"Starting parallel workflow generation for project {project_short_id}")
-            from .core.workflow_setup import setup_project_parallel_with_status_messages
-            
-            async def send_websocket_message(message: str):
-                try:
-                    # Parse message to get proper format
-                    message_data = json.loads(message)
-                    await socket_service.send_to_project(project_short_id, message_data)
-                except Exception as e:
-                    logger.error(f"Failed to send WebSocket message via socket service: {str(e)}")
-                    # If we can't send messages, the connection might be broken
-                    raise e
-            
-            # Run the parallel setup with WebSocket status messages and timeout protection
+        if success:
+            logger.info(f"Successfully registered socket for project {project_short_id}")
+            # Keep the WebSocket connection alive
+            # The socket service now handles all communication on a separate thread
             try:
-                workflow_results = await asyncio.wait_for(
-                    setup_project_parallel_with_status_messages(project_short_id, send_websocket_message),
-                    timeout=300.0  # 5 minute timeout
-                )
-            except asyncio.TimeoutError:
-                logger.error(f"Parallel generation timed out for project {project_short_id} after 5 minutes")
-                timeout_message = create_message(
-                    MessageType.SETUP_LOG,
-                    status=None,
-                    workflow_id=None,
-                    content="Parallel generation timed out after 5 minutes",
-                    result=None
-                )
-                await socket_service.send_to_project(project_short_id, timeout_message)
-                # Keep connection open even after timeout for potential retry
-                return
-            
-            # Extract just the workflow_graphs from the results
-            logger.info(f"Processing {len(workflow_results)} workflow results for project {project_short_id}")
-            workflow_graphs = []
-            for i, workflow in enumerate(workflow_results):
-                if "workflow_graph" in workflow:
-                    workflow_graphs.append(workflow["workflow_graph"])
-                    logger.debug(f"Added workflow {i+1} graph to results")
-                else:
-                    logger.warning(f"Workflow {i+1} missing workflow_graph field: {workflow.keys()}")
-            
-            logger.info(f"Extracted {len(workflow_graphs)} workflow graphs from {len(workflow_results)} results")
-            
-            # Send setup_complete message with workflow graph dicts using new format
-            try:
-                setup_complete_msg = create_message(
-                    MessageType.SETUP_COMPLETE,
-                    status=None,
-                    workflow_id=None,
-                    content="Workflow setup completed successfully",
-                    result=workflow_graphs
-                )
-                await socket_service.send_to_project(project_short_id, setup_complete_msg)
-                
-                logger.info(f"Successfully sent setup_complete message for project {project_short_id} with {len(workflow_graphs)} workflow graphs")
-                
-                # Keep the WebSocket connection open for future execution requests
-                logger.info(f"WebSocket connection remains open for project {project_short_id} for future execution requests")
-                
+                logger.info(f"Keeping WebSocket connection alive for project {project_short_id}")
+                # Wait for the connection to be closed by the client
+                while True:
+                    # Keep connection alive with periodic checks
+                    await asyncio.sleep(30)
+                    
+                    # Check if project is still connected
+                    is_connected = socket_service.is_project_connected(project_short_id)
+                    logger.debug(f"Connection check for project {project_short_id}: {'✅' if is_connected else '❌'}")
+                    
+                    if not is_connected:
+                        logger.info(f"Client {project_short_id} disconnected")
+                        break
+                    logger.debug(f"WebSocket connection still alive for project {project_short_id}")
             except Exception as e:
-                logger.error(f"Failed to send setup_complete message for project {project_short_id}: {str(e)}")
-                # Don't close the connection on message send failure, just log the error
+                logger.info(f"WebSocket connection ended for project {project_short_id}: {e}")
+        else:
+            logger.error(f"Failed to register socket for project {project_short_id}")
+            # Close the connection if registration failed
+            await websocket.close()
             
-        except Exception as e:
-            logger.error(f"Error during parallel generation for project {project_short_id}: {str(e)}")
-            logger.error(f"Exception type: {type(e).__name__}")
-            import traceback
-            logger.error(f"Traceback: {traceback.format_exc()}")
-            
-            try:
-                error_message = create_message(
-                    MessageType.SETUP_LOG,
-                    status=None,
-                    workflow_id=None,
-                    content=f"Error during parallel generation: {str(e)}",
-                    result=None
-                )
-                await socket_service.send_to_project(project_short_id, error_message)
-                
-                # Keep connection open even after error, just log it
-                logger.error(f"Error occurred but keeping connection open for recovery: {str(e)}")
-            except Exception as send_error:
-                logger.error(f"Failed to send error message: {str(send_error)}")
-                # Keep connection open for potential recovery
-    
     except WebSocketDisconnect:
-        logger.info(f"Parallel generation progress WebSocket disconnected for project {project_short_id}")
+        logger.info(f"WebSocket disconnected for project {project_short_id}")
     except Exception as e:
-        logger.error(f"Parallel generation progress WebSocket error for project {project_short_id}: {e}")
-        logger.error(f"Exception type: {type(e).__name__}")
+        logger.error(f"Error in socket registration for project {project_short_id}: {str(e)}")
         import traceback
         logger.error(f"Traceback: {traceback.format_exc()}")
-        
         try:
-            await websocket.send_text(json.dumps({
-                "type": "error",
-                "data": {
-                    "status": "error",
-                    "workflow_id": None,
-                    "content": f"WebSocket error: {str(e)}",
-                    "result": None
-                }
-            }))
-        except Exception as send_error:
-            logger.error(f"Failed to send error message: {str(send_error)}")
-            # Connection might be closed, can't send error message
+            await websocket.close()
+        except:
+            pass
 
 ### _____________________________________________
 ### Socket Management API
