@@ -1,7 +1,6 @@
 import asyncio
 import json
 import os
-import time
 from collections.abc import Callable
 from copy import deepcopy
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -94,7 +93,40 @@ class WorkFlowGenerator(BaseModule):
         self.agent_adaptor_names = []
 
 
-    def _execute_with_retry(
+    def generate_workflow(
+        self, 
+        goal: str, 
+        workflow_inputs: List[Parameter] = [Parameter(name="workflow_input", type="string", description="workflow input")], 
+        workflow_outputs: List[Parameter] = [Parameter(name="workflow_output", type="string", description="workflow output")], 
+        retry: int = 1, 
+        **kwargs
+    ) -> WorkFlowGraph:
+        """
+        Generate a workflow that can be used to achieve the given goal.
+        
+        Args:
+            goal (str): The goal to generate a workflow for
+            workflow_inputs (List[Parameter]): List of workflow inputs
+            workflow_outputs (List[Parameter]): List of workflow outputs
+            retry (int): Number of retry attempts
+            **kwargs: Additional arguments to pass to the operation
+        
+        Returns:
+            WorkFlowGraph: The generated workflow graph
+        """
+        workflow_graph = asyncio.run(
+            self.async_generate_workflow(
+                goal=goal, 
+                workflow_inputs=workflow_inputs, 
+                workflow_outputs=workflow_outputs, 
+                retry=retry, 
+                **kwargs
+            )
+        )
+        return workflow_graph
+
+
+    async def _execute_with_retry(
         self, 
         operation_name: str, 
         operation: Callable, 
@@ -120,18 +152,18 @@ class WorkFlowGenerator(BaseModule):
         while cur_retries <= retries_left:  # Changed < to <= to include the initial try
             try:
                 logger.info(f"{operation_name} (attempt {cur_retries + 1}/{retries_left + 1}) ...")
-                result = operation(**kwargs)
+                result = await operation(**kwargs)
                 return result, cur_retries
             except Exception as e:
                 if cur_retries == retries_left:
                     raise ValueError(f"Failed to {operation_name} after {cur_retries + 1} attempts.\nError: {e}") from e
                 sleep_time = 2 ** cur_retries
                 logger.exception(f"Failed to {operation_name} in {cur_retries + 1} attempts. Retry after {sleep_time} seconds.\nError: {e}")
-                time.sleep(sleep_time)
+                await asyncio.sleep(sleep_time)
                 cur_retries += 1
 
 
-    def generate_workflow(
+    async def async_generate_workflow(
         self, 
         goal: str, 
         workflow_inputs: List[Parameter] = [Parameter(name="workflow_input", type="string", description="workflow input")], 
@@ -140,7 +172,7 @@ class WorkFlowGenerator(BaseModule):
         **kwargs
     ) -> WorkFlowGraph:
         """
-        Generate a workflow that can be used to achieve the given goal.
+        Generate a workflow that can be used to achieve the given goal asynchronously.
 
         Args:
             goal (str): The goal to generate a workflow for
@@ -162,11 +194,11 @@ class WorkFlowGenerator(BaseModule):
 
         # retrieve workflow examples if rag_engine is provided
         if self.rag_engine is not None:
-            task_examples, agent_examples = self._get_examples(goal)
+            task_examples, agent_examples = await self._get_examples(goal)
 
         # Generate the initial workflow plan
         cur_retries = 0
-        workflow, added_retries = self._execute_with_retry(
+        workflow, added_retries = await self._execute_with_retry(
             operation_name="Generating a workflow plan",
             operation=self.generate_workflow_plan,
             retries_left=retry,
@@ -181,7 +213,7 @@ class WorkFlowGenerator(BaseModule):
 
         # generate / assigns the initial agents
         logger.info("Generating agents for the workflow ...")
-        workflow, added_retries = self._execute_with_retry(
+        workflow, added_retries = await self._execute_with_retry(
             operation_name="Generating agents for the workflow",
             operation=self.generate_agents,
             retries_left=retry - cur_retries,
@@ -193,7 +225,7 @@ class WorkFlowGenerator(BaseModule):
         return workflow
 
 
-    def generate_workflow_plan(
+    async def generate_workflow_plan(
         self, 
         goal: str, 
         workflow_inputs: List[Parameter], 
@@ -215,13 +247,13 @@ class WorkFlowGenerator(BaseModule):
         """
 
         logger.info("Generating workflow plan...")
-        plan = self.generate_plan(goal=goal, workflow_inputs=workflow_inputs, workflow_outputs=workflow_outputs, **kwargs)
+        plan = await self.generate_plan(goal=goal, workflow_inputs=workflow_inputs, workflow_outputs=workflow_outputs, **kwargs)
         logger.info("Building workflow from plan...")
         workflow = self.build_workflow_from_plan(goal=goal, plan=plan, workflow_inputs=workflow_inputs, workflow_outputs=workflow_outputs)
         return workflow
 
 
-    def generate_plan(
+    async def generate_plan(
         self, 
         goal: str, 
         workflow_inputs: List[Parameter] = [Parameter(name="workflow_input", type="string", description="workflow input")], 
@@ -255,7 +287,7 @@ class WorkFlowGenerator(BaseModule):
             "examples": examples
         }
         task_planning_action_name = task_planner.task_planning_action_name
-        message: Message = task_planner.execute(
+        message: Message = await task_planner.async_execute(
             action_name=task_planning_action_name,
             action_input_data=task_planning_action_data,
             return_msg_type=MessageType.REQUEST
@@ -263,7 +295,7 @@ class WorkFlowGenerator(BaseModule):
         return message.content
 
 
-    def generate_agents(
+    async def generate_agents(
         self, 
         workflow: WorkFlowGraph,
         examples: Optional[List[Dict]] = None,
@@ -280,18 +312,6 @@ class WorkFlowGenerator(BaseModule):
         Returns:
             WorkFlowGraph: The workflow graph with generated/prebuilt agents
         """
-        workflow = asyncio.run(self.async_generate_agents(workflow, examples))
-        workflow._validate_workflow_graph()
-        return workflow
-
-
-    async def async_generate_agents(
-        self, 
-        workflow: WorkFlowGraph,
-        examples: Optional[List[Dict]] = None,
-        # history: Optional[str] = None, 
-        # suggestion: Optional[str] = None
-    ) -> WorkFlowGraph:
 
         if examples is not None:
             self._create_agents_rag_engine(examples)
@@ -300,6 +320,7 @@ class WorkFlowGenerator(BaseModule):
         agent_generation_tasks = [self._generate_agents_for_node(node, workflow.goal, workflow_desc) for node in workflow.nodes]
         processed_nodes = await asyncio.gather(*agent_generation_tasks)
         workflow.nodes = processed_nodes
+        workflow._validate_workflow_graph()
         return workflow
     
     
@@ -373,8 +394,9 @@ class WorkFlowGenerator(BaseModule):
         return workflow
 
 
-    def _get_workflow_examples(self, goal: str) -> List[Dict]:
-        rag_result: List[Chunk] = self.rag_engine.query(query=goal).corpus.chunks
+    async def _get_workflow_examples(self, goal: str) -> List[Dict]:
+        rag_result: List[Chunk] = await self.rag_engine.query_async(query=goal)
+        rag_result = rag_result.corpus.chunks
         if len(rag_result) == 0:
             logger.warning("No relevant workflow examples found.")
             return []
@@ -502,7 +524,7 @@ class WorkFlowGenerator(BaseModule):
         return tasks, agents
 
 
-    def _get_examples(self, goal: str) -> Tuple[Optional[List[Dict]], Optional[List[Dict]]]:
+    async def _get_examples(self, goal: str) -> Tuple[Optional[List[Dict]], Optional[List[Dict]]]:
         """Get examples for task planning and agent generation.
         
         Args:
@@ -513,7 +535,7 @@ class WorkFlowGenerator(BaseModule):
                 - Examples for task planning.
                 - Examples for agent generation.
         """
-        workflow_examples = self._get_workflow_examples(goal)
+        workflow_examples = await self._get_workflow_examples(goal)
         if len(workflow_examples) == 0:
             return None, None
                 
