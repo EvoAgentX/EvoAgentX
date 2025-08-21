@@ -211,8 +211,13 @@ class TaskPlanning(Action):
 
         for i, example in enumerate(examples):
             goal = example.pop("goal")
-            workflow_inputs = json.dumps(example["sub_tasks"][0]["inputs"], indent=4)
-            workflow_outputs = json.dumps(example["sub_tasks"][-1]["outputs"], indent=4)
+
+            workflow_inputs = example.pop("workflow_inputs")
+            workflow_inputs = json.dumps(workflow_inputs, indent=4)
+            
+            workflow_outputs = example.pop("workflow_outputs")
+            workflow_outputs = json.dumps(workflow_outputs, indent=4)
+            
             tasks_str = json.dumps(example, indent=4)
             example_prompt = TASK_PLANNING_EXAMPLE_TEMPLATE.format(
                 example_id=i+1,
