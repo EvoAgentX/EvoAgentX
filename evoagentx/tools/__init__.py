@@ -10,6 +10,7 @@ from .mcp import MCPToolkit
 from .request import RequestToolkit
 from .request_arxiv import ArxivToolkit
 from .browser_use import BrowserUseToolkit
+from .google_maps_tool import GoogleMapsToolkit
 
 
 __all__ = [
@@ -25,6 +26,7 @@ __all__ = [
     "MCPToolkit",
     "RequestToolkit",
     "ArxivToolkit",
-    "BrowserUseToolkit"
+    "BrowserUseToolkit",
+    "GoogleMapsToolkit"
 ]
 
