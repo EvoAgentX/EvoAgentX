@@ -215,7 +215,7 @@ class WorkFlowGenerator(BaseModule):
         logger.info("Generating agents for the workflow ...")
         workflow, added_retries = await self._execute_with_retry(
             operation_name="Generating agents for the workflow",
-            operation=operation,
+            operation=self.generate_agents,
             retries_left=retry - cur_retries,
             workflow=workflow,
             examples=agent_examples

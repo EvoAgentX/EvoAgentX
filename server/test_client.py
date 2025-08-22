@@ -1,15 +1,52 @@
 #!/usr/bin/env python3
 """
-Simple test client for EvoAgentX Socket Management Service.
-Design: Send a message to the server and keep receiving/printing messages.
+Enhanced test client for EvoAgentX Socket Management Service.
+Design: Send setup message, execute workflows in background thread, and keep receiving/printing messages via WebSocket.
+
+Features:
+- WebSocket connection for real-time log streaming
+- Background workflow execution (same as test_server.py)
+- Concurrent setup and execution testing
+- Real-time log monitoring during execution
+
+Usage:
+1. Run this script while the server is running
+2. It will connect via WebSocket and send setup message
+3. After 3 seconds, it starts workflow execution in background thread
+4. All execution logs stream in real-time via WebSocket
+5. Press Ctrl+C to stop
+
+The send_execution() method runs in a separate thread so WebSocket listening continues uninterrupted.
 """
 
 import asyncio
 import json
 import websockets
+import threading
+import requests
+import time
 from datetime import datetime
 
 project_short_id = "9mshbju"
+
+# Test configuration (same as test_server.py)
+BASE_URL = "http://localhost:8001"
+ACCESS_TOKEN = "default_secret_token_change_me"  # Change this to your actual token
+HEADERS = {
+    "eax-access-token": ACCESS_TOKEN,
+    "Content-Type": "application/json"
+}
+test_workflow_id = "1c184cc8-4495-471c-b3fe-0ffe0c7ee315"
+
+# Test inputs for workflow execution
+TEST_INPUTS = {
+    "theme": "A beautiful sunset over a calm ocean, with a small boat in the foreground. The sky is painted with soft, warm colors, and the water reflects the sunset's glow. The boat is a simple wooden vessel with a sail, gently rocking on the water. The scene is peaceful and serene, with a sense of tranquility and calm.",
+    "characters": ["A beautiful sunset over a calm ocean, with a small boat in the foreground. The sky is painted with soft, warm colors, and the water reflects the sunset's glow. The boat is a simple wooden vessel with a sail, gently rocking on the water. The scene is peaceful and serene, with a sense of tranquility and calm."],
+    "age_group": "3-5",
+    "story_length": "short",
+    "moral_lesson": "A beautiful sunset over a calm ocean, with a small boat in the foreground. The sky is painted with soft, warm colors, and the water reflects the sunset's glow. The boat is a simple wooden vessel with a sail, gently rocking on the water. The scene is peaceful and serene, with a sense of tranquility and calm.",
+    "setting": "A beautiful sunset over a calm ocean, with a small boat in the foreground. The sky is painted with soft, warm colors, and the water reflects the sunset's glow. The boat is a simple wooden vessel with a sail, gently rocking on the water. The scene is peaceful and serene, with a sense of tranquility and calm."
+}
 
 class SimpleEvoAgentXClient:
     """Simple test client that sends a message and keeps receiving messages."""
@@ -58,6 +95,39 @@ class SimpleEvoAgentXClient:
         await self.websocket.send(json.dumps(message))
         print("✅ Message sent!")
     
+    def send_execution(self, workflow_id: list):
+        """Send workflow execution requests in a separate thread."""
+        def _execute_workflows():
+            print(f"\n⚡ Starting workflow execution in background thread...")
+            print(f"   📋 Workflow IDs: {workflow_id}")
+            print(f"   🔧 Test inputs: {json.dumps(TEST_INPUTS, indent=2)}")
+            
+            print(f"\n   🚀 Executing workflow: {workflow_id}")
+            
+            request_data = {"inputs": TEST_INPUTS}
+            url = f"{BASE_URL}/workflow/{workflow_id}/execute"
+            
+            try:
+                print(f"   📤 POST {url}")
+                response = requests.post(url, headers=HEADERS, json=request_data, timeout=30)
+                
+                print(f"   📊 Status: {response.status_code}")
+                if response.status_code == 200:
+                    result = response.json()
+                    print(f"   ✅ Success: {result.get('message', 'Execution started')}")
+                else:
+                    print(f"   ❌ Error: {response.text}")
+            except Exception as e:
+                print(f"   ❌ Error: {e}")
+                        
+            print(f"\n   🎯 All workflow executions completed!")
+        
+        # Start execution in background thread
+        execution_thread = threading.Thread(target=_execute_workflows, daemon=True)
+        execution_thread.start()
+        print(f"🔄 Workflow execution started in background thread")
+        return execution_thread
+    
     async def listen_for_messages(self):
         """Keep listening for and printing messages from the server."""
         print("\n🎧 Listening for messages from server...")
@@ -94,11 +164,27 @@ async def main():
         # Connect to server
         await client.connect()
         
-        # Send a message
-        await client.send_message()
+
         
-        # Keep listening for messages
-        await client.listen_for_messages()
+        # # Send setup message
+        # await client.send_message()
+        
+        # Keep listening for messages (execution logs will come through WebSocket)
+        asyncio.create_task(client.listen_for_messages())
+        
+        # Wait a bit for setup to complete
+        print("\n⏳ Waiting 3 seconds for setup to complete...")
+        await asyncio.sleep(150)
+        
+        # Start workflow execution in background thread
+        # Use example workflow IDs (you can replace with actual ones from setup response)
+        
+        print(f"\n🎯 Starting workflow execution with IDs: {test_workflow_id}")
+        print(f"   💡 Tip: Replace these with actual workflow IDs from your setup response")
+        print(f"   🔧 Using test inputs: {list(TEST_INPUTS.keys())}")
+        execution_thread = client.send_execution(test_workflow_id)
+        
+        
         
     except KeyboardInterrupt:
         print("\n⏹️  Stopped by user")
@@ -113,10 +199,13 @@ async def main():
         await client.disconnect()
 
 if __name__ == "__main__":
-    print("EvoAgentX Simple Socket Client Test")
-    print("===================================")
+    print("EvoAgentX Enhanced Socket Client Test")
+    print("=====================================")
     print("Make sure the server is running on localhost:8001")
-    print("This client will send a message and keep receiving messages")
+    print("This client will:")
+    print("  1. Send setup message")
+    print("  2. Execute workflows in background thread")
+    print("  3. Stream real-time logs via WebSocket")
     print("Press Ctrl+C to stop\n")
     
     asyncio.run(main())

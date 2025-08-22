@@ -1,6 +1,15 @@
 """
 Workflow-specific logging system for the new socket architecture.
 Creates separate loggers for each workflow generation and execution process.
+
+LOG SENDING BEHAVIOR:
+- By default, logs are sent IMMEDIATELY via WebSocket when they occur
+- You can configure batched sending by setting send_immediately=False
+- Batched logs are stored in memory and sent during cleanup
+- Use send_log_immediately() for manual immediate sending
+- Use flush_pending_logs() to manually flush batched logs
+
+This fixes the previous issue where logs were only sent in batches during cleanup.
 """
 
 import asyncio
@@ -24,7 +33,7 @@ class IsolatedWorkflowLogger:
     Captures ALL logs from the workflow engine and marks them with workflow ID.
     """
     
-    def __init__(self, workflow_id: str, process_type: str = "generation", process_id: Optional[str] = None):
+    def __init__(self, workflow_id: str, process_type: str = "generation", process_id: Optional[str] = None, send_immediately: bool = True):
         self.workflow_id = workflow_id
         self.process_type = process_type  # "generation" or "execution"
         self.process_id = process_id or f"{process_type}_{workflow_id}_{int(time.time())}_{uuid.uuid4().hex[:8]}"
@@ -34,6 +43,7 @@ class IsolatedWorkflowLogger:
         self.websocket_send_func = None
         self.is_active = True
         self.captured_logs = []  # Store all captured logs
+        self.send_immediately = send_immediately  # Control whether logs are sent immediately or batched
     
     def setup_isolated_logging(self, websocket_send_func: Optional[Callable] = None):
         """Setup completely isolated logging for this workflow process."""
@@ -64,16 +74,28 @@ class IsolatedWorkflowLogger:
                 # Extract clean message content
                 log_content = str(message).strip()
                 if log_content and self.websocket_send_func:
-                    # Store the log for later sending - we'll send it when the async context is available
-                    self.captured_logs.append({
+                    # Store the log for tracking
+                    log_entry = {
                         "timestamp": datetime.now().isoformat(),
                         "workflow_id": self.workflow_id,
                         "process_id": self.process_id,
                         "content": log_content,
                         "level": "INFO",
                         "source": "isolated_logger",
-                        "pending": True
-                    })
+                        "pending": False  # Mark as sent immediately
+                    }
+                    self.captured_logs.append(log_entry)
+                    
+                    # Send the log immediately via WebSocket if configured to do so
+                    if self.send_immediately:
+                        try:
+                            # Create a task to send the log asynchronously
+                            asyncio.create_task(self._send_isolated_log(log_content))
+                        except Exception as e:
+                            print(f"   ❌ Error creating send task for isolated log: {e}")
+                            log_entry["pending"] = True  # Mark as pending if send fails
+                    else:
+                        log_entry["pending"] = True  # Mark as pending for later batch sending
         
         # Add isolated sink with strict filtering for bound logs
         try:
@@ -118,8 +140,16 @@ class IsolatedWorkflowLogger:
                     print(f"   📤 Sending captured log: {repr(log_content)}")
                     print(f"   📊 Total captured logs: {len(self.captured_logs)}")
                     
-                    # Store the captured log for later sending
-                    self.captured_logs.append(log_entry)
+                    # Send the log immediately via WebSocket if configured to do so
+                    if self.send_immediately:
+                        try:
+                            # Create a task to send the log asynchronously
+                            asyncio.create_task(self._send_captured_log(log_content))
+                        except Exception as e:
+                            print(f"   ❌ Error creating send task: {e}")
+                    else:
+                        # Mark as pending for later batch sending
+                        log_entry["pending"] = True
                 else:
                     print(f"   ⏭️  Skipping - no content or websocket function")
             
@@ -165,12 +195,14 @@ class IsolatedWorkflowLogger:
                 try:
                     # Send the message object directly (not as JSON string)
                     await self.websocket_send_func(log_message)
+                    print(f"   ✅ Sent isolated log via WebSocket: {log_content[:50]}...")
                 except Exception as send_error:
+                    print(f"   ❌ WebSocket send error: {send_error}")
                     # Mark the websocket function as unavailable to prevent further failures
                     self.websocket_send_func = None
             
         except Exception as e:
-            pass
+            print(f"   ❌ Error in _send_isolated_log: {e}")
     
     async def _send_captured_log(self, log_content: str):
         """Send captured workflow engine log via WebSocket with workflow attribution but unchanged content."""
@@ -198,12 +230,14 @@ class IsolatedWorkflowLogger:
                 try:
                     # Send the message object directly (not as JSON string)
                     await self.websocket_send_func(log_message)
+                    print(f"   ✅ Sent captured log via WebSocket: {log_content[:50]}...")
                 except Exception as send_error:
+                    print(f"   ❌ WebSocket send error: {send_error}")
                     # Mark the websocket function as unavailable to prevent further failures
                     self.websocket_send_func = None
             
         except Exception as e:
-            pass
+            print(f"   ❌ Error in _send_captured_log: {e}")
     
     def get_captured_logs(self) -> List[Dict[str, Any]]:
         """Get all logs captured from the workflow engine."""
@@ -239,6 +273,40 @@ class IsolatedWorkflowLogger:
         
         print(f"📊 Flushed {len([log for log in pending_logs if not log.get('pending', False)])} logs successfully")
     
+    def send_log_immediately(self, log_content: str, level: str = "INFO", source: str = "manual"):
+        """Send a log immediately via WebSocket without storing it."""
+        if not self.websocket_send_func:
+            print(f"⚠️  No WebSocket function available for immediate log sending")
+            return
+        
+        # Store for tracking
+        log_entry = {
+            "timestamp": datetime.now().isoformat(),
+            "workflow_id": self.workflow_id,
+            "process_id": self.process_id,
+            "content": log_content,
+            "level": level,
+            "source": source,
+            "pending": False
+        }
+        self.captured_logs.append(log_entry)
+        
+        # Send immediately
+        try:
+            asyncio.create_task(self._send_captured_log(log_content))
+        except Exception as e:
+            print(f"   ❌ Error creating immediate send task: {e}")
+            log_entry["pending"] = True
+    
+    def set_send_immediately(self, send_immediately: bool):
+        """Change the send_immediately setting dynamically."""
+        self.send_immediately = send_immediately
+        print(f"🔄 Changed log sending mode to {'immediate' if send_immediately else 'batched'} for {self.workflow_id}")
+    
+    def get_send_mode(self) -> str:
+        """Get the current log sending mode."""
+        return "immediate" if self.send_immediately else "batched"
+    
     def cleanup(self):
         """Cleanup isolated logging resources."""
         if self.bound_logger and self.is_active:
@@ -271,7 +339,7 @@ class IsolatedWorkflowLogger:
 
 
 @contextmanager
-def isolated_workflow_process(workflow_id: str, process_type: str, websocket_send_func: Optional[Callable] = None):
+def isolated_workflow_process(workflow_id: str, process_type: str, websocket_send_func: Optional[Callable] = None, send_immediately: bool = True):
     """
     Context manager for isolated workflow process logging.
     
@@ -279,17 +347,18 @@ def isolated_workflow_process(workflow_id: str, process_type: str, websocket_sen
         workflow_id: The workflow ID
         process_type: "generation" or "execution"  
         websocket_send_func: Optional WebSocket send function
+        send_immediately: Whether to send logs immediately (True) or batch them (False)
     
     Usage:
-        # For workflow generation
-        with isolated_workflow_process(workflow_id, "generation", websocket_func) as logger:
-            logger.info("This log will only go to this workflow's generation logs")
+        # For workflow generation with immediate log sending
+        with isolated_workflow_process(workflow_id, "generation", websocket_func, send_immediately=True) as logger:
+            logger.info("This log will be sent immediately via WebSocket")
         
-        # For workflow execution  
-        with isolated_workflow_process(workflow_id, "execution", websocket_func) as logger:
-            logger.info("This log will only go to this workflow's execution logs")
+        # For workflow execution with batched log sending
+        with isolated_workflow_process(workflow_id, "execution", websocket_func, send_immediately=False) as logger:
+            logger.info("This log will be batched and sent later")
     """
-    isolated_logger = IsolatedWorkflowLogger(workflow_id, process_type)
+    isolated_logger = IsolatedWorkflowLogger(workflow_id, process_type, send_immediately=send_immediately)
     bound_logger = isolated_logger.setup_isolated_logging(websocket_send_func)
     
     try:
