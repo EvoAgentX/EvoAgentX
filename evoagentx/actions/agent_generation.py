@@ -76,8 +76,50 @@ class AgentGeneration(Action):
         tools = kwargs.pop("tools", None)
         super().__init__(name=name, description=description, prompt=prompt, inputs_format=inputs_format, outputs_format=outputs_format, **kwargs)
         self.tools = tools
-    
-    def execute(self, llm: Optional[BaseLLM] = None, inputs: Optional[dict] = None, sys_msg: Optional[str]=None, return_prompt: bool = False, **kwargs) -> AgentGenerationOutput:
+
+
+    def _prepare_prompt(self, inputs: Dict) -> str:
+        if inputs is None:
+            logger.error("AgentGeneration action received invalid `inputs`: None or empty.")
+            raise ValueError('The `inputs` to AgentGeneration action is None or empty.')
+        
+        prompt_params_names = self.inputs_format.get_attrs()
+        prompt_params_values = dict()
+
+        for param in prompt_params_names:
+            if param in inputs and inputs[param] is not None:
+                prompt_params_values[param] = inputs[param]
+            else:
+                prompt_params_values[param] = "None"
+
+        if isinstance(prompt_params_values["examples"], list):
+            prompt_params_values["examples"] = self.format_agent_examples(
+                prompt_params_values["examples"]
+            )
+
+        if isinstance(prompt_params_values["prebuilt_agents"], list):
+            prompt_params_values["prebuilt_agents"] = self.format_prebuilt_agents(
+                prompt_params_values["prebuilt_agents"]
+            )
+
+        if isinstance(self.tools, list) and len(self.tools) > 0:
+            tool_description = self.format_tools(self.tools)
+            prompt_params_values["tools"] = AGENT_GENERATION_TOOLS_PROMPT.format(tools_description=tool_description)
+        else:
+            prompt_params_values["tools"] = "None"
+        
+        prompt = self.prompt.format(**prompt_params_values)
+        return prompt
+
+
+    def execute(
+        self, 
+        llm: Optional[BaseLLM] = None, 
+        inputs: Optional[Dict] = None, 
+        sys_msg: Optional[str]=None, 
+        return_prompt: bool = False, 
+        **kwargs
+    ) -> AgentGenerationOutput:
         """Execute the agent generation process.
         
         This method uses the provided language model to generate agent specifications
@@ -97,43 +139,13 @@ class AgentGeneration(Action):
         Raises:
             ValueError: If the inputs are None or empty.
         """
-        if not inputs:
-            logger.error("AgentGeneration action received invalid `inputs`: None or empty.")
-            raise ValueError('The `inputs` to AgentGeneration action is None or empty.')
-        
-        inputs_format: AgentGenerationInput = self.inputs_format
-        outputs_format: AgentGenerationOutput = self.outputs_format
 
-        prompt_params_names = inputs_format.get_attrs()
-        prompt_params_values = dict()
+        prompt = self._prepare_prompt(inputs)
 
-        for param in prompt_params_names:
-            if param in inputs and inputs[param] is not None:
-                prompt_params_values[param] = inputs[param]
-            else:
-                prompt_params_values[param] = "None"
-
-        if isinstance(prompt_params_values["examples"], list):
-            prompt_params_values["examples"] = self.format_agent_examples(
-                prompt_params_values["examples"]
-            )
-
-        if isinstance(prompt_params_values["prebuilt_agents"], list):
-            prompt_params_values["prebuilt_agents"] = self.format_prebuilt_agents(
-                prompt_params_values["prebuilt_agents"]
-            )
-
-        if isinstance(self.tools, list) and len(self.tools) > 0:
-            tool_description = self.format_tools(self.tools)
-            prompt_params_values["tools"] = AGENT_GENERATION_TOOLS_PROMPT.format(tools_description=tool_description)
-        else:
-            prompt_params_values["tools"] = "None"
-        
-        prompt = self.prompt.format(**prompt_params_values)
         agents = llm.generate(
             prompt = prompt, 
             system_message = sys_msg, 
-            parser=outputs_format,
+            parser=self.outputs_format,
             parse_mode="json"
         )
         
@@ -143,7 +155,14 @@ class AgentGeneration(Action):
         return agents
 
 
-    async def async_execute(self, llm: Optional[BaseLLM] = None, inputs: Optional[dict] = None, sys_msg: Optional[str]=None, return_prompt: bool = False, **kwargs) -> AgentGenerationOutput:
+    async def async_execute(
+        self, 
+        llm: Optional[BaseLLM] = None, 
+        inputs: Optional[Dict] = None, 
+        sys_msg: Optional[str]=None, 
+        return_prompt: bool = False, 
+        **kwargs
+    ) -> AgentGenerationOutput:
         """Execute the agent generation process asynchronously.
         
         This method uses the provided language model to generate agent specifications
@@ -160,43 +179,12 @@ class AgentGeneration(Action):
             If return_prompt is False (default): The generated agents output.
             If return_prompt is True: A tuple of (generated agents, prompt used).
         """
-        if not inputs:
-            logger.error("AgentGeneration action received invalid `inputs`: None or empty.")
-            raise ValueError('The `inputs` to AgentGeneration action is None or empty.')
         
-        inputs_format: AgentGenerationInput = self.inputs_format
-        outputs_format: AgentGenerationOutput = self.outputs_format
-
-        prompt_params_names = inputs_format.get_attrs()
-        prompt_params_values = dict()
-
-        for param in prompt_params_names:
-            if param in inputs and inputs[param] is not None:
-                prompt_params_values[param] = inputs[param]
-            else:
-                prompt_params_values[param] = "None"
-
-        if isinstance(prompt_params_values["examples"], list):
-            prompt_params_values["examples"] = self.format_agent_examples(
-                prompt_params_values["examples"]
-            )
-
-        if isinstance(prompt_params_values["prebuilt_agents"], list):
-            prompt_params_values["prebuilt_agents"] = self.format_prebuilt_agents(
-                prompt_params_values["prebuilt_agents"]
-            )
-
-        if isinstance(self.tools, list) and len(self.tools) > 0:
-            tool_description = self.format_tools(self.tools)
-            prompt_params_values["tools"] = AGENT_GENERATION_TOOLS_PROMPT.format(tools_description=tool_description)
-        else:
-            prompt_params_values["tools"] = "None"
-        
-        prompt = self.prompt.format(**prompt_params_values)
+        prompt = self._prepare_prompt(inputs)
         agents = await llm.async_generate(
             prompt = prompt, 
             system_message = sys_msg, 
-            parser=outputs_format,
+            parser=self.outputs_format,
             parse_mode="json"
         )
         
@@ -204,6 +192,7 @@ class AgentGeneration(Action):
             return agents, prompt
         
         return agents
+
 
     @staticmethod
     def format_agent_examples(examples: List[Dict]) -> str:
@@ -245,6 +234,7 @@ class AgentGeneration(Action):
 
         return "\n".join(prompt)
 
+
     @staticmethod
     def format_prebuilt_agents(agents: List[Agent]) -> str:
         """
@@ -263,6 +253,7 @@ class AgentGeneration(Action):
             prompt.append(f"- **{name}**: {description}")
         
         return "\n".join(prompt)
+
 
     @staticmethod
     def format_tools(tools: List[Union[Tool, Toolkit]]) -> str:

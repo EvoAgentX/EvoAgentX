@@ -16,14 +16,27 @@ TASK_PLANNING_ACTION_DESC = "This action analyzes a given task, breaks it down i
 TASK_PLANNING_ACTION_INST = """
 Your Task: Given a user's goal, break it down into clear, manageable sub-tasks that are easy to follow and efficient to execute. 
 
-### Instructions:
-1. **Understand the Goal**: Identify the core objective the user is trying to achieve. 
-2. **Review the History**: Assess any previously generated task plan to identify gaps or areas needing refinement. 
+## Instructions
+1. **Understand the Goal**: Accurately interpret the core objective the user is trying to accomplish.
+2. **Review the History**: Examine any previous task plans or partial attempts to identify areas for refinement or improvement.
 3. **Consider Suggestions**: Consider user-provided suggestions to improve or optimize the workflow. 
+4. **Define Sub-Tasks**: Decompose the goal into logical, actionable sub-tasks based on the complexity of the goal.
 
-4. **Define Sub-Tasks**: Break the task into logical, actionable sub-tasks based on the complexity of the goal. 
+## Critical Requirements
+- **Inputs Rules**:
+    * A sub-task's inputs can only come from:
+        1. Inputs from the **Workflow Inputs** section, and
+        2. Outputs from other sub-tasks.
+    * Each input in the **Workflow Inputs** section MUST be used by at least one sub-task.
+    * The inputs of a sub-task should contain SUFFICIENT information to effectivelly address the current sub-task.
+- **Outputs Rules**:
+    * Each sub-task must produce outputs that are:
+        1. Used by other sub-tasks, or
+        2. One or more of the outputs in the **Workflow Outputs** section.
+    * Do not generate outputs that are unused or irrelevant to the workflow.
+- **Strictly Adhere to Provided Workflow Inputs and Outputs**: You MUST NOT alter the inputs and outputs in **Workflow Inputs** and **Workflow Outputs** in any way when using them in sub-tasks. Use them exactly as they are and pay close attention to the `name`, `type` and `required` fields in the sub-tasks that use them to make sure they are consistent with the ones given in **Workflow Inputs** and **Workflow Outputs**.
 
-4.1 **Principle for Breaking Task**:
+## Task Structuring Principles
 - **Simplicity**: Each sub-task is designed to achieve a specific, clearly defined objective. Avoid overloading sub-tasks with multiple objectives. 
 - **Modularity**: Ensure that each sub-task is self-contained, reusable, and contributes meaningfully to the overall solution. 
 - **Consistency**: Sub-tasks must logically support the user's goal and maintain coherence across the workflow.
@@ -31,18 +44,18 @@ Your Task: Given a user's goal, break it down into clear, manageable sub-tasks t
 - **Avoid Redundancy**: Ensure that there are no overlapping or unnecessary sub-tasks. 
 - **Consider Cycles**: Identify tasks that require iteration or feedback loops, and structure dependencies (by specifying inputs and outputs) accordingly. 
 
-4.2 **Sub-Task Format**: 
-Each sub-task should follow the structure below:
+## Sub-Task Format
+Each sub-task must follow this exact structure:
 ```json
 {{
     "name": "subtask_name",
-    "description": "A clear and concise explanation of the goal of this sub-task.",
+    "description": "A clear and concise explanation of what this sub-task achieves.",
     "reason": "Why this sub-task is necessary and how it contributes to achieving user's goal.",
     "inputs": [
         {{
             "name": "the input's name", 
             "type": "string/int/float/other_type",
-            "required": true/false (only set to `false` when this input is the feedback from later sub-task, or the previous generated output for the current sub-task),
+            "required": true/false,
             "description": "Description of the input's purpose and usage."
         }},
         ...
@@ -59,23 +72,14 @@ Each sub-task should follow the structure below:
 }}
 ```
 
-### Special Instructions for Programming Tasks
+## Special Instructions for Programming Tasks
 - **Environment Setup and Deployment**: For programming-related tasks, **do not** include sub-tasks related to setting up environments or deployment unless explicitly requested.
 - **Complete Code Generation**: For programming-related tasks, ensure that the final sub-task outputs a complete and working solution.
 - **IMPORTANT - Include Full Requirements**: For EVERY code generation tasks, in addition to the outputs from previous sub-tasks, the overall goal (and analysed requirements if any) MUST be included as inputs. This ensures each code generation step maintains full context of what's being built, even when split across multiple steps.
-
-### Notes:
-- Provide clear and concise names for the sub-tasks, inputs, and outputs. 
-- Maintain consistency in the flow of inputs and outputs between sub-tasks to ensure seamless integration. 
-- The inputs of a sub-task can ONLY be chosen from the workflow's inputs and any outputs from its preceding sub-tasks. 
-- The inputs of a sub-task should contain SUFFICIENT information to effectivelly address the current sub-task.
-- If a sub-task require feedback from a later sub-task (for feedback or refinement), include the later sub-task's output and the current sub-task's output in the current sub-task's inputs and set `"required": false`. 
-- You will be provided with the inputs and outputs requirements of the workflow in the "### Workflow Inputs" and "### Workflow Outputs" sections. You must incorporate all inputs in "### Workflow Inputs". All outputs in "### Workflow Outputs" must be the direct results of the sub-tasks.
-- You MUST NOT alter the provided workflow inputs or outputs in any way. Use them exactly as they are in your sub-tasks.
 """
 
 TASK_PLANNING_ACTION_DEMOS = """
-### Examples: 
+## Examples: 
 Below are some generated workflows that follow the given instructions:
 
 {examples}
@@ -208,17 +212,17 @@ Example {example_id}:
 
 
 TASK_PLANNING_OUTPUT_FORMAT = """
-### Output Format
+## Output Format
 Your final output should ALWAYS in the following format:
 
-## Thought 
+### Thought 
 Provide a brief explanation of your reasoning for breaking down the task and the chosen task structure.  
 
-## Goal
+### Goal
 Restate the user's goal clearly and concisely.
 
-## Plan
-You MUST provide the workflow plan with detailed sub-tasks in the following JSON format. The description of each sub-task MUST STRICTLY follow the JSON format described in the **Sub-Task Format** section.
+### Plan
+You MUST provide the workflow plan with detailed sub-tasks in the following JSON format. Each sub-task MUST STRICTLY follow the JSON format described in the **Sub-Task Format** section.
 ```json
 {{
     "sub_tasks": [
