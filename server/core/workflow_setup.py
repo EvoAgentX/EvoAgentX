@@ -212,15 +212,9 @@ async def _generate_workflow_core(payload, llm_config_dict: Dict[str, Any], mcp_
                     result=None
                 )
                 message_json = json.dumps(log_message)
-                print(f"\n🔍 [DIRECT LOG DEBUG]")
-                print(f"   Workflow ID: {workflow_id}")
-                print(f"   Message content: {repr(message)}")
-                print(f"   Full JSON message: {message_json}")
-                print(f"   WebSocket function: {'Available' if websocket_send_func else 'None'}")
                 
                 # Send the JSON string (send_websocket_message expects JSON string)
                 await websocket_send_func(message_json)
-                print(f"   ✅ Successfully sent via WebSocket (JSON string: {len(message_json)} chars)")
                 
             except Exception as e:
                 print(f"   ❌ Error sending direct workflow log: {e}")
@@ -249,13 +243,8 @@ async def _generate_workflow_core(payload, llm_config_dict: Dict[str, Any], mcp_
                     result=None
                 )
                 message_json = json.dumps(log_message)
-                print(f"\n🔍 [DIRECT ERROR DEBUG]")
-                print(f"   Workflow ID: {workflow_id}")
-                print(f"   Error content: {repr(error_content)}")
-                print(f"   Full JSON message: {message_json}")
                 
                 await websocket_send_func(message_json)
-                print(f"   ✅ Successfully sent error via WebSocket")
                 
             except Exception as e:
                 print(f"   ❌ Error sending direct workflow error: {e}")
@@ -264,9 +253,7 @@ async def _generate_workflow_core(payload, llm_config_dict: Dict[str, Any], mcp_
                 # Don't fail the entire workflow generation if error logging fails
                 # Just continue with the process
     
-    # Send a test message to verify WebSocket connection is working
-    if websocket_send_func and workflow_id:
-        await log_info("🧪 TEST: Starting _generate_workflow_core function")
+
     
     # Start with the predefined generation tools
     tools = generation_tools.copy()
@@ -399,7 +386,6 @@ async def setup_project(project_short_id: str, websocket_send_func: Callable = N
     detailed_requirements = await retrieve_requirement_from_storage(project_short_id)
     
     # Extract workflows and database info
-    print(f"🔍 Extracting workflows from detailed requirements...")
     extracted_data = await extract_workflow_requirements(detailed_requirements)
     
     print(f"✅ Extracted {len(extracted_data['workflows'])} workflows")
@@ -617,7 +603,6 @@ async def setup_project_parallel(project_short_id: str, websocket_send_func: Cal
     detailed_requirements = await retrieve_requirement_from_storage(project_short_id)
     
     # Extract workflows and database info
-    print(f"🔍 Extracting workflows from detailed requirements...")
     extracted_data = await extract_workflow_requirements(detailed_requirements)
     
     print(f"✅ Extracted {len(extracted_data['workflows'])} workflows")
@@ -745,7 +730,6 @@ async def setup_project_parallel_with_status_messages(project_short_id: str, web
     detailed_requirements = await retrieve_requirement_from_storage(project_short_id)
     
     # Extract workflows and database info
-    print(f"🔍 Extracting workflows from detailed requirements...")
     extracted_data = await extract_workflow_requirements(detailed_requirements)
     
     print(f"✅ Extracted {len(extracted_data['workflows'])} workflows")
@@ -809,39 +793,93 @@ async def setup_project_parallel_with_status_messages(project_short_id: str, web
         await websocket_send_func(json.dumps(status_message))
     
     # Create concurrent tasks for all workflow generations
+    if websocket_send_func:
+        from ..socket_management.protocols import create_message, MessageType
+        status_message = create_message(
+            MessageType.SETUP_LOG,
+            status=None,
+            workflow_id=None,  # No specific workflow_id at this point
+            content=f"Test loggings, starting workflow generation in parallel - 2",
+            result=None
+        )
+        await websocket_send_func(json.dumps(status_message))
     
     workflow_tasks = [
         _generate_single_workflow_with_retry(extracted_workflow, websocket_send_func=websocket_send_func, semaphore=semaphore) 
         for extracted_workflow in extracted_data["workflows"]
     ]
     
-    # Execute all workflow generations concurrently
-    generated_workflows = await asyncio.gather(*workflow_tasks, return_exceptions=True)
+    # Create concurrent tasks for all workflow generations
+    if websocket_send_func:
+        from ..socket_management.protocols import create_message, MessageType
+        status_message = create_message(
+            MessageType.SETUP_LOG,
+            status=None,
+            workflow_id=None,  # No specific workflow_id at this point
+            content=f"Test loggings, starting workflow generation in parallel - 3",
+            result=None
+        )
+        await websocket_send_func(json.dumps(status_message))
     
-    # Handle results from parallel execution
+    # Execute all workflow generations concurrently using asyncio.as_completed for progressive processing
+    if websocket_send_func:
+        from ..socket_management.protocols import create_message, MessageType
+        status_message = create_message(
+            MessageType.SETUP_LOG,
+            status=None,
+            workflow_id=None,
+            content=f"Starting progressive workflow generation - processing as they complete",
+            result=None
+        )
+        await websocket_send_func(json.dumps(status_message))
+    
+    # Process workflows as they complete, keeping the event loop responsive
     processed_workflows = []
-    for i, result in enumerate(generated_workflows):
-        if isinstance(result, Exception):
-            print(f"❌ Error generating workflow {extracted_data['workflows'][i]['workflow_name']}: {str(result)}")
-            # Create a fallback workflow entry for failed generations
-            fallback_workflow = {
-                "workflow_name": extracted_data['workflows'][i]['workflow_name'],
-                "workflow_id": extracted_data['workflows'][i]['workflow_id'],
-                "workflow_requirement": extracted_data['workflows'][i]['workflow_requirement'],
-                "workflow_inputs": extracted_data['workflows'][i]['workflow_inputs'],
-                "workflow_outputs": extracted_data['workflows'][i]['workflow_outputs'],
-                "workflow_graph": f"Workflow generation failed after retries: {str(result)}",
-                "success": False,
-                "error": str(result)
-            }
-            processed_workflows.append(fallback_workflow)
-        else:
-            # Check if the result has success flag
-            if hasattr(result, 'get') and result.get("success") is False:
-                print(f"❌ Workflow generation failed for {result['workflow_name']}: {result.get('error', 'Unknown error')}")
+    completed_count = 0
+    total_workflows = len(workflow_tasks)
+    
+    # Use asyncio.as_completed() correctly - it returns a generator, not an async iterator
+    for completed_task in asyncio.as_completed(workflow_tasks):
+        try:
+            result = await completed_task
+            completed_count += 1
+            
+            if isinstance(result, Exception):
+                print(f"❌ Error generating workflow: {str(result)}")
+                # Create a fallback workflow entry for failed generations
+                fallback_workflow = {
+                    "workflow_name": "Unknown",
+                    "workflow_id": "unknown",
+                    "workflow_requirement": "Generation failed",
+                    "workflow_inputs": {},
+                    "workflow_outputs": {},
+                    "workflow_graph": f"Workflow generation failed: {str(result)}",
+                    "success": False,
+                    "error": str(result)
+                }
+                processed_workflows.append(fallback_workflow)
             else:
-                print(f"✅ Workflow generation succeeded for {result['workflow_name']}")
-            processed_workflows.append(result)
+                # Check if the result has success flag
+                if hasattr(result, 'get') and result.get("success") is False:
+                    print(f"❌ Workflow generation failed for {result['workflow_name']}: {result.get('error', 'Unknown error')}")
+                else:
+                    print(f"✅ Workflow generation succeeded for {result['workflow_name']}")
+                processed_workflows.append(result)
+            
+            # Send progress update via WebSocket
+            if websocket_send_func:
+                progress_message = create_message(
+                    MessageType.SETUP_LOG,
+                    status="progress",
+                    workflow_id=None,
+                    content=f"Progress: {completed_count}/{total_workflows} workflows completed",
+                    result={"completed": completed_count, "total": total_workflows}
+                )
+                await websocket_send_func(json.dumps(progress_message))
+                
+        except Exception as e:
+            print(f"❌ Error processing completed workflow: {e}")
+            completed_count += 1
     
     print(f"✅ Generated {len(processed_workflows)} workflows (parallel execution with retry)")
     

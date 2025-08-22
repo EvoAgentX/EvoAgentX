@@ -321,8 +321,8 @@ async def register_project_socket(
                 logger.info(f"Keeping WebSocket connection alive for project {project_short_id}")
                 # Wait for the connection to be closed by the client
                 while True:
-                    # Keep connection alive with periodic checks
-                    await asyncio.sleep(30)
+                    # Keep connection alive with more frequent checks
+                    await asyncio.sleep(10)  # Reduced from 30 to 10 seconds
                     
                     # Check if project is still connected
                     is_connected = socket_service.is_project_connected(project_short_id)
@@ -483,7 +483,7 @@ async def get_socket_status(project_short_id: str):
             "timeout": timeout,
             "timeout_description": "No expiry" if timeout == -1 else f"{timeout} seconds",
             "connected_at": connection_info.get("connected_at").isoformat() if connection_info.get("connected_at") else None,
-            "last_ping": connection_info.get("last_ping").isoformat() if connection_info.get("last_ping") else None
+            "last_ping": None
         }
         
     except Exception as e:

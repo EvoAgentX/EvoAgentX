@@ -33,7 +33,7 @@ if not logger.handlers:
 class MessageHandler:
     """
     Handles socket messages according to README specification.
-    Only supports: setup messages, heartbeat, and error handling.
+    Only supports: setup messages and error handling.
     """
     
     def __init__(self, socket_service: 'SocketService'):
@@ -68,12 +68,9 @@ class MessageHandler:
             if message_type == "setup":
                 # Handle setup message non-blocking - start in background, don't await
                 self._handle_setup_message_non_blocking(project_short_id, message_data)
-            elif message_type == "heartbeat":
-                # Handle heartbeat for connection keep-alive
-                await self._handle_heartbeat(project_short_id, message_data)
             else:
                 # Unknown message type
-                await self._send_error(project_short_id, f"Unsupported message type: {message_type}. Only 'setup' and 'heartbeat' are supported.")
+                await self._send_error(project_short_id, f"Unsupported message type: {message_type}. Only 'setup' is supported.")
                 
         except Exception as e:
             logger.error(f"Error handling message from {project_short_id}: {e}")
@@ -110,14 +107,14 @@ class MessageHandler:
             # Start setup in background task (non-blocking)
             logger.info(f"Starting setup background task for project {project_short_id}")
             
-            heartbeat_response = create_message(
-                MessageType.SETUP_LOG,  # Use SETUP_LOG type for heartbeat responses
-                status="alive",
+            status_response = create_message(
+                MessageType.SETUP_LOG,
+                status="processing",
                 workflow_id=None,
                 content="Start creating setup worker",
                 result={"timestamp": datetime.now().isoformat()}
             )
-            asyncio.create_task(self.socket_service.send_to_project(project_short_id, heartbeat_response))
+            asyncio.create_task(self.socket_service.send_to_project(project_short_id, status_response))
             
             
             # Create and start the setup task that handles all async operations
@@ -172,14 +169,14 @@ class MessageHandler:
     async def _run_setup_worker(self, project_short_id: str, websocket_send_func):
         """Background worker that runs the actual setup process."""
         try:
-            heartbeat_response = create_message(
-                MessageType.SETUP_LOG,  # Use SETUP_LOG type for heartbeat responses
-                status=None,
+            status_response = create_message(
+                MessageType.SETUP_LOG,
+                status="processing",
                 workflow_id=None,
                 content="In setup worker",
                 result={"timestamp": datetime.now().isoformat()}
             )
-            asyncio.create_task(self.socket_service.send_to_project(project_short_id, heartbeat_response))
+            asyncio.create_task(self.socket_service.send_to_project(project_short_id, status_response))
             
             logger.info(f"Starting setup worker for project {project_short_id}")
             
@@ -276,29 +273,6 @@ class MessageHandler:
             logger.debug(f"Connection refresh task cancelled for {project_short_id}")
         except Exception as e:
             logger.error(f"Error in connection refresh task for {project_short_id}: {e}")
-
-    async def _handle_heartbeat(self, project_short_id: str, message_data: Dict[str, Any]):
-        """Handle heartbeat messages for connection keep-alive."""
-        try:
-            # Update last ping time to keep connection alive
-            if project_short_id in self.socket_service.active_connections:
-                self.socket_service.active_connections[project_short_id]["last_ping"] = datetime.now()
-                logger.debug(f"Updated last ping time for {project_short_id}")
-            
-            # Send heartbeat response in the correct format
-            heartbeat_response = create_message(
-                MessageType.SETUP_LOG,  # Use SETUP_LOG type for heartbeat responses
-                status="alive",
-                workflow_id=None,
-                content="heartbeat",
-                result={"timestamp": datetime.now().isoformat()}
-            )
-            
-            await self.socket_service.send_to_project(project_short_id, heartbeat_response)
-            logger.debug(f"Sent heartbeat response to {project_short_id}")
-            
-        except Exception as e:
-            logger.error(f"Error handling heartbeat: {e}")
 
     async def _send_error(self, project_short_id: str, error_message: str):
         """Send error message to client."""

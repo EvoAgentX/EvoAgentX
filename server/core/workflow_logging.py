@@ -39,12 +39,7 @@ class IsolatedWorkflowLogger:
         """Setup completely isolated logging for this workflow process."""
         self.websocket_send_func = websocket_send_func
         
-        # DEBUG: Print raw setup data
-        print(f"\n🔍 [DEBUG] SETTING UP ISOLATED LOGGING")
-        print(f"   Workflow ID: {self.workflow_id}")
-        print(f"   Process Type: {self.process_type}")
-        print(f"   Process ID: {self.process_id}")
-        print(f"   WebSocket Function: {'SET' if websocket_send_func else 'NOT SET'}")
+
         
         # Create bound logger with unique process context
         self.bound_logger = global_logger.bind(
@@ -61,25 +56,14 @@ class IsolatedWorkflowLogger:
             record = message.record
             extra = record.get("extra", {})
             
-            # DEBUG: Print raw message data
-            print(f"\n🔍 [DEBUG] ISOLATED SINK RECEIVED:")
-            print(f"   Raw message: {repr(str(message))}")
-            print(f"   Record extra: {extra}")
-            print(f"   Expected workflow_id: {self.workflow_id}")
-            print(f"   Expected process_type: {self.process_type}")
-            print(f"   Expected process_id: {self.process_id}")
-            
             # Only process logs from this exact workflow process
             if (extra.get("workflow_id") == self.workflow_id and 
                 extra.get("process_type") == self.process_type and
                 extra.get("process_id") == self.process_id):
                 
-                print(f"   ✅ MATCH - Processing isolated log")
-                
                 # Extract clean message content
                 log_content = str(message).strip()
                 if log_content and self.websocket_send_func:
-                    print(f"   📤 Sending isolated log: {repr(log_content)}")
                     # Store the log for later sending - we'll send it when the async context is available
                     self.captured_logs.append({
                         "timestamp": datetime.now().isoformat(),
@@ -90,10 +74,6 @@ class IsolatedWorkflowLogger:
                         "source": "isolated_logger",
                         "pending": True
                     })
-                else:
-                    print(f"   ⏭️  Skipping - no content or websocket function")
-            else:
-                print(f"   ❌ NO MATCH - Ignoring isolated log")
         
         # Add isolated sink with strict filtering for bound logs
         try:
@@ -116,19 +96,9 @@ class IsolatedWorkflowLogger:
                 record = message.record
                 extra = record.get("extra", {})
                 
-                # DEBUG: Print raw global sink data
-                print(f"\n🌍 [DEBUG] GLOBAL SINK RECEIVED:")
-                print(f"   Raw message: {repr(str(message))}")
-                print(f"   Record extra: {extra}")
-                print(f"   Record level: {record['level'].name}")
-                print(f"   Has workflow_id: {'workflow_id' in extra}")
-                
                 # Skip logs that are already bound to a workflow (to avoid duplicates)
                 if extra.get("workflow_id"):
-                    print(f"   ⏭️  Skipping - already bound to workflow: {extra.get('workflow_id')}")
                     return
-                
-                print(f"   🎯 CAPTURING - Unbound log, attributing to workflow: {self.workflow_id}")
                 
                 # Capture ALL unbound logs and attribute them to our workflow ID
                 log_content = str(message).strip()
@@ -172,11 +142,6 @@ class IsolatedWorkflowLogger:
     async def _send_isolated_log(self, log_content: str):
         """Send isolated log message via WebSocket with workflow attribution."""
         try:
-            print(f"\n📤 [DEBUG] SENDING ISOLATED LOG:")
-            print(f"   Process type: {self.process_type}")
-            print(f"   Workflow ID: {self.workflow_id}")
-            print(f"   Raw content: {repr(log_content)}")
-            
             from ..socket_management.protocols import create_message, MessageType
             if self.process_type == "generation":
                 log_message = create_message(
@@ -195,34 +160,21 @@ class IsolatedWorkflowLogger:
                     result=None
                 )
             
-            print(f"   Created message: {json.dumps(log_message, indent=2)}")
-            
             if self.websocket_send_func is not None:
                 # Check if the WebSocket connection is still healthy before sending
                 try:
                     # Send the message object directly (not as JSON string)
                     await self.websocket_send_func(log_message)
-                    print(f"   ✅ Sent via WebSocket")
                 except Exception as send_error:
-                    print(f"   ❌ WebSocket send failed: {send_error}")
                     # Mark the websocket function as unavailable to prevent further failures
                     self.websocket_send_func = None
-            else:
-                print(f"   ⚠️  No WebSocket function available, skipping send")
             
         except Exception as e:
-            print(f"   ❌ Error sending isolated log for {self.process_id}: {e}")
-            import traceback
-            traceback.print_exc()
+            pass
     
     async def _send_captured_log(self, log_content: str):
         """Send captured workflow engine log via WebSocket with workflow attribution but unchanged content."""
         try:
-            print(f"\n🎯 [DEBUG] SENDING CAPTURED LOG:")
-            print(f"   Process type: {self.process_type}")
-            print(f"   Workflow ID: {self.workflow_id}")
-            print(f"   Raw engine content: {repr(log_content)}")
-            
             from ..socket_management.protocols import create_message, MessageType
             if self.process_type == "generation":
                 log_message = create_message(
@@ -241,25 +193,17 @@ class IsolatedWorkflowLogger:
                     result=None
                 )
             
-            print(f"   Created message: {json.dumps(log_message, indent=2)}")
-            
             if self.websocket_send_func is not None:
                 # Check if the WebSocket connection is still healthy before sending
                 try:
                     # Send the message object directly (not as JSON string)
                     await self.websocket_send_func(log_message)
-                    print(f"   ✅ Sent captured log via WebSocket")
                 except Exception as send_error:
-                    print(f"   ❌ WebSocket send failed: {send_error}")
                     # Mark the websocket function as unavailable to prevent further failures
                     self.websocket_send_func = None
-            else:
-                print(f"   ⚠️  No WebSocket function available, skipping captured log send")
             
         except Exception as e:
-            print(f"   ❌ Error sending captured workflow engine log for {self.process_id}: {e}")
-            import traceback
-            traceback.print_exc()
+            pass
     
     def get_captured_logs(self) -> List[Dict[str, Any]]:
         """Get all logs captured from the workflow engine."""

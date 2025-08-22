@@ -26,7 +26,15 @@ class SimpleEvoAgentXClient:
         socket_url = f"{self.server_url}/project/{self.project_short_id}/regist"
         print(f"🔌 Connecting to {socket_url}")
         
-        self.websocket = await websockets.connect(socket_url)
+        # Add timeout settings to prevent premature disconnections
+        self.websocket = await websockets.connect(
+            socket_url,
+            ping_interval=30,      # Send ping every 30 seconds
+            ping_timeout=100,       # Wait 10 seconds for pong response
+            close_timeout=100,      # Wait 10 seconds when closing
+            max_size=2**20,        # 1MB max message size
+            max_queue=2**10        # 1024 message queue size
+        )
         print("✅ Connected successfully!")
         
     async def disconnect(self):

@@ -42,12 +42,9 @@ class ProcessMonitor:
             Accepts both JSON strings and already-formatted message objects.
             """
             try:
-                logger.debug(f"WebSocket send function called for project {project_short_id} with message: {str(message_input)[:100]}...")
-                
                 # Handle different input formats
                 if isinstance(message_input, dict):
                     # Already a formatted message object - send directly
-                    logger.debug(f"Sending formatted message object to project {project_short_id}: {message_input.get('type', 'unknown')}")
                     await self.socket_service.send_to_project(project_short_id, message_input)
                 elif isinstance(message_input, str):
                     # Try to parse as JSON first
@@ -56,7 +53,6 @@ class ProcessMonitor:
                         
                         # If it's already a properly formatted message, send it directly
                         if isinstance(message_data, dict) and "type" in message_data:
-                            logger.debug(f"Sending parsed JSON message to project {project_short_id}: {message_data.get('type')}")
                             await self.socket_service.send_to_project(project_short_id, message_data)
                         else:
                             # If it's not properly formatted, wrap it in setup-log format
@@ -68,7 +64,6 @@ class ProcessMonitor:
                                     "result": None
                                 }
                             }
-                            logger.debug(f"Sending wrapped message to project {project_short_id}: setup-log")
                             await self.socket_service.send_to_project(project_short_id, log_message)
                             
                     except json.JSONDecodeError:
@@ -81,7 +76,6 @@ class ProcessMonitor:
                                 "result": None
                             }
                         }
-                        logger.debug(f"Sending text message to project {project_short_id}: setup-log")
                         await self.socket_service.send_to_project(project_short_id, log_message)
                 else:
                     # Convert other types to string and wrap
@@ -93,7 +87,6 @@ class ProcessMonitor:
                             "result": None
                         }
                     }
-                    logger.debug(f"Sending converted message to project {project_short_id}: setup-log")
                     await self.socket_service.send_to_project(project_short_id, log_message)
                     
             except Exception as e:

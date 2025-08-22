@@ -162,7 +162,9 @@ if __name__ == "__main__":
             host="0.0.0.0", 
             port=target_port,
             log_level="debug",
-            access_log=True
+            access_log=True,
+            timeout_keep_alive=65,      # Keep connections alive for 65 seconds
+            timeout_graceful_shutdown=30  # Graceful shutdown timeout
         )
     except KeyboardInterrupt:
         print("\n🛑 Server interrupted by user")

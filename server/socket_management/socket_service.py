@@ -42,10 +42,7 @@ class SocketService:
     def __init__(self, default_timeout: int = 18000):  # Increased to 5 hours for long-running setups
         """Initialize the SocketService."""
         self.active_connections = {}
-        self._heartbeat_task = None
-        self._cleanup_task = None
         self.default_timeout = default_timeout  # 18000 seconds default (5 hours), -1 for no expiry
-        self.heartbeat_interval = 30  # Send heartbeat every 30 seconds
         
         # Connection handlers for each project
         self.connection_handlers: Dict[str, List[asyncio.Task]] = {}
@@ -54,40 +51,6 @@ class SocketService:
         self.background_tasks: Dict[str, List[asyncio.Task]] = {}
         
         logger.info(f"SocketService initialized with default timeout: {default_timeout}s")
-    
-    def _start_heartbeat_task(self):
-        """Start background heartbeat task to keep connections alive."""
-        async def heartbeat_loop():
-            while True:
-                try:
-                    await asyncio.sleep(30)  # Send heartbeat every 30 seconds
-                    await self._send_heartbeats()
-                except Exception as e:
-                    logger.error(f"Error in heartbeat loop: {e}")
-        
-        self._heartbeat_task = asyncio.create_task(heartbeat_loop())
-    
-    async def _send_heartbeats(self):
-        """Send heartbeat to all active connections."""
-        heartbeat_message = {
-            "type": "heartbeat",
-            "data": {
-                "status": "alive",
-                "workflow_id": None,
-                "content": "heartbeat",
-                "result": {"timestamp": datetime.now().isoformat()}
-            }
-        }
-        
-        disconnected = []
-        for project_short_id in list(self.active_connections.keys()):
-            success = await self.send_to_project(project_short_id, heartbeat_message)
-            if not success:
-                disconnected.append(project_short_id)
-        
-        # Clean up failed connections
-        for project_short_id in disconnected:
-            await self.disconnect_project(project_short_id)
     
     async def register_project_socket(self, project_short_id: str, websocket: WebSocket) -> bool:
         """Register a new WebSocket connection for a project."""
@@ -105,16 +68,10 @@ class SocketService:
             self.active_connections[project_short_id] = {
                 "socket": websocket,
                 "connected_at": datetime.now(),
-                "last_ping": datetime.now(),
                 "timeout": self.default_timeout,
                 "is_processing": False  # Track if connection is actively processing
             }
             logger.info(f"Stored connection for project {project_short_id}")
-
-            # Start heartbeat task if this is the first connection
-            if self._heartbeat_task is None:
-                self._start_heartbeat_task()
-                logger.info("Started heartbeat task for socket connections")
 
             logger.info(f"Project {project_short_id} registered successfully")
 
@@ -172,11 +129,6 @@ class SocketService:
                 
                 while True:
                     try:
-                        # Check if WebSocket is still connected
-                        if not self.is_websocket_connected(websocket):
-                            logger.info(f"WebSocket not connected for project {project_short_id}, stopping listener")
-                            break
-                        
                         # Wait for message with timeout
                         try:
                             message = await asyncio.wait_for(websocket.receive_text(), timeout=1.0)
@@ -307,9 +259,6 @@ class SocketService:
             logger.warning(f"No active connection for project {project_short_id}")
             return False
         
-        # Check connection health before attempting to send
-        if not self.is_connection_healthy(project_short_id):
-            logger.warning(f"Connection {project_short_id} is not healthy, attempting to send anyway")
         
         connection_info = self.active_connections[project_short_id]
         websocket = connection_info["socket"]
@@ -323,6 +272,7 @@ class SocketService:
                         return False
                 
                 # Send the message
+                
                 await websocket.send_text(json.dumps(message))
                 logger.debug(f"Successfully sent message to {project_short_id} (attempt {attempt + 1})")
                 return True
@@ -333,8 +283,6 @@ class SocketService:
                     await asyncio.sleep(0.1 * (attempt + 1))  # Exponential backoff
                 else:
                     logger.error(f"Failed to send message to {project_short_id} after {max_retries} attempts: {e}")
-                    # Mark connection as failed
-                    await self.disconnect_project(project_short_id)
                     return False
         
         return False
@@ -403,10 +351,6 @@ class SocketService:
                 logger.debug(f"Skipping cleanup for {project_short_id} - actively processing")
                 continue
                 
-            # Check if connection has exceeded its timeout
-            time_since_ping = (current_time - conn_info["last_ping"]).total_seconds()
-            if time_since_ping > timeout:
-                inactive_projects.append(project_short_id)
         
         for project_short_id in inactive_projects:
             await self.disconnect_project(project_short_id)
@@ -453,7 +397,7 @@ class SocketService:
                 "project_id": project_id,
                 "connected_at": conn_info["connected_at"].isoformat(),
                 "timeout": conn_info.get("timeout", self.default_timeout),
-                "last_ping": conn_info["last_ping"].isoformat()
+                "last_ping": None
             })
         
         return {
@@ -466,14 +410,6 @@ class SocketService:
     
     async def start_all_monitoring(self):
         """Start all monitoring background tasks."""
-        # Start heartbeat task if not already running
-        if self._heartbeat_task is None:
-            self._start_heartbeat_task()
-            
-        # Start automatic cleanup task  
-        if self._cleanup_task is None:
-            self._start_cleanup_task()
-            
         logger.info("All socket monitoring services started")
     
     async def _start_cleanup_task(self):
@@ -487,28 +423,9 @@ class SocketService:
                 except Exception as e:
                     logger.error(f"Error in cleanup loop: {e}")
         
-        self._cleanup_task = asyncio.create_task(cleanup_loop())
-        logger.info("Started automatic socket cleanup monitoring")
     
     async def cleanup(self):
         """Clean up the service and stop background tasks."""
-        # Stop heartbeat task
-        if self._heartbeat_task:
-            self._heartbeat_task.cancel()
-            try:
-                await self._heartbeat_task
-            except asyncio.CancelledError:
-                pass
-            self._heartbeat_task = None
-        
-        # Stop cleanup task
-        if self._cleanup_task:
-            self._cleanup_task.cancel()
-            try:
-                await self._cleanup_task
-            except asyncio.CancelledError:
-                pass
-            self._cleanup_task = None
         
         # Clean up all connection handlers
         for project_short_id in list(self.connection_handlers.keys()):
@@ -536,7 +453,7 @@ class SocketService:
             self.active_connections[project_short_id]["is_processing"] = is_active
             if is_active:
                 # Reset the last ping time when starting an operation
-                self.active_connections[project_short_id]["last_ping"] = datetime.now()
+                pass
             logger.debug(f"Marked connection {project_short_id} as {'active' if is_active else 'inactive'}")
     
     def is_connection_processing(self, project_short_id: str) -> bool:
@@ -563,13 +480,7 @@ class SocketService:
             if connection_info.get("is_processing", False):
                 return True
             
-            # Check if connection hasn't timed out
-            last_ping = connection_info.get("last_ping")
-            if last_ping:
-                time_since_ping = (datetime.now() - last_ping).total_seconds()
-                timeout = connection_info.get("timeout", self.default_timeout)
-                if timeout != -1 and time_since_ping > timeout:
-                    return False
+            pass
             
             return True
             
@@ -591,8 +502,7 @@ class SocketService:
     def refresh_connection_state(self, project_short_id: str):
         """Refresh connection state to prevent timeout during long-running operations."""
         if project_short_id in self.active_connections:
-            # Update last ping time to keep connection alive
-            self.active_connections[project_short_id]["last_ping"] = datetime.now()
+            pass
             
             # If connection is processing, extend timeout if needed
             if self.active_connections[project_short_id].get("is_processing", False):
@@ -634,6 +544,31 @@ class SocketService:
             import traceback
             logger.error(f"MessageHandler error traceback: {traceback.format_exc()}")
             raise
+
+    async def check_connection_health(self, project_short_id: str):
+        """Check if a WebSocket connection is healthy and ready to send messages."""
+        if project_short_id not in self.active_connections:
+            return False
+        
+        connection_info = self.active_connections[project_short_id]
+        websocket = connection_info["socket"]
+        
+        try:
+            # Check WebSocket state
+            if hasattr(websocket, 'client_state'):
+                if websocket.client_state.name in ['DISCONNECTED', 'CLOSING', 'CLOSED']:
+                    return False
+            
+            # Check if connection is marked as processing (active)
+            if connection_info.get("is_processing", False):
+                return True
+            
+            # Since we removed heartbeat, just check if connection is still valid
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error checking connection health for {project_short_id}: {e}")
+            return False
 
 # Global socket service instance
 socket_service = SocketService()

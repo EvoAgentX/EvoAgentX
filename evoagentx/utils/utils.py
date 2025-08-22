@@ -1,7 +1,7 @@
 import os
 import re
 import time
-from typing import Any, Dict, List, Optional, Set, Union
+from typing import Any, Dict, List, Optional, Set, Union, get_args, get_origin
 
 import regex
 import requests
@@ -224,13 +224,7 @@ def pydantic_to_parameters(base_model: BaseModel) -> List[Parameter]:
         in the input BaseModel.
     """
     parameters = []
-    for field_name, field_info in base_model.model_fields.items():
-        # Get the field type as a json type
-        try:
-            field_type = python_to_json_type[field_info.annotation]
-        except KeyError:
-            field_type = "string"
-
+    for field_name, field_info in base_model.model_fields.items(): 
         # Determine the description
         description = field_info.description if field_info.description else field_name
 
@@ -238,6 +232,16 @@ def pydantic_to_parameters(base_model: BaseModel) -> List[Parameter]:
         # A field is considered required if it doesn't have a default value
         # and isn't Optional.
         required = field_info.is_required()
+
+        if required:
+            field_type = python_to_json_type[field_info.annotation]
+        else:
+            if get_origin(field_info.annotation) is Union:
+                # field is not required because it can be None
+                field_type = python_to_json_type[get_args(field_info.annotation)[0]]
+            else:
+                # field is not required because it has a default value
+                field_type = python_to_json_type[field_info.annotation]
 
         # Create the Parameter instance
         param = Parameter(
