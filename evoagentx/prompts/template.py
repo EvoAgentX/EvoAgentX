@@ -8,7 +8,7 @@ from pydantic_core import PydanticUndefined
 from ..core.logging import logger
 from ..core.module import BaseModule
 from ..models.base_model import PARSER_VALID_MODE, LLMOutputParser
-from ..prompts.tool_calling import TOOL_CALLING_TEMPLATE
+from ..prompts.tool_calling import TOOL_CALLING_TEMPLATE,normalize_tool_schemas
 from ..tools import Toolkit
 from ..utils.utils import python_to_json_type
 
@@ -181,13 +181,35 @@ class PromptTemplate(BaseModule):
             return ""
         return f"### Context\nHere is some additional background information to help you understand the task:\n{self.context}\n"
 
+    # def render_tools(self) -> str:
+    #     if not self.tools:
+    #         return ""
+    #     tools_schemas = [tool.get_tool_schemas() for tool in self.tools]
+    #     tools_schemas = [j for i in tools_schemas for j in i]
+    #     return TOOL_CALLING_TEMPLATE.format(tools_description=tools_schemas)
+    
+    #  smolagent风格render_tools
     def render_tools(self) -> str:
         if not self.tools:
             return ""
+        #  统一格式
         tools_schemas = [tool.get_tool_schemas() for tool in self.tools]
         tools_schemas = [j for i in tools_schemas for j in i]
-        return TOOL_CALLING_TEMPLATE.format(tools_description=tools_schemas)
-    
+        tools_schemas = normalize_tool_schemas(tools_schemas)  
+        tools_desc = []
+        for s in tools_schemas:
+            # 使用 .get() 方法安全访问属性
+            name = s.get("name", "unknown_tool")
+            description = s.get("description", "")
+            inputs = s.get("inputs", {})
+            output_type = s.get("output_type", "string")
+            
+            desc = f"- {name}: {description}"
+            desc += f"\n  inputs: {inputs}"
+            desc += f"\n  output: {output_type}"
+            tools_desc.append(desc)
+        return TOOL_CALLING_TEMPLATE.format(tools_description="\n".join(tools_desc))
+
     def render_constraints(self) -> str:
         if not self.constraints:
             return ""

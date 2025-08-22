@@ -83,11 +83,18 @@ class CustomizeAction(Action):
                 prompt_params_values[param] = value
             elif isinstance(value, (dict, list)):
                 prompt_params_values[param] = json.dumps(value, indent=4)
+            elif isinstance(value, (int, float)):
+                prompt_params_values[param] = str(value)
             else:
+<<<<<<< HEAD
                 try:
                     prompt_params_values[param] = str(value)
                 except:
                     raise TypeError(f"Invalid input type {type(value)}. Expected a type that can be converted to a string.")
+=======
+                raise TypeError(f"The input type {type(value)} is invalid! Valid types: [str, dict, list, int, float].")
+        
+>>>>>>> new_workflow
         if self.prompt:
             prompt = self.prompt.format(**prompt_params_values) if prompt_params_values else self.prompt
             if self.tools:
@@ -187,19 +194,78 @@ class CustomizeAction(Action):
             except Exception as e:
                 logger.error(f"Failed to load tools from toolkit '{toolkit.name}': {e}")
     
-    def _extract_tool_calls(self, llm_output: str) -> List[dict]:
-        pattern = r"```ToolCalling\s*\n(.*?)\n\s*```"
+    # def _extract_tool_calls(self, llm_output: str) -> List[dict]:
+    #     pattern = r"```ToolCalling\s*\n(.*?)\n\s*```"
         
-        # Find all ToolCalling blocks in the output
-        matches = re.findall(pattern, llm_output, re.DOTALL)
+    #     # Find all ToolCalling blocks in the output
+    #     matches = re.findall(pattern, llm_output, re.DOTALL)
 
-        if not matches:
-            return []
+    #     if not matches:
+    #         return []
         
-        parsed_tool_calls = []
+    #     parsed_tool_calls = []
+    #     for match_content in matches:
+    #         try:
+    #             json_content = match_content.strip()
+    #             json_list = parse_json_from_text(json_content)
+    #             if not json_list:
+    #                 logger.warning("No valid JSON found in ToolCalling block")
+    #                 continue
+    #             # Only use the first JSON string from each block
+    #             parsed_tool_call = json.loads(json_list[0])
+    #             if isinstance(parsed_tool_call, dict):
+    #                 parsed_tool_calls.append(parsed_tool_call)
+    #             elif isinstance(parsed_tool_call, list):
+    #                 parsed_tool_calls.extend(parsed_tool_call)
+    #             else:
+    #                 logger.warning(f"Invalid tool call format: {parsed_tool_call}")
+    #                 continue
+    #         except (json.JSONDecodeError, IndexError) as e:
+    #             logger.warning(f"Failed to parse tool calls from LLM output: {e}")
+    #             continue
+
+    #     return parsed_tool_calls
+
+    #smolagent风格：
+    def _extract_tool_calls(self, llm_output: str) -> List[dict]:
+        """
+        Parse tool calls from LLM output (smolagents style).
+        Expecting a JSON array of objects with keys: "name", "arguments".
+        """
+        # content = llm_output.strip()
+        # # Quick heuristic: tool calls must start with '[' or '{'
+        # if not (content.startswith("[") or content.startswith("{")):
+        #     return []
+        # try:
+        #     tool_calls = json.loads(content)
+        # except json.JSONDecodeError:
+        #     logger.warning(f"LLM output is not valid JSON: {llm_output}")
+        #     return []
+        # # Check if the parsed result is a list
+        # if not isinstance(tool_calls, list):
+        #     logger.warning(f"Tool calls must be a JSON array, got: {type(tool_calls)}")
+        #     return []       
+        # parsed = []
+        # for call in tool_calls:
+        #     if not isinstance(call, dict):
+        #         logger.warning(f"Invalid tool call entry: {call}")
+        #         continue
+        #     if "name" not in call or "arguments" not in call:
+        #         logger.warning(f"Missing 'name' or 'arguments' in tool call: {call}")
+        #         continue
+        #     parsed.append(call)
+        # return parsed
+       
+        # First, try to extract from <ToolCalling> tags
+        pattern = r"<ToolCalling>\s*(.*?)\s*</ToolCalling>"
+        matches = re.findall(pattern, llm_output, re.DOTALL)
+        
+        parsed = []
         for match_content in matches:
             try:
+                # Parse JSON from the extracted content
                 json_content = match_content.strip()
+<<<<<<< HEAD
                 json_list = parse_json_from_text(json_content)
                 if not json_list:
                     logger.warning("No valid JSON found in ToolCalling block")
@@ -216,10 +282,39 @@ class CustomizeAction(Action):
                     continue
             except (json.JSONDecodeError, IndexError) as e:
                 logger.warning(f"Failed to parse tool calls from LLM output: {e}")
+=======
+                tool_calls = json.loads(json_content)
+                
+                if not isinstance(tool_calls, list):
+                    tool_calls = [tool_calls]
+                
+                for call in tool_calls:
+                    if not isinstance(call, dict):
+                        logger.warning(f"Invalid tool call entry: {call}")
+                        continue
+                    
+                    # Support both new and legacy field names
+                    if "tool_name" in call and "arguments" in call:
+                        parsed.append({
+                            "name": call["tool_name"],
+                            "arguments": call.get("arguments", {})
+                        })
+                    elif "name" in call and "arguments" in call:
+                        parsed.append({
+                            "name": call["name"],
+                            "arguments": call.get("arguments", {})
+                        })
+                    else:
+                        logger.warning(f"Missing required fields in tool call: {call}")
+                        continue
+                        
+            except (json.JSONDecodeError, KeyError) as e:
+                logger.warning(f"Failed to parse tool calls: {e}")
+>>>>>>> new_workflow
                 continue
+        
+        return parsed
 
-        return parsed_tool_calls
-    
     def _extract_output(self, llm_output: Any, llm: BaseLLM = None, **kwargs):
 
         # Get the raw output content
@@ -310,51 +405,97 @@ class CustomizeAction(Action):
             # print(output)
             return output
     
-    def _calling_tools(self, tool_call_args) -> dict:
-        ## ___________ Call the tools ___________
-        errors = []
-        results  =[]
-        for function_param in tool_call_args:
-            try:
-                function_name = function_param.get("function_name")
-                function_args = function_param.get("function_args") or {}
+    # def _calling_tools(self, tool_call_args) -> dict:
+    #     ## ___________ Call the tools ___________
+    #     errors = []
+    #     results  =[]
+    #     for function_param in tool_call_args:
+    #         try:
+    #             function_name = function_param.get("function_name")
+    #             function_args = function_param.get("function_args") or {}
         
-                # Check if we have a valid function to call
-                if not function_name:
-                    errors.append("No function name provided")
-                    break
+    #             # Check if we have a valid function to call
+    #             if not function_name:
+    #                 errors.append("No function name provided")
+    #                 break
                 
-                # Try to get the callable from our tools_caller dictionary
-                callable_fn = None
-                if self.tools_caller and function_name in self.tools_caller:
-                    callable_fn = self.tools_caller[function_name]
-                elif callable(function_name):
-                    callable_fn = function_name
+    #             # Try to get the callable from our tools_caller dictionary
+    #             callable_fn = None
+    #             if self.tools_caller and function_name in self.tools_caller:
+    #                 callable_fn = self.tools_caller[function_name]
+    #             elif callable(function_name):
+    #                 callable_fn = function_name
                         
-                if not callable_fn:
-                    errors.append(f"Function '{function_name}' not found or not callable")
-                    break
+    #             if not callable_fn:
+    #                 errors.append(f"Function '{function_name}' not found or not callable")
+    #                 break
                 
-                try:
-                    # Determine if the function is async or not
-                    print("_____________________ Start Function Calling _____________________")
-                    print(f"Executing function calling: {function_name} with parameters: {function_args}")
-                    result = callable_fn(**function_args)
+    #             try:
+    #                 # Determine if the function is async or not
+    #                 print("_____________________ Start Function Calling _____________________")
+    #                 print(f"Executing function calling: {function_name} with parameters: {function_args}")
+    #                 result = callable_fn(**function_args)
                 
-                except Exception as e:
-                    logger.error(f"Error executing tool {function_name}: {e}")
-                    errors.append(f"Error executing tool {function_name}: {str(e)}")
-                    break
+    #             except Exception as e:
+    #                 logger.error(f"Error executing tool {function_name}: {e}")
+    #                 errors.append(f"Error executing tool {function_name}: {str(e)}")
+    #                 break
             
-                results.append(result)
-            except Exception as e:
-                logger.error(f"Error executing tool: {e}")
-                errors.append(f"Error executing tool: {str(e)}")
+    #             results.append(result)
+    #         except Exception as e:
+    #             logger.error(f"Error executing tool: {e}")
+    #             errors.append(f"Error executing tool: {str(e)}")
         
 
-        ## 3. Add the tool call results to the query and continue the conversation
-        results = {"result": results, "error": errors}
-        return results
+    #     ## 3. Add the tool call results to the query and continue the conversation
+    #     results = {"result": results, "error": errors}
+    #     return results
+
+    #smolagent风格：
+    def _calling_tools(self, tool_call_args: List[dict]) -> dict:
+        """
+        Call the tools with the given arguments.
+        """
+        # errors, results = [], []
+        # for call in tool_call_args:
+        #     try:
+        #         tool_name = call["name"]
+        #         args = call.get("arguments", {})
+
+        #         if tool_name not in self.tools_caller:
+        #             errors.append(f"Unknown tool: {tool_name}")
+        #             continue
+
+        #         tool_fn = self.tools_caller[tool_name]
+        #         print("_____________________ Start Function Calling _____________________")
+        #         print(f"Executing tool: {tool_name} with arguments: {args}")
+        #         result = tool_fn(**args)
+        #         results.append(result)
+        #     except Exception as e:
+        #         logger.error(f"Error executing tool {call}: {e}")
+        #         errors.append(f"Error executing {call}: {str(e)}")
+
+        # return {"result": results, "error": errors}
+        errors, results = [], []
+        for call in tool_call_args:
+            try:
+                tool_name = call["name"]
+                args = call.get("arguments", {})
+
+                if tool_name not in self.tools_caller:
+                    errors.append(f"Unknown tool: {tool_name}")
+                    continue
+
+                tool_fn = self.tools_caller[tool_name]
+                print("_____________________ Start Function Calling _____________________")
+                print(f"Executing tool: {tool_name} with arguments: {args}")
+                result = tool_fn(**args)
+                results.append(result)
+            except Exception as e:
+                logger.error(f"Error executing tool {call}: {e}")
+                errors.append(f"Error executing {call}: {str(e)}")
+
+        return {"result": results, "error": errors}
     
     def execute(self, llm: Optional[BaseLLM] = None, inputs: Optional[dict] = None, sys_msg: Optional[str]=None, return_prompt: bool = False, time_out = 0, **kwargs):
         input_attributes: dict = self.inputs_format.get_attr_descriptions()
@@ -411,6 +552,7 @@ class CustomizeAction(Action):
             # Store the final LLM response
             final_llm_response = llm_response
             
+            # logger.info(f"这是此时LLM的输出: {final_llm_response}")
             tool_call_args = self._extract_tool_calls(llm_response.content)
             if not tool_call_args:
                 break
@@ -470,7 +612,7 @@ class CustomizeAction(Action):
         else:
             conversation = [{"role": "system", "content": sys_msg}, {"role": "user", "content": self.prepare_action_prompt(inputs=inputs, system_prompt=sys_msg)}]
         
-        
+        logger.info(f"此时conversation的内容为: {conversation}")
         ## 1. get all the input parameters
         prompt_params_values = {k: inputs.get(k, "") for k in input_attributes.keys()}
         while True:
@@ -480,6 +622,7 @@ class CustomizeAction(Action):
                 current_prompt = self.prepare_action_prompt(inputs=prompt_params_values or {})
                 # Use the final LLM response if available, otherwise fall back to execution history
                 content_to_extract = final_llm_response if final_llm_response is not None else "{content}".format(content = conversation)
+                logger.info(f"此时提取出来的conten为: {content_to_extract}")
                 if return_prompt:
                     return await self._async_extract_output(content_to_extract, llm = llm), current_prompt
                 return await self._async_extract_output(content_to_extract, llm = llm) 

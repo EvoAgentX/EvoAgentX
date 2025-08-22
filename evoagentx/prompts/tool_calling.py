@@ -117,9 +117,90 @@ If your next move cannot be completed by the tool, you should not call the tool
 """
 
 
+# TOOL_CALLING_TEMPLATE = """
+# # Tool Calling Guide
+
+# ## When to Use Tools
+# - Use tools only when necessary to complete your task
+# - Check history first - if the information is already available, don't call tools
+# - If tools can't help with the task, proceed without them
+
+# ## How to Call Tools
+# 1. Include a brief explanation of:
+#    - What you know from the history
+#    - What information is needed
+#    - Why you're using the tool
+
+# 2. Format your tool calls exactly as shown:
+# ```ToolCalling
+# [
+#     {{
+#         "function_name": "tool_name",
+#         "function_args": {{
+#             "param1": "value1",
+#             "param2": "value2"
+#         }}
+#     }},
+#     ...
+# ]
+# ```
+
+# **Important Notes**
+# - Only use tools listed in Available Tools
+# - Never write comments in tool calls
+# - Stop generating after the tool call JSON
+# - Each tool call must include both function_name and function_args
+
+# ## Available Tools
+# {tools_description}
+# """
+
+def normalize_tool_schemas(tools_schemas):
+    """
+    Normalize different tool schema formats into a unified format:
+    {
+        "name": str,
+        "description": str,
+        "inputs": dict,
+        "output_type": str
+    }
+    """
+    normalized = []
+    for s in tools_schemas:
+        # Handle OpenAI format: {"type": "function", "function": {...}}
+        if isinstance(s, dict):
+            if "function" in s and isinstance(s["function"], dict):
+                # OpenAI format
+                func_data = s["function"]
+                tool_name = func_data.get("name", "unknown_tool")
+                desc = func_data.get("description", "")
+                inputs = func_data.get("parameters", {})
+            else:
+                # Direct format or other formats
+                tool_name = s.get("name") or s.get("function_name", "unknown_tool")
+                desc = s.get("description", "")
+                inputs = s.get("inputs") or s.get("parameters") or s.get("function_args", {})       
+            output_type = s.get("output_type", "string")
+        else:
+            # Fallback for unexpected formats
+            tool_name = "unknown_tool"
+            desc = ""
+            inputs = {}
+            output_type = "string"
+
+        normalized.append({
+            "name": tool_name,
+            "description": desc,
+            "inputs": inputs,
+            "output_type": output_type
+        })
+    return normalized
+
+
 TOOL_CALLING_TEMPLATE = """
 # Tool Calling Guide
 
+<<<<<<< HEAD
 ## When to Use Tools
 - Use tools only when necessary to complete your task
 - Check history first - if the information is already available, don't call tools
@@ -152,6 +233,30 @@ TOOL_CALLING_TEMPLATE = """
 - Each tool call must include both function_name and function_args
 
 ## Available Tools
+=======
+You can call the following tools:
+>>>>>>> new_workflow
 {tools_description}
-"""
 
+## Output format
+Always return a JSON array of tool calls, like:
+
+<ToolCalling>
+[
+  {{
+    "tool_name": "tool_name",
+
+    "arguments": {{
+      "param1": "value1",
+      "param2": "value2"
+    }}
+  }}
+]
+</ToolCalling>
+
+## Rules
+- Only use tools listed above
+- Each call must include "name" and "arguments"
+- Do not write explanations, comments, or extra text
+- If no tool is needed, return an empty list: []
+"""
