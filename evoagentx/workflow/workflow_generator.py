@@ -519,6 +519,10 @@ class WorkFlowGenerator(BaseModule):
             formatted_node_agents = []
 
             for node_agent in node_agents:
+                agent_class_name = node_agent.get("class_name", None)
+                if agent_class_name is not None and agent_class_name != "CustomizeAgent":
+                    continue
+                
                 agent = {
                     "name": node_agent["name"],
                     "description": node_agent["description"],
