@@ -275,9 +275,9 @@ def validate_params(
         if param.name not in actual_params_dict:
             raise ValueError(f"{required_params_name} '{param.name}' is not found in {actual_params_name}")
             
-        actual_type = actual_params_dict[param.name].type
+        actual_type = string_to_python_type[actual_params_dict[param.name].type]
         actual_required = actual_params_dict[param.name].required
-        if param.type != actual_type or param.required != actual_required:
+        if string_to_python_type[param.type] is not actual_type or param.required != actual_required:
             raise ValueError(f"Mismatch for '{param.name}': {required_params_name} (type={param.type}, required={param.required}) vs. {actual_params_name} (type={actual_type}, required={actual_required})")
 
 
