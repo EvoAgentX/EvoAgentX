@@ -33,6 +33,7 @@ Here are some things to notice:
 - It will be used to generate the workflow, so the requirement should be detailed.
 - The workflow requirement should be specific, contains possible suggestions and detailed criteria of the final output.
 - The workflow requirement should state clear about the purpose of this workflow, rough guideline and the separation of concerns.
+- You should not mention the inputs and outputs in the workflow requirement.
 
 ## Example 1
 Here is an example of a workflow requirement. The data here is fake and should only be used as an example.

@@ -260,7 +260,7 @@ TEST_INPUTS = {
     "characters": ["A beautiful sunset over a calm ocean, with a small boat in the foreground. The sky is painted with soft, warm colors, and the water reflects the sunset's glow. The boat is a simple wooden vessel with a sail, gently rocking on the water. The scene is peaceful and serene, with a sense of tranquility and calm."],
     "age_group": "3-5",
     "story_length": "short",
-    "moral_lesson": "A beautiful sunset over a calm ocean, with a small boat in the foreground. The sky is painted with soft, warm colors, and the water reflects the sunset's glow. The boat is a simple wooden vessel with a sail, gently rocking on the water. The scene is peaceful and serene, with a sense of tranquility and calm.",
+    "moral_lesson": "A beautiful sunset over a calm ocean, with a small boat in the foreground. The sky is painted with soft, warm colors, and the water reflects the sunset's glow. The boat is a simple wooden vessel with a sail, gently rocking on the water. The scene is peaceful and serene, with a sense of tranquility and calm.", 
     "setting": "A beautiful sunset over a calm ocean, with a small boat in the foreground. The sky is painted with soft, warm colors, and the water reflects the sunset's glow. The boat is a simple wooden vessel with a sail, gently rocking on the water. The scene is peaceful and serene, with a sense of tranquility and calm."
 }
 
@@ -276,8 +276,8 @@ TEST_INPUTS = {
 # Fixed test configuration
 TEST_CONFIG = {
     # "project_short_id": "xf35dy4", ## Image
-    "project_short_id": "gt99u7w", ## Image analysis
-    # "project_short_id": "9mshbju", ## Fairy tail generation
+    # "project_short_id": "gt99u7w", ## Image analysis
+    "project_short_id": "9mshbju", ## Fairy tail generation
     "test_workflow_ids": [test_workflow_id_1, test_workflow_id_2]
 }
 def generate_test_ids() -> str:

@@ -28,6 +28,6 @@ primary_region = 'sea'
     protocol = 'http'
 
 [[vm]]
-  memory = '2gb'
+  memory = '4gb'
   cpu_kind = 'shared'
-  cpus = 2
+  cpus = 4

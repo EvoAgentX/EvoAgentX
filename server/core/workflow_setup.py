@@ -208,7 +208,7 @@ async def generate_workflow_from_goal(payload, llm_config_dict: Dict[str, Any], 
     workflow_generator = WorkFlowGenerator(llm=llm, tools=tools)
     
     # Generate the workflow with proper parameters
-    workflow_graph: WorkFlowGraph = workflow_generator.generate_workflow(
+    workflow_graph: WorkFlowGraph = await workflow_generator.async_generate_workflow(
         goal=goal,
         workflow_inputs=workflow_inputs,
         workflow_outputs=workflow_outputs
