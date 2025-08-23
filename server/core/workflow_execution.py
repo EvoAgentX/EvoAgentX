@@ -57,6 +57,140 @@ default_llm_config = {
 sudo_execution_result = None
 
 
+def create_project_websocket_send_func(project_short_id: str) -> Optional[Callable]:
+    """
+    Create a websocket send function for a project if there's an active connection.
+    
+    Args:
+        project_short_id: The project identifier
+        
+    Returns:
+        Optional[Callable]: A function that sends messages to the project socket, or None if no connection
+        
+    Example:
+        websocket_send_func = create_project_websocket_send_func("proj_123")
+        if websocket_send_func:
+            await websocket_send_func({"type": "log", "content": "Hello from workflow!"})
+    """
+    try:
+        # Import socket service to check for active connections
+        from ..socket_management.socket_service import socket_service
+        
+        if socket_service.is_project_connected(project_short_id):
+            async def send_func(message):
+                try:
+                    # Ensure message is a dictionary
+                    if not isinstance(message, dict):
+                        if isinstance(message, str):
+                            # Try to parse as JSON if it's a string
+                            try:
+                                import json
+                                message = json.loads(message)
+                            except json.JSONDecodeError:
+                                print(f"❌ Failed to parse message string as JSON: {message}")
+                                return False
+                        else:
+                            print(f"❌ Cannot send non-dict message: {message}")
+                            return False
+                    
+                    # Send the message
+                    result = await socket_service.send_to_project(project_short_id, message)
+                    if not result:
+                        print(f"⚠️  Failed to send message to project {project_short_id}")
+                    return result
+                except Exception as e:
+                    print(f"❌ Error sending message to project {project_short_id}: {e}")
+                    return False
+            
+            return send_func
+        else:
+            return None
+    except Exception as e:
+        print(f"⚠️  Error checking socket connection for project {project_short_id}: {e}")
+        return None
+
+
+def create_project_websocket_messenger(project_short_id: str) -> Optional[Dict[str, Callable]]:
+    """
+    Create a convenient messenger object with pre-configured message functions for a project.
+    
+    Args:
+        project_short_id: The project identifier
+        
+    Returns:
+        Optional[Dict[str, Callable]]: A dictionary with message functions, or None if no connection
+        
+    Example:
+        messenger = create_project_websocket_messenger("proj_123")
+        if messenger:
+            await messenger["log"]("Workflow started")
+            await messenger["progress"](0.5, "Halfway done")
+            await messenger["error"]("Something went wrong")
+    """
+    try:
+        # Import socket service and protocols
+        from ..socket_management.socket_service import socket_service
+        from ..socket_management.protocols import create_message, MessageType
+        
+        if socket_service.is_project_connected(project_short_id):
+            async def send_func(message):
+                return await socket_service.send_to_project(project_short_id, message)
+            
+            # Create convenience functions
+            async def log_message(content: str, workflow_id: str = None):
+                message = create_message(
+                    MessageType.SETUP_LOG,
+                    status=None,
+                    workflow_id=workflow_id,
+                    content=content,
+                    result=None
+                )
+                return await send_func(message)
+            
+            async def progress_message(status: str, progress: float, content: str, workflow_id: str = None):
+                message = create_message(
+                    MessageType.SETUP_LOG,
+                    status=status,
+                    workflow_id=workflow_id,
+                    content=content,
+                    result={"progress": progress}
+                )
+                return await send_func(message)
+            
+            async def error_message(content: str, workflow_id: str = None):
+                message = create_message(
+                    MessageType.SETUP_LOG,
+                    status="error",
+                    workflow_id=workflow_id,
+                    content=f"ERROR: {content}",
+                    result=None
+                )
+                return await send_func(message)
+            
+            async def status_message(status: str, workflow_id: str = None):
+                message = create_message(
+                    MessageType.SETUP_LOG,
+                    status=status,
+                    workflow_id=workflow_id,
+                    content=f"Status: {status}",
+                    result=None
+                )
+                return await send_func(message)
+            
+            return {
+                "send": send_func,
+                "log": log_message,
+                "progress": progress_message,
+                "error": error_message,
+                "status": status_message
+            }
+        else:
+            return None
+    except Exception as e:
+        print(f"⚠️  Error creating messenger for project {project_short_id}: {e}")
+        return None
+
+
 def _create_supabase_public_url(project_short_id: str, file_path: str, execution_id: str = None) -> str:
     """Create Supabase signed URL for file access."""
     try:
@@ -208,7 +342,7 @@ def create_llm_config(llm_config_dict: Dict[str, Any]) -> LLMConfig:
         return OpenAILLMConfig(**llm_config_dict)
 
 
-async def execute_workflow_from_config(workflow: Dict[str, Any], llm_config_dict: Dict[str, Any], mcp_config: dict = None, inputs: Dict[str, Any] = None, database_information: Dict[str, Any] = None, task_info: Dict[str, Any] = None) -> Dict[str, Any]:
+async def execute_workflow_from_config(workflow: Dict[str, Any], llm_config_dict: Dict[str, Any], mcp_config: dict = None, inputs: Dict[str, Any] = None, database_information: Dict[str, Any] = None, task_info: Dict[str, Any] = None, websocket_send_func: Callable = None) -> Dict[str, Any]:
     """
     Execute a workflow with the given configuration.
     
@@ -218,6 +352,8 @@ async def execute_workflow_from_config(workflow: Dict[str, Any], llm_config_dict
         mcp_config: Optional MCP configuration dictionary
         inputs: Optional inputs dictionary to pass to async_execute
         database_information: Optional database information for dynamic MongoDB toolkit creation
+        task_info: Optional task info for socket messaging
+        websocket_send_func: Optional WebSocket send function for real-time updates
         
     Returns:
         Dict containing only the essential execution results:
@@ -251,9 +387,39 @@ async def execute_workflow_from_config(workflow: Dict[str, Any], llm_config_dict
         execution_id = str(uuid.uuid4())
         print(f"🚀 Starting workflow execution with execution ID {execution_id}")
         
+        # Send execution start message via socket if available
+        if websocket_send_func and task_info:
+            try:
+                workflow_name = task_info.get("workflow_name", "Unknown")
+                start_message = {
+                    "type": "SETUP_LOG",
+                    "status": "executing",
+                    "workflow_id": workflow.get("id", "unknown"),
+                    "content": f"🚀 Starting workflow execution: {workflow_name}",
+                    "result": {"execution_id": execution_id}
+                }
+                # Send message asynchronously without blocking
+                asyncio.create_task(websocket_send_func(start_message))
+            except Exception as e:
+                print(f"⚠️  Failed to send execution start message via socket: {e}")
+        
         # Process inputs: replace URLs with Supabase storage paths
         if inputs and project_short_id:
             print(f"🔄 Processing inputs for URL replacement...")
+            if websocket_send_func:
+                try:
+                    process_message = {
+                        "type": "SETUP_LOG",
+                        "status": "processing",
+                        "workflow_id": workflow.get("id", "unknown"),
+                        "content": "🔄 Processing inputs for URL replacement...",
+                        "result": None
+                    }
+                    # Send message asynchronously without blocking
+                    asyncio.create_task(websocket_send_func(process_message))
+                except Exception as e:
+                    print(f"⚠️  Failed to send input processing message via socket: {e}")
+            
             inputs = _replace_urls_with_paths(inputs, project_short_id, execution_id)
         
         # Create tools with proper storage handling first
@@ -264,7 +430,36 @@ async def execute_workflow_from_config(workflow: Dict[str, Any], llm_config_dict
         
         # Create tools with project_short_id and execution_id for storage configuration
         if project_short_id:
+            if websocket_send_func:
+                try:
+                    tools_message = {
+                        "type": "SETUP_LOG",
+                        "status": "preparing",
+                        "workflow_id": workflow.get("id", "unknown"),
+                        "content": "🔧 Creating execution tools...",
+                        "result": None
+                    }
+                    # Send message asynchronously without blocking
+                    asyncio.create_task(websocket_send_func(tools_message))
+                except Exception as e:
+                    print(f"⚠️  Failed to send tools creation message via socket: {e}")
+            
             execution_tools += create_tools(project_short_id, database_information, execution_id)
+            print(f"🔧 Created {len(execution_tools)} tools for project {project_short_id}")
+            
+            if websocket_send_func:
+                try:
+                    tools_ready_message = {
+                        "type": "SETUP_LOG",
+                        "status": "ready",
+                        "workflow_id": workflow.get("id", "unknown"),
+                        "content": f"🔧 Created {len(execution_tools)} execution tools",
+                        "result": {"tool_count": len(execution_tools)}
+                    }
+                    # Send message asynchronously without blocking
+                    asyncio.create_task(websocket_send_func(tools_ready_message))
+                except Exception as e:
+                    print(f"⚠️  Failed to send tools ready message via socket: {e}")
         else:
             print("⚠️  No project_short_id found, creating tools without storage support")
             execution_tools += create_tools("default", database_information, execution_id)
@@ -275,6 +470,20 @@ async def execute_workflow_from_config(workflow: Dict[str, Any], llm_config_dict
             if isinstance(workflow_graph_data, WorkFlowGraph):
                 workflow_graph = workflow_graph_data
             else:
+                if websocket_send_func:
+                    try:
+                        init_message = {
+                            "type": "SETUP_LOG",
+                            "status": "initializing",
+                            "workflow_id": workflow.get("id", "unknown"),
+                            "content": "🏗️ Initializing workflow graph...",
+                            "result": None
+                        }
+                        # Send message asynchronously without blocking
+                        asyncio.create_task(websocket_send_func(init_message))
+                    except Exception as e:
+                        print(f"⚠️  Failed to send workflow init message via socket: {e}")
+                
                 workflow_graph: WorkFlowGraph = WorkFlowGraph.from_dict(workflow_graph_data, llm_config=llm_config, tools=execution_tools)
         elif isinstance(workflow, WorkFlowGraph):
             workflow_graph = workflow
@@ -282,12 +491,40 @@ async def execute_workflow_from_config(workflow: Dict[str, Any], llm_config_dict
             workflow_graph: WorkFlowGraph = WorkFlowGraph.from_dict(workflow, llm_config=llm_config, tools=execution_tools)
         
         # Create agent manager and add agents from workflow
+        if websocket_send_func:
+            try:
+                agents_message = {
+                    "type": "SETUP_LOG",
+                    "status": "preparing",
+                    "workflow_id": workflow.get("id", "unknown"),
+                    "content": "🤖 Creating agent manager and adding agents...",
+                    "result": None
+                }
+                # Send message asynchronously without blocking
+                asyncio.create_task(websocket_send_func(agents_message))
+            except Exception as e:
+                print(f"⚠️  Failed to send agents creation message via socket: {e}")
+        
         agent_manager = AgentManager(tools=execution_tools)
         agent_manager.add_agents_from_workflow(workflow_graph, llm_config=llm_config)
 
         # Create and execute workflow
         workflow_instance = WorkFlow(graph=workflow_graph, agent_manager=agent_manager, llm=llm)
         workflow_instance.init_module()
+        
+        if websocket_send_func:
+            try:
+                execute_message = {
+                    "type": "SETUP_LOG",
+                    "status": "executing",
+                    "workflow_id": workflow.get("id", "unknown"),
+                    "content": "⚡ Executing workflow...",
+                    "result": None
+                }
+                # Send message asynchronously without blocking
+                asyncio.create_task(websocket_send_func(execute_message))
+            except Exception as e:
+                print(f"⚠️  Failed to send execution start message via socket: {e}")
         
         # Execute workflow - it returns a structured dict with all output parameters
         output = await workflow_instance.async_execute(inputs=inputs, extract_output=False)
@@ -299,9 +536,51 @@ async def execute_workflow_from_config(workflow: Dict[str, Any], llm_config_dict
             # Fallback for string output (shouldn't happen with extract_output=False)
             parsed_json = {"workflow_output": str(output)}
         
+        if websocket_send_func:
+            try:
+                completion_message = {
+                    "type": "SETUP_LOG",
+                    "status": "completed",
+                    "workflow_id": workflow.get("id", "unknown"),
+                    "content": "✅ Workflow execution completed successfully",
+                    "result": {"output_keys": list(parsed_json.keys()) if isinstance(parsed_json, dict) else ["output"]}
+                }
+                # Send message asynchronously without blocking
+                asyncio.create_task(websocket_send_func(completion_message))
+            except Exception as e:
+                print(f"⚠️  Failed to send completion message via socket: {e}")
+        
         # Scan and replace file paths with URLs if we have parsed_json and project_short_id
         if parsed_json and project_short_id:
+            if websocket_send_func:
+                try:
+                    processing_message = {
+                        "type": "SETUP_LOG",
+                        "status": "processing",
+                        "workflow_id": workflow.get("id", "unknown"),
+                        "content": "🔄 Processing output for file path replacement...",
+                        "result": None
+                    }
+                    # Send message asynchronously without blocking
+                    asyncio.create_task(websocket_send_func(processing_message))
+                except Exception as e:
+                    print(f"⚠️  Failed to send processing message via socket: {e}")
+            
             parsed_json = _scan_and_replace_file_paths(parsed_json, project_short_id, execution_id)
+            
+            if websocket_send_func:
+                try:
+                    final_message = {
+                        "type": "SETUP_LOG",
+                        "status": "finalizing",
+                        "workflow_id": workflow.get("id", "unknown"),
+                        "content": "✨ Finalizing workflow output...",
+                        "result": None
+                    }
+                    # Send message asynchronously without blocking
+                    asyncio.create_task(websocket_send_func(final_message))
+                except Exception as e:
+                    print(f"⚠️  Failed to send finalization message via socket: {e}")
         
         return {
             "original_message": output,
@@ -309,6 +588,21 @@ async def execute_workflow_from_config(workflow: Dict[str, Any], llm_config_dict
         }
         
     except Exception as e:
+        # Send error message via socket if available
+        if websocket_send_func:
+            try:
+                error_message = {
+                    "type": "SETUP_LOG",
+                    "status": "error",
+                    "workflow_id": workflow.get("id", "unknown"),
+                    "content": f"❌ Workflow execution failed: {str(e)}",
+                    "result": {"error": str(e)}
+                }
+                # Send message asynchronously without blocking
+                asyncio.create_task(websocket_send_func(error_message))
+            except Exception as socket_error:
+                print(f"⚠️  Failed to send error message via socket: {socket_error}")
+        
         # Re-raise the exception instead of returning an error dictionary
         # This allows proper error handling in the calling functions
         raise e
@@ -330,10 +624,10 @@ async def execute_workflow(workflow_id: str, inputs: Dict[str, Any]) -> Dict[str
         if workflow.get("workflow_graph") is None:
             raise ValueError(f"Workflow {workflow_id} has not completed generation phase")
         
-        # Update workflow status
-        await update_workflow_status(workflow_id, "running")
+        # Extract project_short_id to find active socket connection
+        project_short_id = workflow.get("project_short_id")
         
-        # Get workflow graph (now a single workflow, not a list)
+        # Get workflow graph and task info early for socket messaging
         workflow_graph = workflow["workflow_graph"]
         task_info = workflow.get("task_info", {})
         workflow_name = task_info.get("workflow_name", workflow_id)
@@ -345,18 +639,72 @@ async def execute_workflow(workflow_id: str, inputs: Dict[str, Any]) -> Dict[str
             
         print(f"🚀 Executing workflow: {workflow_name}")
         
+        # Create websocket send function if there's an active connection for this project
+        websocket_send_func = create_project_websocket_send_func(project_short_id) if project_short_id else None
+        
+        if websocket_send_func:
+            print(f"🔌 Found active socket connection for project {project_short_id}, enabling real-time updates")
+            # Test the socket connection with a simple message
+            try:
+                test_message = {
+                    "type": "SETUP_LOG",
+                    "status": None,
+                    "workflow_id": workflow_id,
+                    "content": "Starting workflow execution",
+                    "result": None
+                }
+                # Send test message asynchronously without blocking
+                asyncio.create_task(websocket_send_func(test_message))
+                print(f"✅ Socket test message sent successfully")
+            except Exception as e:
+                print(f"⚠️  Socket test message failed: {e}")
+                websocket_send_func = None  # Disable socket messaging if test fails
+        elif project_short_id:
+            print(f"⚠️  No active socket connection found for project {project_short_id}")
+        else:
+            print(f"ℹ️  No project_short_id found in workflow, proceeding without socket updates")
+        
+        # Update workflow status
+        await update_workflow_status(workflow_id, "running")
+        
+        # Send status update via socket if available
+        if websocket_send_func:
+            try:
+                status_message = {
+                    "type": "SETUP_LOG",
+                    "status": "running",
+                    "workflow_id": workflow_id,
+                    "content": f"Workflow {workflow_name} is now running",
+                    "result": None
+                }
+                # Send message asynchronously without blocking
+                asyncio.create_task(websocket_send_func(status_message))
+            except Exception as e:
+                print(f"⚠️  Failed to send running status via socket: {e}")
+        
         # Get database information for dynamic MongoDB toolkit
         database_information = task_info.get("database_information")
         
-        # Execute the workflow with database information
-        execution_result = await execute_workflow_from_config(
-            workflow,  # Pass the whole workflow document instead of just workflow_graph
-            default_llm_config, 
-            mcp_config={}, 
-            inputs=inputs,
-            database_information=database_information,
-            task_info=task_info
-        )
+        # If we have a websocket connection, use the enhanced execution with real-time updates
+        if websocket_send_func:
+            print(f"📡 Executing workflow with real-time socket updates")
+            execution_result = await execute_workflow_with_websocket(
+                workflow_id=workflow_id,
+                inputs=inputs,
+                websocket_send_func=websocket_send_func
+            )
+        else:
+            print(f"📡 Executing workflow without socket updates")
+            # Execute the workflow with database information
+            execution_result = await execute_workflow_from_config(
+                workflow,  # Pass the whole workflow document instead of just workflow_graph
+                default_llm_config, 
+                mcp_config={}, 
+                inputs=inputs,
+                database_information=database_information,
+                task_info=task_info,
+                websocket_send_func=websocket_send_func  # Pass the websocket_send_func here
+            )
         
         if execution_result is None:
             print(f"❌ Failed to execute workflow: {workflow_name}")
@@ -370,10 +718,40 @@ async def execute_workflow(workflow_id: str, inputs: Dict[str, Any]) -> Dict[str
             execution_result=execution_result
         )
         
+        # Send final completion message via socket if available
+        if websocket_send_func:
+            try:
+                final_completion_message = {
+                    "type": "SETUP_LOG",
+                    "status": "completed",
+                    "workflow_id": workflow_id,
+                    "content": f"🎉 Workflow {workflow_name} execution completed and saved to database",
+                    "result": {"summary": "completed", "workflow_id": workflow_id}
+                }
+                # Send message asynchronously without blocking
+                asyncio.create_task(websocket_send_func(final_completion_message))
+            except Exception as e:
+                print(f"⚠️  Failed to send final completion message via socket: {e}")
+        
         # Return only the essential data
         return execution_result["parsed_json"]
         
     except Exception as e:
+        # Send error message via socket if available
+        if websocket_send_func:
+            try:
+                error_message = {
+                    "type": "SETUP_LOG",
+                    "status": "error",
+                    "workflow_id": workflow_id,
+                    "content": f"❌ Workflow execution failed: {str(e)}",
+                    "result": {"error": str(e)}
+                }
+                # Send message asynchronously without blocking
+                asyncio.create_task(websocket_send_func(error_message))
+            except Exception as socket_error:
+                print(f"⚠️  Failed to send error message via socket: {socket_error}")
+        
         await update_workflow_status(workflow_id, "failed")
         raise ValueError(f"Execution is not successful: {e}")
 
@@ -475,7 +853,8 @@ async def execute_workflow_with_websocket(
                 mcp_config={}, 
                 inputs=inputs,
                 database_information=database_information,
-                task_info=task_info
+                task_info=task_info,
+                websocket_send_func=websocket_send_func # Pass the websocket_send_func here
             )
             
             # Log execution completion with bound logger
@@ -572,3 +951,81 @@ async def execute_workflow_with_websocket(
             "original_message": f"Failed to execute workflow: {str(e)}",
             "parsed_json": None
         }
+
+
+# Example usage of the socket messaging pattern:
+"""
+# Example 1: Basic usage in any function
+async def some_workflow_function(workflow_id: str):
+    # Get the workflow to find project_short_id
+    workflow = await get_workflow(workflow_id)
+    project_short_id = workflow.get("project_short_id")
+    
+    # Create websocket send function
+    websocket_send_func = create_project_websocket_send_func(project_short_id)
+    
+    if websocket_send_func:
+        # Send real-time updates
+        await websocket_send_func({
+            "type": "SETUP_LOG",
+            "status": None,
+            "workflow_id": workflow_id,
+            "content": "Starting workflow function",
+            "result": None
+        })
+    
+    # ... do work ...
+    
+    if websocket_send_func:
+        await websocket_send_func({
+            "type": "SETUP_LOG", 
+            "status": None,
+            "workflow_id": workflow_id,
+            "content": "Workflow function completed",
+            "result": None
+        })
+
+# Example 2: Using the convenience messenger
+async def another_workflow_function(workflow_id: str):
+    workflow = await get_workflow(workflow_id)
+    project_short_id = workflow.get("project_short_id")
+    
+    # Create messenger with convenience functions
+    messenger = create_project_websocket_messenger(project_short_id)
+    
+    if messenger:
+        await messenger["log"]("Starting workflow function", workflow_id)
+        await messenger["progress"]("starting", 0.0, "Initializing...", workflow_id)
+        
+        # ... do work ...
+        
+        await messenger["progress"]("processing", 0.5, "Halfway done", workflow_id)
+        
+        # ... more work ...
+        
+        await messenger["progress"]("completed", 1.0, "All done!", workflow_id)
+        await messenger["log"]("Workflow function completed successfully", workflow_id)
+    else:
+        # Fallback to console logging
+        print("No active socket connection, using console logging")
+
+# Example 3: Integration with existing workflow setup pattern
+async def setup_project_with_socket(project_short_id: str):
+    # This is exactly what the workflow setup does
+    websocket_send_func = create_project_websocket_send_func(project_short_id)
+    
+    if websocket_send_func:
+        print(f"🔌 Found active socket for project {project_short_id}")
+        # Use the same pattern as workflow setup
+        await websocket_send_func({
+            "type": "SETUP_LOG",
+            "status": None,
+            "workflow_id": None,
+            "content": "Project setup started",
+            "result": None
+        })
+    else:
+        print(f"⚠️  No active socket for project {project_short_id}")
+    
+    # ... continue with setup logic ...
+"""

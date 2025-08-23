@@ -384,10 +384,20 @@ async def execute_workflow_with_socket_integration(
             # Create WebSocket send function
             async def websocket_send_func(message_str: str):
                 message_data = json.loads(message_str) if isinstance(message_str, str) else message_str
-                await socket_service.send_to_project(project_short_id, message_data)
+                asyncio.create_task(socket_service.send_to_project(project_short_id, message_data))
             
             # Execute with socket integration
             from .core.workflow_execution import execute_workflow_with_websocket
+            
+            test_message = {
+                "type": "SETUP_LOG",
+                "status": "executing",
+                "workflow_id": workflow.get("id", "unknown"),
+                "content": f"🚀 Starting workflow execution: {workflow.get('name', 'unknown')}",
+                "result": None
+            }
+            await websocket_send_func(test_message)
+            
             result = await execute_workflow_with_websocket(workflow_id, request.inputs, websocket_send_func)
             
             return ProjectWorkflowExecutionResponse(
