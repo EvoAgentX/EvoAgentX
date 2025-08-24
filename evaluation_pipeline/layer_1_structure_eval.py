@@ -176,7 +176,10 @@ async def async_evaluate_structure_batch(
     async def evaluate_single_test(test_data: Dict[str, Any]) -> Dict[str, Any]:
         try:
             result = await evaluator.evaluate_workflow_structure(test_data)
-            return {'type': 'result', 'data': result}
+            if result['success']:
+                return {'type': 'result', 'data': result}
+            else:
+                return {'type': 'error', 'data': result}
         except Exception as e:
             error_info = capture_exception_details(e)
             error_info['test_id'] = test_data.get('workflow_id', 'unknown')
