@@ -6,12 +6,14 @@ from .openai_embedding import OpenAIEmbeddingWrapper
 from .huggingface_embedding import HuggingFaceEmbeddingWrapper
 from .ollama_embedding import OllamaEmbeddingWrapper
 from .multimodal_huggingface_embedding import MultimodalHuggingFaceEmbeddingWrapper
+from .voyage import VoyageEmbeddingWrapper
 
 __all__ = [
     'OpenAIEmbeddingWrapper',
     'HuggingFaceEmbeddingWrapper',
     'OllamaEmbeddingWrapper',
     'MultimodalHuggingFaceEmbeddingWrapper',
+    'VoyageEmbeddingWrapper',
     'EmbeddingFactory',
     'BaseEmbedding',
     'EmbeddingProvider'
@@ -46,6 +48,8 @@ class EmbeddingFactory:
             wrapper = HuggingFaceEmbeddingWrapper(**model_config)
         elif provider == EmbeddingProvider.OLLAMA:
             wrapper = OllamaEmbeddingWrapper(**model_config)
+        elif provider == EmbeddingProvider.VOYAGE:
+            wrapper = VoyageEmbeddingWrapper(**model_config)
         elif provider == "multimodal":
             wrapper = MultimodalHuggingFaceEmbeddingWrapper(**model_config)
         else:

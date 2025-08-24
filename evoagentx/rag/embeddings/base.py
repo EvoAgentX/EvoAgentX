@@ -23,8 +23,16 @@ SUPPORTED_MODELS: Dict[str, List[str]] = {
         "nomic-embed-text",
         "mxbai-embed-large",
         "bge-m3",
-        "all-minilm"
+        "all-minilm",
         "snowflake-arctic-embed"
+    ],
+    "voyage": [
+        "voyage-multimodal-3",
+        "voyage-3",
+        "voyage-3-lite",
+        "voyage-finance-2",
+        "voyage-multilingual-2",
+        "voyage-code-2"
     ]
 }
 
@@ -33,6 +41,7 @@ class EmbeddingProvider(str, Enum):
     OPENAI = "openai"
     HUGGINGFACE = "huggingface"
     OLLAMA = "ollama"
+    VOYAGE = "voyage"
 
     @classmethod
     def validate_model(cls, provider: str, model_name: str) -> bool:

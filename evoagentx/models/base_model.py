@@ -1,9 +1,11 @@
 import yaml
 import inspect
 import asyncio
+import base64
 from abc import ABC, abstractmethod
 from pydantic import Field
-from typing import Union, Optional, Type, Callable, List
+from typing import Union, Optional, Type, Callable, List, Any, Dict
+from pathlib import Path
 
 from ..core.parser import Parser
 from .model_configs import LLMConfig
@@ -334,6 +336,99 @@ class LLMOutputParser(Parser):
         return structured_data
 
 
+def _is_multimodal_content(content: Any) -> bool:
+    """Check if content contains multimodal objects (TextChunk, ImageChunk, etc.)."""
+    try:
+        from ..rag.schema import TextChunk, ImageChunk
+        
+        # Handle different content formats
+        if isinstance(content, list):
+            return any(isinstance(item, (TextChunk, ImageChunk)) for item in content)
+        elif isinstance(content, (TextChunk, ImageChunk)):
+            return True
+        
+        return False
+    except ImportError:
+        return False
+
+
+def _process_multimodal_content(content: List[Any], model_type: str = "openai") -> List[Dict[str, Any]]:
+    """Convert multimodal content (TextChunk, ImageChunk) to model-specific message format."""
+    try:
+        from ..rag.schema import TextChunk, ImageChunk
+    except ImportError:
+        raise ImportError("Cannot import TextChunk/ImageChunk from rag.schema for multimodal processing")
+    
+    processed_content = []
+    
+    for item in content:
+        if isinstance(item, TextChunk):
+            processed_content.append({
+                "type": "text",
+                "text": item.text
+            })
+        elif isinstance(item, ImageChunk):
+            if model_type.lower() in ["openai", "openrouter", "litellm"]:
+                # OpenAI-style format
+                image_data = _get_image_data_url(item)
+                processed_content.append({
+                    "type": "image_url",
+                    "image_url": {"url": image_data}
+                })
+            else:
+                # For other models, include image path/data as appropriate
+                processed_content.append({
+                    "type": "image",
+                    "image_path": item.image_path,
+                    "image_mimetype": item.image_mimetype
+                })
+        else:
+            # Handle other types (strings, etc.)
+            if isinstance(item, str):
+                processed_content.append({
+                    "type": "text", 
+                    "text": item
+                })
+            else:
+                # Convert to string as fallback
+                processed_content.append({
+                    "type": "text",
+                    "text": str(item)
+                })
+    
+    return processed_content
+
+
+def _get_image_data_url(image_chunk) -> str:
+    """Convert ImageChunk to data URL format for model consumption."""
+    from PIL import Image
+    import io
+    
+    try:
+        # Load image using the chunk's lazy loading
+        image = image_chunk.get_image()
+        if image is None:
+            raise ValueError(f"Could not load image from path: {image_chunk.image_path}")
+        
+        # Convert to base64
+        buffer = io.BytesIO()
+        # Determine format from mimetype or default to PNG
+        format_name = "PNG"
+        if image_chunk.image_mimetype:
+            format_name = image_chunk.image_mimetype.split('/')[-1].upper()
+            if format_name not in ['PNG', 'JPEG', 'JPG', 'GIF', 'WEBP']:
+                format_name = "PNG"
+        
+        image.save(buffer, format=format_name)
+        image_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
+        
+        # Create data URL
+        mime_type = image_chunk.image_mimetype or f"image/{format_name.lower()}"
+        return f"data:{mime_type};base64,{image_data}"
+        
+    except Exception as e:
+        raise RuntimeError(f"Failed to convert image to data URL: {str(e)}")
+
 
 class BaseLLM(ABC):
     """Abstract base class for Large Language Model implementations.
@@ -523,7 +618,10 @@ class BaseLLM(ABC):
             if isinstance(messages[0], dict):
                 single_generate = True
                 messages = [messages]
-            return messages, single_generate
+            
+            # Process multimodal content in messages
+            processed_messages = self._process_messages_for_multimodal(messages)
+            return processed_messages, single_generate
 
         if isinstance(prompt, str):
             single_generate = True
@@ -544,6 +642,47 @@ class BaseLLM(ABC):
         
         prepared_messages = self.formulate_messages(prompts=prompt, system_messages=system_message)
         return prepared_messages, single_generate
+
+    def _process_messages_for_multimodal(self, messages: List[List[dict]]) -> List[List[dict]]:
+        """Process messages to handle multimodal content (TextChunk, ImageChunk)."""
+        processed_messages = []
+        
+        for message_list in messages:
+            processed_message_list = []
+            
+            for message in message_list:
+                processed_message = message.copy()
+                content = message.get("content")
+                
+                # Check if content contains multimodal objects
+                if _is_multimodal_content(content):
+                    # Get model type for proper formatting
+                    llm_type = getattr(self.config, 'llm_type', 'openai')
+                    # Map LLM types to processing types
+                    if llm_type.lower() in ["openaillm", "openai"]:
+                        model_type = "openai"
+                    elif llm_type.lower() in ["litellm"]:
+                        model_type = "litellm" 
+                    elif llm_type.lower() in ["openrouter"]:
+                        model_type = "openrouter"
+                    else:
+                        model_type = "openai"  # Default to OpenAI format
+                    
+                    from ..core.logging import logger
+                    logger.debug(f"Processing multimodal content: llm_type={llm_type}, model_type={model_type}")
+                    
+                    # Convert multimodal content to appropriate format
+                    if isinstance(content, list):
+                        processed_message["content"] = _process_multimodal_content(content, model_type)
+                    else:
+                        # Single chunk - wrap in list for processing
+                        processed_message["content"] = _process_multimodal_content([content], model_type)
+                
+                processed_message_list.append(processed_message)
+            
+            processed_messages.append(processed_message_list)
+        
+        return processed_messages
 
     def generate(
         self,
