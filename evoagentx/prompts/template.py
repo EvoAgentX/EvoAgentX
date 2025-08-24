@@ -243,9 +243,9 @@ class PromptTemplate(BaseModule):
                     type_prompt = ""
                 else:
                     type_prompt = f"(Must be in a valid JSON '{field_type}' format. DO NOT add comments.)"
-                example_values[key] = f"[{type_prompt} {field_info.description}]"
+                example_values[key] = f"[Insert here: {field_info.description} {type_prompt}]"
             else:
-                example_values[key] = "[Your output here]"
+                example_values[key] = "[Insert your output here]"
         output_str += ouptut_template.format(**example_values)
 
         if "(Optional)" in ouptut_template:
