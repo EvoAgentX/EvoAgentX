@@ -1,14 +1,19 @@
 import os 
 import yaml
 import json
-import regex
+import os
+from datetime import date, datetime
+from types import UnionType
+from typing import Any, Dict, List, Type, Union, get_args, get_origin
 from uuid import uuid4
-from datetime import datetime, date 
+
+import regex
+import yaml
 from pydantic import BaseModel
 from pydantic_core import PydanticUndefined, ValidationError
-from typing import Union, Type, Any, List, Dict, get_origin, get_args
 
-from .logging import logger 
+from .logging import logger
+
 
 def make_parent_folder(path: str):
 
@@ -88,7 +93,7 @@ def escape_json_values(string: str) -> str:
         raw_value = raw_value.replace('\n', '\\n')
         return f'"{raw_value}"'
     
-    def fix_json(match):
+    def escape_nested_json(match):
         raw_key = match.group(1)
         raw_value = match.group(2)
         raw_value = raw_value.replace("\n", "\\n")
@@ -108,13 +113,40 @@ def escape_json_values(string: str) -> str:
         pattern_value = r'(?<=:\s*)\\"((?:\\.|[^"\\])*)\\"'
         string = regex.sub(pattern_value, escape_value, string, flags=regex.DOTALL) # replace \\"value\\" with "value"and change \n to \\n
         pattern_nested_json = r'"([^"]+)"\s*:\s*\\"([^"]*\{+[\S\s]*?\}+)[\r\n\\n]*"' # handle nested json in value
-        string = regex.sub(pattern_nested_json, fix_json, string, flags=regex.DOTALL)
+        string = regex.sub(pattern_nested_json, escape_nested_json, string, flags=regex.DOTALL)
         json.loads(string)
         return string
     except json.JSONDecodeError:
         pass
     
     return string
+
+
+def fix_json_booleans(string: str) -> str:
+    """
+    Finds and replaces isolated "True" and "False" with "true" and "false".
+
+    The '\b' in the regex stands for a "word boundary", which ensures that
+    we only match the full words and not substrings like "True" in "IsTrue".
+
+    Args:
+        json_string (str): The input JSON string.
+
+    Returns:
+        str: The modified JSON string with booleans in lowercase.
+    """
+    # Use re.sub() with a word boundary (\b) to ensure we only match
+    # the isolated words 'True' and 'False' and not substrings like "True" in "IsTrue"
+    modified_string = regex.sub(r'\bTrue\b', 'true', string)
+    modified_string = regex.sub(r'\bFalse\b', 'false', modified_string)
+    return modified_string
+
+
+def fix_json(string: str) -> str:
+    string = fix_json_booleans(string)
+    string = escape_json_values(string)
+    return string
+
 
 def parse_json_from_text(text: str) -> List[str]:
     """
@@ -129,7 +161,7 @@ def parse_json_from_text(text: str) -> List[str]:
     json_pattern = r"""(?:\{(?:[^{}]*|(?R))*\}|\[(?:[^\[\]]*|(?R))*\])"""
     pattern = regex.compile(json_pattern, regex.VERBOSE)
     matches = pattern.findall(text)
-    matches = [escape_json_values(match) for match in matches]
+    matches = [fix_json(match) for match in matches]
     return matches
 
 def parse_xml_from_text(text: str, label: str) -> List[str]:

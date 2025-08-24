@@ -204,9 +204,8 @@ class CustomizeAction(Action):
                 if not json_list:
                     logger.warning("No valid JSON found in ToolCalling block")
                     continue
-                tool_call_json = fix_json_booleans(json_list[0])
                 # Only use the first JSON string from each block
-                parsed_tool_call = json.loads(tool_call_json)
+                parsed_tool_call = json.loads(json_list[0])
                 if isinstance(parsed_tool_call, dict):
                     parsed_tool_calls.append(parsed_tool_call)
                 elif isinstance(parsed_tool_call, list):
