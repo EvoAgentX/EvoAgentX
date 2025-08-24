@@ -13,6 +13,7 @@ class BaseEvaluator:
             llm_config = OpenAILLMConfig(model=self.config.evaluation_llm_model, temperature=self.config.evaluation_llm_temperature)
             llm = OpenAILLM(config=llm_config)
             self.llm = llm
+            self.llm_config = llm_config
         else:
             raise ValueError(f"Unsupported LLM type: {self.config.evaluation_llm_type}")
         

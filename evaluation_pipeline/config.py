@@ -27,6 +27,7 @@ class EvaluationConfig:
     
     # Directory paths
     eval_data_dir: str = "evaluation_pipeline/workflow_generation_eval_data"
+    eval_execution_data_dir: str = "evaluation_pipeline/workflow_execution_eval_data"  # directory of execution test data, containing input test data of each field for each workflow
     checkpoint_dir: str = "evaluation_pipeline/checkpoints"
     results_dir: str = "evaluation_pipeline/results"
     
