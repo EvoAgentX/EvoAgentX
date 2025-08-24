@@ -339,7 +339,7 @@ class CustomizeAction(Action):
                     continue
 
                 tool_fn = self.tools_caller[tool_name]
-                looger.info("_____________________ Start Function Calling _____________________")
+                logger.info("_____________________ Start Function Calling _____________________")
                 logger.info(f"Executing tool: {tool_name} with arguments: {args}")
                 result = tool_fn(**args)
                 results.append(result)
