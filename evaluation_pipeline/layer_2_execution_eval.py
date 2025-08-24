@@ -11,6 +11,7 @@ from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_compl
 from datetime import datetime
 from typing import Dict, List, Any, Optional, Tuple
 
+from .base_evaluator import BaseEvaluator
 from .config import EvaluationConfig
 from .utils import (
     retry_with_backoff,
@@ -20,14 +21,48 @@ from .utils import (
     create_batch_iterator,
     merge_results
 )
+from evoagentx.workflow import WorkFlow
+from evoagentx.agents import AgentManager
 
 
-class ExecutionEvaluator:
+class ExecutionEvaluator(BaseEvaluator):
     """Evaluates workflow execution capability"""
     
     def __init__(self, config: EvaluationConfig):
-        self.config = config
+        super().__init__(config)
         self.layer_num = 2
+
+    def load_test_inputs(self, workflow_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        Load test inputs from workflow_execution_eval_data
+        Args:
+            workflow_data: Workflow test data
+        Returns:
+            List of test input sets
+        notes: 
+            In workflow_execution_eval_data and workflow_generation_eval_data, the file names containing the number must be the id of workflow.
+            For example, workflow_gen_1.json contains the workflow with id a1b2c3d4-e5f6-4789-9012-34567890abcd, and there must be a file named workflow_exe_a1b2c3d4-e5f6-4789-9012-34567890abcd.json in workflow_execution_eval_data.
+        """
+        # load test inputs from workflow_execution_eval_data
+        execution_data_dir = self.config.eval_execution_data_dir
+        # get the file name of the workflow_execution_eval_data
+        execution_data_file = os.path.join(execution_data_dir, f"workflow_exe_{workflow_data.get('test_id')}.json")
+        try:
+            with open(execution_data_file, 'r', encoding='utf-8') as f:
+                execution_data = json.load(f)
+            return [execution_data.get('test_inputs')]
+        except Exception as e:
+            print(f"Error loading test inputs from {execution_data_file}: {e}")
+            return []
+        
+    def workflow_json_filter(self, workflow_json: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Filter workflow JSON, discard the fields that are not appropriate
+        e.g. "graph"
+        """
+        if 'graph' in workflow_json:
+            workflow_json['graph'] = None
+        return workflow_json
     
     def execute_workflow_with_test_inputs(self, workflow_data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -44,21 +79,25 @@ class ExecutionEvaluator:
         try:
             # Load workflow from Layer 1 results if available
             workflow_json = workflow_data.get('workflow_json')
+            workflow_json = json.loads(workflow_json)
+            workflow_json = self.workflow_json_filter(workflow_json)
             if not workflow_json:
                 raise ValueError("No workflow JSON found in test data")
             
             # Generate test inputs based on workflow inputs specification
-            test_inputs = self._generate_test_inputs(workflow_data)
+            # test_inputs = self._generate_test_inputs(workflow_data)  # deprecated
+            # load test inputs from workflow_execution_eval_data
+            test_inputs: List[Dict[str, Any]] = self.load_test_inputs(workflow_data)
             
             # Execute workflow with each test input set
             execution_results = []
-            for i, test_input in enumerate(test_inputs):
+            for i, one_set_test_input in enumerate(test_inputs):
                 try:
-                    result = self._execute_single_workflow(workflow_json, test_input)
+                    result = self._execute_single_workflow(workflow_json, one_set_test_input)
                     execution_results.append({
                         'input_set': i + 1,
                         'success': True,
-                        'input': test_input,
+                        'input': one_set_test_input,
                         'output': result,
                         'execution_time': result.get('execution_time', 0)
                     })
@@ -66,7 +105,7 @@ class ExecutionEvaluator:
                     execution_results.append({
                         'input_set': i + 1,
                         'success': False,
-                        'input': test_input,
+                        'input': one_set_test_input,
                         'error': capture_exception_details(e),
                         'execution_time': time.time() - start_time
                     })
@@ -78,6 +117,7 @@ class ExecutionEvaluator:
             # Analyze error types
             error_analysis = self._analyze_errors(failed_executions)
             
+            # return execution results: "test_results" field
             return {
                 'test_id': workflow_data.get('test_id'),
                 'workflow_name': workflow_data.get('workflow_name'),
@@ -100,78 +140,12 @@ class ExecutionEvaluator:
                 'test_id': workflow_data.get('test_id'),
                 'workflow_name': workflow_data.get('workflow_name'),
                 'overall_success': False,
+                'execution_results': [],
+                'statistics': {},
                 'error': capture_exception_details(e),
                 'total_execution_time': time.time() - start_time,
                 'timestamp': datetime.now().isoformat()
             }
-    
-    def _generate_test_inputs(self, workflow_data: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """
-        Generate test inputs based on workflow input specifications
-        
-        Args:
-            workflow_data: Workflow test data
-            
-        Returns:
-            List of test input sets
-        """
-        workflow_inputs = workflow_data.get('workflow_inputs', [])
-        
-        # Generate multiple test input sets with different scenarios
-        test_input_sets = []
-        
-        # Basic test case based on the example (RSS content analysis)
-        if workflow_data.get('workflow_name') == 'content_analysis':
-            test_input_sets = [
-                {
-                    'article_content': 'This is a sample news article about technology trends and artificial intelligence developments in 2024.',
-                    'article_title': 'AI Technology Trends in 2024',
-                    'source_category': 'technology'
-                },
-                {
-                    'article_content': 'Breaking news: Stock market shows significant volatility amid economic uncertainty and inflation concerns.',
-                    'article_title': 'Market Volatility Continues',
-                    'source_category': 'finance'
-                },
-                {
-                    'article_content': 'Local sports team wins championship after an exciting final match that went into overtime.',
-                    'article_title': 'Championship Victory in Overtime',
-                    'source_category': 'sports'
-                }
-            ]
-        else:
-            # Generic test input generation based on input specifications
-            for i in range(3):  # Generate 3 test cases
-                test_input = {}
-                for inp in workflow_inputs:
-                    test_input[inp['name']] = self._generate_sample_value(inp)
-                test_input_sets.append(test_input)
-        
-        return test_input_sets
-    
-    def _generate_sample_value(self, input_spec: Dict[str, Any]) -> Any:
-        """
-        Generate sample value based on input specification
-        
-        Args:
-            input_spec: Input parameter specification
-            
-        Returns:
-            Sample value for the input
-        """
-        input_type = input_spec.get('type', 'string')
-        input_name = input_spec.get('name', 'input')
-        
-        if input_type == 'string':
-            return f"sample_{input_name}_value"
-        elif input_type == 'number':
-            return 42
-        elif input_type == 'boolean':
-            return True
-        elif input_type == 'array':
-            return [f"item1_{input_name}", f"item2_{input_name}"]
-        else:
-            return f"sample_{input_name}"
     
     @retry_with_backoff(max_retries=2, delay=1.0)
     def _execute_single_workflow(self, workflow_json: Dict[str, Any], test_input: Dict[str, Any]) -> Dict[str, Any]:
@@ -192,11 +166,11 @@ class ExecutionEvaluator:
         
         try:
             # Create workflow from JSON
-            workflow = WorkFlowGraph.from_dict(workflow_json)
+            workflow_graph = WorkFlowGraph.from_dict(workflow_json, llm_config=self.llm_config, tools=self.tools)
             
             # For now, simulate workflow execution since we need proper setup
-            # In real implementation, you would call workflow.async_execute(test_input)
-            execution_result = self._simulate_workflow_execution(workflow, test_input)
+            # In real implementation, we would call workflow.async_execute(test_input)
+            execution_result = self._do_workflow_execution(workflow_graph, test_input)
             
             execution_time = time.time() - start_time
             execution_result['execution_time'] = execution_time
@@ -207,40 +181,25 @@ class ExecutionEvaluator:
             # Re-raise with additional context
             raise RuntimeError(f"Workflow execution failed: {str(e)}") from e
     
-    def _simulate_workflow_execution(self, workflow, test_input: Dict[str, Any]) -> Dict[str, Any]:
+    def _do_workflow_execution(self, workflow_graph, test_input: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Simulate workflow execution for testing purposes
-        TODO: Replace with actual workflow execution
-        
         Args:
-            workflow: Workflow object
+            workflow: WorkFlowGraph object
             test_input: Input data
             
         Returns:
-            Simulated execution result
+            execution_result: execution result
         """
-        # Simulate processing time
-        time.sleep(0.1)
-        
-        # Generate mock output based on workflow outputs
-        simulated_output = {}
-        
-        # For content analysis workflow, generate appropriate outputs
-        if 'article_content' in test_input:
-            simulated_output = {
-                'categories': [{'name': 'technology', 'confidence': 0.85}],
-                'key_topics': ['AI', 'trends', '2024'],
-                'sentiment_score': 0.3,
-                'summary': 'Article discusses technology trends and AI developments.'
-            }
-        else:
-            # Generic output simulation
-            simulated_output = {
-                'result': 'processed_data',
-                'status': 'completed'
-            }
-        
-        return simulated_output
+
+        agent_manager = AgentManager()
+
+        agent_manager.add_agents_from_workflow(workflow_graph, llm_config=self.llm_config)
+
+        workflow = WorkFlow(graph=workflow_graph, agent_manager=agent_manager, llm=self.llm)
+
+        execution_result = asyncio.run(workflow.async_execute(test_input))
+
+        return execution_result
     
     def _analyze_errors(self, failed_executions: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
@@ -323,6 +282,7 @@ def execute_workflows_batch(
     
     execution_time = time.time() - start_time
     
+    # return batch execution results
     return {
         'test_results': results,
         'errors': errors,
