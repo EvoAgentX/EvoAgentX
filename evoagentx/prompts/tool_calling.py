@@ -1,28 +1,93 @@
 OUTPUT_EXTRACTION_PROMPT = """
-You are given the following text:
-{text}
+## Task
+You are given a piece of unstructured text and a list of fields to extract. Each field includes:
+- `name`: The name of the field.
+- `description`: A description of the field.
+- `type`: The type of the field.
+- `required`: Whether the field is required. If the field is not required, you can set it to `null`.
 
-We need you to process this text and generate high-quality outputs for each of the following fields:
-{output_description}
+Your task is to analyze the text carefully and generate a valid JSON object that includes all of the requested fields
 
-**Instructions:**
+## Instructions
 1. Read through the provided text carefully.
-2. For each of the listed output fields, analyze the relevant information from the text and generate a well-formulated response.
+2. For each of the listed fields, analyze the relevant information from the text and generate a well-formulated response.
 3. You may summarize, process, restructure, or enhance the information as needed to provide the best possible answer.
 4. Your analysis should be faithful to the content but can go beyond simple extraction - provide meaningful insights where appropriate.
-5. Return your processed outputs in a single JSON object, where the JSON keys **exactly match** the output names given above.
-6. If there is insufficient information for an output, provide your best reasonable inference or set its value to an empty string ("") or `null`.
+5. Return your processed outputs in a single JSON object, where the JSON keys **exactly match** the field names provided in **Fields** section.
+6. If there is insufficient information for an output follow the following rules:
+    - If the field is not required, set it to `null`.
+    - If the field is required and `type` is `string`, return an empty string `""`.
+    - If the field is required and `type` is `array`, return an empty array `[]`.
+    - If the field is required and `type` is `object`, return an empty object `{}`.
+    - If the field is required and `type` is none of the above, provide your best reasonable inference.
 7. Do not include any additional keys in the JSON.
 8. Your final output should be valid JSON and should not include any explanatory text.
 
-**Example JSON format:**
-{{
-  "<OUTPUT_NAME_1>": "Processed content here",
-  "<OUTPUT_NAME_2>": "Processed content here",
-  "<OUTPUT_NAME_3>": "Processed content here"
-}}
+## Example
+### Text
+Alex is a designer with 5 years of experience. He currently lives in Berlin. He speaks English, German, and a bit of French. You can contact him at alex.design@mail.com
 
-Now, based on the text and the instructions above, provide your final JSON output.
+### Fields
+```json
+[
+    {{
+        "name": "person_name",
+        "type": "string",
+        "description": "name of the person",
+        "required": true
+    }},
+    {{
+        "name": "email",
+        "type": "string",
+        "description": "email of the person",
+        "required": true
+    }},
+    {{
+        "name": "location",
+        "type": "string",
+        "description": "current city or location of the person",
+        "required": true
+    }},
+    {{
+        "name": "languages",
+        "type": "array",
+        "description": "languages the person speaks",
+        "required": true
+    }},
+    {{
+        "name": "portfolio",
+        "type": "array",
+        "description": "list of project categories or specialties",
+        "required": false
+    }}
+]
+```
+
+### Output
+```json
+{{
+    "person_name": "Alex",
+    "email": "alex.design@mail.com",
+    "location": "Berlin",
+    "languages": ["English", "German", "French"],
+    "portfolio": null
+}}
+```
+
+---
+
+Now let's begin!
+
+## Text
+{text}
+
+## Fields
+```json
+{output_description}
+```
+
+## Output
+```json
 """
 
 
@@ -38,8 +103,6 @@ Results:
 AGENT_GENERATION_TOOLS_PROMPT = """
 In the following Tools Description section, you are offered with the following tools. A short description of each functionality is also provided for each tool.
 You should assign tools to agent if you think it would be helpful for the agent to use the tool.
-A sample output for tool argument looks like this following line (The example tools are not real tools): 
-tools: ["File Tool", "Browser Tool"]
 
 **Tools Description**
 {tools_description}
