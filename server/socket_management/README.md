@@ -28,6 +28,7 @@
 {
   "type": "setup-log",
   "data":{
+    "log_type": "connection report",
     "workflow_id": null,
     "content": "WebSocket connection established",
     "result": null
@@ -40,6 +41,7 @@
 {
   "type": "setup-log",
   "data":{
+    "log_type": "setup report",
     "workflow_id": null,
     "content": "Setup start...",
     "result": null
@@ -52,6 +54,7 @@
 {
   "type": "setup-log",
   "data":{
+    "log_type": "database report",
     "workflow_id": "<workflow_id>",
     "content": "<workflow_id> updates database status to: <uninitialized if just extracted, pending if generation complete>",
     "result": null
@@ -64,6 +67,7 @@
 {
   "type": "setup-log",
   "data":{
+    "log_type": "progress logging",
     "workflow_id": "<workflow_id>",
     "content": "<raw_generation_messages>",
     "result": null
@@ -76,6 +80,7 @@
 {
   "type": "setup-complete",
   "data":{
+    "log_type": "progress logging",
     "workflow_id": "<workflow_id>",
     "content": "Workflow <workflow_id> generated...",
     "result": <workflow_graph_dictionary, not the workflow info>
@@ -87,6 +92,7 @@
 {
   "type": "setup-complete",
   "data":{
+    "log_type": "error message",
     "workflow_id": "<workflow_id>" or null,
     "content": "<error_description>: <raw_error_message>",
     "result": null
