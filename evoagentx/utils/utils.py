@@ -1,7 +1,7 @@
 import os
 import re
 import time
-from typing import Any, Dict, List, Optional, Set, Union, get_args, get_origin
+from typing import Any, Dict, List, Optional, Set, Union, get_args, get_origin, Type
 
 import regex
 import requests
@@ -212,7 +212,7 @@ def create_agent_from_dict(
     return agent
 
 
-def pydantic_to_parameters(base_model: BaseModel) -> List[Parameter]:
+def pydantic_to_parameters(base_model: Type[BaseModel], ignore: List[str] = []) -> List[Parameter]:
     """
     Converts a Pydantic BaseModel class into a list of Parameter instances.
 
@@ -225,6 +225,9 @@ def pydantic_to_parameters(base_model: BaseModel) -> List[Parameter]:
     """
     parameters = []
     for field_name, field_info in base_model.model_fields.items(): 
+        if field_name in ignore:
+            continue
+
         # Determine the description
         description = field_info.description if field_info.description else field_name
 
