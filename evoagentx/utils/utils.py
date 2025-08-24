@@ -261,47 +261,78 @@ def validate_params(
     required_params: List[Parameter], 
     actual_params: List[Parameter], 
     required_params_name: str, 
-    actual_params_name: str
-):
+    actual_params_name: str,
+    auto_fix: bool = False
+)-> Dict[str, Parameter]:
     """
     Checks if `actual_params` have `required_params` and if the `required_params` in `actual_params` have the same type and required value.
+    If `actual_params` doesn't have `required_params`, it will raise a ValueError.
+    If `actual_params` has `required_params` but with different type or required value, it will change them to match `required_params`.
 
     Args:
         required_params: A list of parameters that are required. Raises error if `actual_params` doesn't contain these parameters.
         actual_params: A list of parameters to check if `required_params` exist.
         required_params_name: A name for `required params` to be shown in error messages.
         actual_params_name: A name for `actual_params` to be shown in error messages.
+
+    Returns:
+        Dict[str, Parameter]: A dictionary of actual parameters with their names as keys.
+            If `auto_fix` is True, it will fix the mismatched `type` and `required` fields.
     """
 
     actual_params_dict = {param.name: param for param in actual_params}
     for param in required_params:
         if param.name not in actual_params_dict:
             raise ValueError(f"{required_params_name} '{param.name}' is not found in {actual_params_name}")
-            
-        actual_type = string_to_python_type[actual_params_dict[param.name].type]
+
+        actual_type = actual_params_dict[param.name].type
+        actual_python_type = string_to_python_type[actual_type]
         actual_required = actual_params_dict[param.name].required
-        if string_to_python_type[param.type] is not actual_type or param.required != actual_required:
-            raise ValueError(f"Mismatch for '{param.name}': {required_params_name} (type={param.type}, required={param.required}) vs. {actual_params_name} (type={actual_type}, required={actual_required})")
+
+        required_param_python_type = string_to_python_type[param.type]
+
+        if required_param_python_type is not actual_python_type:
+            if auto_fix:
+                logger.warning(
+                    f"Mismatch for '{param.name}': {required_params_name} (type={required_param_python_type}) vs. {actual_params_name} (type={actual_python_type})"
+                )
+                logger.info(f"Fixing '{param.name}' type from '{actual_type}' to '{param.type}'")
+                actual_params_dict[param.name].type = param.type
+            else:
+                raise ValueError(
+                    f"Mismatch for '{param.name}': {required_params_name} (type={required_param_python_type}) vs. {actual_params_name} (type={actual_python_type})"
+                )
+
+        if param.required != actual_required:
+            if auto_fix:
+                logger.warning(
+                    f"Mismatch for '{param.name}': {required_params_name} (required={param.required}) vs. {actual_params_name} (required={actual_required})"
+                )
+                logger.info(f"Fixing '{param.name}' required from `{actual_required}` to `{param.required}`")
+                actual_params_dict[param.name].required = param.required
+            else:
+                raise ValueError(
+                    f"Mismatch for '{param.name}': {required_params_name} (required={param.required}) vs. {actual_params_name} (required={actual_required})"
+                )
+
+    return actual_params_dict
 
 
-def fix_json_booleans(json_string: str) -> str:
+def update_params(old_params: List[Parameter], new_params: Dict[str, Parameter]) -> List[Parameter]:
     """
-    Finds and replaces isolated "True" and "False" with "true" and "false".
-
-    The '\b' in the regex stands for a "word boundary", which ensures that
-    we only match the full words and not substrings like "True" in "IsTrue".
+    Updates a list of parameters with new parameters.
 
     Args:
-        json_string (str): The input JSON string.
+        old_params: The list of parameters to update.
+        new_params: A dictionary of parameters to update with, where the key is the parameter name.
 
     Returns:
-        str: The modified JSON string with booleans in lowercase.
+        List[Parameter]: The updated list of parameters.
     """
-    # Use re.sub() with a word boundary (\b) to ensure we only match
-    # the isolated words 'True' and 'False' and not substrings like "True" in "IsTrue"
-    modified_string = re.sub(r'\bTrue\b', 'true', json_string)
-    modified_string = re.sub(r'\bFalse\b', 'false', modified_string)
-    return modified_string
+    for param_idx, param in enumerate(old_params):
+        if param.name in new_params:
+            old_params[param_idx] = new_params[param.name]
+    return old_params
 
 
 string_to_python_type = {
