@@ -16,7 +16,7 @@ from ..prompts.tool_calling import (
     TOOL_CALLING_TEMPLATE,
 )
 from ..tools.tool import Toolkit
-from ..utils.utils import fix_json_booleans
+from ..utils.utils import pydantic_to_parameters
 from .action import Action
 
 
@@ -119,13 +119,11 @@ class CustomizeAction(Action):
         Returns:
             str: Formatted extraction prompt
         """
-        attr_descriptions: dict = self.outputs_format.get_attr_descriptions()
-        output_description_list = [] 
-        for i, (name, desc) in enumerate(attr_descriptions.items()):
-            output_description_list.append(f"{i+1}. {name}\nDescription: {desc}")
-        output_description = "\n\n".join(output_description_list)
-        return OUTPUT_EXTRACTION_PROMPT.format(text=llm_output_content, output_description=output_description)
-    
+        output_params = pydantic_to_parameters(self.outputs_format, ignore=["class_name"])
+        output_params = [param.to_dict(ignore=["class_name"]) for param in output_params]
+        output_params_json = json.dumps(output_params, indent=4, ensure_ascii=False)
+        prompt = OUTPUT_EXTRACTION_PROMPT.format(text=llm_output_content, output_description=output_params_json)
+        return prompt
     
     def add_tools(self, tools: Union[Toolkit, List[Toolkit]]):
         if not tools:
