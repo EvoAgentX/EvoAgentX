@@ -3,7 +3,7 @@ import inspect
 import json
 from abc import ABC, abstractmethod
 from collections.abc import Callable
-from typing import Dict, List, Optional, Type, Union
+from typing import List, Optional, Type, Union
 
 import yaml
 from pydantic import Field
@@ -97,6 +97,21 @@ class LLMOutputParser(Parser):
             field_desc = field_info.description if field_info.description is not None else "None"
             results[field_name] = field_desc
         return results
+
+    @classmethod
+    def get_attr_types(cls) -> dict[str, Type]:
+        """Returns a dictionary mapping attribute names to their types."""
+        attr_types = {}
+        exclude_attrs = ["class_name"]
+        
+        # Only exclude 'content' if it's not redefined in a subclass
+        if not cls._is_content_defined_in_subclass():
+            exclude_attrs.append("content")
+            
+        for field, field_info in cls.model_fields.items():
+            if field not in exclude_attrs:
+                attr_types[field] = field_info.annotation
+        return attr_types
 
     @classmethod
     def get_specification(cls, ignore_fields: List[str] = []) -> str:
@@ -268,9 +283,9 @@ class LLMOutputParser(Parser):
             ValueError: If the content is missing expected XML tags or if the
                         extracted values can't be converted to the expected types.
         """
-        attrs_with_types: List[tuple] = cls.get_attrs(return_type=True)
+        attr_types = cls.get_attr_types()
         data = {} 
-        for attr, attr_type in attrs_with_types:
+        for attr, attr_type in attr_types.items():
             attr_raw_value_list = parse_xml_from_text(text=content, label=attr)
             if len(attr_raw_value_list) > 0:
                 attr_raw_value = attr_raw_value_list[0]
@@ -311,13 +326,12 @@ class LLMOutputParser(Parser):
         Returns:
             A dictionary mapping title names to their section contents.
         """
-        attrs_with_types: List[tuple] = cls.get_attrs(return_type=True)
         
-        if len(attrs_with_types) == 0:
+        attr_types = cls.get_attr_types()
+        if len(attr_types) == 0:
             return {}
         
-        attr_type_lookup: Dict[str, str] = {attr_and_type[0]: attr_and_type[1] for attr_and_type in attrs_with_types}
-        output_titles = [title_format.format(title=attr) for attr in attr_type_lookup.keys()]
+        output_titles = [title_format.format(title=attr) for attr in attr_types.keys()]
 
         def is_output_title(text: str):
             for title in output_titles:
@@ -334,7 +348,7 @@ class LLMOutputParser(Parser):
                 raw_value = code_blocks[-1]
                 value = parse_data_from_text(raw_value, datatype)
             except Exception:
-                raise ValueError(f"Cannot parse text: {raw_value} into {datatype} data!")
+                raise ValueError(f"Cannot parse text: '{raw_value}' into {datatype} data!")
             return value
 
         data = {}
@@ -345,7 +359,7 @@ class LLMOutputParser(Parser):
             if is_title:
                 if current_attr_name is not None and current_attr_lines is not None:
                     # if we already have some content for a title, and now we reach a new title
-                    attr_type = attr_type_lookup[current_attr_name]
+                    attr_type = attr_types[current_attr_name]
                     attr_value = process_lines(lines=current_attr_lines, datatype=attr_type)
                     data[current_attr_name] = attr_value
 
@@ -356,11 +370,19 @@ class LLMOutputParser(Parser):
             else: 
                 if current_attr_lines is not None:
                     current_attr_lines.append(line)
+
         if current_attr_name is not None and current_attr_lines is not None:
             # if we have some content for a title, and now we reach the end
-            attr_type = attr_type_lookup[current_attr_name]
+            attr_type = attr_types[current_attr_name]
             attr_value = process_lines(lines=current_attr_lines, datatype=attr_type)
             data[current_attr_name] = attr_value
+
+        if len(data) != len(attr_types):
+            # fill the missing attributes with None
+            for attr in attr_types:
+                if attr not in data:
+                    data[attr] = None
+
         return data
     
     @classmethod
