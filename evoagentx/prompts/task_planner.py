@@ -64,7 +64,7 @@ Each sub-task must follow this exact structure:
         {{
             "name": "the output's name", 
             "type": "string/int/float/other_type",
-            "required": true (always set the `required` field of outputs as true), 
+            "required": true/false, 
             "description": "Description of the output produced by this sub-task."
         }},
         ...
