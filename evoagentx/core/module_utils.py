@@ -1,5 +1,3 @@
-import os 
-import yaml
 import json
 import os
 from datetime import date, datetime
@@ -172,17 +170,42 @@ def parse_xml_from_text(text: str, label: str) -> List[str]:
         values = [match.strip() for match in matches]
     return values
 
-def parse_data_from_text(text: str, datatype: str):
-    if datatype == "str":
+def parse_data_from_text(text: str, datatype: Type):
+    if datatype is str:
         data = text
-    elif datatype == "int":
+    
+    elif datatype is int:
         data = int(text)
-    elif datatype == "float":
+    
+    elif datatype is float:
         data = float(text)
-    elif datatype == "bool":
+    
+    elif datatype is bool:
         data = text.lower() in ("true", "yes", "1", "on", "True")
-    elif datatype in ["list", "dict"]:
+    
+    elif datatype is list:
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError:
+            data = [item.strip() for item in text.split(",")]
+            type_args = get_args(datatype)
+            if len(type_args) == 1:
+                data = [parse_data_from_text(item, type_args[0]) for item in data]
+    
+    elif datatype is dict:
         data = json.loads(text)
+    
+    elif get_origin(datatype) is Union or get_origin(datatype) is UnionType:
+        type_args = get_args(datatype)
+        for i, type_arg in enumerate(type_args):
+            try:
+                data = parse_data_from_text(text, type_arg)
+                break
+            except:
+                if i == len(type_args) - 1:
+                    data = text
+                continue
+            
     else:
         # raise ValueError(
         #     f"Invalid value '{datatype}' is detected for `datatype`. "
