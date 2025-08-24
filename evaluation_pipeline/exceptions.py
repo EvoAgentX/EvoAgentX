@@ -1,0 +1,3 @@
+
+class WorkFlowGenerationFailed(Exception):
+    pass

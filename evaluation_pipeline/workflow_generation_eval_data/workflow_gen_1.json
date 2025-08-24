@@ -1,0 +1,47 @@
+{
+    "workflow_name": "content_analysis",
+    "workflow_id": "a1b2c3d4-e5f6-4789-9012-34567890abcd",
+    "workflow_requirement": "Analyze RSS news content to extract key topics, sentiment, and auto-categorize articles",
+    "workflow_inputs": [
+      {
+        "name": "article_content",
+        "type": "string",
+        "description": "Full article text content",
+        "required": true
+      },
+      {
+        "name": "article_title",
+        "type": "string",
+        "description": "Article title",
+        "required": true
+      },
+      {
+        "name": "source_category",
+        "type": "string",
+        "description": "Source RSS feed category hint",
+        "required": true
+      }
+    ],
+    "workflow_outputs": [
+      {
+        "name": "categories",
+        "type": "array",
+        "description": "Extracted categories with confidence scores"
+      },
+      {
+        "name": "key_topics",
+        "type": "array",
+        "description": "Main topics and keywords"
+      },
+      {
+        "name": "sentiment_score",
+        "type": "number",
+        "description": "Sentiment analysis score (-1 to 1)"
+      },
+      {
+        "name": "summary",
+        "type": "string",
+        "description": "AI-generated article summary"
+      }
+    ]
+}
