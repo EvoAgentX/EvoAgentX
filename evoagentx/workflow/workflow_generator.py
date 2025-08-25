@@ -98,6 +98,7 @@ class WorkFlowGenerator(BaseModule):
         goal: str, 
         workflow_inputs: List[Parameter] = [Parameter(name="workflow_input", type="string", description="workflow input")], 
         workflow_outputs: List[Parameter] = [Parameter(name="workflow_output", type="string", description="workflow output")], 
+        tools: Optional[List[Union[Tool, Toolkit]]] = None,
         retry: int = 1, 
         **kwargs
     ) -> WorkFlowGraph:
@@ -119,6 +120,7 @@ class WorkFlowGenerator(BaseModule):
                 goal=goal, 
                 workflow_inputs=workflow_inputs, 
                 workflow_outputs=workflow_outputs, 
+                tools=tools,
                 retry=retry, 
                 **kwargs
             )
@@ -168,6 +170,7 @@ class WorkFlowGenerator(BaseModule):
         goal: str, 
         workflow_inputs: List[Parameter] = [Parameter(name="workflow_input", type="string", description="workflow input")], 
         workflow_outputs: List[Parameter] = [Parameter(name="workflow_output", type="string", description="workflow output")], 
+        tools: Optional[List[Union[Tool, Toolkit]]] = None,
         retry: int = 1, 
         **kwargs
     ) -> WorkFlowGraph:
@@ -185,9 +188,12 @@ class WorkFlowGenerator(BaseModule):
             WorkFlowGraph: The generated workflow graph
         """
 
-        # Validate input
         if not goal or len(goal.strip()) < 10:
             raise ValueError("Goal must be at least 10 characters and descriptive")
+
+        for workflow_input in workflow_inputs:
+            if workflow_input in workflow_outputs:
+                raise ValueError(f"Workflow input '{workflow_input.name}' is also in workflow outputs")
 
         plan_history, plan_suggestion = "", ""
         task_examples, agent_examples = None, None
@@ -218,7 +224,8 @@ class WorkFlowGenerator(BaseModule):
             operation=self.generate_agents,
             retries_left=retry - cur_retries,
             workflow=workflow,
-            examples=agent_examples
+            examples=agent_examples,
+            tools=tools
         )
 
         self.agents_rag_engine = None
@@ -299,6 +306,7 @@ class WorkFlowGenerator(BaseModule):
         self, 
         workflow: WorkFlowGraph,
         examples: Optional[List[Dict]] = None,
+        tools: Optional[List[Union[Tool, Toolkit]]] = None,
         # history: Optional[str] = None, 
         # suggestion: Optional[str] = None
     ) -> WorkFlowGraph:
@@ -317,15 +325,28 @@ class WorkFlowGenerator(BaseModule):
             self._create_agents_rag_engine(examples)
 
         workflow_desc = workflow.get_workflow_description()
-        agent_generation_tasks = [self._generate_agents_for_node(node, workflow.goal, workflow_desc) for node in workflow.nodes]
+        agent_generation_tasks = [
+            self._generate_agents_for_node(
+                node=node, 
+                goal=workflow.goal, 
+                workflow_desc=workflow_desc,
+                tools=tools
+            ) for node in workflow.nodes
+        ]
         processed_nodes = await asyncio.gather(*agent_generation_tasks)
         workflow.nodes = processed_nodes
-        workflow._validate_workflow_graph()
+        workflow.validate_workflow_graph(auto_fix=True)
         return workflow
     
     
     @retry(stop=stop_after_attempt(2), reraise=True)
-    async def _generate_agents_for_node(self, node: WorkFlowNode, goal: str, workflow_desc: str) -> WorkFlowNode:
+    async def _generate_agents_for_node(
+        self, 
+        node: WorkFlowNode, 
+        goal: str, 
+        workflow_desc: str, 
+        tools: Optional[List[Union[Tool, Toolkit]]] = None
+    ) -> WorkFlowNode:
         if self.agents_rag_engine is not None:
             rag_results = await self.agents_rag_engine.query_async(node.description)
             chunks = rag_results.corpus.chunks
@@ -337,12 +358,25 @@ class WorkFlowGenerator(BaseModule):
         node_dict = node.to_dict(ignore=["class_name"])
         node_data = {key: value for key, value in node_dict.items() if key in node_fields}
         node_desc = json.dumps(node_data, indent=4)
+
+        agent_generation_tools = [] if tools is None else tools
+
+        if self.tools is not None:
+            if len(agent_generation_tools) == 0:
+                agent_generation_tools = self.tools
+            else:
+                tool_names = [tool.name for tool in agent_generation_tools]
+                # only add tools that are not already in `agent_generation_tools`
+                for tool in self.tools:
+                    if tool.name not in tool_names:
+                        agent_generation_tools.append(tool)
+
         agent_generation_action_data = {
             "goal": goal, 
             "workflow": workflow_desc, 
             "task": node_desc, 
             "prebuilt_agents": self.prebuilt_agents,
-            "tools": self.tools,
+            "tools": agent_generation_tools,
             "examples": agent_examples,
         }
         logger.info(f"Generating agents for node: {node_data['name']}")
@@ -389,8 +423,9 @@ class WorkFlowGenerator(BaseModule):
             nodes=nodes, 
             edges=edges, 
             workflow_inputs=workflow_inputs, 
-            workflow_outputs=workflow_outputs
+            workflow_outputs=workflow_outputs,
         )
+        workflow._check_workflow_inputs_outputs(auto_fix=True)
         return workflow
 
 
