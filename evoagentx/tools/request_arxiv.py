@@ -3,6 +3,7 @@ from typing import Dict, Any, Optional, List
 import re
 
 from .tool import Tool, Toolkit
+from .storage_handler import FileStorageHandler
 from .request_base import RequestBase
 
 
@@ -220,13 +221,14 @@ class ArxivBase(RequestBase):
             return text
         return ''
     
-    def download_pdf(self, pdf_url: str, save_path: str) -> Dict[str, Any]:
+    def download_pdf(self, pdf_url: str, save_path: str, storage_handler: FileStorageHandler = None) -> Dict[str, Any]:
         """
         Download a PDF from arXiv.
         
         Args:
             pdf_url: URL of the PDF to download
             save_path: Local path to save the PDF
+            storage_handler: Storage handler for file operations
             
         Returns:
             Dictionary with download status
@@ -234,19 +236,26 @@ class ArxivBase(RequestBase):
         try:
             response = self.request(url=pdf_url, method='GET')
             
-            # Save the PDF content
-            success = self.save_content(
-                content=response.content,  # Use response.content for binary data
-                file_path=save_path,
-                content_type='pdf'
-            )
+            # Get the PDF content
+            pdf_content = response.content
             
-            return {
-                'success': success,
-                'file_path': save_path,
-                'size': len(response.content),
-                'url': pdf_url
-            }
+            # Save the PDF content using storage handler
+            result = storage_handler.save(save_path, pdf_content)
+            if result["success"]:
+                return {
+                    'success': True,
+                    'file_path': save_path,
+                    'size': len(pdf_content),
+                    'url': pdf_url,
+                    'storage_handler': type(storage_handler).__name__
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': f"Failed to save PDF: {result.get('error', 'Unknown error')}",
+                    'url': pdf_url,
+                    'save_path': save_path
+                }
             
         except Exception as e:
             return {
@@ -330,10 +339,11 @@ class ArxivDownloadTool(Tool):
     }
     required: Optional[List[str]] = ["pdf_url", "save_path"]
     
-    def __init__(self, arxiv_base: ArxivBase = None):
+    def __init__(self, arxiv_base: ArxivBase = None, storage_handler: FileStorageHandler = None):
         super().__init__()
         self.arxiv_base = arxiv_base
-    
+        self.storage_handler = storage_handler
+
     def __call__(self, pdf_url: str, save_path: str) -> Dict[str, Any]:
         """
         Download a PDF from arXiv.
@@ -345,22 +355,28 @@ class ArxivDownloadTool(Tool):
         Returns:
             Dictionary with download status
         """
-        return self.arxiv_base.download_pdf(pdf_url, save_path)
+        return self.arxiv_base.download_pdf(pdf_url, save_path, self.storage_handler)
 
 
 class ArxivToolkit(Toolkit):
-    def __init__(self, name: str = "ArxivToolkit"):
+    def __init__(self, name: str = "ArxivToolkit", storage_handler: FileStorageHandler = None):
+        # Initialize storage handler if not provided
+        if storage_handler is None:
+            from .storage_file import LocalStorageHandler
+            storage_handler = LocalStorageHandler()
+        
         # Create the shared arxiv base instance
         arxiv_base = ArxivBase()
         
-        # Create tools with the shared base
+        # Create tools with the shared base and storage handler
         tools = [
             ArxivSearchTool(arxiv_base=arxiv_base),
-            ArxivDownloadTool(arxiv_base=arxiv_base)
+            ArxivDownloadTool(arxiv_base=arxiv_base, storage_handler=storage_handler)
         ]
         
         # Initialize parent with tools
         super().__init__(name=name, tools=tools)
         
         # Store arxiv_base as instance variable
-        self.arxiv_base = arxiv_base 
+        self.arxiv_base = arxiv_base
+        self.storage_handler = storage_handler 

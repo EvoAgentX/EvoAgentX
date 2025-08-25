@@ -49,7 +49,7 @@ class SearchGoogle(SearchBase):
         search_engine_id = os.getenv('GOOGLE_SEARCH_ENGINE_ID', '')
         
         # print(f"api_key: {api_key}")
-        # print(f"search_engine_id: {search_engine_id}")
+        # print(f"search_engine_id: {search_engine_id}")    
             
         if not api_key or not search_engine_id:
             error_msg = (

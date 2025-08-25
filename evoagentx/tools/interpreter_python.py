@@ -8,6 +8,7 @@ import traceback
 from typing import List, Set, Optional, Union, Dict
 from .interpreter_base import BaseInterpreter
 from .tool import Tool,Toolkit
+from .storage_handler import FileStorageHandler
 from pydantic import Field
 
 # Constants
@@ -25,6 +26,7 @@ class PythonInterpreter(BaseInterpreter):
         project_path:Optional[str] = ".",
         directory_names:Optional[List[str]] = [],
         allowed_imports:Optional[Set[str]] = None,
+        storage_handler: FileStorageHandler = None,
         **kwargs
     ):
         """
@@ -35,6 +37,7 @@ class PythonInterpreter(BaseInterpreter):
             project_path (Optional[str]): Path to the project directory for module resolution
             directory_names (Optional[List[str]]): List of directory names to check for imports
             allowed_imports (Optional[Set[str]]): Set of allowed module imports to enforce security
+            storage_handler (Optional[FileStorageHandler]): Storage handler for file operations
             **kwargs: Additional data to pass to the parent class
         """
         super().__init__(
@@ -47,6 +50,13 @@ class PythonInterpreter(BaseInterpreter):
         self.allowed_imports = allowed_imports or set()
         self.namespace = {}
         self.visited_modules = {}
+        
+        # Initialize storage handler
+        if storage_handler is None:
+            from .storage_file import LocalStorageHandler
+            self.storage_handler = LocalStorageHandler(base_path="./workplace/interpreter")
+        else:
+            self.storage_handler = storage_handler
 
     def _get_file_and_folder_names(self, target_path: str) -> List[str]:
         """Retrieves the names of files and folders (without extensions) in a given directory.
@@ -88,8 +98,11 @@ class PythonInterpreter(BaseInterpreter):
 
         
         # Read the module file to perform code analysis
-        with open(path, "r", encoding=DEFAULT_ENCODING) as f:
-            code = f.read()
+        result = self.storage_handler.read(path)
+        if result["success"]:
+            code = result["content"]
+        else:
+            raise FileNotFoundError(f"Could not read file {path}: {result.get('error', 'Unknown error')}")
 
         # Perform safety check before adding functions/classes
         violations = self._analyze_code(code)
@@ -348,14 +361,12 @@ class PythonInterpreter(BaseInterpreter):
             str: The output of the executed code (printed content only), or an error message if the execution fails.
         """
         
-        if not os.path.isfile(file_path):
-            return f"Error: File '{file_path}' does not exist."
-        
-        try:
-            with open(file_path, 'r', encoding=DEFAULT_ENCODING) as file:
-                code = file.read()
-        except Exception as e:
-            return f"Error reading file: {e}"
+        # Read file using storage handler
+        result = self.storage_handler.read(file_path)
+        if result["success"]:
+            code = result["content"]
+        else:
+            return f"Error: Could not read file '{file_path}': {result.get('error', 'Unknown error')}"
             
         return self.execute(code, language)
     
@@ -427,14 +438,21 @@ class PythonInterpreterToolkit(Toolkit):
         project_path: Optional[str] = ".",
         directory_names: Optional[List[str]] = None,
         allowed_imports: Optional[Set[str]] = None,
+        storage_handler: FileStorageHandler = None,
         **kwargs
     ):
-        # Create the shared Python interpreter instance
+        # Initialize storage handler if not provided
+        if storage_handler is None:
+            from .storage_file import LocalStorageHandler
+            storage_handler = LocalStorageHandler(base_path="./workplace/python")
+        
+        # Create the shared Python interpreter instance with storage handler
         python_interpreter = PythonInterpreter(
             name="PythonInterpreter",
             project_path=project_path,
             directory_names=directory_names or [],
             allowed_imports=allowed_imports,
+            storage_handler=storage_handler,
             **kwargs
         )
         
@@ -449,4 +467,6 @@ class PythonInterpreterToolkit(Toolkit):
         
         # Store python_interpreter as instance variable
         self.python_interpreter = python_interpreter
+    
+
     

@@ -1,8 +1,8 @@
 import requests
+import html2text
 from bs4 import BeautifulSoup
 from typing import Tuple, Optional
 from ..core.module import BaseModule
-from ..core.logging import logger
 from pydantic import Field
 
 class SearchBase(BaseModule):
@@ -32,6 +32,13 @@ class SearchBase(BaseModule):
         """ 
         # Pass to parent class initialization
         super().__init__(name=name, num_search_pages=num_search_pages, max_content_words=max_content_words, **kwargs)
+        self.content_converter = html2text.HTML2Text()
+        # Configure html2text for better content extraction
+        self.content_converter.ignore_links = False
+        self.content_converter.ignore_images = True
+        self.content_converter.body_width = 0  # Don't wrap text
+        self.content_converter.unicode_snob = True
+        self.content_converter.escape_snob = True
     
     def _truncate_content(self, content: str, max_words: Optional[int] = None) -> str:
         """
@@ -75,10 +82,9 @@ class SearchBase(BaseModule):
             tuple: (Optional[title], Optional[main textual content])
         """
         headers = {"User-Agent": "Mozilla/5.0"}
-        response = requests.get(url, headers=headers, timeout=5)
+        response = requests.get(url, headers=headers, timeout=10)
 
         if response.status_code != 200:
-            logger.warning(f"Failed to scrape page {url}, status code: {response.status_code} ({response.reason}), response: {response.text[:200]}...")
             return None, None
 
         soup = BeautifulSoup(response.text, "html.parser")
@@ -86,9 +92,25 @@ class SearchBase(BaseModule):
         # Extract title
         title = soup.title.string if soup.title else "No Title"
 
-        # Extract text content (only from <p> tags)
-        paragraphs = soup.find_all("p")
-        paragraph_texts = [p.get_text(strip=True) for p in paragraphs if p.get_text(strip=True)]
-        text_content = "\n\n".join(paragraph_texts)
+        # Try to extract main content for specific sites
+        main_content = None
+        
+        # For Wikipedia, try to get the main content area
+        if 'wikipedia.org' in url:
+            main_content = soup.find('div', {'id': 'mw-content-text'})
+            if main_content:
+                # Remove navigation and other non-content elements
+                for element in main_content.find_all(['nav', 'script', 'style', 'table']):
+                    element.decompose()
+                text_content = self.content_converter.handle(str(main_content))
+            else:
+                text_content = self.content_converter.handle(response.text)
+        else:
+            # For other sites, try to find main content areas
+            main_content = soup.find('main') or soup.find('article') or soup.find('div', {'class': 'content'})
+            if main_content:
+                text_content = self.content_converter.handle(str(main_content))
+            else:
+                text_content = self.content_converter.handle(response.text)
 
         return title, text_content

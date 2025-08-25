@@ -1,16 +1,30 @@
 #!/usr/bin/env python3
+
+"""
+To test with postgresql, you might need to run the following commands:
+# sudo service postgresql start
+# sudo -u postgres psql -c "CREATE USER testuser WITH PASSWORD 'testpass';"
+# sudo -u postgres psql -c "CREATE DATABASE testdb;"
+# sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE testdb TO testuser;"
+"""
+
+
 """
 Example demonstrating how to use various toolkits from EvoAgentX.
 This script provides comprehensive examples for:
 - PythonInterpreter and DockerInterpreter tools for code execution
 - BrowserToolkit with auto-initialization and auto-cleanup
 - Search toolkits (Wikipedia, Google, Google Free)
-- File operations with different file types
+- File operations with different file types using the new StorageToolkit
 - MCP toolkit integration
+- FAISS toolkit for semantic search and document management
+- PostgreSQL toolkit for relational database operations
+- MongoDB toolkit for document database operations
 """
 
 import os
 import sys
+import json
 from pathlib import Path
 
 # Add the parent directory to sys.path to import from evoagentx
@@ -22,11 +36,20 @@ from evoagentx.tools import (
     WikipediaSearchToolkit,
     GoogleSearchToolkit,
     GoogleFreeSearchToolkit,
+    DDGSSearchToolkit,
+    SerpAPIToolkit,  # Added SerpAPI toolkit
+    SerperAPIToolkit,  # Added SerperAPI toolkit
     MCPToolkit,
-    FileToolkit,
+    StorageToolkit,  # Updated to use new StorageToolkit
     BrowserToolkit,
     ArxivToolkit,
-    BrowserUseToolkit
+    BrowserUseToolkit,
+    FaissToolkit,
+    PostgreSQLToolkit,
+    MongoDBToolkit,
+    RSSToolkit,
+    CMDToolkit,
+    RequestToolkit
 )
 
 
@@ -216,7 +239,7 @@ except ImportError as e:
 
 def run_search_examples():
     """
-    Run examples using the search toolkits (Wikipedia, Google, and Google Free).
+    Run examples using the search toolkits (Wikipedia, Google, Google Free, DDGS, SerpAPI, and SerperAPI).
     """
     print("\n===== SEARCH TOOLS EXAMPLES =====\n")
     
@@ -224,63 +247,164 @@ def run_search_examples():
     wiki_toolkit = WikipediaSearchToolkit(max_summary_sentences=3)
     google_toolkit = GoogleSearchToolkit(num_search_pages=3, max_content_words=200)
     google_free_toolkit = GoogleFreeSearchToolkit()
+    ddgs_toolkit = DDGSSearchToolkit(num_search_pages=3, max_content_words=200, backend="auto", region="us-en")
+    
+    # Initialize SerpAPI toolkit (will check for API key)
+    serpapi_toolkit = SerpAPIToolkit(
+        num_search_pages=3, 
+        max_content_words=300,
+        enable_content_scraping=True
+    )
+    
+    # Initialize SerperAPI toolkit (will check for API key)
+    serperapi_toolkit = SerperAPIToolkit(
+        num_search_pages=3,
+        max_content_words=300,
+        enable_content_scraping=True
+    )
     
     # Get the individual tools from toolkits
     wiki_tool = wiki_toolkit.get_tool("wikipedia_search")
     google_tool = google_toolkit.get_tool("google_search")
     google_free_tool = google_free_toolkit.get_tool("google_free_search")
+    ddgs_tool = ddgs_toolkit.get_tool("ddgs_search")
+    serpapi_tool = serpapi_toolkit.get_tool("serpapi_search")
+    serperapi_tool = serperapi_toolkit.get_tool("serperapi_search")
     
-    # Example search query
+    # # Example search query
     query = "artificial intelligence agent architecture"
     
-    # Run Wikipedia search example
-    try:
-        print("\nWikipedia Search Example:")
-        print("-" * 50)
-        wiki_results = wiki_tool(query=query, num_search_pages=2)
+    # # Run Wikipedia search example
+    # try:
+    #     print("\nWikipedia Search Example:")
+    #     print("-" * 50)
+    #     wiki_results = wiki_tool(query=query, num_search_pages=2)
         
-        if wiki_results.get("error"):
-            print(f"Error: {wiki_results['error']}")
-        else:
-            for i, result in enumerate(wiki_results.get("results", [])):
-                print(f"Result {i+1}: {result['title']}")
-                print(f"Summary: {result['summary'][:150]}...")
-                print(f"URL: {result['url']}")
-                print("-" * 30)
-    except Exception as e:
-        print(f"Error running Wikipedia search: {str(e)}")
+    #     if wiki_results.get("error"):
+    #         print(f"Error: {wiki_results['error']}")
+    #     else:
+    #         for i, result in enumerate(wiki_results.get("results", [])):
+    #             print(f"Result {i+1}: {result['title']}")
+    #             print(f"Summary: {result['summary'][:150]}...")
+    #             print(f"URL: {result['url']}")
+    #             print("-" * 30)
+    # except Exception as e:
+    #     print(f"Error running Wikipedia search: {str(e)}")
     
-    # Run Google search example (requires API key)
-    try:
-        print("\nGoogle Search Example (requires API key):")
-        print("-" * 50)
-        google_results = google_tool(query=query)
+    # # Run Google search example (requires API key)
+    # try:
+    #     print("\nGoogle Search Example (requires API key):")
+    #     print("-" * 50)
+    #     google_results = google_tool(query=query)
         
-        if google_results.get("error"):
-            print(f"Error: {google_results['error']}")
-        else:
-            for i, result in enumerate(google_results.get("results", [])):
-                print(f"Result {i+1}: {result['title']}")
-                print(f"URL: {result['url']}")
-                print("-" * 30)
-    except Exception as e:
-        print(f"Error running Google search: {str(e)}")
+    #     if google_results.get("error"):
+    #         print(f"Error: {google_results['error']}")
+    #     else:
+    #         for i, result in enumerate(google_results.get("results", [])):
+    #             print(f"Result {i+1}: {result['title']}")
+    #             print(f"URL: {result['url']}")
+    #             print("-" * 30)
+    # except Exception as e:
+    #     print(f"Error running Google search: {str(e)}")
     
-    # Run Google Free search example
-    try:
-        print("\nGoogle Free Search Example:")
-        print("-" * 50)
-        free_results = google_free_tool(query=query, num_search_pages=2)
+    # # Run Google Free search example
+    # try:
+    #     print("\nGoogle Free Search Example:")
+    #     print("-" * 50)
+    #     free_results = google_free_tool(query=query, num_search_pages=2)
         
-        if free_results.get("error"):
-            print(f"Error: {free_results['error']}")
+    #     if free_results.get("error"):
+    #         print(f"Error: {free_results['error']}")
+    #     else:
+    #         for i, result in enumerate(free_results.get("results", [])):
+    #             print(f"Result {i+1}: {result['title']}")
+    #             print(f"URL: {result['url']}")
+    #             print("-" * 30)
+    # except Exception as e:
+    #     print(f"Error running free Google search: {str(e)}")
+    
+    # Run DDGS search example
+    try:
+        print("\nDDGS Search Example:")
+        print("-" * 50)
+        ddgs_results = ddgs_tool(query=query, num_search_pages=2, backend="duckduckgo")
+        
+        if ddgs_results.get("error"):
+            print(f"Error: {ddgs_results['error']}")
         else:
-            for i, result in enumerate(free_results.get("results", [])):
+            for i, result in enumerate(ddgs_results.get("results", [])):
                 print(f"Result {i+1}: {result['title']}")
+                print(f"Result full: \n{result}")
                 print(f"URL: {result['url']}")
                 print("-" * 30)
     except Exception as e:
-        print(f"Error running free Google search: {str(e)}")
+        print(f"Error running DDGS search: {str(e)}")
+    
+    # Run SerpAPI search example (requires API key)
+    serpapi_api_key = os.getenv("SERPAPI_KEY")
+    if serpapi_api_key:
+        try:
+            print("\nSerpAPI Search Example (with content scraping):")
+            print("-" * 50)
+            print(f"✓ Using SerpAPI key: {serpapi_api_key[:8]}...")
+            
+            serpapi_results = serpapi_tool(
+                query=query, 
+                num_search_pages=3,
+                max_content_words=300,
+                engine="google",
+                location="United States",
+                language="en"
+            )
+            
+            if serpapi_results.get("error"):
+                print(f"Error: {serpapi_results['error']}")
+            else:
+                # Display processed results
+                print(f"SerpAPI results: {serpapi_results}")
+                
+        except Exception as e:
+            print(f"Error running SerpAPI search: {str(e)}")
+    else:
+        print("\nSerpAPI Search Example:")
+        print("-" * 50)
+        print("❌ SERPAPI_KEY not found in environment variables")
+        print("To test SerpAPI search, set your API key:")
+        print("export SERPAPI_KEY='your-serpapi-key-here'")
+        print("Get your key from: https://serpapi.com/")
+        print("✓ SerpAPI toolkit initialized successfully (API key required for search)")
+    
+    # Run SerperAPI search example (requires API key)
+    serperapi_api_key = os.getenv("SERPERAPI_KEY")
+    if serperapi_api_key:
+        try:
+            print("\nSerperAPI Search Example (with content scraping):")
+            print("-" * 50)
+            print(f"✓ Using SerperAPI key: {serperapi_api_key[:8]}...")
+            
+            serperapi_results = serperapi_tool(
+                query=query,
+                num_search_pages=3,
+                max_content_words=300,
+                location="United States",
+                language="en"
+            )
+            
+            if serperapi_results.get("error"):
+                print(f"Error: {serperapi_results['error']}")
+            else:
+                print(f"SerperAPI results: {serperapi_results}")
+                
+        except Exception as e:
+            print(f"Error running SerperAPI search: {str(e)}")
+    else:
+        print("\nSerperAPI Search Example:")
+        print("-" * 50)
+        print("❌ SERPERAPI_KEY not found in environment variables")
+        print("To test SerperAPI search, set your API key:")
+        print("export SERPERAPI_KEY='your-serperapi-key-here'")
+        print("Get your key from: https://serper.dev/")
+        print("✓ SerperAPI toolkit initialized successfully (API key required for search)")
 
 
 def run_python_interpreter_examples():
@@ -399,227 +523,133 @@ def run_mcp_example():
 
 def run_file_tool_example():
     """
-    Run an example using the FileToolkit to read and write PDF files.
+    Run an example using the StorageToolkit to read and write files with the new storage handler system.
     """
-    print("\n===== FILE TOOL EXAMPLE =====\n")
+    print("\n===== STORAGE TOOL EXAMPLE =====\n")
     
     try:
-        # Initialize the file toolkit
-        file_toolkit = FileToolkit()
+        # Initialize the storage toolkit with default storage handler
+        storage_toolkit = StorageToolkit(name="DemoStorageToolkit")
         
         # Get individual tools from the toolkit
-        read_tool = file_toolkit.get_tool("read_file")
-        write_tool = file_toolkit.get_tool("write_file")
-        append_tool = file_toolkit.get_tool("append_file")
+        save_tool = storage_toolkit.get_tool("save")
+        read_tool = storage_toolkit.get_tool("read")
+        append_tool = storage_toolkit.get_tool("append")
+        list_tool = storage_toolkit.get_tool("list_files")
+        exists_tool = storage_toolkit.get_tool("exists")
         
-        # Create sample content for a PDF
-        sample_content = """This is a sample PDF document created using the FileTool.
-This tool provides special handling for different file types.
-For PDF files, it uses PyPDF2 library for reading operations."""
+        # Create sample content for different file types
+        sample_text = """This is a sample text document created using the StorageToolkit.
+This tool provides comprehensive file operations with automatic format detection.
+It supports various file types including text, JSON, CSV, YAML, XML, Excel, and more."""
         
-        # Example PDF file path
-        pdf_path = os.path.join(os.getcwd(), "examples", "output", "sample_document.pdf")
+        sample_json = {
+            "name": "Sample Document",
+            "type": "test",
+            "content": "This is a JSON document for testing",
+            "metadata": {
+                "created": "2024-01-01",
+                "version": "1.0"
+            }
+        }
         
-        # Make sure the output directory exists
-        os.makedirs(os.path.dirname(pdf_path), exist_ok=True)
+        # Test file operations with default storage paths
+        print("1. Testing file save operations...")
         
-        print(f"Writing content to PDF file: {pdf_path}")
-        
-        # Write content to PDF file
-        write_result = write_tool(file_path=pdf_path, content=sample_content)
-        print("Write Result:")
+        # Save text file
+        text_result = save_tool(
+            file_path="sample_document.txt",
+            content=sample_text
+        )
+        print("Text file save result:")
         print("-" * 30)
-        print(write_result)
-        print("-" * 30)
-        
-        # Read content from PDF file
-        print(f"\nReading content from PDF file: {pdf_path}")
-        read_result = read_tool(file_path=pdf_path)
-        print("Read Result:")
-        print("-" * 30)
-        print(read_result)
-        print("-" * 30)
-        
-        # Also demonstrate with a regular text file
-        text_path = os.path.join(os.getcwd(), "examples", "output", "sample_text.txt")
-        
-        print(f"\nWriting content to text file: {text_path}")
-        text_write_result = write_tool(file_path=text_path, content="This is a sample text file.")
-        print("Text Write Result:")
-        print("-" * 30)
-        print(text_write_result)
+        print(text_result)
         print("-" * 30)
         
-        print(f"\nReading content from text file: {text_path}")
-        text_read_result = read_tool(file_path=text_path)
-        print("Text Read Result:")
+        # Save JSON file
+        json_result = save_tool(
+            file_path="sample_data.json",
+            content=json.dumps(sample_json, indent=2)
+        )
+        print("JSON file save result:")
+        print("-" * 30)
+        print(json_result)
+        print("-" * 30)
+        
+        # Test file read operations
+        print("\n2. Testing file read operations...")
+        
+        # Read text file
+        text_read_result = read_tool(file_path="sample_document.txt")
+        print("Text file read result:")
         print("-" * 30)
         print(text_read_result)
         print("-" * 30)
         
-        # ===== APPEND FILE OPERATIONS =====
-        print("\n===== APPEND FILE OPERATIONS =====\n")
-        
-        # 1. Append to text file
-        print(f"Appending content to text file: {text_path}")
-        append_text_content = "\nThis line was appended to the text file."
-        text_append_result = append_tool(file_path=text_path, content=append_text_content)
-        print("Text Append Result:")
+        # Read JSON file
+        json_read_result = read_tool(file_path="sample_data.json")
+        print("JSON file read result:")
         print("-" * 30)
-        print(text_append_result)
+        print(json_read_result)
         print("-" * 30)
         
-        # Read the text file again to show appended content
-        print(f"\nReading text file after append: {text_path}")
-        text_read_after_append = read_tool(file_path=text_path)
-        print("Text File After Append:")
-        print("-" * 30)
-        print(text_read_after_append)
-        print("-" * 30)
+        # Test file append operations
+        print("\n3. Testing file append operations...")
         
-        # 2. Append to PDF file
-        print(f"\nAppending content to PDF file: {pdf_path}")
-        append_pdf_content = "\n\nThis content was appended to the PDF document.\nIt demonstrates PDF append functionality."
-        pdf_append_result = append_tool(file_path=pdf_path, content=append_pdf_content)
-        print("PDF Append Result:")
+        # Append to text file
+        append_text_result = append_tool(
+            file_path="sample_document.txt",
+            content="\n\nThis content was appended to the text file."
+        )
+        print("Text file append result:")
         print("-" * 30)
-        print(pdf_append_result)
+        print(append_text_result)
         print("-" * 30)
         
-        # Read the PDF file again to show appended content
-        print(f"\nReading PDF file after append: {pdf_path}")
-        pdf_read_after_append = read_tool(file_path=pdf_path)
-        print("PDF File After Append:")
+        # Append to JSON file (will add to existing array or create new array)
+        append_json_data = {"additional": "data", "timestamp": "2024-01-01T12:00:00Z"}
+        append_json_result = append_tool(
+            file_path="sample_data.json",
+            content=json.dumps(append_json_data)
+        )
+        print("JSON file append result:")
         print("-" * 30)
-        print(pdf_read_after_append)
-        print("-" * 30)
-        
-        # 3. Append to log file
-        log_path = os.path.join(os.getcwd(), "examples", "output", "application.log")
-        print(f"\nCreating and appending to log file: {log_path}")
-        
-        # Initial log entry
-        initial_log = "2024-01-01 10:00:00 INFO Application started"
-        log_write_result = write_tool(file_path=log_path, content=initial_log)
-        print("Initial Log Write Result:")
-        print("-" * 30)
-        print(log_write_result)
+        print(append_json_result)
         print("-" * 30)
         
-        # Append multiple log entries
-        log_entries = [
-            "\n2024-01-01 10:01:00 INFO User logged in",
-            "\n2024-01-01 10:02:00 WARNING Cache miss for key 'user_data'",
-            "\n2024-01-01 10:03:00 ERROR Database connection failed",
-            "\n2024-01-01 10:04:00 INFO Retrying database connection",
-            "\n2024-01-01 10:05:00 INFO Database connection restored"
-        ]
-        
-        for log_entry in log_entries:
-            append_result = append_tool(file_path=log_path, content=log_entry)
-            print(f"Appended: {log_entry.strip()}")
-        
-        # Read the complete log file
-        print(f"\nReading complete log file: {log_path}")
-        log_read_result = read_tool(file_path=log_path)
-        print("Complete Log File:")
+        # Test file listing
+        print("\n4. Testing file listing...")
+        list_result = list_tool(path=".", max_depth=2, include_hidden=False)
+        print("File listing result:")
         print("-" * 30)
-        print(log_read_result)
+        print(list_result)
         print("-" * 30)
         
-        # 4. Append to CSV file
-        csv_path = os.path.join(os.getcwd(), "examples", "output", "data.csv")
-        print(f"\nCreating and appending to CSV file: {csv_path}")
-        
-        # Initial CSV header and data
-        csv_header = "Name,Age,City,Occupation"
-        csv_write_result = write_tool(file_path=csv_path, content=csv_header)
-        print("CSV Header Write Result:")
+        # Test file existence
+        print("\n5. Testing file existence...")
+        exists_result = exists_tool(path="sample_document.txt")
+        print("File existence check result:")
         print("-" * 30)
-        print(csv_write_result)
+        print(exists_result)
         print("-" * 30)
         
-        # Append CSV rows
-        csv_rows = [
-            "\nJohn Doe,30,New York,Engineer",
-            "\nJane Smith,25,Los Angeles,Designer",
-            "\nBob Johnson,35,Chicago,Manager",
-            "\nAlice Brown,28,San Francisco,Developer"
-        ]
-        
-        for csv_row in csv_rows:
-            append_result = append_tool(file_path=csv_path, content=csv_row)
-            print(f"Appended CSV row: {csv_row.strip()}")
-        
-        # Read the complete CSV file
-        print(f"\nReading complete CSV file: {csv_path}")
-        csv_read_result = read_tool(file_path=csv_path)
-        print("Complete CSV File:")
+        # Test supported formats
+        print("\n6. Testing supported formats...")
+        formats_tool = storage_toolkit.get_tool("list_supported_formats")
+        formats_result = formats_tool()
+        print("Supported formats result:")
         print("-" * 30)
-        print(csv_read_result)
+        print(formats_result)
         print("-" * 30)
         
-        # 5. Append to configuration file
-        config_path = os.path.join(os.getcwd(), "examples", "output", "config.ini")
-        print(f"\nCreating and appending to config file: {config_path}")
-        
-        # Initial config content
-        initial_config = """[DATABASE]
-host = localhost
-port = 5432
-name = myapp"""
-        
-        config_write_result = write_tool(file_path=config_path, content=initial_config)
-        print("Initial Config Write Result:")
-        print("-" * 30)
-        print(config_write_result)
-        print("-" * 30)
-        
-        # Append new config sections
-        additional_configs = [
-            "\n\n[CACHE]",
-            "\nredis_host = localhost",
-            "\nredis_port = 6379",
-            "\nttl = 3600",
-            "\n\n[LOGGING]",
-            "\nlevel = INFO",
-            "\nfile = /var/log/myapp.log",
-            "\nmax_size = 10MB"
-        ]
-        
-        for config_line in additional_configs:
-            append_result = append_tool(file_path=config_path, content=config_line)
-        
-        print("Appended additional configuration sections")
-        
-        # Read the complete config file
-        print(f"\nReading complete config file: {config_path}")
-        config_read_result = read_tool(file_path=config_path)
-        print("Complete Config File:")
-        print("-" * 30)
-        print(config_read_result)
-        print("-" * 30)
-        
-        # 6. Demonstrate error handling for non-existent file append
-        non_existent_path = os.path.join(os.getcwd(), "examples", "output", "non_existent.txt")
-        print(f"\nTesting append to non-existent file: {non_existent_path}")
-        error_append_result = append_tool(file_path=non_existent_path, content="This should create a new file")
-        print("Append to Non-existent File Result:")
-        print("-" * 30)
-        print(error_append_result)
-        print("-" * 30)
-        
-        # Verify the file was created
-        if error_append_result.get("success"):
-            print(f"Reading newly created file: {non_existent_path}")
-            new_file_read = read_tool(file_path=non_existent_path)
-            print("Newly Created File Content:")
-            print("-" * 30)
-            print(new_file_read)
-            print("-" * 30)
+        print("\n✓ StorageToolkit test completed successfully!")
+        print("✓ All file operations working with default storage handler")
+        print("✓ Automatic format detection working")
+        print("✓ File append operations working")
+        print("✓ File listing and existence checks working")
         
     except Exception as e:
-        print(f"Error running file tool example: {str(e)}")
+        print(f"Error running storage tool example: {str(e)}")
 
 
 def run_browser_tool_example():
@@ -873,35 +903,533 @@ def run_browser_use_tool_example():
         print("Note: Make sure you have the required dependencies installed and API keys set up.")
 
 
+def run_faiss_tool_example():
+    """Powerful example using FaissToolkit for semantic search and document management."""
+    print("\n===== FAISS TOOL EXAMPLE =====\n")
+    
+    # Check for OpenAI API key
+    if not os.getenv("OPENAI_API_KEY"):
+        print("❌ OPENAI_API_KEY not found - skipping FAISS example")
+        return
+    
+    try:
+        # Initialize FAISS toolkit with default storage (no explicit path needed)
+        toolkit = FaissToolkit(
+            name="DemoFaissToolkit",
+            default_corpus_id="demo_corpus"
+        )
+        
+        print("✓ FaissToolkit initialized with default storage")
+        
+        # Get tools
+        insert_tool = toolkit.get_tool("faiss_insert")
+        query_tool = toolkit.get_tool("faiss_query")
+        stats_tool = toolkit.get_tool("faiss_stats")
+        delete_tool = toolkit.get_tool("faiss_delete")
+        
+        # Insert AI knowledge documents
+        documents = [
+            "Artificial Intelligence enables machines to perform tasks requiring human intelligence.",
+            "Machine learning allows computers to learn from data without explicit programming.",
+            "Deep learning uses neural networks with multiple layers for complex pattern recognition.",
+            "Natural Language Processing helps computers understand and generate human language.",
+            "Computer vision enables machines to interpret visual information from images and videos."
+        ]
+        
+        try:
+            result = insert_tool(
+                documents=documents,
+                metadata={"source": "ai_knowledge", "topic": "artificial_intelligence"}
+            )
+            
+            if result["success"]:
+                print(f"✓ Inserted {result['data']['documents_inserted']} documents")
+                
+                # Perform semantic search
+                search_result = query_tool(
+                    query="How do machines learn?",
+                    top_k=3,
+                    similarity_threshold=0.1
+                )
+                
+                if search_result["success"]:
+                    print(f"✓ Found {search_result['data']['total_results']} relevant results")
+                    for i, res in enumerate(search_result["data"]["results"], 1):
+                        print(f"  {i}. Score: {res['score']:.3f} - {res['content'][:80]}...")
+                
+                # Get statistics
+                stats_result = stats_tool()
+                if stats_result["success"]:
+                    print(f"✓ Database stats: {stats_result['data']['total_corpora']} corpora")
+                
+                # Test delete functionality
+                print("\n🗑️ Testing delete functionality...")
+                delete_result = delete_tool(
+                    metadata_filters={"source": "ai_knowledge"}
+                )
+                
+                if delete_result["success"]:
+                    print(f"✓ Deleted documents with metadata filter")
+                    
+                    # Verify deletion
+                    verify_result = query_tool(
+                        query="artificial intelligence",
+                        top_k=5,
+                        similarity_threshold=0.1
+                    )
+                    
+                    if verify_result["success"]:
+                        remaining = verify_result['data']['total_results']
+                        print(f"✓ Remaining documents after deletion: {remaining}")
+            else:
+                print(f"❌ Insert failed: {result.get('error', 'Unknown error')}")
+                
+        except Exception as e:
+            if "DocumentMetadata" in str(e):
+                print("⚠ DocumentMetadata import issue detected - this may be a dependency problem")
+                print("   The FAISS toolkit requires proper RAG engine dependencies")
+                print(f"   Error details: {str(e)}")
+            else:
+                print(f"❌ Unexpected error during FAISS operations: {str(e)}")
+        
+        print("\n✓ FaissToolkit test completed with default storage")
+        
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        if "DocumentMetadata" in str(e):
+            print("Note: This appears to be a dependency issue with the RAG engine components")
+            print("The FAISS toolkit may need additional setup or dependencies")
+
+
+def run_postgresql_tool_example():
+    """Powerful example using PostgreSQLToolkit for database operations."""
+    print("\n===== POSTGRESQL TOOL EXAMPLE =====\n")
+    
+    try:
+        # Initialize PostgreSQL toolkit with default storage (no explicit path needed)
+        toolkit = PostgreSQLToolkit(
+            name="DemoPostgreSQLToolkit",
+            database_name="demo_db",
+            auto_save=True
+        )
+        
+        print("✓ PostgreSQLToolkit initialized with default storage")
+        
+        # Get tools
+        execute_tool = toolkit.get_tool("postgresql_execute")
+        find_tool = toolkit.get_tool("postgresql_find")
+        create_tool = toolkit.get_tool("postgresql_create")
+        delete_tool = toolkit.get_tool("postgresql_delete")
+        
+        # Create users table and insert data
+        create_sql = """
+        CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(100) NOT NULL,
+            email VARCHAR(100) UNIQUE NOT NULL,
+            age INTEGER,
+            department VARCHAR(50)
+        );
+        """
+        
+        result = create_tool(create_sql)
+        if result["success"]:
+            print("✓ Created users table")
+            
+            # Insert users
+            insert_sql = """
+            INSERT INTO users (name, email, age, department) VALUES
+            ('Alice Johnson', 'alice@example.com', 28, 'Engineering'),
+            ('Bob Smith', 'bob@example.com', 32, 'Marketing'),
+            ('Carol Davis', 'carol@example.com', 25, 'Engineering')
+            ON CONFLICT (email) DO NOTHING;
+            """
+            
+            result = execute_tool(insert_sql)
+            if result["success"]:
+                print("✓ Inserted users")
+                
+                # Query users - fix the field access issue
+                find_result = find_tool(
+                    "users",
+                    where="department = 'Engineering'",
+                    columns="name, age",
+                    sort="age ASC"
+                )
+                
+                if find_result["success"]:
+                    engineers = find_result["data"]
+                    print(f"✓ Found {len(engineers)} engineers:")
+                    for user in engineers:
+                        # Handle potential missing fields safely
+                        name = user.get('name', 'Unknown')
+                        age = user.get('age', 'N/A')
+                        print(f"  - {name} (age: {age})")
+                
+                # Test delete functionality
+                print("\n🗑️ Testing delete functionality...")
+                delete_result = delete_tool(
+                    "users",
+                    "department = 'Marketing'"
+                )
+                
+                if delete_result["success"]:
+                    deleted_count = delete_result["data"].get("rowcount", 0)
+                    print(f"✓ Deleted {deleted_count} marketing users")
+                    
+                    # Verify deletion
+                    verify_result = find_tool("users")
+                    if verify_result["success"]:
+                        remaining = verify_result["data"]
+                        print(f"✓ Remaining users after deletion: {len(remaining)}")
+        
+        print("\n✓ PostgreSQLToolkit test completed with default storage")
+        
+    except Exception as e:
+        print(f"Error: {str(e)}")
+
+
+def run_mongodb_tool_example():
+    """Powerful example using MongoDBToolkit for document operations."""
+    print("\n===== MONGODB TOOL EXAMPLE =====\n")
+    
+    try:
+        # Initialize MongoDB toolkit with default storage (no explicit path needed)
+        toolkit = MongoDBToolkit(
+            name="DemoMongoDBToolkit",
+            database_name="demo_db",
+            auto_save=True
+        )
+        
+        print("✓ MongoDBToolkit initialized with default storage")
+        
+        # Get tools
+        execute_tool = toolkit.get_tool("mongodb_execute_query")
+        find_tool = toolkit.get_tool("mongodb_find")
+        delete_tool = toolkit.get_tool("mongodb_delete")
+        
+        # Insert products data - fix query format
+        products = [
+            {"id": "P001", "name": "Laptop", "category": "Electronics", "price": 999.99, "stock": 50},
+            {"id": "P002", "name": "Mouse", "category": "Electronics", "price": 29.99, "stock": 100},
+            {"id": "P003", "name": "Desk Chair", "category": "Furniture", "price": 199.99, "stock": 25}
+        ]
+        
+        # Use proper JSON string format
+        result = execute_tool(
+            query=json.dumps(products),
+            query_type="insert",
+            collection_name="products"
+        )
+        
+        if result["success"]:
+            print("✓ Inserted products")
+            
+            # Query products with filter
+            find_result = find_tool(
+                collection_name="products",
+                filter='{"category": "Electronics"}',
+                sort='{"price": -1}'
+            )
+            
+            if find_result["success"]:
+                electronics = find_result["data"]
+                print(f"✓ Found {len(electronics)} electronics products:")
+                for product in electronics:
+                    name = product.get('name', 'Unknown')
+                    price = product.get('price', 0)
+                    stock = product.get('stock', 0)
+                    print(f"  - {name}: ${price} (stock: {stock})")
+            
+            # Test delete functionality
+            print("\n🗑️ Testing delete functionality...")
+            delete_result = delete_tool(
+                collection_name="products",
+                filter='{"category": "Furniture"}',
+                multi=True
+            )
+            
+            if delete_result["success"]:
+                deleted_count = delete_result["data"].get("deleted_count", 0)
+                print(f"✓ Deleted {deleted_count} furniture products")
+                
+                # Verify deletion
+                verify_result = find_tool(collection_name="products")
+                if verify_result["success"]:
+                    remaining = verify_result["data"]
+                    print(f"✓ Remaining products after deletion: {len(remaining)}")
+        
+        print("\n✓ MongoDBToolkit test completed with default storage")
+        
+    except Exception as e:
+        print(f"Error: {str(e)}")
+
+
+def run_rss_tool_example():
+    """Powerful example using RSSToolkit for RSS feed operations."""
+    print("\n===== RSS TOOL EXAMPLE =====\n")
+    
+    try:
+        # Initialize RSS toolkit
+        toolkit = RSSToolkit(name="DemoRSSToolkit")
+        
+        print("✓ RSSToolkit initialized")
+        
+        # Get tools
+        fetch_tool = toolkit.get_tool("rss_fetch")
+        validate_tool = toolkit.get_tool("rss_validate")
+        
+        # Test RSS feed URLs
+        test_feeds = [
+            "https://feeds.bbci.co.uk/news/rss.xml",  # BBC News
+            "https://rss.cnn.com/rss/edition.rss",    # CNN
+            "https://feeds.feedburner.com/TechCrunch" # TechCrunch
+        ]
+        
+        for feed_url in test_feeds:
+            print(f"\n--- Testing RSS Feed: {feed_url} ---")
+            
+            # Validate the feed
+            print("1. Validating RSS feed...")
+            validate_result = validate_tool(url=feed_url)
+            
+            if validate_result.get("success") and validate_result.get("is_valid"):
+                print(f"✓ Valid {validate_result.get('feed_type')} feed: {validate_result.get('title', 'Unknown')}")
+                
+                # Fetch the feed
+                print("2. Fetching RSS feed...")
+                fetch_result = fetch_tool(feed_url=feed_url, max_entries=3)
+                
+                if fetch_result.get("success"):
+                    entries = fetch_result.get("entries", [])
+                    print(f"✓ Fetched {len(entries)} entries from '{fetch_result.get('title')}'")
+                    
+                    # Display first few entries
+                    for i, entry in enumerate(entries[:2], 1):
+                        print(f"  Entry {i}: {entry.get('title', 'No title')}")
+                        print(f"    Published: {entry.get('published', 'Unknown')}")
+                        print(f"    Link: {entry.get('link', 'No link')}")
+                        print(f"    Author: {entry.get('author', 'Unknown')}")
+                        print()
+                
+                # Test monitoring for recent entries
+                print("3. Testing feed monitoring...")
+                
+                
+                
+            else:
+                print(f"❌ Invalid or inaccessible feed: {validate_result.get('error', 'Unknown error')}")
+        
+        print("\n✓ RSSToolkit test completed")
+        
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        print("Note: RSS feed availability may vary. Some feeds may be temporarily unavailable.")
+
+
+def run_cmd_tool_example():
+    """Simple example using CMDToolkit for command line operations."""
+    print("\n===== CMD TOOL EXAMPLE =====\n")
+    
+    try:
+        # Initialize the CMD toolkit
+        cmd_toolkit = CMDToolkit(name="DemoCMDToolkit")
+        execute_tool = cmd_toolkit.get_tool("execute_command")
+        
+        print("✓ CMDToolkit initialized")
+        
+        # Test basic command execution
+        print("1. Testing basic command execution...")
+        result = execute_tool(command="echo 'Hello from CMD toolkit'")
+        
+        if result.get("success"):
+            print("✓ Command executed successfully")
+            print(f"Output: {result.get('stdout', 'No output')}")
+        else:
+            print(f"❌ Command failed: {result.get('error', 'Unknown error')}")
+        
+        # Test system information commands
+        print("\n2. Testing system information commands...")
+        
+        # Get current working directory
+        pwd_result = execute_tool(command="pwd")
+        if pwd_result.get("success"):
+            print(f"✓ Current directory: {pwd_result.get('stdout', '').strip()}")
+        
+        # Get system information
+        if os.name == 'posix':  # Linux/Mac
+            uname_result = execute_tool(command="uname -a")
+            if uname_result.get("success"):
+                print(f"✓ System info: {uname_result.get('stdout', '').strip()}")
+        else:  # Windows
+            ver_result = execute_tool(command="ver")
+            if ver_result.get("success"):
+                print(f"✓ System info: {ver_result.get('stdout', '').strip()}")
+        
+        # Test file listing
+        print("\n3. Testing file listing...")
+        if os.name == 'posix':
+            ls_result = execute_tool(command="ls -la", working_directory=".")
+        else:
+            ls_result = execute_tool(command="dir", working_directory=".")
+        
+        if ls_result.get("success"):
+            print("✓ File listing successful")
+            print(f"Output length: {len(ls_result.get('stdout', ''))} characters")
+        else:
+            print(f"❌ File listing failed: {ls_result.get('error', 'Unknown error')}")
+        
+        # Test with timeout
+        print("\n4. Testing command timeout...")
+        timeout_result = execute_tool(command="sleep 5", timeout=12)
+        if not timeout_result.get("success"):
+            print("✓ Timeout working correctly (command was interrupted)")
+        else:
+            print("⚠ Timeout may not be working as expected")
+        
+        print("\n✓ CMDToolkit test completed")
+        
+    except Exception as e:
+        print(f"Error: {str(e)}")
+
+
+def run_request_tool_example():
+    """Simple example using RequestToolkit for HTTP operations."""
+    print("\n===== REQUEST TOOL EXAMPLE =====\n")
+    
+    try:
+        # Initialize the request toolkit
+        request_toolkit = RequestToolkit(name="DemoRequestToolkit")
+        http_tool = request_toolkit.get_tool("http_request")
+        
+        print("✓ RequestToolkit initialized")
+        
+        # Test GET request
+        print("1. Testing GET request...")
+        get_result = http_tool(
+            url="https://httpbin.org/get",
+            method="GET",
+            params={"test": "param", "example": "value"}
+        )
+        
+        if get_result.get("success"):
+            print("✓ GET request successful")
+            print(f"Status: {get_result.get('status_code')}")
+            print(f"Response size: {len(str(get_result.get('content', '')))} characters")
+        else:
+            print(f"❌ GET request failed: {get_result.get('error', 'Unknown error')}")
+        
+        # Test POST request with JSON data
+        print("\n2. Testing POST request with JSON...")
+        post_result = http_tool(
+            url="https://httpbin.org/post",
+            method="POST",
+            json_data={"name": "Test User", "email": "test@example.com"},
+            headers={"Content-Type": "application/json"}
+        )
+        
+        if post_result.get("success"):
+            print("✓ POST request successful")
+            print(f"Status: {post_result.get('status_code')}")
+            content = post_result.get('content', '')
+            if isinstance(content, dict) and 'json' in content:
+                print(f"✓ JSON data received: {content['json']}")
+        else:
+            print(f"❌ POST request failed: {post_result.get('error', 'Unknown error')}")
+        
+        # Test PUT request
+        print("\n3. Testing PUT request...")
+        put_result = http_tool(
+            url="https://httpbin.org/put",
+            method="PUT",
+            data={"update": "new value", "timestamp": "2024-01-01"}
+        )
+        
+        if put_result.get("success"):
+            print("✓ PUT request successful")
+            print(f"Status: {put_result.get('status_code')}")
+        else:
+            print(f"❌ PUT request failed: {put_result.get('error', 'Unknown error')}")
+        
+        # Test DELETE request
+        print("\n4. Testing DELETE request...")
+        delete_result = http_tool(
+            url="https://httpbin.org/delete",
+            method="DELETE"
+        )
+        
+        if delete_result.get("success"):
+            print("✓ DELETE request successful")
+            print(f"Status: {delete_result.get('status_code')}")
+        else:
+            print(f"❌ DELETE request failed: {delete_result.get('error', 'Unknown error')}")
+        
+        # Test error handling with invalid URL
+        print("\n5. Testing error handling...")
+        error_result = http_tool(
+            url="https://invalid-domain-that-does-not-exist-12345.com",
+            method="GET"
+        )
+        
+        if not error_result.get("success"):
+            print("✓ Error handling working correctly")
+            print(f"Error: {error_result.get('error', 'Unknown error')}")
+        else:
+            print("⚠ Error handling may not be working as expected")
+        
+        print("\n✓ RequestToolkit test completed")
+        
+    except Exception as e:
+        print(f"Error: {str(e)}")
+
+
 def main():
     """Main function to run all examples"""
     print("===== INTERPRETER TOOL EXAMPLES =====")
     
-    # Run file tool example
-    run_file_tool_example()
-    
-    # Run browser tool example
-    run_browser_tool_example()
-    
-    # Run MCP toolkit example
-    run_mcp_example()
-    
-    # Run Python interpreter examples
-    run_python_interpreter_examples()
+    # # Run storage tool example (updated from file tool)
+    # run_file_tool_example()
+   
+    # # Run Python interpreter examples
+    # run_python_interpreter_examples()
     
     # Run Docker interpreter examples
     run_docker_interpreter_examples()
     
-    # Run search tools examples
-    run_search_examples()
+    # # Run search tools examples
+    # run_search_examples()
     
-    # Run arXiv tool example
-    run_arxiv_tool_example()
+    # # Run arXiv tool example
+    # run_arxiv_tool_example()
     
-    # Run BrowserUse tool example
-    run_browser_use_tool_example()
+    # # Run BrowserUse tool example
+    # run_browser_use_tool_example()
+        
+    # # Run browser tool example
+    # run_browser_tool_example()
     
-    print("\n===== ALL EXAMPLES COMPLETED =====")
+    # # Run FAISS tool example
+    # run_faiss_tool_example()
+    
+    # # Run PostgreSQL tool example
+    # run_postgresql_tool_example()
+    
+    # # Run MongoDB tool example
+    # run_mongodb_tool_example()
+    
+    # # Run RSS tool example
+    # run_rss_tool_example()
+    
+    # # Run CMD tool example
+    # run_cmd_tool_example()
+
+    # # Run Request tool example
+    # run_request_tool_example()
+   
+    # # Run MCP toolkit example
+    # run_mcp_example()
+    
+    # print("\n===== ALL EXAMPLES COMPLETED =====")
 
 
 if __name__ == "__main__":

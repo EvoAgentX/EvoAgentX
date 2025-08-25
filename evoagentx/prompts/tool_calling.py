@@ -49,6 +49,7 @@ tools: ["File Tool", "Browser Tool"]
 
 TOOL_CALLING_TEMPLATE = """
 ### Tools Calling Instructions
+You should try to use tools if you are given a list of tools.
 You may have access to various tools that might help you accomplish your task.
 Once you have completed all preparations, you SHOULD NOT call any tool and just generate the final answer.
 If you need to use the tool, you should also include the ** very short ** thinking process before you call the tool and stop generating the output. 
@@ -60,8 +61,9 @@ Do not generate any tool calling instructions if you have the information.
 Distinguish tool calls and tool calling arguments, only include "```ToolCalling" when you are calling the tool, otherwise you should pass arguments with out this catch phrase.
 The tools in the Example Output does not really exist, you should use the tools in the Available Tools section.
 Every tool call should contain the function name and function arguments. The function name should be the name of the tool you are calling. The function arguments in the next example are fake arguments, you should use the real arguments for the tool you are calling.
+You should keep the tool call a list even if it is a single tool call.
 
-** Example Output **
+** Example Output 1 **
 Base on the goal, I found out that I need to use the following tools:
 ```ToolCalling
 [{{
@@ -80,6 +82,17 @@ Base on the goal, I found out that I need to use the following tools:
     }}
 }},...]
 ```
+** Example Output 2 **
+To do this, I need to use the following tools call:
+```ToolCalling
+[{{
+    "function_name": "search_repositories",
+    "function_args": {{
+        "command": "dir examples/output/invest/data_cache/",
+        "timeout": 30
+    }}
+}}
+```
 
 ** Example Output When Tool Calling not Needed **
 Based on the information, ... 
@@ -94,8 +107,7 @@ After using a tool, analyze its output and determine next steps.
 {tools_description}
 
 ** Tool Calling Key Points **
-You do not have to use the tool.
-Tools might not be useful for the task, if you find out so, you should not call the tool.
+You should strictly follow the tool calling structure, even if it is a single tool call.
 You should always check the history to determine if you have the information or the tool is not useful, if you have the information, you should not use the tool.
 You should try to use tools to get the information you need
 You should not call any tool if you completed the goal

@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import ClassVar, Dict, List, Optional
 from .interpreter_base import BaseInterpreter
 from .tool import Tool,Toolkit
-import os
+from .storage_handler import FileStorageHandler
 from pydantic import Field
 
 class DockerInterpreter(BaseInterpreter):
@@ -35,6 +35,8 @@ class DockerInterpreter(BaseInterpreter):
     tmp_directory:str = Field(default="/tmp", description="The directory to use for the container")
     image_tag:Optional[str] = Field(default=None, description="The Docker image tag to use")
     dockerfile_path:Optional[str] = Field(default=None, description="Path to the Dockerfile to build")
+    auto_cleanup:bool = Field(default=True, description="Whether to automatically cleanup container on cleanup() call")
+    auto_destroy:bool = Field(default=True, description="Whether to automatically cleanup container on object destruction")
     
     class Config:
         arbitrary_types_allowed = True  # Allow non-pydantic types like sets
@@ -51,6 +53,9 @@ class DockerInterpreter(BaseInterpreter):
         container_directory:str = "/home/app/",
         container_command:str = "tail -f /dev/null",
         tmp_directory:str = "/tmp",
+        storage_handler: FileStorageHandler = None,
+        auto_cleanup:bool = True,
+        auto_destroy:bool = True,
         **data
     ):
         """
@@ -85,6 +90,9 @@ class DockerInterpreter(BaseInterpreter):
         self.container = None
         self.image_tag = image_tag
         self.dockerfile_path = dockerfile_path
+        self.storage_handler = storage_handler
+        self.auto_cleanup = auto_cleanup
+        self.auto_destroy = auto_destroy
         self._initialize_if_needed()
         
         # Upload directory if specified
@@ -93,12 +101,32 @@ class DockerInterpreter(BaseInterpreter):
 
     def __del__(self):
         try:
-            if hasattr(self, 'container') and self.container is not None:
-                import sys
-                if sys.meta_path is not None:  # Check if Python is shutting down
-                    self.container.remove(force=True)
+            if hasattr(self, 'auto_destroy') and self.auto_destroy and hasattr(self, 'container') and self.container is not None:
+                self.container.remove(force=True)
         except Exception:
             pass  # Silently ignore errors during shutdown
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.cleanup()
+
+    def cleanup(self):
+        """Explicitly clean up the container and Docker client."""
+        if self.auto_cleanup:
+            try:
+                if hasattr(self, 'container') and self.container is not None:
+                    self.container.remove(force=True)
+                    self.container = None
+            except Exception:
+                pass
+            try:
+                if hasattr(self, 'client') and self.client is not None:
+                    self.client.close()
+                    self.client = None
+            except Exception:
+                pass
 
     def _initialize_if_needed(self):
         image_tag = self.image_tag
@@ -283,19 +311,12 @@ class DockerInterpreter(BaseInterpreter):
             RuntimeError: If container is not properly initialized or execution fails
             ValueError: If file content is invalid or exceeds limits
         """
-        # Check if file exists and is readable
-        if not os.path.isfile(file_path):
-            raise FileNotFoundError(f"Script file not found: {file_path}")
-            
-        if not os.access(file_path, os.R_OK):
-            raise PermissionError(f"Cannot read script file: {file_path}")
-        
-        # Read the file content
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                code = f.read()
-        except Exception as e:
-            raise RuntimeError(f"Failed to read script file: {e}")
+        # Read file using storage handler
+        result = self.storage_handler.read(file_path)
+        if result["success"]:
+            code = result["content"]
+        else:
+            raise RuntimeError(f"Could not read file '{file_path}': {result.get('error', 'Unknown error')}")
             
         # Execute the code
         return self.execute(code, language)
@@ -379,9 +400,17 @@ class DockerInterpreterToolkit(Toolkit):
         container_directory: str = "/home/app/",
         container_command: str = "tail -f /dev/null",
         tmp_directory: str = "/tmp",
+        storage_handler: FileStorageHandler = None,
+        auto_cleanup: bool = True,
+        auto_destroy: bool = True,
         **kwargs
     ):
-        # Create the shared Docker interpreter instance
+        # Initialize storage handler if not provided
+        if storage_handler is None:
+            from .storage_file import LocalStorageHandler
+            storage_handler = LocalStorageHandler(base_path="./workplace/docker")
+        
+        # Create the shared Docker interpreter instance with storage handler
         docker_interpreter = DockerInterpreter(
             name="DockerInterpreter",
             image_tag=image_tag,
@@ -393,6 +422,9 @@ class DockerInterpreterToolkit(Toolkit):
             container_directory=container_directory,
             container_command=container_command,
             tmp_directory=tmp_directory,
+            storage_handler=storage_handler,
+            auto_cleanup=auto_cleanup,
+            auto_destroy=auto_destroy,
             **kwargs
         )
         
@@ -407,4 +439,29 @@ class DockerInterpreterToolkit(Toolkit):
         
         # Store docker_interpreter as instance variable
         self.docker_interpreter = docker_interpreter
+        self.storage_handler = storage_handler
+        self.auto_cleanup = auto_cleanup
+        self.auto_destroy = auto_destroy
+    
+    def cleanup(self):
+        """Clean up the Docker interpreter and storage handler."""
+        try:
+            if hasattr(self, 'auto_cleanup') and self.auto_cleanup:
+                if hasattr(self, 'docker_interpreter') and self.docker_interpreter:
+                    self.docker_interpreter.cleanup()
+                if hasattr(self, 'storage_handler') and self.storage_handler:
+                    try:
+                        self.storage_handler.cleanup()
+                    except Exception:
+                        pass
+        except Exception:
+            pass  # Silently ignore cleanup errors
+
+    def __del__(self):
+        """Cleanup when toolkit is destroyed."""
+        try:
+            if hasattr(self, 'auto_destroy') and self.auto_destroy:
+                self.cleanup()
+        except Exception:
+            pass  # Silently ignore errors during destruction
     
