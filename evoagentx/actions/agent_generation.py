@@ -102,8 +102,12 @@ class AgentGeneration(Action):
                 prompt_params_values["prebuilt_agents"]
             )
 
-        if isinstance(self.tools, list) and len(self.tools) > 0:
-            tool_description = self.format_tools(self.tools)
+        tools = inputs.get("tools", None)
+        if tools is None:
+            tools = self.tools
+        
+        if isinstance(tools, list) and len(tools) > 0:
+            tool_description = self.format_tools(tools)
             prompt_params_values["tools"] = AGENT_GENERATION_TOOLS_PROMPT.format(tools_description=tool_description)
         else:
             prompt_params_values["tools"] = "None"
