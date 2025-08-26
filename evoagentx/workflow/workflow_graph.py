@@ -422,6 +422,9 @@ class WorkFlowGraph(BaseModule):
                 workflow_outputs.extend(self.get_node(node_name).outputs)
             self.workflow_outputs = workflow_outputs
 
+        self.workflow_inputs_dict = {param.name: param for param in self.workflow_inputs}
+        self.workflow_outputs_dict = {param.name: param for param in self.workflow_outputs}
+        
         self._validate_workflow_structure()
         self.update_graph()
     
@@ -467,18 +470,19 @@ class WorkFlowGraph(BaseModule):
         """
         isolated_nodes = list(nx.isolates(self.graph))
         if len(self.graph.nodes) > 1 and len(isolated_nodes) > 0:
+            
             for node_name in isolated_nodes:
                 node = self.get_node(node_name)
 
                 for node_input in node.inputs:
-                    if node_input not in self.workflow_inputs:
-                        error_message = f"Node '{node_name}' is an isolated node and has an input '{node_input}' that is not in the workflow inputs!"
+                    if node_input.name not in self.workflow_inputs_dict:
+                        error_message = f"Node '{node_name}' is an isolated node and has an input '{node_input.name}' that is not in the workflow inputs: {list(self.workflow_inputs_dict.keys())}"
                         logger.error(error_message)
                         raise ValueError(error_message)
 
                 for node_output in node.outputs:
-                    if node_output not in self.workflow_outputs:
-                        error_message = f"Node '{node_name}' is an isolated node and has an output '{node_output}' that is not in the workflow outputs!"
+                    if node_output.name not in self.workflow_outputs_dict:
+                        error_message = f"Node '{node_name}' is an isolated node and has an output '{node_output.name}' that is not in the workflow outputs: {list(self.workflow_outputs_dict.keys())}"
                         logger.error(error_message)
                         raise ValueError(error_message)                        
 
