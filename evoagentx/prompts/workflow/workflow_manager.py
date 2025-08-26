@@ -123,7 +123,7 @@ DEFAULT_ACTION_SCHEDULER = {
 }
 
 
-OUTPUT_EXTRACTION_PROMPT = """
+WORKFLOW_OUTPUT_EXTRACTION_PROMPT = """
 ### Objective 
 Your goal is to read the Workflow Goal, the WorkFlow Information, and the WorkFlow Execution Results from the provided input. Then, based on those details, extract and present ONLY the FINAL output data that meets the Workflow Goal.
 
