@@ -243,7 +243,7 @@ class LLMOutputParser(Parser):
         """
         extracted_json_list = parse_json_from_text(content)
         if len(extracted_json_list) > 0:
-            json_str = extracted_json_list[0] # only use the first JSON
+            json_str = extracted_json_list[-1] # only use the last JSON
             try:
                 data = yaml.safe_load(json_str)
                 if not isinstance(data, dict):
