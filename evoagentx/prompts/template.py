@@ -181,13 +181,6 @@ class PromptTemplate(BaseModule):
             return ""
         return f"### Context\nHere is some additional background information to help you understand the task:\n{self.context}\n"
 
-    # def render_tools(self) -> str:
-    #     if not self.tools:
-    #         return ""
-    #     tools_schemas = [tool.get_tool_schemas() for tool in self.tools]
-    #     tools_schemas = [j for i in tools_schemas for j in i]
-    #     return TOOL_CALLING_TEMPLATE.format(tools_description=tools_schemas)
-    
     #  smolagent风格render_tools
     def render_tools(self) -> str:
         if not self.tools:

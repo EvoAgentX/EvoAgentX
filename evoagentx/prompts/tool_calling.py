@@ -200,42 +200,7 @@ def normalize_tool_schemas(tools_schemas):
 TOOL_CALLING_TEMPLATE = """
 # Tool Calling Guide
 
-<<<<<<< HEAD
-## When to Use Tools
-- Use tools only when necessary to complete your task
-- Check history first - if the information is already available, don't call tools
-- If tools can't help with the task, proceed without them
-
-## How to Call Tools
-1. Include a brief explanation of:
-   - What you know from the history
-   - What information is needed
-   - Why you're using the tool
-
-2. Format your tool calls exactly as shown:
-```ToolCalling
-[
-    {{
-        "function_name": "tool_name",
-        "function_args": {{
-            "param1": "value1",
-            "param2": "value2"
-        }}
-    }},
-    ...
-]
-```
-
-**Important Notes**
-- All content within the `ToolCalling` code block must be valid JSON. Do not include any text, explanations or comments within these code blocks.
-- Only use tools listed in Available Tools
-- Stop generating after the tool call JSON
-- Each tool call must include both function_name and function_args
-
-## Available Tools
-=======
 You can call the following tools:
->>>>>>> new_workflow
 {tools_description}
 
 ## Output format
