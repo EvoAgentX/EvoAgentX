@@ -215,14 +215,61 @@ TASK_PLANNING_OUTPUT_FORMAT = """
 ## Output Format
 Your final output should ALWAYS in the following format:
 
-### Thought 
-Provide a brief explanation of your reasoning for breaking down the task and the chosen task structure.  
+### Thought
+
+Describe your reasoning in a step-by-step fashion, following these phases:
+
+1. **Goal Interpretation**  
+   Begin by interpreting the user's goal. What is the user ultimately trying to achieve? Paraphrase or reframe the goal if needed to make it more actionable or concrete.
+
+2. **High-Level Task Segmentation**  
+   Think about the **major steps** needed to achieve the goal.  
+   - What are the key stages or phases of the process?  
+   - What logical components naturally break apart into separate steps?  
+   - If a subtask is doing too much, can it be split?  
+   - If two subtasks are too small or meaningless on their own, should they be merged?
+
+3. **Information & Data Flow**  
+   Consider how data flows through the process.  
+   - Which subtasks produce outputs that are needed by later steps?  
+   - Which inputs from the workflow are needed, and at what stage?
+   - Which subtasks depend on others being completed first?
+
+5. **Validation Against Goal & Outputs**  
+   Cross-check that your subtask design, when executed, will:
+   - Satisfy all outputs requirements in the **Workflow Outputs** section.
+   - Use all inputs in the **Workflow Inputs** section.
+   - Align with the user's end-goal.
+
+6. **Mermaid Graph**
+    Create a Mermaid diagram that visualizes the relationships and execution flow between the subtasks.
+
+Keep this section focused on **how** you're thinking and making design choices. The specifics of each subtask will come later.
+
 
 ### Goal
 Restate the user's goal clearly and concisely.
 
-### Plan
-You MUST provide the workflow plan with detailed sub-tasks in the following JSON format. Each sub-task MUST STRICTLY follow the JSON format described in the **Sub-Task Format** section.
+### Inputs to Include
+List the exact names of all inputs from the **Workflow Inputs** section.
+Even if an input has `"required": false`, it must be included in the plan.
+
+### Outputs to Include
+List the exact names of all outputs from the **Workflow Outputs** section that the workflow will produce.
+Even if an output has `"required": false`, it must be included in the plan.
+
+### Subtask Details
+Now break down each subtask with full technical detail:
+For each subtask, include:
+- **Description**: What it does
+- **Reason**: Why this sub-task is necessary and how it contributes to achieving user's goal.
+- **Inputs**: List of inputs (can include workflow inputs or outputs from other subtasks)
+- **Outputs**: List of outputs this subtask generates
+- **Depends on**: Any subtasks that must be completed before this one
+
+### Workflow Plan
+Create the final workflow plan in the following JSON format. This must match the details from the previous section.
+Each sub-task MUST STRICTLY follow the JSON format described in the **Sub-Task Format** section.
 ```json
 {{
     "sub_tasks": [
