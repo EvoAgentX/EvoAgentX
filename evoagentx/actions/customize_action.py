@@ -9,12 +9,9 @@ from ..core.logging import logger
 from ..core.message import Message
 from ..core.module_utils import parse_json_from_llm_output, parse_json_from_text
 from ..models.base_model import BaseLLM, LLMOutputParser
+from ..prompts.output_extraction import OUTPUT_EXTRACTION_PROMPT
 from ..prompts.template import ChatTemplate, StringTemplate
-from ..prompts.tool_calling import (
-    OUTPUT_EXTRACTION_PROMPT,
-    TOOL_CALLING_HISTORY_PROMPT,
-    TOOL_CALLING_TEMPLATE,
-)
+from ..prompts.tool_calling import TOOL_CALLING_HISTORY_PROMPT, TOOL_CALLING_TEMPLATE
 from ..tools.tool import Toolkit
 from ..utils.utils import pydantic_to_parameters
 from .action import Action
