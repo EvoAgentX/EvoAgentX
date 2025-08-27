@@ -155,46 +155,7 @@ If your next move cannot be completed by the tool, you should not call the tool
 # {tools_description}
 # """
 
-def normalize_tool_schemas(tools_schemas):
-    """
-    Normalize different tool schema formats into a unified format:
-    {
-        "name": str,
-        "description": str,
-        "inputs": dict,
-        "output_type": str
-    }
-    """
-    normalized = []
-    for s in tools_schemas:
-        # Handle OpenAI format: {"type": "function", "function": {...}}
-        if isinstance(s, dict):
-            if "function" in s and isinstance(s["function"], dict):
-                # OpenAI format
-                func_data = s["function"]
-                tool_name = func_data.get("name", "unknown_tool")
-                desc = func_data.get("description", "")
-                inputs = func_data.get("parameters", {})
-            else:
-                # Direct format or other formats
-                tool_name = s.get("name") or s.get("function_name", "unknown_tool")
-                desc = s.get("description", "")
-                inputs = s.get("inputs") or s.get("parameters") or s.get("function_args", {})       
-            output_type = s.get("output_type", "string")
-        else:
-            # Fallback for unexpected formats
-            tool_name = "unknown_tool"
-            desc = ""
-            inputs = {}
-            output_type = "string"
 
-        normalized.append({
-            "name": tool_name,
-            "description": desc,
-            "inputs": inputs,
-            "output_type": output_type
-        })
-    return normalized
 
 
 TOOL_CALLING_TEMPLATE = """
@@ -203,25 +164,62 @@ TOOL_CALLING_TEMPLATE = """
 You can call the following tools:
 {tools_description}
 
+## Rules
+- ONLY use tools listed above. Do not invent or use non-existent tools.
+- Check the conversation history before calling: If the needed information is already available (e.g., from previous tool results), do not call tools again. Summarize and use it directly.
+- If a previous tool call failed (e.g., error in history), try a different tool or adjust arguments; do not repeat the same call.
+- Call tools ONLY when necessary for the task (e.g., external data, computation). Otherwise, proceed to the final output without tools.
+- Support multiple parallel calls: Use an array with multiple objects if needed.
+- Each call MUST include "function_name" (exact match from tool's Action) and "function_args" (a dict with exact argument names and values).
+- For arguments: Each parameter must be a valid JSON type (e.g., string, integer) and required/optional status as described. Do not add extra args.
+- Output STRICTLY in the format below. NO explanations, comments, thoughts, or extra text outside the <ToolCalling> block. If no tools needed, do not output this block at all.
+
 ## Output format
 Always return a JSON array of tool calls, like:
 
 <ToolCalling>
 [
   {{
-    "tool_name": "tool_name",
-
-    "arguments": {{
-      "param1": "value1",
-      "param2": "value2"
-    }}
-  }}
+#         "function_name": "tool_name",
+#         "function_args": {{
+#             "param1": "value1",
+#             "param2": "value2"
+#         }}
+#     }},
+#     ...
 ]
 </ToolCalling>
 
-## Rules
-- Only use tools listed above
-- Each call must include "name" and "arguments"
-- Do not write explanations, comments, or extra text
-- If no tool is needed, return an empty list: []
+## Examples
+Example 1: Single tool call for web search.
+<ToolCalling>
+[
+    {{
+        "function_name": "web_search",
+        "function_args": {{
+            "query": "example search term",
+            "num_results": 5
+        }}
+    }}
+]
+</ToolCalling>
+
+Example 2: Multiple parallel calls (e.g., search and code execution).
+<ToolCalling>
+[
+    {{
+        "function_name": "web_search",
+        "function_args": {{
+            "query": "python tips"
+        }}
+    }},
+    {{
+        "function_name": "code_execution",
+        "function_args": {{
+            "code": "print('Hello world')"
+        }}
+    }}
+]
+
+
 """
