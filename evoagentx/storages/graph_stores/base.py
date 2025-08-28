@@ -26,8 +26,8 @@ class GraphStoreBase(ABC):
         pass
 
     @abstractmethod
-    def aload(self) -> None:
-        """Asynchronously load a single node into the graph database."""
+    def load(self) -> None:
+        """Load a single node into the graph database."""
         pass
 
     @abstractmethod

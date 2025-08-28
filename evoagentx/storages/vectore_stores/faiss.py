@@ -30,9 +30,9 @@ class FaissVectorStoreWrapper(VectorStoreBase):
     def get_vector_store(self) -> FaissMapVectorStore:
         return self.vector_store
 
-    async def aload(self, node: BaseNode) -> None:
+    def load(self, node: BaseNode) -> None:
         """
-        Asynchronously load a single node into the FAISS vector store.
+        Load a single node into the FAISS vector store.
 
         Checks if a node with the same ID already exists in the FAISS vector store. If it does not exist,
         inserts the node with its embedding. Handles both Chunk and BaseNode types.
