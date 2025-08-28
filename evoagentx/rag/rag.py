@@ -342,7 +342,7 @@ class RAGEngine:
             raise
 
     def load(self, source: Optional[str] = None, corpus_id: Optional[str] = None, 
-             index_type: Optional[str] = None, table: Optional[str] = None) -> None:
+             index_type: Optional[str] = None, table: Optional[str] = None) -> Sequence[str]:
         """Load indices from files or database.
 
         Reconstructs indices and retrievers from JSONL/JSON files or SQLite database records.
@@ -354,6 +354,9 @@ class RAGEngine:
             index_type (Optional[str]): Specific index type to load. If None, loads all indices.
             table (Optional[str]): Database table name for index data. Defaults to 'indexing' if None.
 
+        Returns:
+            The Sequence with id of loaded chunk.
+        
         Raises:
             Exception: If loading fails due to file or database errors, invalid data, or unsupported embedding model/dimension.
         
@@ -366,6 +369,7 @@ class RAGEngine:
         try:
             table = table or "indexing"
             config_dimension = self.storage_handler.storageConfig.vectorConfig.dimensions
+            loaded_chunk_ids: List[str] = []
 
             if source:
                 # File-based loading
@@ -421,7 +425,8 @@ class RAGEngine:
                         )
 
                     # Load index
-                    self._load_index(corpus, cid, idx_type)
+                    chunk_ids = self._load_index(corpus, cid, idx_type)
+                    loaded_chunk_ids.extend(chunk_ids)
                     logger.info(f"Loaded {idx_type} index with {len(corpus.chunks)} chunks for corpus {cid} from {nodes_file}")
             else:
                 # Database loading
@@ -480,14 +485,16 @@ class RAGEngine:
                         )
 
                     # Load index
-                    self._load_index(corpus, cid, idx_type)
+                    chunk_ids = self._load_index(corpus, cid, idx_type)
+                    loaded_chunk_ids.extend(chunk_ids)
                     logger.info(f"Loaded {idx_type} index with {len(corpus.chunks)} chunks for corpus {cid} from database table {table}")
-
+            
+            return loaded_chunk_ids
         except Exception as e:
             logger.error(f"Failed to load indices: {str(e)}")
             raise
 
-    def _load_index(self, corpus: Corpus, corpus_id: str, index_type: str) -> None:
+    def _load_index(self, corpus: Corpus, corpus_id: str, index_type: str) -> Sequence[str]:
         """Helper method to load an index and its retriever."""
         try:
             if corpus_id not in self.indices:
@@ -516,11 +523,22 @@ class RAGEngine:
                 )
 
             nodes = corpus.to_llama_nodes()
-            self.indices[corpus_id][index_type].load(nodes)
+            chunk_ids = self.indices[corpus_id][index_type].load(nodes)
             logger.info(f"Inserted {len(nodes)} nodes into {index_type} index for corpus {corpus_id}")
+            return chunk_ids
         except Exception as e:
             logger.error(f"Failed to load index for corpus {corpus_id}, index_type {index_type}: {str(e)}")
             raise
+
+    async def aget(self, corpus_id: str, index_type: str, node_ids: List[str]) -> List[Chunk]:
+        """Retrieve chunks by node_ids from the index."""
+        try:
+            chunks = await self.indices[corpus_id][index_type].get(node_ids=node_ids)
+            logger.info(f"Retrieved {len(chunks)} chunks for node_ids: {node_ids}")
+            return chunks
+        except Exception as e:
+            logger.error(f"Failed to get chunks: {str(e)}")
+            return []
 
     async def query_async(self, query: Union[str, Query], corpus_id: Optional[str] = None,
                         query_transforms: Optional[List] = None) -> RagResult:

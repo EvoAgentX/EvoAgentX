@@ -21,7 +21,7 @@ class OpenRouterLLM(BaseLLM):
     def init_model(self):
         config: OpenRouterConfig = self.config
         self._client = self._init_client(config)
-        self._default_ignore_fields = ["llm_type", "openrouter_key", "openrouter_base", "output_response"]
+        self._default_ignore_fields = ["llm_type", "openrouter_key", "openrouter_base", "openrouter_model_base", "output_response"]
     
     def _init_client(self, config: OpenRouterConfig):
         client = OpenAI(

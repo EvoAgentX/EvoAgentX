@@ -128,4 +128,71 @@ def register_parse_function(func):
         return func(*args, **kwargs)
     PARSE_FUNCTION_REGISTRY.register(func.__name__, wrapper)
     return wrapper
+
+
+class ActionFunctionRegistry:
+    
+    def __init__(self):
+        self.functions = {}
+    
+    def register(self, func_name: str, func):
+        """Register a function with a given name.
+        
+        Args:
+            func_name: The name to register the function under
+            func (Callable): The function to register
+            
+        Raises:
+            ValueError: If a function with the same name is already registered
+        """
+        if func_name in self.functions:
+            raise ValueError(f"Function name '{func_name}' is already registered!")
+        self.functions[func_name] = func
+    
+    def get_function(self, func_name: str) -> callable:
+        """Get a registered function by name.
+        
+        Args:
+            func_name: The name of the function to retrieve
+            
+        Returns:
+            Callable: The registered function
+            
+        Raises:
+            KeyError: If no function with the given name is registered
+        """
+        if func_name not in self.functions:
+            available_funcs = list(self.functions.keys())
+            raise KeyError(f"Function '{func_name}' not found! Available functions: {available_funcs}")
+        return self.functions[func_name]
+    
+    def has_function(self, func_name: str) -> bool:
+        """Check if a function name is registered.
+        
+        Args:
+            func_name: The name to check
+            
+        Returns:
+            True if the function name is registered, False otherwise
+        """
+        return func_name in self.functions
+
+
+ACTION_FUNCTION_REGISTRY = ActionFunctionRegistry()
+
+
+def register_action_function(func):
+    """Register a function for ActionAgent serialization.
+    
+    Args:
+        func (Callable): The function to register
+        
+    Returns:
+        Callable: The original function (for decorator usage)
+    """
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        return func(*args, **kwargs)
+    ACTION_FUNCTION_REGISTRY.register(func.__name__, wrapper)
+    return wrapper
     

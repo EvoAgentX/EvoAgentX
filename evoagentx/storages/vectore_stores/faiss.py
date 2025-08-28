@@ -44,20 +44,16 @@ class FaissVectorStoreWrapper(VectorStoreBase):
             if not isinstance(node, BaseNode):
                 raise ValueError(f"Unsupported node type: {type(node)}. Must be Chunk or BaseNode.")
 
-            existing_ids = self.vector_store._faiss_index.id_map
-            node_id_int = self.vector_store._get_node_id_int(node.id)
-            if node_id_int in existing_ids:
-                logger.info(f"Node with ID {node.id} already exists in FAISS vector store, skipping insertion.")
+            node_id = node.id if hasattr(node, "id") else node.id_
+            existing_ids = self.vector_store._node_id_to_faiss_id_map
+            if node_id in existing_ids:
+                logger.info(f"Node with ID {node_id} already exists in FAISS vector store, skipping insertion.")
                 return
-
-            if not node.embedding or len(node.embedding) != self.dimension:
-                raise ValueError(f"Node {node.id} has invalid or missing embedding. Expected dimension: {self.dimension}")
-
-
+            
             self.vector_store.add([node])
 
-            logger.info(f"Inserted node with ID {node.id} into FAISS vector store.")
+            logger.info(f"Inserted node with ID {node_id} into FAISS vector store.")
 
         except Exception as e:
-            logger.error(f"Failed to load node with ID {node.id} into FAISS vector store: {str(e)}")
+            logger.error(f"Failed to load node with ID {node_id} into FAISS vector store: {str(e)}")
             raise

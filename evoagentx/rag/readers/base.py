@@ -99,6 +99,7 @@ class LLamaIndexReader:
         filter_file_by_suffix: Optional[Union[str, List, Tuple]] = None,
         merge_by_file: bool = False,
         show_progress: bool = False,
+        use_async: bool = False,
     ) -> List[Document]:
         """Load documents from files or directories.
 
@@ -153,7 +154,9 @@ class LLamaIndexReader:
                 errors=self.errors,
             )
 
-            llama_docs = asyncio.run(reader.aload_data(show_progress=show_progress, num_workers=self.num_workers))
+            llama_docs = asyncio.run(reader.aload_data(show_progress=show_progress, num_workers=self.num_workers)) if use_async \
+                else reader.load_data(show_progress=show_progress)
+            
             if merge_by_file:
                 file_to_docs = {}
                 for doc in llama_docs:

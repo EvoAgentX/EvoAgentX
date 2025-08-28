@@ -286,12 +286,16 @@ class Agent(BaseModule):
         """
         Initialize the language model for the agent.
         """
-        assert self.llm_config or self.llm, "must provide either 'llm_config' or 'llm' when is_human=False"
-        if self.llm_config and not self.llm:
-            llm_cls = MODEL_REGISTRY.get_model(self.llm_config.llm_type)
-            self.llm = llm_cls(config=self.llm_config)
-        if self.llm:
-            self.llm_config = self.llm.config
+        # Only initialize LLM if not human and LLM is provided
+        if not self.is_human and (not self.llm_config and not self.llm):
+            raise ValueError("must provide `llm_config` or `llm` when `is_human` is False")
+        if not self.is_human and (self.llm_config or self.llm):
+            if self.llm_config and not self.llm:
+                llm_cls = MODEL_REGISTRY.get_model(self.llm_config.llm_type)
+                self.llm = llm_cls(config=self.llm_config)
+            if self.llm:
+                self.llm_config = self.llm.config
+        # If is_human=True or no LLM provided, self.llm remains None
 
     def init_long_term_memory(self):
         """
