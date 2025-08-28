@@ -706,7 +706,15 @@ class WorkFlowGenerator(BaseModule):
         if self.rag_engine is not None:
             return
 
-        db_path = self.db_path if self.db_path is not None else "./workflows.db"
+        load_from_db = False
+        
+        if self.db_path is not None:
+            if not os.path.exists(self.db_path):
+                raise ValueError(f"Database file '{self.db_path}' does not exist.")
+            load_from_db = True
+            db_path = self.db_path
+        else:
+            db_path = "./workflows.db"
 
         storage_handler = StorageHandler(
             storageConfig=StoreConfig(
@@ -723,7 +731,7 @@ class WorkFlowGenerator(BaseModule):
         )
         self.rag_engine = RAGEngine(config=rag_config, storage_handler=storage_handler)
 
-        if self.db_path is not None:
+        if load_from_db:
             self.rag_engine.load()
             return
 
@@ -749,11 +757,11 @@ class WorkFlowGenerator(BaseModule):
                 )
                 chunks.append(chunk)
         
-        self.rag_engine.add(index_type="vector", nodes=Corpus(chunks=chunks))
         if len(chunks) == 0:
             logger.warning("No workflow json files found in the workflow folder. RAG will not be used.")
             self.rag_engine = None
         else:
+            self.rag_engine.add(index_type="vector", nodes=Corpus(chunks=chunks))
             logger.info(f"Successfully added {len(chunks)} workflows to the RAG engine.")
             self.rag_engine.save()
 
