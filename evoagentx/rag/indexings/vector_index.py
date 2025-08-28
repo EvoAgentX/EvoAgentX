@@ -128,9 +128,9 @@ class VectorIndexing(BaseIndexWrapper):
             logger.error(f"Failed to delete nodes: {str(e)}")
             raise
 
-    async def aload(self, nodes: List[Union[Chunk, BaseNode]]) -> Sequence[str]:
+    def load(self, nodes: List[Union[Chunk, BaseNode]]) -> Sequence[str]:
         """
-        Asynchronously load nodes into the vector index and its backend store.
+        Load nodes into the vector index and its backend store.
 
         Caches nodes in id_to_node and loads them into the FAISS vector store, ensuring
         no duplicates are inserted by relying on the backend's duplicate checking.
@@ -143,20 +143,10 @@ class VectorIndexing(BaseIndexWrapper):
         """
         try:
             node_ids = self.insert_nodes(nodes)
-
             return node_ids
         except Exception as e:
             logger.error(f"Failed to load nodes into VectorStoreIndex: {str(e)}")
             raise
-
-    def load(self, nodes: List[Union[Chunk, BaseNode]]) -> Sequence[str]:
-        """
-        Synchronously load nodes into the vector index.
-
-        Args:
-            nodes (List[Union[Chunk, BaseNode]]): The nodes to load.
-        """
-        return asyncio.run(self.aload(nodes))
 
     def clear(self) -> None:
         """

@@ -140,9 +140,9 @@ class GraphIndexing(BaseIndexWrapper):
             logger.error(f"Failed to delete nodes: {str(e)}")
             raise
 
-    async def aload(self, nodes: List[Union[Chunk, BaseNode, LabelledNode, Relation, EntityNode, ChunkNode]]) -> Sequence[str]:
+    def load(self, nodes: List[Union[Chunk, BaseNode, LabelledNode, Relation, EntityNode, ChunkNode]]) -> Sequence[str]:
         """
-        Asynchronously load nodes into the graph index and its backend stores.
+        Load nodes into the graph index and its backend stores.
 
         Caches nodes in the id_to_node dictionary and loads them into the graph and optionally
         vector stores, ensuring no duplicates by relying on the backend's duplicate checking.
@@ -155,18 +155,6 @@ class GraphIndexing(BaseIndexWrapper):
             return chunk_ids
         except Exception as e:
             logger.error(f"Failed to load nodes: {str(e)}")
-
-    def load(self, nodes: List[Union[Chunk, BaseNode]]) -> Sequence[str]:
-        """
-        Synchronously load nodes into the graph index.
-
-        Wraps the asynchronous aload method to provide a synchronous interface for loading nodes.
-
-        Args:
-            nodes (List[Union[Chunk, BaseNode]]): List of nodes to load, either Chunk or BaseNode.
-
-        """
-        return asyncio.run(self.aload(nodes))
 
     def build_kv_store(self) -> None:
         """
