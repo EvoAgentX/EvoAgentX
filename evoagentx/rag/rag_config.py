@@ -36,7 +36,6 @@ class EmbeddingConfig(BaseModule):
     api_key: Optional[str] = Field(default=None, description="API key for the embedding provider (if required).")
     api_url: str = Field(default="https://api.openai.com/v1", description="api url for embedding model.")
     dimensions: Optional[int] = Field(default=None, description="Dimensions of the embedding model.")
-    # Huggingface
     normalize: Optional[bool] = Field(default=True, description="Whether to normalize the embedding model(huggingface).")
     device: Optional[str] = Field(default=None, description="The device was used for embedding model.")
 
@@ -58,6 +57,7 @@ class RetrievalConfig(BaseModule):
 
 class RAGConfig(BaseConfig):
     """Configuration for the RAG pipeline."""
+    modality: str = Field(default="text", description="RAG modality: 'text' for text-only, 'multimodal' for images.")
     num_workers: Optional[int] = Field(default=None, description="Number of workers for parallel processing (e.g., reading, retrieval).")
     reader: ReaderConfig = Field(default_factory=ReaderConfig, description="Configuration for document reading.")
     chunker: ChunkerConfig = Field(default_factory=ChunkerConfig, description="Configuration for document chunking.")

@@ -31,7 +31,6 @@ matplotlib>=3.10.0
 # torch==2.2.1 
 # torchvision==0.17.1 
 # torchaudio==2.2.1
-transformers>=4.47.1
 datasets>=3.4.0
 faiss-cpu==1.8.0.post1
 # faiss-gpu
@@ -82,3 +81,10 @@ html2text>=2020.1.16
 browser-use; python_version >= "3.11"
 browser-use-py310; python_version < "3.11"
 mcp>=0.1.0
+
+# Multimodal dependencies
+colpali-engine==0.3.9
+Pillow
+torch
+transformers>=4.50.0,<4.51.0
+voyageai

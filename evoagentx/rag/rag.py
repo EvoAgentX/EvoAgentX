@@ -4,11 +4,10 @@ import asyncio
 from uuid import uuid4
 from datetime import datetime
 from typing import List, Union, Optional, Sequence, Dict, Any, Tuple
-
-from llama_index.core.schema import NodeWithScore, TextNode, RelatedNodeInfo
+from llama_index.core.schema import NodeWithScore, TextNode, ImageNode, RelatedNodeInfo
 
 from .rag_config import RAGConfig
-from .readers import LLamaIndexReader
+from .readers import LLamaIndexReader, MultimodalReader
 from .indexings import IndexFactory, BaseIndexWrapper
 from .chunkers import ChunkFactory
 from .embeddings import EmbeddingFactory, EmbeddingProvider
@@ -16,7 +15,7 @@ from .retrievers import RetrieverFactory, BaseRetrieverWrapper
 from .postprocessors import PostprocessorFactory
 from .indexings.base import IndexType
 from .retrievers.base import RetrieverType
-from .schema import Chunk, Corpus, ChunkMetadata, IndexMetadata, Query, RagResult
+from .schema import Corpus, ChunkMetadata, IndexMetadata, Query, RagResult, ImageChunk, TextChunk
 from evoagentx.storages.base import StorageHandler
 from evoagentx.storages.schema import IndexStore
 from evoagentx.models.base_model import BaseLLM
@@ -33,18 +32,34 @@ class RAGEngine:
         self.retriever_factory = RetrieverFactory()
         self.postprocessor_factory = PostprocessorFactory()
         self.llm = llm  # LLM for entity extractor
+        
+        # Set chunk class based on modality config
+        logger.info(f"RAGEngine modality config: {self.config.modality}")
+        
+        if self.config.modality == "multimodal":
+            self.chunk_class = ImageChunk
+        else:
+            self.chunk_class = TextChunk
 
-        # Initialize reader
-        self.reader = LLamaIndexReader(
-            recursive=self.config.reader.recursive,
-            exclude_hidden=self.config.reader.exclude_hidden,
-            num_workers=self.config.num_workers,
-            num_files_limits=self.config.reader.num_files_limit,
-            custom_metadata_function=self.config.reader.custom_metadata_function,
-            extern_file_extractor=self.config.reader.extern_file_extractor,
-            errors=self.config.reader.errors,
-            encoding=self.config.reader.encoding
-        )
+        # Initialize reader based on modality
+        if self.config.modality == "multimodal":
+            self.reader = MultimodalReader(
+                recursive=self.config.reader.recursive,
+                exclude_hidden=self.config.reader.exclude_hidden,
+                num_files_limits=self.config.reader.num_files_limit,
+                errors=self.config.reader.errors
+            )
+        else:
+            self.reader = LLamaIndexReader(
+                recursive=self.config.reader.recursive,
+                exclude_hidden=self.config.reader.exclude_hidden,
+                num_workers=self.config.num_workers,
+                num_files_limits=self.config.reader.num_files_limit,
+                custom_metadata_function=self.config.reader.custom_metadata_function,
+                extern_file_extractor=self.config.reader.extern_file_extractor,
+                errors=self.config.reader.errors,
+                encoding=self.config.reader.encoding
+            )
 
         # Initialize embedding model. 
         self.embed_model = self.embedding_factory.create(
@@ -59,16 +74,19 @@ class RAGEngine:
                 self.storage_handler.storageConfig.vectorConfig.dimensions = self.embed_model.dimensions
                 self.storage_handler._init_vector_store()
 
-        # Initialize chunker
-        self.chunker = self.chunk_factory.create(
-            strategy=self.config.chunker.strategy,
-            embed_model=self.embed_model.get_embedding_model(),
-            chunker_config={
-                "chunk_size": self.config.chunker.chunk_size,
-                "chunk_overlap": self.config.chunker.chunk_overlap,
-                "max_chunks": self.config.chunker.max_chunks
-            }
-        )
+        # Initialize chunker (skip for multimodal)
+        if self.config.modality == "multimodal":
+            self.chunker = None  # No chunking for images
+        else:
+            self.chunker = self.chunk_factory.create(
+                strategy=self.config.chunker.strategy,
+                embed_model=self.embed_model.get_embedding_model(),
+                chunker_config={
+                    "chunk_size": self.config.chunker.chunk_size,
+                    "chunk_overlap": self.config.chunker.chunk_overlap,
+                    "max_chunks": self.config.chunker.max_chunks
+                }
+            )
 
         # Initialize indices and retrievers
         self.indices: Dict[str, Dict[str, BaseIndexWrapper]] = {}  # Nested: {corpus_id: {index_type: index}}
@@ -107,16 +125,38 @@ class RAGEngine:
                 merge_by_file=merge_by_file,
                 show_progress=show_progress
             )
-            corpus = self.chunker.chunk(documents)
-            corpus.corpus_id = corpus_id
-            logger.info(f"Read {len(documents)} documents and created {len(corpus.chunks)} chunks for corpus {corpus_id}")
+            if self.config.modality == "multimodal":
+                # No chunking - convert ImageDocuments directly to ImageChunks
+                image_chunks = []
+                for doc in documents:
+                    # Get image path from document - try multiple possible attributes
+                    image_path = getattr(doc, 'image_path', None) or doc.metadata.get('file_path')
+                    image_mimetype = getattr(doc, 'image_mimetype', None)
+                    
+                    image_chunk = self.chunk_class(
+                        image_path=image_path,
+                        image_mimetype=image_mimetype,
+                        chunk_id=doc.metadata.get('file_name', f'img_{len(image_chunks)}'),
+                        metadata=ChunkMetadata(
+                            doc_id=doc.metadata.get('file_name', f'doc_{len(image_chunks)}'),
+                            corpus_id=corpus_id,
+                            **doc.metadata
+                        )
+                    )
+                    image_chunks.append(image_chunk)
+                corpus = Corpus(chunks=image_chunks, corpus_id=corpus_id)
+                logger.info(f"Read {len(documents)} multimodal documents (no chunking) for corpus {corpus_id}")
+            else:
+                corpus = self.chunker.chunk(documents)
+                corpus.corpus_id = corpus_id
+                logger.info(f"Read {len(documents)} documents and created {len(corpus.chunks)} chunks for corpus {corpus_id}")
             return corpus
         except Exception as e:
             logger.error(f"Failed to read documents for corpus {corpus_id}: {str(e)}")
             raise
 
-    def add(self, index_type: str, nodes: Union[Corpus, List[NodeWithScore], List[TextNode]], 
-            corpus_id: str = None) -> Sequence[str]:
+    def add(self, index_type: str, nodes: Union[Corpus, List[NodeWithScore], List[TextNode], List[ImageNode]], 
+            corpus_id: str = None) -> None:
         """Add nodes to an index for a specific corpus.
 
         Initializes an index if it doesn't exist and inserts nodes, updating metadata with corpus_id and index_type.
@@ -148,13 +188,14 @@ class RAGEngine:
                 )
                 self.indices[corpus_id][index_type] = index
                 self.retrievers[corpus_id][index_type] = self.retriever_factory.create(
-                    retriever_type=index_type,
+                    retriever_type=self.config.retrieval.retrivel_type,
                     llm=self.llm,
                     index=index.get_index(),
                     graph_store=index.get_index().storage_context.graph_store,
                     embed_model=self.embed_model.get_embedding_model(),
                     query=Query(query_str="", top_k=self.config.retrieval.top_k if self.config.retrieval else 5),
                     storage_handler=self.storage_handler,
+                    chunk_class=self.chunk_class  
                 )
 
             nodes_to_insert = nodes.to_llama_nodes() if isinstance(nodes, Corpus) else nodes
@@ -291,7 +332,7 @@ class RAGEngine:
 
                     # Convert index nodes to Corpus
                     chunks = [
-                        Chunk.from_llama_node(node_data)
+                        self.chunk_class.from_llama_node(node_data)
                         for node_id, node_data in index.id_to_node.items()
                     ]
                     corpus = Corpus(chunks=chunks, corpus_id=cid)
@@ -342,7 +383,7 @@ class RAGEngine:
             raise
 
     def load(self, source: Optional[str] = None, corpus_id: Optional[str] = None, 
-             index_type: Optional[str] = None, table: Optional[str] = None) -> Sequence[str]:
+             index_type: Optional[str] = None, table: Optional[str] = None) -> None:
         """Load indices from files or database.
 
         Reconstructs indices and retrievers from JSONL/JSON files or SQLite database records.
@@ -444,20 +485,39 @@ class RAGEngine:
                         continue
 
                     # Reconstruct corpus
+                    chunks = []
+                    for chunk_data in parsed["content"]["chunks"]:
+                        metadata = ChunkMetadata.model_validate(chunk_data["metadata"])
+                        
+                        if self.config.modality == "multimodal":
+                            # Create ImageChunk for multimodal mode
+                            chunk = ImageChunk(
+                                chunk_id=chunk_data["chunk_id"],
+                                image_path=chunk_data["image_path"],
+                                image_mimetype=chunk_data.get("image_mimetype"),
+                                metadata=metadata,
+                                embedding=chunk_data["embedding"],
+                                excluded_embed_metadata_keys=chunk_data["excluded_embed_metadata_keys"],
+                                excluded_llm_metadata_keys=chunk_data["excluded_llm_metadata_keys"],
+                                relationships={k: RelatedNodeInfo(**v) for k, v in chunk_data["relationships"].items()}
+                            )
+                        else:
+                            # Create TextChunk for text mode
+                            chunk = TextChunk(
+                                chunk_id=chunk_data["chunk_id"],
+                                text=chunk_data["text"],
+                                metadata=metadata,
+                                embedding=chunk_data["embedding"],
+                                start_char_idx=chunk_data["start_char_idx"],
+                                end_char_idx=chunk_data["end_char_idx"],
+                                excluded_embed_metadata_keys=chunk_data["excluded_embed_metadata_keys"],
+                                excluded_llm_metadata_keys=chunk_data["excluded_llm_metadata_keys"],
+                                relationships={k: RelatedNodeInfo(**v) for k, v in chunk_data["relationships"].items()}
+                            )
+                        chunks.append(chunk)
+                    
                     corpus = Corpus(
-                        chunks=[
-                            Chunk(
-                                chunk_id=chunk["chunk_id"],
-                                text=chunk["text"],
-                                metadata=ChunkMetadata.model_validate(chunk["metadata"]),
-                                embedding=chunk["embedding"],
-                                start_char_idx=chunk["start_char_idx"],
-                                end_char_idx=chunk["end_char_idx"],
-                                excluded_embed_metadata_keys=chunk["excluded_embed_metadata_keys"],
-                                excluded_llm_metadata_keys=chunk["excluded_llm_metadata_keys"],
-                                relationships={k: RelatedNodeInfo(**v) for k, v in chunk["relationships"].items()}
-                            ) for chunk in parsed["content"]["chunks"]
-                        ],
+                        chunks=chunks,
                         corpus_id=cid,
                         metadata=IndexMetadata.model_validate(parsed["metadata"])
                     )
@@ -510,7 +570,6 @@ class RAGEngine:
                     llm=self.llm
                 )
                 self.indices[corpus_id][index_type] = index
-                
                 retriever_type = RetrieverType.GRAPH if index_type == IndexType.GRAPH else RetrieverType.VECTOR
                 self.retrievers[corpus_id][index_type] = self.retriever_factory.create(
                     retriever_type=retriever_type,
@@ -523,6 +582,10 @@ class RAGEngine:
                 )
 
             nodes = corpus.to_llama_nodes()
+           
+            for node in nodes:
+                node.metadata.update({"corpus_id": corpus_id, "index_type": index_type})
+           
             chunk_ids = self.indices[corpus_id][index_type].load(nodes)
             logger.info(f"Inserted {len(nodes)} nodes into {index_type} index for corpus {corpus_id}")
             return chunk_ids
@@ -530,7 +593,7 @@ class RAGEngine:
             logger.error(f"Failed to load index for corpus {corpus_id}, index_type {index_type}: {str(e)}")
             raise
 
-    async def aget(self, corpus_id: str, index_type: str, node_ids: List[str]) -> List[Chunk]:
+    async def aget(self, corpus_id: str, index_type: str, node_ids: List[str]) -> List[Union[TextChunk, ImageChunk]]:
         """Retrieve chunks by node_ids from the index."""
         try:
             chunks = await self.indices[corpus_id][index_type].get(node_ids=node_ids)
