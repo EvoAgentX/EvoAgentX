@@ -180,13 +180,13 @@ Always return a JSON array of tool calls, like:
 <ToolCalling>
 [
   {{
-#         "function_name": "tool_name",
-#         "function_args": {{
-#             "param1": "value1",
-#             "param2": "value2"
-#         }}
-#     }},
-#     ...
+         "function_name": "tool_name",
+         "function_args": {{
+             "param1": "value1",
+             "param2": "value2"
+         }}
+     }},
+     ...
 ]
 </ToolCalling>
 
@@ -220,6 +220,15 @@ Example 2: Multiple parallel calls (e.g., search and code execution).
         }}
     }}
 ]
+</ToolCalling>
 
 
+"""
+
+TOOL_CALLING_RETRY_PROMPT = """
+The following output is supposed to be a JSON list of tool calls, but it's invalid.
+Please fix it and return ONLY the valid JSON array:
+--- Invalid Output ---
+{text}
+--- End ---
 """

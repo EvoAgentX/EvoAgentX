@@ -14,6 +14,7 @@ from ..prompts.tool_calling import (
     OUTPUT_EXTRACTION_PROMPT,
     TOOL_CALLING_HISTORY_PROMPT,
     TOOL_CALLING_TEMPLATE,
+    TOOL_CALLING_RETRY_PROMPT,
 )
 from ..tools.tool import Toolkit
 from ..utils.utils import fix_json_booleans
@@ -218,13 +219,7 @@ class CustomizeAction(Action):
             except (json.JSONDecodeError, IndexError) as e:
                 logger.warning(f"Failed to parse tool calls from LLM output: {e}")
                 if llm is not None:
-                    retry_prompt = f"""
-                    The following output is supposed to be a JSON list of tool calls, but it's invalid.
-                    Please fix it and return ONLY the valid JSON array:
-                    --- Invalid Output ---
-                    {match_content}
-                    --- End ---
-                    """
+                    retry_prompt = TOOL_CALLING_RETRY_PROMPT.format(text=match_content)
                     try:
                         fixed_output = llm.generate(prompt=retry_prompt).content.strip()
                         logger.info(f"Retrying tool call parse with fixed output:\n{fixed_output}")
@@ -436,7 +431,7 @@ class CustomizeAction(Action):
             # Store the final LLM response
             final_llm_response = llm_response
             
-            tool_call_args = self._extract_tool_calls(llm_response.content,llm=llm)
+            tool_call_args = self._extract_tool_calls(llm_response.content, llm=llm)
             if not tool_call_args:
                 break
             
@@ -517,7 +512,7 @@ class CustomizeAction(Action):
             # Store the final LLM response
             final_llm_response = llm_response
             
-            tool_call_args = self._extract_tool_calls(llm_response.content,llm=llm)
+            tool_call_args = self._extract_tool_calls(llm_response.content, llm=llm)
             if not tool_call_args:
                 break
             
