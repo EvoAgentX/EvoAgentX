@@ -54,7 +54,7 @@ Each sub-task must follow this exact structure:
     "inputs": [
         {{
             "name": "the input's name", 
-            "type": "string/int/float/other_type",
+            "type": "string/integer/number/boolean/object/array",
             "required": true/false,
             "description": "Description of the input's purpose and usage."
         }},
@@ -63,7 +63,7 @@ Each sub-task must follow this exact structure:
     "outputs": [
         {{
             "name": "the output's name", 
-            "type": "string/int/float/other_type",
+            "type": "string/integer/number/boolean/object/array",
             "required": true/false, 
             "description": "Description of the output produced by this sub-task."
         }},
