@@ -226,8 +226,7 @@ class CustomizeAction(Action):
                         
                         fixed_list = parse_json_from_text(fixed_output)
                         if fixed_list:
-                            fixed_json = fix_json_booleans(fixed_list[0])
-                            parsed_tool_call = json.loads(fixed_json)
+                            parsed_tool_call = json.loads(fixed_list[0])
                             if isinstance(parsed_tool_call, dict):
                                 parsed_tool_calls.append(parsed_tool_call)
                         elif isinstance(parsed_tool_call, list):

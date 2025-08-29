@@ -221,8 +221,6 @@ Example 2: Multiple parallel calls (e.g., search and code execution).
     }}
 ]
 </ToolCalling>
-
-
 """
 
 TOOL_CALLING_RETRY_PROMPT = """
