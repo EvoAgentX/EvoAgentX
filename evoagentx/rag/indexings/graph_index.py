@@ -1,7 +1,7 @@
 import json
 import asyncio
 from uuid import uuid4
-from typing import Dict, Any, Union, List, Optional
+from typing import Dict, Any, Union, List, Sequence, Optional
 
 from llama_index.core.schema import BaseNode
 from llama_index.core.storage import StorageContext
@@ -140,9 +140,9 @@ class GraphIndexing(BaseIndexWrapper):
             logger.error(f"Failed to delete nodes: {str(e)}")
             raise
 
-    async def aload(self, nodes: List[Union[Chunk, BaseNode, LabelledNode, Relation, EntityNode, ChunkNode]]) -> None:
+    def load(self, nodes: List[Union[Chunk, BaseNode, LabelledNode, Relation, EntityNode, ChunkNode]]) -> Sequence[str]:
         """
-        Asynchronously load nodes into the graph index and its backend stores.
+        Load nodes into the graph index and its backend stores.
 
         Caches nodes in the id_to_node dictionary and loads them into the graph and optionally
         vector stores, ensuring no duplicates by relying on the backend's duplicate checking.
@@ -151,42 +151,10 @@ class GraphIndexing(BaseIndexWrapper):
             nodes (List[Union[Chunk, BaseNode]]): List of nodes to load, either Chunk or BaseNode.
         """
         try:
-            filtered_nodes = [node.to_llama_node() if isinstance(node, Chunk) else node for node in nodes]
-
-            tasks = []
-            for node in filtered_nodes:
-                if isinstance(node, BaseNode):
-                    node.metadata = {"metadata": json.dumps(node.metadata)}
-
-                # load into vector database
-                if (self.storage_handler.vector_store is not None) and \
-                    (not self.storage_handler.graph_store.supports_vector_queries):
-
-                    tasks.append(
-                        self.storage_handler.vector_store.aload(node)
-                    )
-
-                # load into graph database
-                tasks.extend([self.storage_handler.graph_store.aload(node)])
-
-            # Async load
-            await asyncio.gather(*tasks, return_exceptions=True)
-            logger.info(f"Loaded {len(filtered_nodes)} nodes into cache and graph store.")
-
+            chunk_ids = self.insert_nodes(nodes)
+            return chunk_ids
         except Exception as e:
             logger.error(f"Failed to load nodes: {str(e)}")
-
-    def load(self, nodes: List[Union[Chunk, BaseNode]]) -> None:
-        """
-        Synchronously load nodes into the graph index.
-
-        Wraps the asynchronous aload method to provide a synchronous interface for loading nodes.
-
-        Args:
-            nodes (List[Union[Chunk, BaseNode]]): List of nodes to load, either Chunk or BaseNode.
-
-        """
-        asyncio.run(self.aload(nodes))
 
     def build_kv_store(self) -> None:
         """
@@ -208,3 +176,31 @@ class GraphIndexing(BaseIndexWrapper):
         except Exception as e:
             logger.error(f"Failed to clear index: {str(e)}")
             raise
+
+    async def _get(self, node_id: str) -> Optional[Chunk]:
+        """Get a node by node_id from cache or vector store."""
+        try:
+            # Check cache first
+            
+            node = self.storage_handler.graph_store.get(ids=[node_id])
+            if node:
+                if isinstance(node, Chunk):
+                    return node.model_copy()
+                return Chunk.from_llama_node(node)
+
+            logger.warning(f"Node with ID {node_id} not found in cache or vector store")
+            return None
+        except Exception as e:
+            logger.error(f"Failed to get node {node_id}: {str(e)}")
+            return None
+
+    async def get(self, node_ids: Sequence[str]) -> List[Chunk]:
+        """Get nodes by node_ids from cache or vector store."""
+        try:
+            nodes = await asyncio.gather(*[self._get(node) for node in node_ids])
+            nodes = [node for node in nodes if node is not None]
+            logger.info(f"Retrieved {len(nodes)} nodes for node_ids: {node_ids}")
+            return nodes
+        except Exception as e:
+            logger.error(f"Failed to get nodes: {str(e)}")
+            return []

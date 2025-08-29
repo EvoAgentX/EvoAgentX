@@ -25,6 +25,7 @@ from ..utils.utils import (
     generate_dynamic_class_name,
     make_parent_folder,
     pydantic_to_parameters,
+    update_params,
     validate_params,
 )
 from .action_graph import ActionGraph
@@ -236,7 +237,7 @@ class WorkFlowNode(BaseModule):
         else:
             return [param.name for param in self.outputs]
 
-    def check_agents(self):
+    def check_agents(self, auto_fix: bool = False):
         """
         Checks if any agent assigned to this node accept the node inputs and if any agent outputs the node outputs.
         """
@@ -254,8 +255,8 @@ class WorkFlowNode(BaseModule):
                     action for action in agent.actions if action.name != "ContextExtraction"
                 ]
                 for action in agent_actions:
-                    agent_inputs.extend(pydantic_to_parameters(action.inputs_format))
-                    agent_outputs.extend(pydantic_to_parameters(action.outputs_format))
+                    agent_inputs.extend(pydantic_to_parameters(action.inputs_format, ignore=["class_name"]))
+                    agent_outputs.extend(pydantic_to_parameters(action.outputs_format, ignore=["class_name"]))
             elif isinstance(agent, dict):
                 input_parameters = [Parameter.from_dict(input) for input in agent["inputs"]]
                 output_parameters = [Parameter.from_dict(output) for output in agent["outputs"]]
@@ -266,8 +267,43 @@ class WorkFlowNode(BaseModule):
             else:
                 raise TypeError(f"{type(agent)} is an unknown agent type!")
 
-        validate_params(self.inputs, agent_inputs, f"node '{self.name}' input", "agent input")
-        validate_params(self.outputs, agent_outputs, f"node '{self.name}' output", "agent output")
+
+        validated_inputs = validate_params(
+            self.inputs,
+            agent_inputs,
+            f"node '{self.name}' input",
+            "agent input",
+            auto_fix=auto_fix
+        )
+        
+        validated_outputs = validate_params(
+            self.outputs,
+            agent_outputs,
+            f"node '{self.name}' output",
+            "agent output",
+            auto_fix=auto_fix
+        )
+
+
+        if auto_fix:
+            for agent_idx, agent in enumerate(self.agents):
+                
+                if isinstance(agent, Agent):
+                    self.agents[agent_idx].inputs = update_params(agent.inputs, validated_inputs)
+                    self.agents[agent_idx].outputs = update_params(agent.outputs, validated_outputs)
+                
+                elif isinstance(agent, dict):
+                    old_inputs = [Parameter.from_dict(input) for input in agent["inputs"]]
+                    old_outputs = [Parameter.from_dict(output) for output in agent["outputs"]]
+
+                    new_inputs = update_params(old_inputs, validated_inputs)
+                    new_outputs = update_params(old_outputs, validated_outputs)
+
+                    new_inputs_dict = [input.to_dict() for input in new_inputs]
+                    new_outputs_dict = [output.to_dict() for output in new_outputs]
+
+                    self.agents[agent_idx]["inputs"] = new_inputs_dict
+                    self.agents[agent_idx]["outputs"] = new_outputs_dict
 
 
 class WorkFlowEdge(BaseModule):
@@ -349,6 +385,7 @@ class WorkFlowGraph(BaseModule):
         graph: Internal NetworkX MultiDiGraph or another WorkFlowGraph
         workflow_inputs: List of inputs that the workflow accepts. If not provided, inputs from initial nodes are used.
         workflow_outputs: The final outputs of the workflow. If not provided, outputs from end nodes are used.
+        auto_fix: Whether to automatically fix mismatched `type` and `required` fields when the parameter name is the same.
     """
 
     goal: str
@@ -369,8 +406,7 @@ class WorkFlowGraph(BaseModule):
         else:
             raise TypeError(f"{type(self.graph)} is an unknown type for graph. Supported types: [MultiDiGraph, WorkFlowGraph]")
         
-        self._validate_workflow_structure()
-
+        # If `workflow_inputs` is not provided, set it to the inputs of initial nodes
         if self.workflow_inputs is None:
             initial_nodes = self.find_initial_nodes()
             workflow_inputs = []
@@ -378,14 +414,18 @@ class WorkFlowGraph(BaseModule):
                 workflow_inputs.extend(self.get_node(node_name).inputs)
             self.workflow_inputs = workflow_inputs
 
+        # If `workflow_outputs` is not provided, set it to the outputs of end nodes
         if self.workflow_outputs is None:
             end_nodes = self.find_end_nodes()
             workflow_outputs = []
             for node_name in end_nodes:
                 workflow_outputs.extend(self.get_node(node_name).outputs)
             self.workflow_outputs = workflow_outputs
+
+        self.workflow_inputs_dict = {param.name: param for param in self.workflow_inputs}
+        self.workflow_outputs_dict = {param.name: param for param in self.workflow_outputs}
         
-        self._check_workflow_inputs_outputs()
+        self._validate_workflow_structure()
         self.update_graph()
     
     def update_graph(self):
@@ -422,12 +462,33 @@ class WorkFlowGraph(BaseModule):
         graph_nodes = self.merge_nodes(graph_nodes, nodes)
         graph_edges = self.merge_edges(graph_edges, edges)
         self._init_from_nodes_and_edges(nodes=graph_nodes, edges=graph_edges)
-    
-    def _validate_workflow_structure(self):
 
+    def _check_isolated_nodes(self):
+        """
+        If there are isolated nodes, check if their inputs and outputs are workflow inputs and outputs.
+        If not, raise error as their inputs and outputs are not connected to the workflow graph.
+        """
         isolated_nodes = list(nx.isolates(self.graph))
-        if len(self.graph.nodes) > 1 and isolated_nodes:
-            logger.warning(f"The workflow contains isolated nodes: {isolated_nodes}")
+        if len(self.graph.nodes) > 1 and len(isolated_nodes) > 0:
+            
+            for node_name in isolated_nodes:
+                node = self.get_node(node_name)
+
+                for node_input in node.inputs:
+                    if node_input.name not in self.workflow_inputs_dict:
+                        error_message = f"Node '{node_name}' is an isolated node and has an input '{node_input.name}' that is not in the workflow inputs: {list(self.workflow_inputs_dict.keys())}"
+                        logger.error(error_message)
+                        raise ValueError(error_message)
+
+                for node_output in node.outputs:
+                    if node_output.name not in self.workflow_outputs_dict:
+                        error_message = f"Node '{node_name}' is an isolated node and has an output '{node_output.name}' that is not in the workflow outputs: {list(self.workflow_outputs_dict.keys())}"
+                        logger.error(error_message)
+                        raise ValueError(error_message)                        
+
+
+    def _validate_workflow_structure(self):
+        self._check_isolated_nodes()
         
         initial_nodes = self.find_initial_nodes()
         if len(self.graph.nodes) > 1 and not initial_nodes:
@@ -1130,10 +1191,18 @@ class WorkFlowGraph(BaseModule):
         return edges
 
 
-    def _check_workflow_inputs_outputs(self):
+    def _check_workflow_inputs_outputs(self, auto_fix: bool = False):
         """Checks if the workflow inputs and outputs can be satisfied by the nodes in the workflow graph.
         Raises error If any workflow input is not used by a node, or if any workflow output cannot be found from a node's output.
+
+        Args:
+            auto_fix: Whether to automatically fix mismatched `type` and `required` fields.
         """
+        # Check if workflow inputs are also in workflow outputs
+        for workflow_input in self.workflow_inputs:
+            if workflow_input in self.workflow_outputs:
+                raise ValueError(f"Workflow input '{workflow_input.name}' is also in workflow outputs")
+
         graph_inputs = []
         graph_outputs = []
 
@@ -1141,20 +1210,47 @@ class WorkFlowGraph(BaseModule):
             graph_inputs.extend(node.inputs)
             graph_outputs.extend(node.outputs)
 
-        validate_params(self.workflow_inputs, graph_inputs, "required input", "actual workflow input")
-        validate_params(self.workflow_outputs, graph_outputs, "required output", "actual workflow output")
+        validated_inputs = validate_params(
+            self.workflow_inputs, 
+            graph_inputs, 
+            "required input", 
+            "actual workflow input",
+            auto_fix=auto_fix
+        )
+
+        validated_outputs = validate_params(
+            self.workflow_outputs, 
+            graph_outputs, 
+            "required output", 
+            "actual workflow output",
+            auto_fix=auto_fix
+        )
+
+        if auto_fix:
+            for node_idx, node in enumerate(self.nodes):
+                self.nodes[node_idx].inputs = update_params(node.inputs, validated_inputs)
+                self.nodes[node_idx].outputs = update_params(node.outputs, validated_outputs)
 
 
-    def _check_agents(self):
+    def _check_agents(self, auto_fix: bool = False):
         """Checks if each node's inputs and outputs can be satisfied by the agents assigned to the node."""
         for node in self.nodes:
-            node.check_agents()
+            node.check_agents(auto_fix=auto_fix)
     
 
-    def _validate_workflow_graph(self):
+    def validate_workflow_graph(self, auto_fix: bool = False):
+        """
+        Validates the workflow graph by checking:
+            - The workflow structure
+            - Workflow inputs and outputs can be derived from nodes
+            - Nodes' inputs and outputs can be derived from agents
+        
+        Args:
+            auto_fix: Whether to automatically fix mismatched `type` and `required` fields when the parameter name is the same.
+        """
         self._validate_workflow_structure()
-        self._check_workflow_inputs_outputs()
-        self._check_agents()
+        self._check_workflow_inputs_outputs(auto_fix=auto_fix)
+        self._check_agents(auto_fix=auto_fix)
 
 
     def get_config(self) -> dict:
@@ -1194,7 +1290,7 @@ class WorkFlowGraph(BaseModule):
             node["agents"] = node_agents
 
         workflow_graph: WorkFlowGraph = cls._create_instance(data)
-        workflow_graph._validate_workflow_graph()
+        workflow_graph.validate_workflow_graph()
         return workflow_graph
 
 

@@ -167,9 +167,9 @@ class Neo4jGraphStoreWrapper(GraphStoreBase):
             session.run("MATCH (n) DETACH DELETE n")
             session.run("CALL apoc.schema.assert({}, {})")
 
-    async def aload(self, node: Union[LabelledNode, Relation, BaseNode]) -> None:
+    def load(self, node: Union[LabelledNode, Relation, BaseNode]) -> None:
         """
-        Asynchronously load a single node into the Neo4j graph database.
+        Load a single node into the Neo4j graph database.
 
         Checks if a node with the same ID already exists in the database. If it does not exist,
         inserts the node as either an EntityNode or ChunkNode based on its type. Handles metadata

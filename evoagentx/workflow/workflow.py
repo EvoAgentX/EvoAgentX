@@ -44,6 +44,7 @@ class WorkFlow(BaseModule):
         if self.agent_manager is None:
             logger.warning("agent_manager is NoneType when initializing a WorkFlow instance")
         
+        self.graph.validate_workflow_graph()
         self.output_names = [output.name for output in self.graph.workflow_outputs]
 
 

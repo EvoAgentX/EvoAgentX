@@ -32,7 +32,7 @@ You are tasked with generating agents to complete a sub-task within a workflow. 
         {{
             "name": "the input's name", 
             "type": "string/integer/number/boolean/object/array",
-            "required": true/false (`false` means the input is the feedback from later sub-task, or the previous output for the current sub-task), 
+            "required": true/false, 
             "description": "Description of the input's purpose and usage."
         }},
         ...
@@ -41,7 +41,7 @@ You are tasked with generating agents to complete a sub-task within a workflow. 
         {{
             "name": "the output's name", 
             "type": "string/integer/number/boolean/object/array",
-            "required": true (the `required` field of outputs are always true), 
+            "required": true/false, 
             "description": "Description of the output produced by this sub-task."
         }},
         ...
@@ -63,7 +63,7 @@ You are tasked with generating agents to complete a sub-task within a workflow. 
         {{
             "name": "the input's name", 
             "type": "string/integer/number/boolean/object/array",
-            "required": true/false (`false` means the input is the feedback from later sub-task, or the previous output for the current sub-task), 
+            "required": true/false, 
             "description": "Description of the input's purpose and usage."
         }},
         ...
@@ -72,7 +72,7 @@ You are tasked with generating agents to complete a sub-task within a workflow. 
         {{
             "name": "the output's name", 
             "type": "string/integer/number/boolean/object/array",
-            "required": true (the `required` field of outputs are always true), 
+            "required": true/false, 
             "description": "Description of the output produced by this sub-task."
         }},
         ...
@@ -89,7 +89,7 @@ You are tasked with generating agents to complete a sub-task within a workflow. 
         {{
             "name": "the input's name", 
             "type": "string/integer/number/boolean/object/array",
-            "required": true/false (only set to `false` when this input is the feedback from later sub-task, or the previous generated output for the current sub-task), 
+            "required": true/false, 
             "description": "Description of the input's purpose and usage."
         }},
         ...
@@ -98,7 +98,7 @@ You are tasked with generating agents to complete a sub-task within a workflow. 
         {{
             "name": "the output's name", 
             "type": "string/integer/number/boolean/object/array",
-            "required": true (always set the `required` field of outputs as true), 
+            "required": true/false, 
             "description": "Description of the output produced by this agent."
         }},
         ...

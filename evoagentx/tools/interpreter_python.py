@@ -45,6 +45,8 @@ class PythonInterpreter(BaseInterpreter):
             **kwargs
         )
         self.allowed_imports = allowed_imports or set()
+        self.namespace = {}
+        self.visited_modules = {}
 
     def _get_file_and_folder_names(self, target_path: str) -> List[str]:
         """Retrieves the names of files and folders (without extensions) in a given directory.

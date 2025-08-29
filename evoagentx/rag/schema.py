@@ -73,6 +73,19 @@ class ChunkMetadata(DocumentMetadata):
     similarity_score: Optional[float] = Field(default=None, description="Similarity score from retrieval.")
     # graph support
     graph_node: Optional[GraphNodeData] = Field(default=None, description="The properties of all types of graph nodes.")
+    # LongTermMemory
+    content: Optional[str] = Field(default=None, description="the content of the message, will be dumps by 'dumps' from json lib.")
+    memory_id: Optional[str] = Field(default=None, description="Unique identifier for memory entries.")
+    agent: Optional[str] = Field(default=None, description="The sender of the message.")
+    msg_type: Optional[str] = Field(default=None, description="The type of the message (e.g., 'request', 'response').")
+    prompt: Optional[Union[str, List[dict]]] = Field(default=None, description="The prompt used to generate the message.")
+    next_actions: Optional[List[str]] = Field(default=None, description="The following actions after the message.")
+    wf_task: Optional[str] = Field(default=None, description="The name of a task in the workflow.")
+    wf_task_desc: Optional[str] = Field(default=None, description="The description of a task in the workflow.")
+    message_id: Optional[str] = Field(default=None, description="Unique identifier for the message.")
+    action: Optional[str] = Field(default=None, description="the trigger of the message, normally set as the action name.")
+    wf_goal: Optional[str] = Field(default=None, description="the goal of the whole workflow.")
+    timestamp: Optional[str] = Field(default=None, description="the timestame of the message. ")
 
 class IndexMetadata(BaseModule):
     corpus_id: str = Field(..., description="Identifier for the corpus")

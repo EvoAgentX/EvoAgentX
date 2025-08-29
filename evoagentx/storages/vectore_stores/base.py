@@ -17,6 +17,6 @@ class VectorStoreBase(ABC):
         pass
 
     @abstractmethod
-    async def aload(self):
-        """Asynchronously load a single node into the vector store."""
+    def load(self):
+        """Load a single node into the vector store."""
         pass

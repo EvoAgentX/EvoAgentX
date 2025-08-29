@@ -8,6 +8,7 @@ import os
 import re
 import json
 import base64
+import csv
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Any
@@ -268,11 +269,48 @@ class HTMLGenerator:
             print(f"⚠️ 无法读取图片 {image_path}: {e}")
             return ""
     
+    def _get_latest_close_price(self, stock_code: str, timestamp: str) -> str:
+        """从股票日线数据CSV文件中读取最新的收盘价"""
+        try:
+            # 构建CSV文件路径
+            csv_path = Path(f"{stock_code}/{timestamp}/data/stock_daily_catl_{timestamp}_{stock_code}.csv")
+            
+            if not csv_path.exists():
+                print(f"⚠️ 股票日线数据文件不存在: {csv_path}")
+                return "N/A"
+            
+            # 读取CSV文件
+            with open(csv_path, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+                
+            # 跳过表头，获取最后一行数据
+            if len(lines) < 2:
+                print(f"⚠️ 股票日线数据文件为空或格式错误: {csv_path}")
+                return "N/A"
+                
+            # 获取最后一行数据（最新的交易日）
+            last_line = lines[-1].strip()
+            if not last_line:  # 如果最后一行为空，取倒数第二行
+                last_line = lines[-2].strip()
+                
+            # 解析CSV数据：index,date,open,high,low,close,volume,amount,outstanding_share,turnover
+            fields = last_line.split(',')
+            if len(fields) >= 6:
+                close_price = fields[5]  # close价格在第6列（索引5）
+                return close_price
+            else:
+                print(f"⚠️ 股票日线数据格式错误: {last_line}")
+                return "N/A"
+                
+        except Exception as e:
+            print(f"⚠️ 读取股票收盘价失败: {e}")
+            return "N/A"
+    
     def generate_report(self, md_file_path: str, technical_chart_path: str, 
                        price_volume_chart_path: str) -> str:
-        """Generate the complete HTML report with base64 encoded images from a single comprehensive report."""
+        """Generate the complete HTML report with base64 encoded images."""
         
-        # Read and parse comprehensive report markdown content
+        # Read and parse markdown content
         with open(md_file_path, 'r', encoding='utf-8') as f:
             md_content = f.read()
         
@@ -297,9 +335,151 @@ class HTMLGenerator:
         
         return str(self.output_path)
     
+    def _read_news_from_csv(self, stock_code: str, timestamp: str) -> List[Dict[str, str]]:
+        """Read news data from CSV file and return the latest 10 entries."""
+        try:
+            # Construct the CSV file path
+            csv_path = Path(f"{stock_code}/{timestamp}/data/stock_news_catl_{timestamp}_{stock_code}.csv")
+            
+            if not csv_path.exists():
+                return []
+            
+            news_data = []
+            with open(csv_path, 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    # Parse datetime and sort by time
+                    news_data.append({
+                        '新闻标题': row.get('新闻标题', ''),
+                        '来源': row.get('文章来源', ''),
+                        '发布时间': row.get('发布时间', ''),
+                        '影响程度': '中',  # Default value, could be enhanced
+                        '解读': row.get('新闻内容', '')[:100] + '...' if len(row.get('新闻内容', '')) > 100 else row.get('新闻内容', ''),
+                        '链接': row.get('新闻链接', '')
+                    })
+            
+            # Sort by time (newest first) and return top 10
+            news_data.sort(key=lambda x: x['发布时间'], reverse=True)
+            return news_data[:10]
+            
+        except Exception as e:
+            print(f"Error reading news CSV: {e}")
+            return []
+    
+    def _read_ratings_from_csv(self, stock_code: str, timestamp: str) -> List[Dict[str, str]]:
+        """Read institution rating data from CSV file and return the latest 10 entries."""
+        try:
+            # Construct the CSV file path
+            csv_path = Path(f"{stock_code}/{timestamp}/data/institution_recommendation_catl_{timestamp}_{stock_code}.csv")
+            
+            if not csv_path.exists():
+                return []
+            
+            ratings_data = []
+            with open(csv_path, 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    ratings_data.append({
+                        '机构名称': row.get('评级机构', ''),
+                        '评级': row.get('最新评级', ''),
+                        '目标价': row.get('目标价', '-'),
+                        '评级日期': row.get('评级日期', ''),
+                        '分析师': row.get('分析师', '不详')
+                    })
+            
+            # Sort by date (newest first) and return top 10
+            ratings_data.sort(key=lambda x: x['评级日期'], reverse=True)
+            return ratings_data[:10]
+            
+        except Exception as e:
+            print(f"Error reading ratings CSV: {e}")
+            return []
+
+    def _generate_fundamentals_section_from_csv(self, metadata: Dict[str, str]) -> str:
+        """Generate fundamentals section content directly from CSV files."""
+        if not metadata:
+            return ""
+        
+        # Extract stock code and timestamp from metadata
+        stock_code = metadata.get('股票代码', '300750')
+        # Try to extract timestamp from various possible keys
+        timestamp = metadata.get('日期', '')
+        if not timestamp:
+            # If no date in metadata, try to extract from file names or use current date
+            timestamp = datetime.now().strftime('%Y%m%d')
+        else:
+            # Convert date format like "2025年08月01日" to "20250801"
+            import re
+            date_match = re.search(r'(\d{4})年(\d{2})月(\d{2})日', timestamp)
+            if date_match:
+                year, month, day = date_match.groups()
+                timestamp = f"{year}{month}{day}"
+            else:
+                timestamp = datetime.now().strftime('%Y%m%d')
+        
+        # Read data from CSV files
+        news_data = self._read_news_from_csv(stock_code, timestamp)
+        ratings_data = self._read_ratings_from_csv(stock_code, timestamp)
+        
+        # Debug information
+        print(f"Debug: Stock code: {stock_code}, Timestamp: {timestamp}")
+        print(f"Debug: Found {len(news_data)} news items")
+        print(f"Debug: Found {len(ratings_data)} rating items")
+        
+        # Generate news section
+        news_html = ""
+        if news_data:
+            news_headers = ['新闻标题', '来源', '发布时间', '影响程度', '解读', '链接']
+            news_rows = []
+            for news in news_data:
+                news_rows.append([
+                    news['新闻标题'],
+                    news['来源'], 
+                    news['发布时间'],
+                    news['影响程度'],
+                    news['解读'],
+                    news['链接']
+                ])
+            
+            news_table_data = {'headers': news_headers, 'rows': news_rows}
+            news_html = f"""
+            <div class="subsection">
+                <h3 class="subsection-title"><i class="fas fa-caret-right"></i> 4.1 最新新闻动态</h3>
+                <div class="scrollable-table-container">
+                    {self._generate_table(news_table_data)}
+                </div>
+            </div>
+            """
+        
+        # Generate ratings section 
+        ratings_html = ""
+        if ratings_data:
+            ratings_headers = ['机构名称', '评级', '目标价', '评级日期', '分析师']
+            ratings_rows = []
+            for rating in ratings_data:
+                ratings_rows.append([
+                    rating['机构名称'],
+                    rating['评级'],
+                    rating['目标价'],
+                    rating['评级日期'],
+                    rating['分析师']
+                ])
+            
+            ratings_table_data = {'headers': ratings_headers, 'rows': ratings_rows}
+            ratings_html = f"""
+            <div class="subsection">
+                <h3 class="subsection-title"><i class="fas fa-caret-right"></i> 4.2 机构评级汇总</h3>
+                <div class="scrollable-table-container">
+                    {self._generate_table(ratings_table_data)}
+                </div>
+            </div>
+            """
+        
+        return news_html + ratings_html
+
     def _generate_html_structure(self, parser: MarkdownParser, metadata: Dict[str, str],
                                  technical_chart_base64: str, price_volume_chart_base64: str) -> str:
-        """Generate the complete HTML structure with neomorphism design from a single comprehensive report."""
+        """Generate the complete HTML structure with neomorphism design."""
         
         # Get header
         header_html = self._generate_neomorphism_header(metadata, parser.sections)
@@ -310,8 +490,8 @@ class HTMLGenerator:
         # Generate dashboard overview
         dashboard_html = self._generate_dashboard_overview(parser.sections, metadata)
         
-        # Generate detailed sections (comprehensive report including all sections)
-        sections_html = self._generate_detailed_sections(parser.sections, "综合分析报告")
+        # Generate detailed sections
+        sections_html = self._generate_detailed_sections(parser.sections, metadata)
         
         # Get footer
         footer_html = self._generate_footer(metadata)
@@ -355,9 +535,19 @@ class HTMLGenerator:
         date = now.strftime("%Y年%m月%d日")
         time = now.strftime("%H:%M:%S")
         
-        # Extract current price from metadata
-        current_price = "286.66"
-        if '当前持仓' in metadata:
+        # Extract current price from stock daily data CSV file
+        current_price = "N/A"
+        
+        # Try to get the latest close price from CSV data
+        if stock_code != 'Unknown':
+            # Extract timestamp from date (convert from "2025年08月14日" to "20250814")
+            date_match = re.search(r'(\d{4})年(\d{2})月(\d{2})日', date)
+            if date_match:
+                timestamp = f"{date_match.group(1)}{date_match.group(2)}{date_match.group(3)}"
+                current_price = self._get_latest_close_price(stock_code, timestamp)
+        
+        # Fallback: try to extract from metadata if CSV method failed
+        if current_price == "N/A" and '当前持仓' in metadata:
             holding_info = metadata['当前持仓']
             if '平均成本' in holding_info:
                 price_match = re.search(r'平均成本\s*(\d+(?:\.\d+)?)', holding_info)
@@ -387,54 +577,121 @@ class HTMLGenerator:
         """
     
     def _generate_dashboard_overview(self, sections: Dict[str, Any], metadata: Dict[str, str]) -> str:
-        """Generate a dashboard overview with key metrics."""
-        dashboard_cards = []
+        """Generate a dashboard overview with key metrics extracted from actual report data."""
         
-        # Extract key metrics from sections
-        investment_advice = "买入"
+        # 默认值作为后备
+        investment_advice = "持有"
+        investment_reason = "基于技术分析和基本面评估的专业建议"
         risk_level = "中等"
-        target_price = "310"
-        stop_price = "265"
-        expected_return = "8%"
-        current_holdings = "500股"
+        confidence_level = "中等"
+        target_price = "285"
+        stop_price = "270" 
+        expected_return = "2%"
+        strategy_period = "短期持仓"
         
-        # Extract from trading decision section
-        if '1. 交易操作决策' in sections:
-            decision_section = sections['1. 交易操作决策']
-            subsections = decision_section.get('subsections', {})
+        # 1. 从"一、交易操作决策"部分提取投资建议和风险级别
+        trading_section = sections.get('一、交易操作决策', {})
+        if trading_section:
+            subsections = trading_section.get('subsections', {})
             
-            # Extract core decision
-            if '核心决策' in subsections:
-                core_decision = subsections['核心决策']
+            # 提取核心决策
+            core_decision = subsections.get('1.1 核心决策', {})
+            if core_decision:
                 tables = core_decision.get('tables', [])
-                if tables:
-                    first_table = tables[0]
-                    rows = first_table.get('rows', [])
-                    if rows:
+                if tables and len(tables) > 0:
+                    rows = tables[0].get('rows', [])
+                    if rows and len(rows) > 0:
                         row = rows[0]
                         if len(row) >= 4:
-                            investment_advice = row[1]
-                            risk_level = row[3]
+                            investment_advice = row[1] if row[1] else investment_advice
+                            investment_reason = row[2] if row[2] else investment_reason
+                            risk_level = row[3] if row[3] else risk_level
             
-            # Extract price targets
-            if '价格目标' in subsections:
-                price_targets = subsections['价格目标']
+            # 提取价格目标
+            price_targets = subsections.get('1.3 价格目标', {})
+            if price_targets:
                 tables = price_targets.get('tables', [])
-                if tables:
-                    first_table = tables[0]
-                    rows = first_table.get('rows', [])
-                    if rows:
+                if tables and len(tables) > 0:
+                    rows = tables[0].get('rows', [])
+                    if rows and len(rows) > 0:
                         row = rows[0]
                         if len(row) >= 4:
-                            stop_price = row[2].replace(' RMB', '')
-                            target_price = row[1].replace(' RMB', '')
-                            expected_return = row[3]
+                            target_price = str(row[1]).replace('RMB', '').replace(' ', '') if row[1] else target_price
+                            stop_price = str(row[2]).replace('RMB', '').replace(' ', '') if row[2] else stop_price
+                            expected_return = str(row[3]) if row[3] else expected_return
         
-        # Extract current holdings from metadata
-        if '当前持仓' in metadata:
-            holdings_match = re.search(r'(\d+)\s*股', metadata['当前持仓'])
-            if holdings_match:
-                current_holdings = holdings_match.group(1) + '股'
+        # 2. 从"五、风险评估"部分提取风险信息
+        risk_section = sections.get('五、风险评估', {})
+        if risk_section:
+            subsections = risk_section.get('subsections', {})
+            
+            # 从风险因素表格中提取总体风险评估
+            risk_factors = subsections.get('5.1 风险因素', {})
+            if risk_factors:
+                tables = risk_factors.get('tables', [])
+                if tables and len(tables) > 0:
+                    rows = tables[0].get('rows', [])
+                    # 计算平均风险级别
+                    risk_levels = []
+                    for row in rows:
+                        if len(row) >= 2 and row[1]:
+                            risk_levels.append(row[1])
+                    if risk_levels:
+                        # 简单的风险级别统计
+                        high_count = risk_levels.count('高')
+                        mid_count = risk_levels.count('中')
+                        low_count = risk_levels.count('低')
+                        if high_count > mid_count and high_count > low_count:
+                            risk_level = "高"
+                        elif mid_count >= high_count and mid_count >= low_count:
+                            risk_level = "中等"
+                        else:
+                            risk_level = "低"
+        
+        # 3. 从"七、投资建议"部分提取策略信息
+        advice_section = sections.get('七、投资建议', {})
+        if advice_section:
+            subsections = advice_section.get('subsections', {})
+            
+            # 从短期操作建议中提取信心级别和期间
+            short_term = subsections.get('7.1 短期操作建议', {})
+            if short_term:
+                text_content = short_term.get('text_content', [])
+                if text_content:
+                    content_text = ' '.join(text_content)
+                    # 提取预期收益
+                    return_match = re.search(r'预期收益[：:]\s*([0-9.]+%)', content_text)
+                    if return_match:
+                        expected_return = return_match.group(1)
+            
+            # 从中长期策略中提取持有周期
+            long_term = subsections.get('7.2 中长期策略', {})
+            if long_term:
+                text_content = long_term.get('text_content', [])
+                if text_content:
+                    content_text = ' '.join(text_content)
+                    # 提取持有周期
+                    period_match = re.search(r'持有周期[：:]\s*([^。\n]+)', content_text)
+                    if period_match:
+                        period = period_match.group(1).strip()
+                        if '月' in period or '年' in period:
+                            strategy_period = "中长期持仓"
+                        else:
+                            strategy_period = "短期持仓"
+        
+        # 根据投资建议确定信心级别
+        if investment_advice in ['买入', '强烈买入']:
+            confidence_level = "高"
+        elif investment_advice in ['卖出', '强烈卖出']:
+            confidence_level = "低"
+        elif investment_advice in ['部分卖出', '部分买入']:
+            confidence_level = "中等"
+        else:  # 持有
+            confidence_level = "中等"
+        
+        # 清理价格数据（移除非数字字符）
+        target_price = re.sub(r'[^0-9.]', '', str(target_price))
+        stop_price = re.sub(r'[^0-9.]', '', str(stop_price))
         
         return f"""
             <div class="analysis-summary">
@@ -444,7 +701,7 @@ class HTMLGenerator:
                     </div>
                     <h3>投资建议</h3>
                     <div class="main-value">{investment_advice}</div>
-                    <div class="sub-text">基于技术分析和基本面评估的专业建议</div>
+                    <div class="sub-text">{investment_reason[:50]}{'...' if len(investment_reason) > 50 else ''}</div>
                 </div>
                 
                 <div class="summary-card">
@@ -477,10 +734,10 @@ class HTMLGenerator:
                         </div>
                         <div class="risk-item">
                             <span class="label">信心级别</span>
-                            <span class="value">高</span>
+                            <span class="value">{confidence_level}</span>
                         </div>
                     </div>
-                    <div class="sub-text">短期持仓</div>
+                    <div class="sub-text">{strategy_period}</div>
                 </div>
             </div>
         """
@@ -736,34 +993,6 @@ class HTMLGenerator:
             box-shadow: 20px 20px 40px #bebebe, -20px -20px 40px #ffffff;
         }
         
-        /* Report Section Headers */
-        .report-section-header {
-            text-align: center;
-            margin: 50px 0 30px 0;
-            padding: 30px;
-            background: #e0e5ec;
-            border-radius: 25px;
-            box-shadow: 20px 20px 60px #bebebe, -20px -20px 60px #ffffff;
-        }
-        
-        .report-section-title {
-            font-size: 2.5rem;
-            font-weight: 800;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 15px;
-        }
-        
-        .report-section-divider {
-            width: 100px;
-            height: 4px;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            margin: 0 auto;
-            border-radius: 2px;
-        }
-        
         .section-header {
             display: flex;
             align-items: center;
@@ -848,6 +1077,36 @@ class HTMLGenerator:
         
         .data-table tr:hover td {
             background: rgba(102, 126, 234, 0.1);
+        }
+        
+        /* Scrollable table container for news and ratings */
+        .scrollable-table-container {
+            max-height: 400px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            border-radius: 15px;
+            background: #e0e5ec;
+            box-shadow: inset 8px 8px 16px #bebebe, inset -8px -8px 16px #ffffff;
+            padding: 5px;
+            margin: 10px 0;
+        }
+        
+        .scrollable-table-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .scrollable-table-container::-webkit-scrollbar-track {
+            background: #e0e5ec;
+            border-radius: 4px;
+        }
+        
+        .scrollable-table-container::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 4px;
+        }
+        
+        .scrollable-table-container::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(135deg, #5a67d8, #6b46c1);
         }
         
         /* Status badges */
@@ -1027,8 +1286,6 @@ class HTMLGenerator:
             return '📊'
         elif '投资' in section_lower or '建议' in section_lower:
             return '💡'
-        elif '专业' in section_lower or '方法论' in section_lower or '决策过程' in section_lower:
-            return '🔬'
         else:
             return '📄'
     
@@ -1067,35 +1324,33 @@ class HTMLGenerator:
         
         return ''.join(charts_html)
     
-    def _generate_detailed_sections(self, sections, section_title: str = "详细分析") -> str:
+    def _generate_detailed_sections(self, sections, metadata: Dict[str, str] = None) -> str:
         """Generate detailed analysis sections with optimized layout."""
         sections_html = []
         
-        # Add section title header
-        sections_html.append(f"""
-            <div class="report-section-header">
-                <h1 class="report-section-title">{section_title}</h1>
-                <div class="report-section-divider"></div>
-            </div>
-        """)
-        
         # Priority order for sections
         section_order = [
-            '一、交易操作决策',
-            '二、市场环境分析', 
-            '三、技术分析',
-            '四、基本面分析',
-            '五、综合多维度分析',
-            '六、风险评估',
-            '七、投资建议',
-            '八、专业分析方法论与决策过程'
+            '1. 交易操作决策',
+            '2. 市场环境分析', 
+            '3. 技术分析',
+            '4. 基本面分析（资讯动向）',
+            '5. 风险评估',
+            '6. 历史表现回顾',
+            '7. 投资建议'
         ]
         
         # Generate sections in priority order
         for section_key in section_order:
             if section_key in sections:
                 section_data = sections[section_key]
-                section_name = section_key.split('、', 1)[1] if '、' in section_key else section_key
+                section_name = section_key.split('. ', 1)[1] if '. ' in section_key else section_key
+                
+                # Special handling for 基本面分析 section - use CSV data
+                if '基本面分析' in section_name:
+                    section_content = self._generate_fundamentals_section_from_csv(metadata)
+                else:
+                    section_content = self._generate_section_content(section_data)
+                
                 section_html = f"""
                     <div class="detail-section">
                         <div class="section-header">
@@ -1103,7 +1358,7 @@ class HTMLGenerator:
                             <h2 class="section-title">{section_name}</h2>
                         </div>
                         <div class="section-content">
-                            {self._generate_section_content(section_data)}
+                            {section_content}
                         </div>
                     </div>
                 """
@@ -1112,7 +1367,14 @@ class HTMLGenerator:
         # Add any remaining sections not in the priority list
         for section_key, section_data in sections.items():
             if section_key not in section_order:
-                section_name = section_key.split('、', 1)[1] if '、' in section_key else section_key
+                section_name = section_key.split('. ', 1)[1] if '. ' in section_key else section_key
+                
+                # Special handling for 基本面分析 section - use CSV data
+                if '基本面分析' in section_name:
+                    section_content = self._generate_fundamentals_section_from_csv(metadata)
+                else:
+                    section_content = self._generate_section_content(section_data)
+                
                 section_html = f"""
                     <div class="detail-section">
                         <div class="section-header">
@@ -1120,7 +1382,7 @@ class HTMLGenerator:
                             <h2 class="section-title">{section_name}</h2>
                         </div>
                         <div class="section-content">
-                            {self._generate_section_content(section_data)}
+                            {section_content}
                         </div>
                     </div>
                 """
