@@ -43,6 +43,8 @@
 
 
 ## 🔥 最新消息
+- **[2025年7月]** 🎉 **EvoAgentX** 已在 [arXiv](https://arxiv.org/abs/2507.03616) 发布！
+- **[2025年7月]** 🎉 **EvoAgentX** 已获得 1,000 stars！
 - **[2025年5月]** 🎉 **EvoAgentX** 正式发布！
 
 ## ⚡ 快速开始
@@ -53,6 +55,8 @@
   - [API密钥配置](#api密钥配置)
   - [配置并使用LLM](#配置并使用llm)
 - [自动工作流生成](#自动工作流生成)
+- [工具驱动的工作流生成](#工具驱动的工作流生成)
+- [人机协同（HITL）支持](#Human-in-the-Loop支持)
 - [演示视频](#演示视频)
   - [✨ 最终结果](#-最终结果)
 - [进化算法](#进化算法)
@@ -62,9 +66,11 @@
 - [🎯 路线图](#-路线图)
 - [🙋 支持](#-支持)
   - [加入社区](#加入社区)
+  - [将会议添加到您的日历](#将会议添加到您的日历)
   - [联系信息](#联系信息)
   - [观看往期社区会议](#观看往期社区会议)
 - [🙌 为EvoAgentX做贡献](#-为evoagentx做贡献)
+- [📖 引用](#-引用)
 - [📚 致谢](#-致谢)
 - [📄 许可证](#-许可证)
 
@@ -85,7 +91,7 @@ pip install git+https://github.com/EvoAgentX/EvoAgentX.git
 git clone https://github.com/EvoAgentX/EvoAgentX.git
 cd EvoAgentX
 # 创建新的conda环境
-conda create -n evoagentx python=3.10
+conda create -n evoagentx python=3.11
 
 # 激活环境
 conda activate evoagentx
@@ -205,6 +211,72 @@ print(output)
 > 📂 完整的工作示例，请查看[`workflow_demo.py`](https://github.com/EvoAgentX/EvoAgentX/blob/main/examples/workflow_demo.py)
 
 
+## 工具驱动的工作流生成
+
+在更高级的场景中，您的工作流Agent可能需要使用外部工具。EvoAgentX 支持自动工具集成：您可以将工具列表传递给 WorkFlowGenerator，生成器会根据需要将这些工具分配给合适的Agent。
+
+例如，启用 `ArxivToolkit`：
+
+```python
+from evoagentx.tools import ArxivToolkit
+
+# 初始化工具包
+arxiv_toolkit = ArxivToolkit()
+
+# 让生成器在生成工作流时考虑该工具
+wf_generator = WorkFlowGenerator(llm=llm, tools=[arxiv_toolkit])
+workflow_graph = wf_generator.generate_workflow(goal="Find and summarize the latest research on AI in the field of finance on arXiv")
+
+# 为相关Agent赋予该工具的使用权限
+agent_manager = AgentManager(tools=[arxiv_toolkit])
+agent_manager.add_agents_from_workflow(workflow_graph, llm_config=openai_config)
+
+workflow = WorkFlow(graph=workflow_graph, agent_manager=agent_manager, llm=llm)
+output = workflow.execute()
+print(output)
+```
+
+在此设置下，工作流生成器可能会将 `ArxivToolkit` 分配给相关Agent，使其在工作流中按需调用该工具。
+
+
+## Human-in-the-Loop支持
+
+在一些需要严格把控的场景中，EvoAgentX 支持将人机协同（Human-in-the-Loop，HITL）集成到Agent工作流中。这意味着在关键步骤执行前可暂停，等待人工审批或收集用户输入，确保重要决策由人工确认。
+
+所有人工交互由集中式的 `HITLManager` 管理。HITL 模块包括专用代理，例如：
+
+- HITLInterceptorAgent：拦截并审批关键操作
+- HITLUserInputCollectorAgent：收集用户输入
+
+示例：要求在发送邮件前人工批准
+
+```python
+from evoagentx.hitl import HITLManager, HITLInterceptorAgent, HITLInteractionType, HITLMode
+
+hitl_manager = HITLManager()
+hitl_manager.activate()  # 启用 HITL（默认关闭）
+
+# 创建拦截代理，拦截 DataSendingAgent 的 DummyEmailSendAction
+interceptor = HITLInterceptorAgent(
+    target_agent_name="DataSendingAgent",
+    target_action_name="DummyEmailSendAction",
+    interaction_type=HITLInteractionType.APPROVE_REJECT,
+    mode=HITLMode.PRE_EXECUTION  # 在执行前询问
+)
+
+# 将人工确认结果映射回工作流输入，保证数据流连续
+hitl_manager.hitl_input_output_mapping = {"human_verified_data": "extracted_data"}
+
+# 将拦截代理加入 AgentManager，并在工作流中启用 HITL
+agent_manager.add_agent(interceptor)
+workflow = WorkFlow(graph=workflow_graph, agent_manager=agent_manager, llm=llm, hitl_manager=hitl_manager)
+```
+
+当此拦截器触发时，工作流会暂停并在控制台提示输入 `[a]pprove` 或 `[r]eject`。批准：流程继续执行，并使用经过人工确认的数据；拒绝：跳过该操作或执行相应的异常处理。
+
+📂 完整示例可参考 [tutorial/hitl.md](https://github.com/EvoAgentX/EvoAgentX/blob/615b06d29264f47e58a6780bd24f0e73cbf7deee/docs/tutorial/hitl.md)
+
+
 ## 演示视频
 
 
@@ -285,15 +357,16 @@ print(output)
 
 通过以下资源了解如何有效使用EvoAgentX：
 
-| 指南 | Colab 笔记本 | 描述 |
-|:---|:---|:---|
-| **[构建您的第一个智能体](./docs/zh/tutorial/first_agent.md)** | **[构建您的第一个智能体](./docs/ColabNotebook/tutorial_notebooks_zh/first_agent.ipynb)** | 快速创建和管理具有多动作能力的智能体。 |
-| **[构建您的第一个工作流](./docs/zh/tutorial/first_workflow.md)** | **[构建您的第一个工作流](./docs/ColabNotebook/tutorial_notebooks_zh/first_workflow.ipynb)** | 学习如何使用多个智能体构建协作工作流。 |
-| **[使用工具](./docs/zh/tutorial/tools.md)** | **[使用工具](./docs/ColabNotebook/tutorial_notebooks_zh/tools.ipynb)** | 掌握 EvoAgentX 强大的工具生态系统，实现智能体交互。 |
-| **[自动工作流生成](./docs/zh/quickstart.md#automatic-workflow-generation-and-execution)** | **[自动工作流生成](./docs/ColabNotebook/tutorial_notebooks_zh/quickstart.ipynb)** | 从自然语言目标自动生成工作流。 |
-| **[基准测试与评估教程](./docs/zh/tutorial/benchmark_and_evaluation.md)** | **[基准测试与评估教程](./docs/ColabNotebook/tutorial_notebooks_zh/benchmark_and_evaluation.ipynb)** | 使用基准数据集评估智能体性能。 |
-| **[TextGrad优化器教程](./docs/zh/tutorial/textgrad_optimizer.md)** | **[TextGrad优化器教程](./docs/ColabNotebook/tutorial_notebooks_zh/textgrad_optimizer.ipynb)** | 使用TextGrad自动优化多智能体工作流中的提示词。 |
-| **[AFlow优化器教程](./docs/zh/tutorial/aflow_optimizer.md)** | **[AFlow优化器教程](./docs/ColabNotebook/tutorial_notebooks_zh/aflow_optimizer.ipynb)** | 使用AFlow自动优化多智能体工作流的提示词和结构。 |
+| 指南 | 描述 |
+|:---|:---|
+| **[构建您的第一个智能体](./docs/zh/tutorial/first_agent.md)** | 快速创建和管理具有多动作能力的智能体。 |
+| **[构建您的第一个工作流](./docs/zh/tutorial/first_workflow.md)** | 学习如何使用多个智能体构建协作工作流。 |
+| **[使用工具](./docs/zh/tutorial/tools.md)** | 掌握 EvoAgentX 强大的工具生态系统，实现智能体交互。 |
+| **[自动工作流生成](./docs/zh/quickstart.md#automatic-workflow-generation-and-execution)** | 从自然语言目标自动生成工作流。 |
+| **[基准测试与评估教程](./docs/zh/tutorial/benchmark_and_evaluation.md)** | 使用基准数据集评估智能体性能。 |
+| **[TextGrad优化器教程](./docs/zh/tutorial/textgrad_optimizer.md)** | 使用TextGrad自动优化多智能体工作流中的提示词。 |
+| **[AFlow优化器教程](./docs/zh/tutorial/aflow_optimizer.md)** | 使用AFlow自动优化多智能体工作流的提示词和结构。 |
+| **[Human-In-The-Loop教程](./docs/tutorial/hitl.md)** | 在您的WorkFlow中启用HITL功能。 |
 <!-- | **[SEW优化器教程](./docs/zh/tutorial/sew_optimizer.md)** | 创建SEW（自进化工作流）来增强智能体系统。 | -->
 
 🛠️ 通过这些教程构建和优化您的EvoAgentX工作流。
@@ -350,6 +423,30 @@ print(output)
 我们感谢您对我们开源计划的贡献兴趣。我们提供了[贡献指南](https://github.com/EvoAgentX/EvoAgentX/blob/main/CONTRIBUTING.md)文档，其中概述了为EvoAgentX做贡献的步骤。请参考此指南以确保顺利协作和成功贡献。 🤝🚀
 
 [![Star历史图表](https://api.star-history.com/svg?repos=EvoAgentX/EvoAgentX&type=Date)](https://www.star-history.com/#EvoAgentX/EvoAgentX&Date)
+
+
+## 📖 引用
+
+如果您觉得 EvoAgentX 有帮助，请考虑引用我们的工作：
+
+📄 [EvoAgentX](https://arxiv.org/abs/2507.03616)
+📄 [Survey Paper](https://arxiv.org/abs/2508.07407)
+
+```bibtex
+@article{wang2025evoagentx,
+  title={EvoAgentX: An Automated Framework for Evolving Agentic Workflows},
+  author={Wang, Yingxu and Liu, Siwei and Fang, Jinyuan and Meng, Zaiqiao},
+  journal={arXiv preprint arXiv:2507.03616},
+  year={2025}
+}
+@article{fang202survey,
+      title={A Comprehensive Survey of Self-Evolving AI Agents: A New Paradigm Bridging Foundation Models and Lifelong Agentic Systems}, 
+      author={Jinyuan Fang and Yanwen Peng and Xi Zhang and Yingxu Wang and Xinhao Yi and Guibin Zhang and Yi Xu and Bin Wu and Siwei Liu and Zihao Li and Zhaochun Ren and Nikos Aletras and Xi Wang and Han Zhou and Zaiqiao Meng},
+      year={2025},
+      journal={arXiv preprint arXiv:2508.07407},
+      url={https://arxiv.org/abs/2508.07407}, 
+}
+```
 
 
 ## 📚 致谢 

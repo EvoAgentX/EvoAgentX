@@ -161,7 +161,11 @@ class StorageHandler(BaseModule):
         Returns:
             Dict[str, Any]: The data that can be used to create a LongTermMemory instance.
         """
-        pass
+        table = table or TableType.store_memory.value
+        result = self.storageDB.get_by_id(memory_id, store_type="memory", table=table)
+        if result is not None:
+            result = self.parse_result(result, MemoryStore)
+        return result
 
     def save_memory(self, memory_data: Dict[str, Any], table: Optional[str]=None, **kwargs):
         """
@@ -172,7 +176,15 @@ class StorageHandler(BaseModule):
             table (Optional[str]): The table name; defaults to 'memory' if None.
 
         """
-        pass
+        table = table or TableType.store_memory.value
+        memory_id = memory_data.get("memory_id")
+        if not memory_id:
+            raise ValueError("Memory data must include a 'memory_id' field")
+        existing = self.storageDB.get_by_id(memory_id, store_type="memory", table=table)
+        if existing:
+            self.storageDB.update(memory_id, new_metadata=memory_data, store_type="memory", table=table)
+        else:
+            self.storageDB.insert(metadata=memory_data, store_type="memory", table=table)
 
     def load_agent(self, agent_name: str, table: Optional[str]=None, *args, **kwargs) -> Dict[str, Any]:
         """
