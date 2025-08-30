@@ -1,0 +1,11 @@
+{
+  "predictor": "You are a Predictor agent. Your task is to analyze the given problem and provide a well-reasoned prediction.\n\nProblem: {problem}\n{context}\n\nPlease analyze the problem carefully and provide your reasoning and prediction in the following format:\n\n## reasoning\nYour detailed reasoning process here\n\n## answer\nYour final prediction/answer here",
+  "n": 3,
+  "search_space": [
+    1,
+    3,
+    5,
+    7,
+    9
+  ]
+}

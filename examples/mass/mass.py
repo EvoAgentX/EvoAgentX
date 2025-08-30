@@ -254,18 +254,18 @@ def optimize_executer(optimized_predictor, executor_llm, optimizer_llm, benchmar
     return optimized_block
 
 def main():
-    openai_config = OpenAILLMConfig(model="gpt-4o-mini", openai_key=OPENAI_API_KEY, stream=True, output_response=False)
+    openai_config = OpenAILLMConfig(model="gpt-4o", openai_key=OPENAI_API_KEY, stream=True, output_response=False)
     executor_llm = OpenAILLM(config=openai_config)
-    optimizer_config = OpenAILLMConfig(model="gpt-4o-mini", openai_key=OPENAI_API_KEY, stream=True, output_response=False)
+    optimizer_config = OpenAILLMConfig(model="gpt-4o", openai_key=OPENAI_API_KEY, stream=True, output_response=False)
     optimizer_llm = OpenAILLM(config=optimizer_config)
 
     benchmark = MathSplits()
     
     # Step 0: 优化 Predictor
-    # predictor = Predictor(llm=executor_llm)
+    predictor = Predictor(llm=executor_llm)
     
-    # predictor_score, optimized_predictor = optimize_predictor(predictor, optimizer_llm, benchmark)
-    predictor_score, optimized_predictor = 50.0, Predictor(llm = executor_llm)
+    predictor_score, optimized_predictor = optimize_predictor(predictor, optimizer_llm, benchmark)
+    # predictor_score, optimized_predictor = 50.0, Predictor(llm = executor_llm)
 
 
     # Step 1: 逐个优化每个block
