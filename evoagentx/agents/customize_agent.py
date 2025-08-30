@@ -184,6 +184,16 @@ class CustomizeAgent(Agent):
         """
         return self.action.prompt
     
+    @prompt.setter
+    def prompt(self, value: str):
+        """
+        Set the prompt for the primary custom action.
+        
+        Args:
+            value: The new prompt text
+        """
+        self.action.prompt = value
+    
     @property
     def prompt_template(self) -> PromptTemplate:
         """

@@ -56,16 +56,6 @@ Your final prediction/answer here""",
             'answer': response.content.answer
         }
     
-    @property
-    def prompt(self):
-        """获取当前prompt"""
-        return self.agent.prompt
-    
-    @prompt.setter
-    def prompt(self, value):
-        """设置prompt"""
-        self.agent.prompt = value
-    
     def save(self, path: str):
         """保存agent配置"""
         return self.agent.save_module(path)
@@ -83,21 +73,5 @@ def create_predictor_agent(llm: OpenAILLM, **kwargs):
     """创建PredictorAgent的便捷函数"""
     return Predictor(llm, **kwargs)
 
-if __name__ == "__main__":
-    # 测试代码
-    model_config = OpenAILLMConfig(model="gpt-4o-mini", openai_key=OPENAI_API_KEY, stream=True, output_response=False)
-    llm = OpenAILLM(config=model_config)
-    
-    # 创建predictor agent
-    predictor = create_predictor_agent(llm)
-    
-    # 测试执行
-    problem = "What is 2 + 2?"
-    result, metadata = predictor(problem)
-    print(f"Problem: {problem}")
-    print(f"Result: {result}")
-    # 测试保存和加载
-    save_path = "examples/mass/agents/saved_predictor.json"
-    predictor.save(save_path)
-    print(f"Agent saved to {save_path}")
+
     
