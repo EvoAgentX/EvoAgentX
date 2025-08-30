@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Browser Automation Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .form-group {
+            margin: 15px 0;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        input,
+        textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+
+        .btn-success {
+            background-color: #28a745;
+            color: white;
+        }
+
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            display: none;
+        }
+
+        .success {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+        }
+
+        .error {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Browser Automation Test Page</h1>
+        <p>This page tests various browser automation features including input, clicking, and form submission.</p>
+
+        <div class="form-group">
+            <label for="name-input">Full Name:</label>
+            <input type="text" id="name-input" name="name" placeholder="Enter your full name">
+        </div>
+
+        <div class="form-group">
+            <label for="email-input">Email Address:</label>
+            <input type="email" id="email-input" name="email" placeholder="Enter your email">
+        </div>
+
+        <div class="form-group">
+            <label for="message-input">Message:</label>
+            <textarea id="message-input" name="message" rows="4" placeholder="Enter your message"></textarea>
+        </div>
+
+        <div class="form-group">
+            <button type="button" id="submit-btn" class="btn-primary">Submit Form</button>
+            <button type="button" id="clear-btn" class="btn-secondary">Clear Form</button>
+            <button type="button" id="test-btn" class="btn-success">Test Button</button>
+        </div>
+
+        <div id="result" class="result">
+            <h3>Form Submission Result</h3>
+            <p id="result-text"></p>
+        </div>
+
+        <div id="click-result" class="result">
+            <h3>Click Test Result</h3>
+            <p id="click-text"></p>
+        </div>
+    </div>
+
+    <script>
+        // Form submission handler
+        document.getElementById('submit-btn').addEventListener('click', function (e) {
+            e.preventDefault();
+            const name = document.getElementById('name-input').value;
+            const email = document.getElementById('email-input').value;
+            const message = document.getElementById('message-input').value;
+
+            if (name && email && message) {
+                document.getElementById('result-text').textContent =
+                    'Name: ' + name + ', Email: ' + email + ', Message: ' + message;
+                document.getElementById('result').className = 'result success';
+                document.getElementById('result').style.display = 'block';
+            } else {
+                document.getElementById('result-text').textContent = 'Please fill in all fields';
+                document.getElementById('result').className = 'result error';
+                document.getElementById('result').style.display = 'block';
+            }
+        });
+
+        // Clear form handler
+        document.getElementById('clear-btn').addEventListener('click', function () {
+            document.getElementById('name-input').value = '';
+            document.getElementById('email-input').value = '';
+            document.getElementById('message-input').value = '';
+            document.getElementById('result').style.display = 'none';
+            document.getElementById('click-result').style.display = 'none';
+        });
+
+        // Test button handler
+        document.getElementById('test-btn').addEventListener('click', function () {
+            const timestamp = new Date().toLocaleString();
+            document.getElementById('click-text').textContent = 'Test button clicked at: ' + timestamp;
+            document.getElementById('click-result').className = 'result success';
+            document.getElementById('click-result').style.display = 'block';
+        });
+
+        // Enter key handler for form submission
+        document.getElementById('name-input').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                document.getElementById('submit-btn').click();
+            }
+        });
+
+        document.getElementById('email-input').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                document.getElementById('submit-btn').click();
+            }
+        });
+
+        document.getElementById('message-input').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter' && e.ctrlKey) {
+                document.getElementById('submit-btn').click();
+            }
+        });
+    </script>
+</body>
+
+</html>

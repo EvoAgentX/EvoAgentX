@@ -1,0 +1,283 @@
+{
+    "class_name": "WorkFlowGraph",
+    "goal": "\n    \n                Read and analyze the pdf resume at examples/output/jobs/test_pdf.pdf, then find 5 real job opportunities based on the content of the resume by search the website.\n                \n    \n    It would be better to include a short summary on the resume at the beginning of the output.\n    You should use the tools to find real job opportunities and read resume.\n    I already give you the path in this goal. You should take \"goal\" as the only input at beginning.\n    The output should be well-formatted.\n    You should return every detailed information you collected from the website, inclduing job title, company name, location, detailed job description, detailed job requirements, salary, job posting link, etc.\n    \n    ",
+    "nodes": [
+        {
+            "class_name": "WorkFlowNode",
+            "name": "resume_reading",
+            "description": "Read and extract content from the specified PDF resume to analyze qualifications and experiences.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "goal",
+                    "type": "string",
+                    "description": "The user's goal in textual format.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "resume_content",
+                    "type": "string",
+                    "description": "The text content extracted from the PDF resume, including personal details, experience, education, and skills.",
+                    "required": true
+                }
+            ],
+            "reason": "This sub-task is necessary to understand the candidate's background, which will inform the job search and summary creation.",
+            "agents": [
+                {
+                    "name": "resume_reading_agent",
+                    "description": "This agent reads and extracts text content from the specified PDF resume, enabling the analysis of the candidate's qualifications and experiences.",
+                    "inputs": [
+                        {
+                            "name": "goal",
+                            "type": "string",
+                            "description": "The user's goal in textual format.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "resume_content",
+                            "type": "string",
+                            "description": "The text content extracted from the PDF resume, including personal details, experience, education, and skills.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Objective\nRead the specified PDF resume and extract its content to analyze the candidate's qualifications and experiences.\n\n### Instructions\n1. Use the provided goal as guidance: <input>{goal}</input>.\n2. Locate the PDF resume at the specified path.\n3. Utilize the FileToolkit to read the content from the PDF file.\n4. Extract relevant information from the resume, such as personal details, work experience, education, and skills.\n5. Store the extracted text content as the output.\n\n### Output Format\nYour final output should ALWAYS in the following format:\n\n## Thought\nBriefly explain the reasoning process for reading and extracting content from the PDF resume.\n\n## resume_content\nThe text content extracted from the PDF resume, including personal details, experience, education, and skills.",
+                    "tool_names": [
+                        "FileToolkit"
+                    ]
+                }
+            ],
+            "status": "pending"
+        },
+        {
+            "class_name": "WorkFlowNode",
+            "name": "resume_summary_creation",
+            "description": "Create a short summary highlighting the key qualifications and experiences from the extracted resume content.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "goal",
+                    "type": "string",
+                    "description": "The user's goal in textual format.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "resume_content",
+                    "type": "string",
+                    "description": "The text content extracted from the PDF resume.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "resume_summary",
+                    "type": "string",
+                    "description": "A concise summary of the candidate's qualifications and experiences.",
+                    "required": true
+                }
+            ],
+            "reason": "This summary provides a concise overview of the candidate's profile, which is useful for matching job opportunities.",
+            "agents": [
+                {
+                    "name": "resume_summary_agent",
+                    "description": "This agent generates a concise summary of the candidate's qualifications and experiences based on the provided extracted resume content.",
+                    "inputs": [
+                        {
+                            "name": "goal",
+                            "type": "string",
+                            "description": "The user's goal in textual format.",
+                            "required": true
+                        },
+                        {
+                            "name": "resume_content",
+                            "type": "string",
+                            "description": "The text content extracted from the PDF resume.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "resume_summary",
+                            "type": "string",
+                            "description": "A concise summary of the candidate's qualifications and experiences.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Objective\nGenerate a concise summary of the candidate's qualifications and experiences based on the provided resume content.\n\n### Instructions\n1. Read the user's goal: <input>{goal}</input>.\n2. Analyze the extracted resume content: <input>{resume_content}</input>.\n3. Identify key qualifications, experiences, and skills mentioned in the resume content.\n4. Create a summary that highlights these points succinctly, ensuring it reflects the candidate's strengths and suitability for potential job opportunities.\n5. Present this summary as the output.\n\n### Output Format\nYour final output should ALWAYS in the following format:\n\n## Thought\nBriefly explain the reasoning process for generating the resume summary.\n\n## resume_summary\nProvide a concise summary of the candidate's qualifications and experiences."
+                }
+            ],
+            "status": "pending"
+        },
+        {
+            "class_name": "WorkFlowNode",
+            "name": "job_search",
+            "description": "Search for real job opportunities based on the analyzed resume content and the summary created.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "goal",
+                    "type": "string",
+                    "description": "The user's goal in textual format.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "resume_summary",
+                    "type": "string",
+                    "description": "A concise summary of the candidate's qualifications and experiences.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "job_listings",
+                    "type": "array",
+                    "description": "A list of job opportunities, each containing detailed information such as job title, company name, location, job description, job requirements, salary, and posting link.",
+                    "required": true
+                }
+            ],
+            "reason": "This step utilizes the provided resume information to find relevant job openings tailored to the candidate's skills and experiences.",
+            "agents": [
+                {
+                    "name": "job_search_agent",
+                    "description": "This agent searches for job opportunities that match the qualifications and experiences highlighted in the resume summary, utilizing the provided goal for guidance.",
+                    "inputs": [
+                        {
+                            "name": "goal",
+                            "type": "string",
+                            "description": "The user's goal in textual format.",
+                            "required": true
+                        },
+                        {
+                            "name": "resume_summary",
+                            "type": "string",
+                            "description": "A concise summary of the candidate's qualifications and experiences.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "job_listings",
+                            "type": "array",
+                            "description": "A list of job opportunities, each containing detailed information such as job title, company name, location, job description, job requirements, salary, and posting link.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Objective\nSearch for job opportunities that match the qualifications and experiences summarized in the resume.\n\n### Instructions\n1. Read the user's goal: <input>{goal}</input> to understand the type of job opportunities that should be sought.\n2. Analyze the resume summary provided: <input>{resume_summary}</input> to identify the candidate's key skills and experiences.\n3. Utilize the 'hirebase' tool to search for job listings based on the extracted resume summary and the user's goal.\n4. Filter the search results to ensure that the jobs match the candidate's qualifications.\n5. Compile the list of resulting job opportunities with details including job title, company name, location, job description, job requirements, salary, and posting link.\n\n### Output Format\nYour final output should ALWAYS in the following format:\n\n## Thought\nBriefly explain the reasoning process for the job search based on the provided inputs.\n\n## job_listings\nA list of job opportunities, formatted with detailed information as specified above.",
+                    "tool_names": [
+                        "hirebase"
+                    ]
+                }
+            ],
+            "status": "pending"
+        },
+        {
+            "class_name": "WorkFlowNode",
+            "name": "output_formatting",
+            "description": "Format all collected information into a well-structured output, including the resume summary and job listings.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "goal",
+                    "type": "string",
+                    "description": "The user's goal in textual format.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "resume_summary",
+                    "type": "string",
+                    "description": "A concise summary of the candidate's qualifications and experiences.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "job_listings",
+                    "type": "array",
+                    "description": "A list of job opportunities found during the search.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "formatted_output",
+                    "type": "string",
+                    "description": "A well-formatted output containing the resume summary and detailed job listings.",
+                    "required": true
+                }
+            ],
+            "reason": "This sub-task ensures that the final output is presented in a clear, user-friendly format that meets the user's expectations.",
+            "agents": [
+                {
+                    "name": "output_formatting_agent",
+                    "description": "This agent formats the collected information, including the resume summary and job listings, into a well-structured, readable output.",
+                    "inputs": [
+                        {
+                            "name": "goal",
+                            "type": "string",
+                            "description": "The user's goal in textual format.",
+                            "required": true
+                        },
+                        {
+                            "name": "resume_summary",
+                            "type": "string",
+                            "description": "A concise summary of the candidate's qualifications and experiences.",
+                            "required": true
+                        },
+                        {
+                            "name": "job_listings",
+                            "type": "array",
+                            "description": "A list of job opportunities found during the search.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "formatted_output",
+                            "type": "string",
+                            "description": "A well-formatted output containing the resume summary and detailed job listings.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Objective\nFormat the collected information, including the resume summary and job listings, to create a clear and user-friendly output.\n\n### Instructions\n1. Begin by stating the user's goal: <input>{goal}</input>\n2. Include the resume summary: <input>{resume_summary}</input>.\n3. Iterate through the job listings: <input>{job_listings}</input> to extract and format the details of each job including job title, company name, job location, job description, job requirements, salary, and posting link.\n4. Compile the information into a well-structured output, ensuring clarity and readability for the user.\n\n### Output Format\nYour final output should ALWAYS in the following format:\n\n## Thought\nBriefly explain the reasoning process for achieving the objective.\n\n## formatted_output\nA well-structured output containing the resume summary and detailed job listings."
+                }
+            ],
+            "status": "pending"
+        }
+    ],
+    "edges": [
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "resume_reading",
+            "target": "resume_summary_creation",
+            "priority": 0
+        },
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "resume_summary_creation",
+            "target": "job_search",
+            "priority": 0
+        },
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "resume_summary_creation",
+            "target": "output_formatting",
+            "priority": 0
+        },
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "job_search",
+            "target": "output_formatting",
+            "priority": 0
+        }
+    ],
+    "graph": null
+}

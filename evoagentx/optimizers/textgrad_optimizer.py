@@ -22,7 +22,7 @@ from ..workflow.workflow_graph import WorkFlowGraph, WorkFlowNode
 log_folder_exists = os.path.exists("./logs")
 
 import textgrad as tg
-from textgrad import Variable
+from textgrad import Variable, EngineLM
 from textgrad import logger as tg_logger
 from textgrad import sh as tg_file_handler
 from textgrad.autograd import StringBasedFunction
@@ -44,6 +44,19 @@ tg_logger.removeHandler(tg_file_handler)
 # remove the logs folder created by textgrad
 if not log_folder_exists and os.path.exists("./logs"):
     shutil.rmtree("./logs")
+
+
+class TextGradEngine(EngineLM):
+    def __init__(self, llm: BaseLLM):
+        self.llm = llm
+
+    def generate(self, prompt: str, system_prompt: str = None, **kwargs):
+        with suppress_logger_info():
+            response = self.llm.generate(prompt, system_prompt=system_prompt, **kwargs)
+            return response.content
+
+    def __call__(self, prompt: str, **kwargs):
+        return self.generate(prompt, **kwargs)
 
 
 class CustomAgentCall:
@@ -163,9 +176,9 @@ class TextGradOptimizer(BaseModule):
         def disable_short_variable_value(self, n_words_offset: int = 10):
             return self.value
         Variable.get_short_value = disable_short_variable_value
-
+            
         # Textgrad engine
-        self.optimizer_engine = tg.get_engine(self.optimizer_llm.config.model)
+        self.optimizer_engine = TextGradEngine(self.optimizer_llm)
 
         # Textgrad loss
         if use_answers:

@@ -6,7 +6,7 @@ This guide will walk you through the process of installing EvoAgentX on your sys
 
 Before installing EvoAgentX, make sure you have the following prerequisites:
 
-- Python 3.10 or higher
+- Python 3.11 or higher
 - pip (Python package installer)
 - Git (for cloning the repository)
 - Conda (recommended for environment management, but optional)
@@ -44,7 +44,7 @@ If you prefer to use Conda for managing your Python environments, follow these s
 
 ```bash hl_lines="4-5"
 # Create a new conda environment
-conda create -n evoagentx python=3.10
+conda create -n evoagentx python=3.11
 
 # Activate the environment
 conda activate evoagentx

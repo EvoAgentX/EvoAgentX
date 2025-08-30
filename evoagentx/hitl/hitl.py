@@ -11,6 +11,7 @@ class HITLDecision(str, Enum):
 
 class HITLInteractionType(str, Enum):
     APPROVE_REJECT = "approve_reject"
+    COLLECT_USER_INPUT = "collect_user_input"
     REVIEW_EDIT_STATE = "review_edit_state"
     REVIEW_TOOL_CALLS = "review_tool_calls"
     MULTI_TURN_CONVERSATION = "multi_turn_conversation"

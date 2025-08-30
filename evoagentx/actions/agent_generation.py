@@ -8,6 +8,7 @@ from ..core.base_config import Parameter
 from ..models.base_model import BaseLLM
 from .action import Action, ActionInput, ActionOutput
 from ..prompts.agent_generator import AGENT_GENERATION_ACTION
+from ..prompts.tool_calling import AGENT_GENERATION_TOOLS_PROMPT
 from ..utils.utils import normalize_text
 
 class AgentGenerationInput(ActionInput):
@@ -35,7 +36,7 @@ class GeneratedAgent(BaseModule):
     inputs: List[Parameter]
     outputs: List[Parameter]
     prompt: str
-    tools: Optional[List[str]] = None
+    tool_names: Optional[List[str]] = None
 
     @classmethod
     def find_output_name(cls, text: str, outputs: List[str]):
@@ -139,7 +140,9 @@ class AgentGeneration(Action):
         # outputs_format = kwargs.pop("outputs_format") if "outputs_format" in kwargs else AgentGenerationOutput
         inputs_format = kwargs.pop("inputs_format", None) or AgentGenerationInput
         outputs_format = kwargs.pop("outputs_format", None) or AgentGenerationOutput 
+        tools = kwargs.pop("tools", None)
         super().__init__(name=name, description=description, prompt=prompt, inputs_format=inputs_format, outputs_format=outputs_format, **kwargs)
+        self.tools = tools
     
     def execute(self, llm: Optional[BaseLLM] = None, inputs: Optional[dict] = None, sys_msg: Optional[str]=None, return_prompt: bool = False, **kwargs) -> AgentGenerationOutput:
         """Execute the agent generation process.
@@ -170,6 +173,16 @@ class AgentGeneration(Action):
 
         prompt_params_names = inputs_format.get_attrs()
         prompt_params_values = {param: inputs.get(param, "") for param in prompt_params_names}
+        if self.tools:
+            tool_description = [
+                {
+                    tool.name: [
+                        s["function"]["description"] for s in tool.get_tool_schemas()
+                    ],
+                }
+                for tool in self.tools
+            ]
+            prompt_params_values["tools"] = AGENT_GENERATION_TOOLS_PROMPT.format(tools_description=tool_description)
         prompt = self.prompt.format(**prompt_params_values)
         agents = llm.generate(
             prompt = prompt, 

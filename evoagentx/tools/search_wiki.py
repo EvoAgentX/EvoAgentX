@@ -1,8 +1,9 @@
 import wikipedia
 from .search_base import SearchBase
-from typing import Dict, Any, Optional
+from .tool import Tool,Toolkit
+from typing import Dict, Any, Optional, List
 from pydantic import Field
-from evoagentx.core.logging import logger
+from ..core.logging import logger
 
 
 class SearchWiki(SearchBase):
@@ -97,54 +98,72 @@ class SearchWiki(SearchBase):
             logger.error(f"Error searching Wikipedia: {str(e)}")
             return {"results": [], "error": str(e)}
     
-    def get_tools(self):
-        return [self.search]
 
-    def get_tool_schemas(self) -> list[Dict[str, Any]]:
-        """
-        Returns the OpenAI-compatible function schema for the Wikipedia search tool.
+class WikipediaSearchTool(Tool):
+    name: str = "wikipedia_search"
+    description: str = "Search Wikipedia for relevant articles and content"
+    inputs: Dict[str, Dict[str, str]] = {
+        "query": {
+            "type": "string",
+            "description": "The search query to look up on Wikipedia"
+        },
+        "num_search_pages": {
+            "type": "integer",
+            "description": "Number of search results to retrieve. Default: 5"
+        },
+        "max_content_words": {
+            "type": "integer",
+            "description": "Maximum number of words to include in content per result. None means no limit. Default: None"
+        },
+        "max_summary_sentences": {
+            "type": "integer",
+            "description": "Maximum number of sentences in the summary. None means no limit. Default: None"
+        }
+    }
+    required: Optional[List[str]] = ["query"]
+    
+    def __init__(self, search_wiki: SearchWiki = None):
+        super().__init__()
+        self.search_wiki = search_wiki
+    
+    def __call__(self, query: str, num_search_pages: int = None, max_content_words: int = None, max_summary_sentences: int = None) -> Dict[str, Any]:
+        """Execute Wikipedia search using the SearchWiki instance."""
+        if not self.search_wiki:
+            raise RuntimeError("Wikipedia search instance not initialized")
         
-        Returns:
-            list[Dict[str, Any]]: Function schema in OpenAI format
-        """
-        return [{
-            "type": "function",
-            "function": {
-                "name": "search",
-                "description": "Search Wikipedia for relevant articles and content.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "query": {
-                            "type": "string",
-                            "description": "The search query to look up on Wikipedia"
-                        },
-                        "num_search_pages": {
-                            "type": "integer",
-                            "description": "Number of search results to retrieve. Default: 5"
-                        },
-                        "max_content_words": {
-                            "type": "integer",
-                            "description": "Maximum number of words to include in content per result. None means no limit. Default: None"
-                        },
-                        "max_summary_sentences": {
-                            "type": "integer",
-                            "description": "Maximum number of sentences in the summary. None means no limit. Default: None"
-                        }
-                    },
-                    "required": ["query"]
-                }
-            }
-        }]
+        try:
+            return self.search_wiki.search(query, num_search_pages, max_content_words, max_summary_sentences)
+        except Exception as e:
+            return {"results": [], "error": f"Error executing Wikipedia search: {str(e)}"}
+
+
+class WikipediaSearchToolkit(Toolkit):
+    def __init__(
+        self,
+        name: str = "WikipediaSearchToolkit",
+        num_search_pages: Optional[int] = 5,
+        max_content_words: Optional[int] = None,
+        max_summary_sentences: Optional[int] = None,
+        **kwargs
+    ):
+        # Create the shared Wikipedia search instance
+        search_wiki = SearchWiki(
+            name="SearchWiki",
+            num_search_pages=num_search_pages,
+            max_content_words=max_content_words,
+            max_summary_sentences=max_summary_sentences,
+            **kwargs
+        )
         
-    def get_tool_descriptions(self) -> list[str]:
-        """
-        Returns a brief description of the Wikipedia search tool.
-        
-        Returns:
-            list[str]: Tool descriptions
-        """
-        return [
-            "Search Wikipedia for relevant articles and content."
+        # Create tools with the shared search instance
+        tools = [
+            WikipediaSearchTool(search_wiki=search_wiki)
         ]
+        
+        # Initialize parent with tools
+        super().__init__(name=name, tools=tools)
+        
+        # Store search_wiki as instance variable
+        self.search_wiki = search_wiki
+    
 

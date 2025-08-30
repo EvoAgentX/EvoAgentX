@@ -1,13 +1,14 @@
 import requests
 from bs4 import BeautifulSoup
 from typing import Tuple, Optional
-from .tool import Tool
+from ..core.module import BaseModule
+from ..core.logging import logger
 from pydantic import Field
 
-class SearchBase(Tool):
+class SearchBase(BaseModule):
     """
     Base class for search tools that retrieve information from various sources.
-    Implements the standard tool interface with get_tool_schemas and execute methods.
+    Provides common functionality for search operations.
     """
     
     num_search_pages: Optional[int] = Field(default=5, description="Number of search results to retrieve")
@@ -32,7 +33,7 @@ class SearchBase(Tool):
         # Pass to parent class initialization
         super().__init__(name=name, num_search_pages=num_search_pages, max_content_words=max_content_words, **kwargs)
     
-    def _truncate_content(self, content: str, max_words: Optional[int]) -> str:
+    def _truncate_content(self, content: str, max_words: Optional[int] = None) -> str:
         """
         Truncates content to a maximum number of words while preserving original spacing.
         
@@ -77,6 +78,7 @@ class SearchBase(Tool):
         response = requests.get(url, headers=headers, timeout=5)
 
         if response.status_code != 200:
+            logger.warning(f"Failed to scrape page {url}, status code: {response.status_code} ({response.reason}), response: {response.text[:200]}...")
             return None, None
 
         soup = BeautifulSoup(response.text, "html.parser")

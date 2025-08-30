@@ -1,15 +1,15 @@
+import os
 import json
 from typing import List, Dict, Any, Optional, Union
 
 from pydantic import Field
 
 from ..core.module import BaseModule
-from ..utils.factory import DBStoreFactory, VectorStoreFactory, GraphStoreFactory
 from .storages_config import StoreConfig
-from .db_stores.base import DBStoreBase
-from .graph_stores.base import GraphStoreBase
-from .vectore_stores.base import VectorStoreBase
-from .schema import TableType, AgentStore, WorkflowStore, MemoryStore, HistoryStore
+from .db_stores import DBStoreBase, DBStoreFactory
+from .graph_stores import GraphStoreFactory, GraphStoreBase
+from .vectore_stores import VectorStoreFactory, VectorStoreBase
+from .schema import TableType, AgentStore, WorkflowStore, MemoryStore, HistoryStore, IndexStore
 
 
 class StorageHandler(BaseModule):
@@ -20,19 +20,24 @@ class StorageHandler(BaseModule):
     It supports multiple storage types, including database, vector, and graph storage, initialized via factories.
     """
     storageConfig: StoreConfig = Field(..., description="Configuration for all storage backends")
-    storageDB: Optional[DBStoreBase] = Field(None, description="Database storage backend")
-    storageVector: Optional[VectorStoreBase] = Field(None, description="Optional vector storage backend")
-    storageGraph: Optional[GraphStoreBase] = Field(None, description="Optional graph storage backend")
+    storageDB: Optional[Union[DBStoreBase, Any]] = Field(None, description="Database storage backend")
+    vector_store: Optional[Union[VectorStoreBase, Any]] = Field(None, description="Single vector storage backend")
+    graph_store: Optional[Union[GraphStoreBase, Any]] = Field(None, description="Optional graph storage backend")
 
     def init_module(self):
         """
         Initialize all storage backends based on the provided configuration.
         Calls individual initialization methods for database, vector, and graph stores.
         """
+        # Create the path
+        if (self.storageConfig.path is not None) or (self.storageConfig.path != ":memory:") \
+            or (not self.storageConfig.path):
+            os.makedirs(os.path.dirname(self.storageConfig.path), exist_ok=True)
+        
         self._init_db_store()
         self._init_vector_store()
         self._init_graph_store()
-
+    
     def _init_db_store(self):
         """
         Initialize the database storage backend using the DBStoreFactory.
@@ -48,7 +53,14 @@ class StorageHandler(BaseModule):
         """
         vector_config = self.storageConfig.vectorConfig
         if vector_config is not None:
-            self.storageVector = VectorStoreFactory.create(vector_config)
+            if self.vector_store is not None:
+                del self.vector_store
+
+            vector_config_dict = vector_config.model_dump()
+            self.vector_store = VectorStoreFactory().create(
+                store_type=vector_config.vector_name,
+                store_config=vector_config_dict
+            )
     
     def _init_graph_store(self):
         """
@@ -57,7 +69,10 @@ class StorageHandler(BaseModule):
         """
         graph_config = self.storageConfig.graphConfig
         if graph_config is not None:
-            self.storageGraph = GraphStoreFactory.create(graph_config)
+            self.graph_store = GraphStoreFactory().create(
+                store_type=graph_config.graph_name,
+                store_config=graph_config.model_dump()
+            )
 
     def load(self, tables: Optional[List[str]] = None, *args, **kwargs) -> Dict[str, Any]:
         """
@@ -146,7 +161,11 @@ class StorageHandler(BaseModule):
         Returns:
             Dict[str, Any]: The data that can be used to create a LongTermMemory instance.
         """
-        pass
+        table = table or TableType.store_memory.value
+        result = self.storageDB.get_by_id(memory_id, store_type="memory", table=table)
+        if result is not None:
+            result = self.parse_result(result, MemoryStore)
+        return result
 
     def save_memory(self, memory_data: Dict[str, Any], table: Optional[str]=None, **kwargs):
         """
@@ -157,7 +176,15 @@ class StorageHandler(BaseModule):
             table (Optional[str]): The table name; defaults to 'memory' if None.
 
         """
-        pass
+        table = table or TableType.store_memory.value
+        memory_id = memory_data.get("memory_id")
+        if not memory_id:
+            raise ValueError("Memory data must include a 'memory_id' field")
+        existing = self.storageDB.get_by_id(memory_id, store_type="memory", table=table)
+        if existing:
+            self.storageDB.update(memory_id, new_metadata=memory_data, store_type="memory", table=table)
+        else:
+            self.storageDB.insert(metadata=memory_data, store_type="memory", table=table)
 
     def load_agent(self, agent_name: str, table: Optional[str]=None, *args, **kwargs) -> Dict[str, Any]:
         """
@@ -298,3 +325,20 @@ class StorageHandler(BaseModule):
             self.storageDB.update(memory_id, new_metadata=history_data, store_type="history", table=table)
         else:
             self.storageDB.insert(metadata=history_data, store_type="history", table=table)
+
+    def load_index(self, corpus_id: str, table: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        result = self.storageDB.get_by_id(corpus_id, store_type="indexing", table=table)
+        if result is not None:
+            result = self.parse_result(result, IndexStore)
+
+        return result
+
+    def save_index(self, index_data: Dict[str, Any], table: Optional[str] = None):
+        corpus_id = index_data.get("corpus_id")
+        if not corpus_id:
+            raise ValueError("Index data must include an 'corpus_id' field")
+        existing = self.storageDB.get_by_id(corpus_id, store_type="indexing", table=table)
+        if existing:
+            self.storageDB.update(corpus_id, new_metadata=index_data, store_type="indexing", table=table)
+        else:
+            self.storageDB.insert(metadata=index_data, store_type="indexing", table=table)

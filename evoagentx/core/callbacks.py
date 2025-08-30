@@ -1,8 +1,9 @@
 import sys 
-import stopit
+# import stopit
+from overdue import timeout_set_to 
 import threading
 import contextvars
-from typing import Optional, Union
+from typing import Union
 from contextlib import contextmanager
 from .logging import logger, get_log_file
 
@@ -149,16 +150,23 @@ class TimeoutContext:
     """
     def __init__(self, seconds: Union[int, float]):
         self.seconds = float(seconds)
-        self._context: Optional[stopit.SignalTimeout] = None
+        # self._context: Optional[stopit.SignalTimeout] = None
+        self._cm = None
+        self._result = None
         
     def __enter__(self):
-        self._context = stopit.ThreadingTimeout(self.seconds)
-        self._context.__enter__()
+        # self._context = stopit.ThreadingTimeout(self.seconds)
+        # self._context.__enter__()
+        self._cm = timeout_set_to(self.seconds)
+        self._result = self._cm.__enter__()
         return self
         
     def __exit__(self, exc_type, exc_val, exc_tb):
-        timeout_occurred = self._context.__exit__(exc_type, exc_val, exc_tb)
-        if timeout_occurred:
+        # timeout_occurred = self._context.__exit__(exc_type, exc_val, exc_tb)
+        # if timeout_occurred:
+            # raise TimeoutException("Operation timed out")
+        self._cm.__exit__(exc_type, exc_val, exc_tb)
+        if self._result.triggered:
             raise TimeoutException("Operation timed out")
         return False
 

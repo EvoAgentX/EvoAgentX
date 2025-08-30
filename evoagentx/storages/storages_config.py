@@ -2,7 +2,7 @@ from typing import Optional
 
 from pydantic import Field
 
-from ..core.base_config import BaseConfig
+from evoagentx.core.base_config import BaseConfig
 
 
 class DBConfig(BaseConfig):
@@ -17,23 +17,27 @@ class DBConfig(BaseConfig):
 
 class VectorStoreConfig(BaseConfig):
     """
-    Placeholder for settings related to vector databases (e.g., Qdrant, Chroma).
+    Configuration for vector databases, supporting FAISS and Qdrant.
     """
-    pass
+    vector_name: str = Field(default="faiss", description="Name of the vector database provider (e.g., 'faiss', 'qdrant')")
+    dimensions: Optional[int] = Field(default=1536, description="Dimension of the embedding vectors")
+    index_type: Optional[str] = Field(default="flat_l2", description="Index type for FAISS (e.g., 'flat_l2', 'ivf_flat')")
+    qdrant_url: Optional[str] = Field(default=None, description="URL for Qdrant server (e.g., 'http://localhost:6333')")
+    qdrant_api_key: Optional[str] = Field(default=None, description="API key for Qdrant authentication")
+    qdrant_collection_name: Optional[str] = Field(default="default_collection", description="Name of the Qdrant collection")
 
 
 class GraphStoreConfig(BaseConfig):
     """
-    Placeholder for settings related to graph databases.
+    Configuration for graph databases, supporting Neo4j.
     """
-    pass
-
-
-class FileStoreConfig(BaseConfig):
-    """
-    Placeholder for settings related to file-based storage.
-    """
-    pass
+    graph_name: str = Field(default="neo4j", description="Name of the graph database provider (e.g., 'neo4j')")
+    uri: Optional[str] = Field(default=None, description="URI for Neo4j database (e.g., 'bolt://localhost:7687')")
+    username: Optional[str] = Field(default=None, description="Username for Neo4j authentication")
+    password: Optional[str] = Field(default=None, description="Password for Neo4j authentication")
+    database: Optional[str] = Field(default="neo4j", description="Name of the Neo4j database")
+    max_retries: Optional[int] = Field(default=3, description="Maximum number of connection retries")
+    timeout: Optional[float] = Field(default=30.0, description="Connection timeout in seconds")
 
 
 class StoreConfig(BaseConfig):
@@ -42,5 +46,6 @@ class StoreConfig(BaseConfig):
     """
     dbConfig: DBConfig = Field(..., description="Configuration for the database store")
     vectorConfig: Optional[VectorStoreConfig] = Field(None, description="Configuration for the vector store")
-    fileConfig: Optional[FileStoreConfig] = Field(None, description="Optional configuration for the file store")
     graphConfig: Optional[GraphStoreConfig] = Field(None, description="Optional configuration for the graph store")
+    # For file storage
+    path: Optional[str] = Field(default="/index_cache", description="directory path for storing the index")

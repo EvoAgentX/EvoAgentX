@@ -1,7 +1,8 @@
 import requests
 import os
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from .search_base import SearchBase
+from .tool import Tool,Toolkit
 from evoagentx.core.logging import logger
 import dotenv
 dotenv.load_dotenv()
@@ -103,47 +104,65 @@ class SearchGoogle(SearchBase):
             logger.error(f"Error searching Google: {str(e)}")
             return {"results": [], "error": str(e)}
 
-    def get_tool_schemas(self) -> list[Dict[str, Any]]:
-        """
-        Returns the OpenAI-compatible function schema for the Google search tool.
-        
-        Returns:
-            list[Dict[str, Any]]: Function schema in OpenAI format
-        """
-        return [{
-            "type": "function",
-            "function": {
-                "name": "search",
-                "description": "Search Google and retrieve content from search results.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "query": {
-                            "type": "string",
-                            "description": "The search query to execute on Google"
-                        },
-                        "num_search_pages": {
-                            "type": "integer",
-                            "description": "Number of search results to retrieve. Default: 5"
-                        },
-                        "max_content_words": {
-                            "type": "integer",
-                            "description": "Maximum number of words to include in content per result. None means no limit. Default: None"
-                        }
-                    },
-                    "required": ["query"]
-                }
-            }
-        }]
+
+class GoogleSearchTool(Tool):
+    name: str = "google_search"
+    description: str = "Search Google using the Custom Search API and retrieve content from search results"
+    inputs: Dict[str, Dict[str, str]] = {
+        "query": {
+            "type": "string",
+            "description": "The search query to execute on Google"
+        },
+        "num_search_pages": {
+            "type": "integer",
+            "description": "Number of search results to retrieve. Default: 5"
+        },
+        "max_content_words": {
+            "type": "integer",
+            "description": "Maximum number of words to include in content per result. None means no limit. Default: None"
+        }
+    }
+    required: Optional[List[str]] = ["query"]
     
-    def get_tools(self):
-        return [self.search]
+    def __init__(self, search_google: SearchGoogle = None):
+        super().__init__()
+        self.search_google = search_google
+    
+    def __call__(self, query: str, num_search_pages: int = None, max_content_words: int = None) -> Dict[str, Any]:
+        """Execute Google search using the SearchGoogle instance."""
+        if not self.search_google:
+            raise RuntimeError("Google search instance not initialized")
         
-    def get_tool_descriptions(self) -> list[str]:
-        """
-        Returns a brief description of the Google search tool.
+        try:
+            return self.search_google.search(query, num_search_pages, max_content_words)
+        except Exception as e:
+            return {"results": [], "error": f"Error executing Google search: {str(e)}"}
+
+
+class GoogleSearchToolkit(Toolkit):
+    def __init__(
+        self,
+        name: str = "GoogleSearchToolkit",
+        num_search_pages: Optional[int] = 5,
+        max_content_words: Optional[int] = None,
+        **kwargs
+    ):
+        # Create the shared Google search instance
+        search_google = SearchGoogle(
+            name="SearchGoogle",
+            num_search_pages=num_search_pages,
+            max_content_words=max_content_words,
+            **kwargs
+        )
         
-        Returns:
-            list[str]: Tool descriptions
-        """
-        return ["Search Google and retrieve content from search results."]
+        # Create tools with the shared search instance
+        tools = [
+            GoogleSearchTool(search_google=search_google)
+        ]
+        
+        # Initialize parent with tools
+        super().__init__(name=name, tools=tools)
+        
+        # Store search_google as instance variable
+        self.search_google = search_google
+    

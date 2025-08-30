@@ -1,77 +1,138 @@
 """
-This tool is inspired / modified from MCP Python SDK and mcpadapt projects. You may find more information about by visiting the following links:
+This tool is inspired / modified from MCP Python SDK and mcpadapt projects, now enhanced with FastMCP 2.0. 
+You may find more information about by visiting the following links:
 - https://github.com/modelcontextprotocol/python-sdk
 - https://github.com/grll/mcpadapt
+- https://gofastmcp.com/clients/client
 
+FastMCP 2.0 Integration Notes:
+- Replaced official MCP SDK with FastMCP for better performance and reliability
+- Maintains the same synchronous API with internal async handling via threading
+- Auto-infers transport types (stdio/HTTP) based on configuration
+- Enhanced error handling with FastMCP's exception hierarchy
+- Backwards compatible with existing MCP server configurations
 """
 import threading
 import asyncio
-from pydantic import Field
 from functools import partial
-from typing import Optional, Any, List, Dict, Callable
-from evoagentx.tools.tool import Tool
+from typing import Optional, Any, List, Dict, Callable, Union
+from evoagentx.tools.tool import Tool,Toolkit
 from evoagentx.core.logging import logger
 from contextlib import AsyncExitStack, asynccontextmanager
 
-import mcp
-import os
+# FastMCP 2.0 imports - replacing official MCP SDK
+from fastmcp import Client
+from fastmcp.exceptions import ClientError, McpError
 import json
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
-from mcp.client.sse import sse_client
-
 
 class MCPTool(Tool):
-
-    descriptions: List[str] = Field(default_factory=list, description="A list of descriptions for the tool")
-    schemas: List[dict[str, Any]] = Field(default_factory=list, description="A list of schemas for the tool")
-    tools: List[Callable] = Field(default_factory=list, description="A list of tools for the tool")
-
-    def __init__(
-        self,
-        name: str = "MCPTool",
-        descriptions: List[str] = ["Default MCP Tool description"],
-        schemas: List[dict[str, Any]] = [],
-        tools: List[Callable] = [],
-    ):
-        super().__init__(
-            name=name,
-            descriptions=descriptions,
-            schemas=schemas,
-            tools=tools
-        )
-
-    def get_tool_schemas(self) -> List[Dict[str, Any]]:
-        return self.schemas
+    name: str = "MCPTool"
+    description: str = "MCP tool wrapper"
+    inputs: Dict[str, Dict[str, Any]] = {}
+    required: Optional[List[str]] = None
+    function: Callable = None
     
-    def get_tool_descriptions(self) -> List[str]:
-        return self.descriptions
+    def __init__(self, name: str, description: str, inputs: Dict[str, Dict[str, str]], required: Optional[List[str]] = None, function: Callable = None):
+        super().__init__(name=name, description=description, inputs=inputs, required=required)
+        self.function = function
     
-    def get_tools(self) -> List[Callable]:
-        return self.tools
+    @property
+    def __name__(self):
+        return self.name
+    
+    def __call__(self, **kwargs):
+        if not self.function:
+            raise ValueError("Function not set for MCPTool")
+        result = self.function(**kwargs)
+        return self._convert_result(result)
+    
+    def _convert_result(self, result: Any) -> Any:
+        """
+        Convert MCP tool results to JSON-serializable format.
+        Handles complex objects like Anthropic's TextContent, ImageContent, etc.
+        """
+        if result is None:
+            return None
+        
+        # Handle primitive types
+        if isinstance(result, (str, int, float, bool)):
+            return result
+        
+        # Handle lists
+        if isinstance(result, list):
+            return [self._convert_result(item) for item in result]
+        
+        # Handle dictionaries
+        if isinstance(result, dict):
+            return {key: self._convert_result(value) for key, value in result.items()}
+        
+        # Handle Anthropic content types by name (avoid import dependencies)
+        obj_type = type(result).__name__
+        if obj_type == "TextContent":
+            if hasattr(result, 'text'):
+                return result.text
+            elif hasattr(result, 'content'):
+                return result.content
+            else:
+                return str(result)
+        
+        elif obj_type in ["ImageContent", "ToolUseContent", "ToolResultContent"]:
+            # For these types, return a structured representation
+            if hasattr(result, '__dict__'):
+                return self._convert_result(result.__dict__)
+            else:
+                return str(result)
+        
+        # Handle other objects with text/content attributes
+        if hasattr(result, 'text'):
+            return result.text
+        elif hasattr(result, 'content'):
+            return result.content
+        
+        # Handle objects with __dict__ (convert to dictionary)
+        if hasattr(result, '__dict__'):
+            return self._convert_result(result.__dict__)
+        
+        # Fallback to string representation
+        return str(result)
+    
+    @classmethod
+    def validate_attributes(cls):
+        required_attributes = {
+            "name": str,
+            "description": str,
+            "inputs": dict
+        }
+        
+        for attr, attr_type in required_attributes.items():
+            if not hasattr(cls, attr):
+                raise ValueError(f"Attribute {attr} is required")
+            if not isinstance(getattr(cls, attr), attr_type):
+                raise ValueError(f"Attribute {attr} must be of type {attr_type}")
+
+        if cls.required:
+            for required_input in cls.required:
+                if required_input not in cls.inputs:
+                    raise ValueError(f"Required input '{required_input}' is not found in inputs")
 
 
 class MCPClient:
-    
     def __init__(
         self, 
-        server_configs: StdioServerParameters | dict[str, Any] | list[StdioServerParameters | dict[str, Any]],
+        server_configs: Union[Dict[str, Any], List[Dict[str, Any]]],
         connect_timeout: float = 120.0,
     ):
-        
-        if isinstance(server_configs, list):
-            self.server_configs = server_configs
-        else:
+        if isinstance(server_configs, dict):
             self.server_configs = [server_configs]
+        else:
+            self.server_configs = server_configs
         
         self.event_loop = asyncio.new_event_loop()
-        
-        self.sessions:list[mcp.ClientSession] = []
-        self.mcp_tools:list[list[mcp.types.Tool]] = []
+        self.sessions: list[Client] = []
+        self.mcp_tools: list[list[Any]] = []
         
         self.task = None
         self.thread_running = threading.Event()
-        ## Testing
         self.working_thread = threading.Thread(target=self._run_event, daemon=True)
         self.connect_timeout = connect_timeout
         
@@ -87,20 +148,14 @@ class MCPClient:
     
     def _connect(self):
         self.working_thread.start()
-        # check connection to mcp server is ready
         if not self.thread_running.wait(timeout=self.connect_timeout):
             raise TimeoutError(
                 f"Couldn't connect to the MCP server after {self.connect_timeout} seconds"
             )
     
     def __enter__(self):
-        self.working_thread.start()
-        # check connection to mcp server is ready
-        if not self.thread_running.wait(timeout=self.connect_timeout):
-            raise TimeoutError(
-                f"Couldn't connect to the MCP server after {self.connect_timeout} seconds"
-            )
-        return self.get_tools()
+        self._connect()
+        return self.get_toolkits()
     
     def __del__(self):
         self._disconnect()
@@ -117,21 +172,19 @@ class MCPClient:
             try:
                 async with AsyncExitStack() as stack:
                     connections = [
-                        await stack.enter_async_context(self._start_server(params))
-                        for params in self.server_configs
+                        await stack.enter_async_context(self._start_server(config))
+                        for config in self.server_configs
                     ]
                     self.sessions, self.mcp_tools = [list(c) for c in zip(*connections)]
-                    self.thread_running.set()  # Signal initialization is complete
+                    self.thread_running.set()
                     
-                    # Use asyncio.Future instead of Event for better cleanup
                     done_future = self.event_loop.create_future()
                     await done_future
             except Exception as e:
                 logger.error(f"Error in MCP event loop: {str(e)}")
-                self.thread_running.set()  # Still set the event so we don't hang
+                self.thread_running.set()
                 raise
 
-        # Create and run the task directly in the event loop
         self.task = self.event_loop.create_task(setup())
         
         try:
@@ -142,105 +195,103 @@ class MCPClient:
             logger.error(f"Error in MCP event loop: {str(e)}")
 
     @asynccontextmanager
-    async def _start_server(self, server_config: StdioServerParameters | dict[str, Any]):
-        if isinstance(server_config, StdioServerParameters):
-            client = stdio_client(server_config)
-        elif isinstance(server_config, dict):
-            client = sse_client(**server_config)
-        else:
-            raise ValueError("Invalid server config type: {}".format(type(server_config)))
-        
-        async with client as (read, write):
-            async with ClientSession(read, write) as session:
-                # Initialize the connection and get the tools from the mcp server
-                await session.initialize()
-                tools = await session.list_tools()
-                yield session, tools.tools
+    async def _start_server(self, config: Dict[str, Any]):
+        client = Client(config)
+        async with client:
+            tools = await client.list_tools()
+            yield client, tools
 
     def create_tool(
         self,
-        function: Callable[[dict | None], mcp.types.CallToolResult],
-        mcp_tool: mcp.types.Tool,
-    ) -> MCPTool:
-
-        # make sure jsonref are resolved
-        input_schema = mcp_tool.inputSchema
-        properties = input_schema.get("properties", {})
-        required = input_schema.get("required", [])
-
-        parameters = {
-            "type": "object",
-            "properties": properties,
-            "required": required,
-        }
-
-        schema = {
-            "type": "function",
-            "function": {
-                "name": mcp_tool.name,
-                "description": mcp_tool.description or "No description provided.",
-                "parameters": parameters,
-            },
-        }
-        
-        tool = MCPTool(
-            name=mcp_tool.name,
-            descriptions=[mcp_tool.description or ""],
-            schemas=[schema],
-            tools=[function],
-        )
-
-        return tool
-    
-    def get_tools(self) -> List[Tool]:
-        if not self.sessions:
-            raise RuntimeError("Session not initialized")
-
-        def _sync_call_tool(
-            session, name: str, **kwargs
-        ) -> mcp.types.CallToolResult:
+        session: Client,
+        mcp_tools: List[Any],  # List of FastMCP tool objects for a single server
+        config: Dict[str, Any],
+    ) ->Toolkit:
+        # Define the sync call function once
+        def _sync_call_tool(name: str, **kwargs) -> Any:
             try:
-                # Handle both direct parameters and arguments-wrapped parameters
                 if "arguments" in kwargs and len(kwargs) == 1:
-                    # Original format: {"arguments": {...}}
                     arguments = kwargs["arguments"]
                 else:
-                    # New format: direct parameters
                     arguments = kwargs
                 
                 logger.info(f"Calling MCP tool: {name} with arguments: {arguments}")
                 future = asyncio.run_coroutine_threadsafe(
                     session.call_tool(name, arguments), self.event_loop
                 )
-                result = future.result(timeout=60)  # Increased timeout from 15 to 60 seconds
+                result = future.result(timeout=60)
                 logger.info(f"MCP tool {name} call completed successfully")
                 return result
-            except TimeoutError:
-                logger.error(f"Timeout calling MCP tool: {name}")
-                raise
-            except Exception as e:
+            except (TimeoutError, ClientError, McpError) as e:
                 logger.error(f"Error calling MCP tool {name}: {str(e)}")
                 raise
+            except Exception as e:
+                logger.error(f"Unexpected error calling MCP tool {name}: {str(e)}")
+                raise
+
+        # Collect all schemas and descriptions
+        all_tools = []
+
+        for mcp_tool in mcp_tools:
+            input_schema = getattr(mcp_tool, 'inputSchema', {})
+            if not input_schema and hasattr(mcp_tool, 'input_schema'):
+                input_schema = mcp_tool.input_schema
+            
+            properties = input_schema.get("properties", {})
+            required = input_schema.get("required", [])
+            
+            # Convert MCP properties to Tool.inputs format
+            # Tool.inputs expects Dict[str, Dict[str, str]] format
+            
+            inputs = properties
+            
+            # Create the partial function and add __name__ attribute
+            partial_func = partial(_sync_call_tool, mcp_tool.name)
+            partial_func.__name__ = mcp_tool.name
+            
+            tool = MCPTool(
+                name=mcp_tool.name,
+                description=getattr(mcp_tool, 'description', None) or "",
+                inputs=inputs,
+                required=required,
+                function=partial_func
+            )
+            all_tools.append(tool)
+        
+        tool_collection =Toolkit(name=next(iter(config.get("mcpServers").keys())), tools=all_tools)
+        return tool_collection
+
+    
+    def get_toolkits(self) -> List[Toolkit]:
+        """Return a list ofToolkits, one per server."""
+        if not self.sessions:
+            raise RuntimeError("Session not initialized")
 
         return [
-            self.create_tool(partial(_sync_call_tool, session, tool.name), tool)
-            for session, tools in zip(self.sessions, self.mcp_tools)
-            for tool in tools
+            self.create_tool(session, tools, config)
+            for session, tools, config in zip(self.sessions, self.mcp_tools, self.server_configs)
         ]
-    
     
 class MCPToolkit:
     def __init__(self, servers: Optional[list[MCPClient]] = None, config_path: Optional[str] = None, config: Optional[dict[str, Any]] = None):
-        
         parameters = []
         if config_path:
             parameters += self._from_config_file(config_path)
         if config:
             parameters += self._from_config(config)
         
-        self.servers = [MCPClient(parameters)]
+        # Initialize servers list
+        self.servers = []
+        
+        # Only create MCPClient if we have parameters
+        if parameters:
+            self.servers.append(MCPClient(parameters))
+        
+        # Add additional servers if provided
         if servers:
-            self.servers += servers
+            self.servers.extend(servers)
+        
+        # Connect to all servers
         for server in self.servers:
             try:
                 server._connect()
@@ -263,42 +314,40 @@ class MCPToolkit:
             return []
     
     def _from_config(self, server_configs: dict[str, Any]):
-        parameters = []
-        if server_configs.get("mcpServers", None):
-            server_configs = server_configs.get("mcpServers")
-        for name, cfg in server_configs.items():
-            if not isinstance(cfg, dict):
-                logger.warning(f"Configuration for server '{name}' must be a dictionary")
-                continue
-
-            if "command" not in cfg and "url" not in cfg:
-                logger.warning(f"Missing required 'command' or 'url' field for server '{name}'")
-                continue
-                
-            command_or_url = cfg.get("command") or cfg.get("url")
-            # Get timeout from config or use default
-            timeout = cfg.get("timeout", None)
-            parameters.append(StdioServerParameters(
-                command=command_or_url, 
-                args=cfg.get("args", []), 
-                env={**os.environ, **cfg.get("env", {})}, 
-                timeout=timeout, 
-                headers=cfg.get("headers", None)
-            ))
-            logger.info(f"Configured MCP server: {name} with command: {command_or_url}")
+        if not isinstance(server_configs, dict):
+            logger.error("Server configuration must be a dictionary")
+            return []
             
-        return parameters
+        # If there's no mcpServers key, treat it as a single server config
+        if "mcpServers" not in server_configs:
+            raise ValueError("Server configuration must contain 'mcpServers' key")
+            
+        # Separate each server into its own config with the same format
+        server_list = []
+        for server_name, server_config in server_configs["mcpServers"].items():
+            individual_config = {
+                "mcpServers": {
+                    server_name: server_config
+                }
+            }
+            server_list.append(individual_config)
+            
+        return server_list
     
     def disconnect(self):
         for server in self.servers:
             server._disconnect()
         
-    def get_tools(self):
+    def get_toolkits(self) -> List[Toolkit]:
         """Return a flattened list of all tools across all servers"""
         all_tools = []
+        if not self.servers:
+            logger.info("No MCP servers configured, returning empty toolkit list")
+            return all_tools
+            
         for server in self.servers:
             try:
-                tools = server.get_tools()
+                tools = server.get_toolkits()
                 all_tools.extend(tools)
                 logger.info(f"Added {len(tools)} tools from MCP server")
             except Exception as e:

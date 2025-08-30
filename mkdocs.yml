@@ -185,6 +185,9 @@ plugins:
               - Build Your First Agent: tutorial/first_agent.md
               - Build Your First Workflow: tutorial/first_workflow.md
               - Tools: tutorial/tools.md
+              - RAG: tutorial/rag.md
+              - Human-in-the-Loop (HITL): tutorial/hitl.md
+              - MCP: tutorial/mcp.md
               - Benchmark and Evaluation: tutorial/benchmark_and_evaluation.md
               - AFlow Optimizer: tutorial/aflow_optimizer.md
               - SEW Optimizer: tutorial/sew_optimizer.md
@@ -196,6 +199,8 @@ plugins:
               - Prompt Template: modules/prompt_template.md
               - Workflow Graph: modules/workflow_graph.md
               - Action Graph: modules/action_graph.md
+              - RAG: modules/rag.md
+              - Storages: modules/storages.md
               - Benchmark: modules/benchmark.md 
               - Evaluator: modules/evaluator.md 
             - API Reference:
@@ -223,6 +228,7 @@ plugins:
               - 构建你的第一个 Agent: tutorial/first_agent.md
               - 构建你的第一个工作流: tutorial/first_workflow.md
               - 使用工具: tutorial/tools.md
+              - RAG 检索增强生成: tutorial/rag.md
               - 基准测试与评估: tutorial/benchmark_and_evaluation.md
               - AFlow 优化器: tutorial/aflow_optimizer.md
               - SEW 优化器: tutorial/sew_optimizer.md
@@ -234,6 +240,8 @@ plugins:
               - 提示模板: modules/prompt_template.md
               - 工作流图: modules/workflow_graph.md
               - 动作图: modules/action_graph.md
+              - RAG 检索增强生成: modules/rag.md
+              - 存储模块: modules/storages.md
               - 基准测试模块: modules/benchmark.md 
               - 评估器模块: modules/evaluator.md 
           - API 参考:

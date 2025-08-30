@@ -15,6 +15,8 @@ from ..agents.workflow_reviewer import WorkFlowReviewer
 from ..actions.task_planning import TaskPlanningOutput
 from ..actions.agent_generation import AgentGenerationOutput
 from ..workflow.workflow_graph import WorkFlowGraph, WorkFlowNode, WorkFlowEdge
+from ..tools.tool import Toolkit
+
 class WorkFlowGenerator(BaseModule):
     """
     Automated workflow generation system based on high-level goals.
@@ -36,6 +38,8 @@ class WorkFlowGenerator(BaseModule):
     agent_generator: Optional[AgentGenerator] = Field(default=None, description="Assigns or generates the appropriate agent(s) to handle each sub-task.")
     workflow_reviewer: Optional[WorkFlowReviewer] = Field(default=None, description="Provides feedback and reflections to improve the generated workflow.")
     num_turns: Optional[PositiveInt] = Field(default=0, description="Specifies the number of refinement iterations for the generated workflow.")
+    tools: Optional[List[Toolkit]] = Field(default=None, description="A list of tools that can be used in the workflow.")
+    
     def init_module(self):
         if self.task_planner is None:
             if self.llm is None:
@@ -45,13 +49,23 @@ class WorkFlowGenerator(BaseModule):
         if self.agent_generator is None:
             if self.llm is None:
                 raise ValueError("Must provide `llm` when `agent_generator` is None")
-            self.agent_generator = AgentGenerator(llm=self.llm)
+            self.agent_generator = AgentGenerator(llm=self.llm, tools=self.tools)
         
         # TODO add WorkFlowReviewer
         # if self.workflow_reviewer is None:
         #     if self.llm is None:
         #         raise ValueError(f"Must provide `llm` when `workflow_reviewer` is None")
         #     self.workflow_reviewer = WorkFlowReviewer(llm=self.llm)
+
+    def get_tool_info(self):
+        self.tool_info =[
+            {
+                tool.name: [
+                    s["function"]["description"] for s in tool.get_tool_schemas()
+                ],
+            }
+            for tool in self.tools
+        ]
 
     def _execute_with_retry(self, operation_name: str, operation, retries_left: int = 1, **kwargs):
         """Helper method to execute operations with retry logic.

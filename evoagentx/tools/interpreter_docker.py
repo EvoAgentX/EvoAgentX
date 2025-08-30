@@ -4,10 +4,12 @@ import tarfile
 import uuid
 import docker
 from pathlib import Path
-from typing import ClassVar, Dict, Any, List
+from typing import ClassVar, Dict, List, Optional
 from .interpreter_base import BaseInterpreter
+from .tool import Tool,Toolkit
 import os
 from pydantic import Field
+
 class DockerInterpreter(BaseInterpreter):
     """
     A Docker-based interpreter for executing Python, Bash, and R scripts in an isolated environment.
@@ -31,8 +33,8 @@ class DockerInterpreter(BaseInterpreter):
     container_directory:str = Field(default="/home/app/", description="The directory to use for the container")
     container_command:str = Field(default="tail -f /dev/null", description="The command to use for the container")
     tmp_directory:str = Field(default="/tmp", description="The directory to use for the container")
-    image_tag:str = Field(default=None, description="The Docker image tag to use")
-    dockerfile_path:str = Field(default=None, description="Path to the Dockerfile to build")
+    image_tag:Optional[str] = Field(default=None, description="The Docker image tag to use")
+    dockerfile_path:Optional[str] = Field(default=None, description="Path to the Dockerfile to build")
     
     class Config:
         arbitrary_types_allowed = True  # Allow non-pydantic types like sets
@@ -40,8 +42,8 @@ class DockerInterpreter(BaseInterpreter):
     def __init__(
         self, 
         name:str = "DockerInterpreter",
-        image_tag:str = None,
-        dockerfile_path:str = None,
+        image_tag:Optional[str] = None,
+        dockerfile_path:Optional[str] = None,
         require_confirm:bool = False,
         print_stdout:bool = True,
         print_stderr:bool = True,
@@ -67,20 +69,9 @@ class DockerInterpreter(BaseInterpreter):
             tmp_directory (str): The temporary directory to use for file creation in the container
             **data: Additional data to pass to the parent class
         """
-        # Extract or generate schemas, descriptions, tools
-        schemas = data.pop('schemas', None) or self.get_tool_schemas()
-        descriptions = data.pop('descriptions', None) or self.get_tool_descriptions()
-        tools = data.pop('tools', None)
-        tools = self.get_tools()
+        # Pass to the parent class initialization
+        super().__init__(name=name, **data)
         
-        # Pass these to the parent class initialization
-        super().__init__(
-            name=name,
-            schemas=schemas,
-            descriptions=descriptions,
-            tools=tools,
-            **data
-        )
         self.require_confirm = require_confirm
         self.print_stdout = print_stdout
         self.print_stderr = print_stderr
@@ -314,78 +305,106 @@ class DockerInterpreter(BaseInterpreter):
             raise ValueError(f"Unsupported language: {language}")
         return self.CODE_TYPE_MAPPING[language]
 
-    def get_tool_schemas(self) -> list[Dict[str, Any]]:
-        """
-        Returns the OpenAI-compatible function schema for the Docker interpreter.
+
+class DockerExecuteTool(Tool):
+    name: str = "docker_execute"
+    description: str = "Execute code in a secure Docker container environment"
+    inputs: Dict[str, Dict[str, str]] = {
+        "code": {
+            "type": "string",
+            "description": "The code to execute"
+        },
+        "language": {
+            "type": "string",
+            "description": "The programming language of the code (e.g., python, py, python3)"
+        }
+    }
+    required: Optional[List[str]] = ["code", "language"]
+    
+    def __init__(self, docker_interpreter: DockerInterpreter = None):
+        super().__init__()
+        self.docker_interpreter = docker_interpreter
+    
+    def __call__(self, code: str, language: str) -> str:
+        """Execute code using the Docker interpreter."""
+        if not self.docker_interpreter:
+            raise RuntimeError("Docker interpreter not initialized")
         
-        Returns:
-            list[Dict[str, Any]]: Function schema in OpenAI format
-        """
-        schemas = [
-            {
-                "type": "function",
-                "function": {
-                    "name": "execute",
-                    "description": "Execute code in a secure Docker container environment.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "code": {
-                                "type": "string",
-                                "description": "The code to execute"
-                            },
-                            "language": {
-                                "type": "string",
-                                "description": "The programming language of the code (e.g., python, py, python3)",
-                                "enum": list(self.CODE_TYPE_MAPPING.keys())
-                            }
-                        },
-                        "required": ["code", "language"]
-                    }
-                }
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "execute_script",
-                    "description": "Execute code from a script file in a secure Docker container environment.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "file_path": {
-                                "type": "string",
-                                "description": "The path to the script file to execute"
-                            },
-                            "language": {
-                                "type": "string",
-                                "description": "The programming language of the code. If not provided, will be determined from file extension.",
-                                "enum": list(self.CODE_TYPE_MAPPING.keys())
-                            }
-                        },
-                        "required": ["file_path"]
-                    }
-                }
-            }
+        try:
+            return self.docker_interpreter.execute(code, language)
+        except Exception as e:
+            return f"Error executing code: {str(e)}"
+
+
+class DockerExecuteScriptTool(Tool):
+    name: str = "docker_execute_script"
+    description: str = "Execute code from a script file in a secure Docker container environment"
+    inputs: Dict[str, Dict[str, str]] = {
+        "file_path": {
+            "type": "string",
+            "description": "The path to the script file to execute"
+        },
+        "language": {
+            "type": "string",
+            "description": "The programming language of the code. If not provided, will be determined from file extension"
+        }
+    }
+    required: Optional[List[str]] = ["file_path", "language"]
+    
+    def __init__(self, docker_interpreter: DockerInterpreter = None):
+        super().__init__()
+        self.docker_interpreter = docker_interpreter
+    
+    def __call__(self, file_path: str, language: str) -> str:
+        """Execute script file using the Docker interpreter."""
+        if not self.docker_interpreter:
+            raise RuntimeError("Docker interpreter not initialized")
+        
+        try:
+            return self.docker_interpreter.execute_script(file_path, language)
+        except Exception as e:
+            return f"Error executing script: {str(e)}"
+
+
+class DockerInterpreterToolkit(Toolkit):
+    def __init__(
+        self,
+        name: str = "DockerInterpreterToolkit",
+        image_tag: Optional[str] = None,
+        dockerfile_path: Optional[str] = None,
+        require_confirm: bool = False,
+        print_stdout: bool = True,
+        print_stderr: bool = True,
+        host_directory: str = "",
+        container_directory: str = "/home/app/",
+        container_command: str = "tail -f /dev/null",
+        tmp_directory: str = "/tmp",
+        **kwargs
+    ):
+        # Create the shared Docker interpreter instance
+        docker_interpreter = DockerInterpreter(
+            name="DockerInterpreter",
+            image_tag=image_tag,
+            dockerfile_path=dockerfile_path,
+            require_confirm=require_confirm,
+            print_stdout=print_stdout,
+            print_stderr=print_stderr,
+            host_directory=host_directory,
+            container_directory=container_directory,
+            container_command=container_command,
+            tmp_directory=tmp_directory,
+            **kwargs
+        )
+        
+        # Create tools with the shared interpreter
+        tools = [
+            DockerExecuteTool(docker_interpreter=docker_interpreter),
+            DockerExecuteScriptTool(docker_interpreter=docker_interpreter)
         ]
-        return schemas
         
-    def get_tool_descriptions(self) -> List[str]:
-        """
-        Returns a brief description of the Docker interpreter tool.
+        # Initialize parent with tools
+        super().__init__(name=name, tools=tools)
         
-        Returns:
-            List[str]: Tool description
-        """
-        return [
-            "Execute code in a secure Docker container environment.",
-            "Execute code from script files in a secure Docker container environment."
-        ]
-        
-    def get_tools(self) -> List[callable]:
-        """
-        Returns a list of callable methods provided by this tool.
-        
-        Returns:
-            List[callable]: List of callable methods
-        """
-        return [self.execute, self.execute_script]
+        # Store docker_interpreter as instance variable
+        self.docker_interpreter = docker_interpreter
+    

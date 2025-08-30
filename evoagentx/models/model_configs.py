@@ -1,3 +1,4 @@
+
 from pydantic import BaseModel, Field
 from typing import Optional, Union, List
 
@@ -48,12 +49,22 @@ class OpenAILLMConfig(LLMConfig):
     modalities: Optional[List] = Field(default=None, description="Output types that you would like the model to generate for this request. Most models are capable of generating text, which is the default: [\"text\"]")
     response_format: Optional[Union[BaseModel, dict]] = Field(default=None, description=" An object specifying the format that the model must output.")
 
+# ==== Azure OpenAI Configuration ====
+class AzureOpenAIConfig(LLMConfig):
+    llm_type: str = "AzureOpenAILLM"
+    azure_endpoint: str = Field(..., description="Azure OpenAI service endpoint URL")
+    azure_key: str = Field(..., description="Azure OpenAI API key for authentication")
+    api_version: Optional[str] = Field(default="2024-12-01-preview", description="Azure OpenAI API version to use")
+    # 'model' field inherited from LLMConfig will be used to specify the deployment name
+    # generation parameters (temperature, max_tokens, etc.) inherited from OpenAILLMConfig
+
 
 class LiteLLMConfig(LLMConfig):
 
     llm_type: str = "LiteLLM"
     api_base: Optional[str] = Field(default=None, description="Base URL for the LLM API (e.g., http://localhost:11434/v1 for Ollama)") 
     is_local: Optional[bool] = Field(default=False, description="Whether the model is running locally (e.g., Ollama)")
+    api_key: Optional[str] = Field(default=None, description="the API key used to authenticate generic OpenAI-compatible requests (e.g., LM Studio, FastChat, LocalAI)")
 
     # LLM keys
     openai_key: Optional[str] = Field(default=None, description="the API key used to authenticate OpenAI requests")
@@ -65,6 +76,11 @@ class LiteLLMConfig(LLMConfig):
     openrouter_base: Optional[str] = Field(default="https://openrouter.ai/api/v1", description="the base URL used to authenticate OpenRouter requests")
     perplexity_key: Optional[str] = Field(default=None, description="the API key used to authenticate Perplexity requests")
     groq_key: Optional[str] = Field(default=None, description="the API key used to authenticate Groq requests")
+    
+    # Azure OpenAI keys
+    azure_endpoint: Optional[str] = Field(default=None, description="Azure OpenAI service endpoint URL")
+    azure_key: Optional[str] = Field(default=None, description="Azure OpenAI API key for authentication")
+    api_version: Optional[str] = Field(default=None, description="Azure OpenAI API version to use")
 
     # generation parameters 
     temperature: Optional[float] = Field(default=None, description="the temperature used to scaling logits")

@@ -1,7 +1,9 @@
 import importlib
 
-from ..storages.storages_config import DBConfig, VectorStoreConfig
+from .base import DBStoreBase
+from ..storages_config import DBConfig
 
+__all__ = ['DBStoreBase', 'SQLite', 'DBStoreFactory']
 
 def load_class(class_type: str):
     """
@@ -55,55 +57,3 @@ class DBStoreFactory:
             return db_store_class(**config)
         else:
             raise ValueError(f"Unsupported Database provider: {provider_name}")
-
-
-class VectorStoreFactory:
-    """
-    Factory class for creating vector store instances based on configuration.
-    Maps provider names to specific vector store classes.
-    """
-    provider_to_class = {
-        "qdrant": "mem0.vector_stores.qdrant.Qdrant",
-        "chroma": "mem0.vector_stores.chroma.ChromaDB",
-        "faiss": "mem0.vector_stores.faiss.FAISS",
-    }
-
-
-    def create(cls, config: VectorStoreConfig):
-        """
-        Create a vector store instance based on the provided configuration.
-
-        Attributes:
-            config (VectorStoreConfig): Configuration for the vector store.
-
-        Returns:
-            VectorStoreBase: An instance of the vector store.
-        """
-        # TODO: Implement vector store creation logic
-        pass
-
-
-# Factory for creating graph store instances
-class GraphStoreFactory:
-    """
-    Factory class for creating graph store instances based on configuration.
-    Maps provider names to specific graph store classes.
-    """
-    provider_to_class = {
-        "neo4j": "mem0.graph_stores",  # Note: Incomplete mapping, likely a placeholder
-        "": "mem0.graph_stores",  # Note: Incomplete mapping, likely a placeholder
-    }
-
-    @classmethod
-    def create(cls, config: VectorStoreConfig):
-        """
-        Create a graph store instance based on the provided configuration.
-
-        Attributes:
-            config (VectorStoreConfig): Configuration for the graph store.
-
-        Returns:
-            GraphStoreBase: An instance of the graph store.
-        """
-        # TODO: Implement graph store creation logic
-        pass

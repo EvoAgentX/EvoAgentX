@@ -13,7 +13,7 @@
 
 [![EvoAgentX Homepage](https://img.shields.io/badge/EvoAgentX-Homepage-blue?logo=homebridge)](https://evoagentx.org/)
 [![Docs](https://img.shields.io/badge/-Documentation-0A66C2?logo=readthedocs&logoColor=white&color=7289DA&labelColor=grey)](https://EvoAgentX.github.io/EvoAgentX/)
-[![Discord](https://img.shields.io/badge/Chat-Discord-5865F2?&logo=discord&logoColor=white)](https://discord.gg/8hdQyKCY)
+[![Discord](https://img.shields.io/badge/Chat-Discord-5865F2?&logo=discord&logoColor=white)](https://discord.gg/XWBZUJFwKe)
 [![Twitter](https://img.shields.io/badge/Follow-@EvoAgentX-e3dee5?&logo=x&logoColor=white)](https://x.com/EvoAgentX)
 [![Wechat](https://img.shields.io/badge/WeChat-EvoAgentX-brightgreen?logo=wechat&logoColor=white)](./assets/wechat_info.md)
 [![GitHub star chart](https://img.shields.io/github/stars/EvoAgentX/EvoAgentX?style=social)](https://star-history.com/#EvoAgentX/EvoAgentX)
@@ -43,6 +43,9 @@
 
 
 ## 🔥 Latest News
+- **[Aug 2025]** 🎉 **The EvoAgentX Team has published the latest survey of self-evolving AI Agents** on [arxiv](https://arxiv.org/abs/2508.07407)!
+- **[July 2025]** 🎉 **EvoAgentX** is on [arxiv](https://arxiv.org/abs/2507.03616)!
+- **[July 2025]** 🎉 **EvoAgentX** has achieved 1,000 stars!
 - **[May 2025]** 🎉 **EvoAgentX** has been officially released!
 
 ## ⚡ Get Started
@@ -53,6 +56,7 @@
   - [API Key Configuration](#api-key-configuration)
   - [Configure and Use the LLM](#configure-and-use-the-llm)
 - [Automatic WorkFlow Generation](#automatic-workflow-generation)
+- [Tool-Enabled Workflows Generation:](#tool-enabled-workflows-generation)
 - [Demo Video](#demo-video)
   - [✨ Final Results](#-final-results)
 - [Evolution Algorithms](#evolution-algorithms)
@@ -62,10 +66,15 @@
 - [🎯 Roadmap](#-roadmap)
 - [🙋 Support](#-support)
   - [Join the Community](#join-the-community)
+  - [Add the meeting to your calendar](#add-the-meeting-to-your-calendar)
   - [Contact Information](#contact-information)
+  - [Community Call](#community-call)
 - [🙌 Contributing to EvoAgentX](#-contributing-to-evoagentx)
+- [📖 Citation](#-citation)
 - [📚 Acknowledgements](#-acknowledgements)
 - [📄 License](#-license)
+
+
 
 ## Installation
 
@@ -84,7 +93,7 @@ For local development or detailed setup (e.g., using conda), refer to the [Insta
 git clone https://github.com/EvoAgentX/EvoAgentX.git
 cd EvoAgentX
 # Create a new conda environment
-conda create -n evoagentx python=3.10
+conda create -n evoagentx python=3.11
 
 # Activate the environment
 conda activate evoagentx
@@ -203,6 +212,63 @@ You can also:
 
 > 📂 For a complete working example, check out the [`workflow_demo.py`](https://github.com/EvoAgentX/EvoAgentX/blob/main/examples/workflow_demo.py)
 
+## Tool-Enabled Workflows Generation:
+
+In more advanced scenarios, your workflow agents may need to use external tools. EvoAgentX allows Automatic tool integration: Provide a list of toolkits to WorkFlowGenerator. The generator will consider these and include them in the agents if appropriate.
+
+For instance, to enable an Arxiv toolkit:
+```python
+from evoagentx.tools import ArxivToolkit
+
+# Initialize a command-line toolkit for file operations
+arxiv_toolkit = ArxivToolkit()
+
+# Generate a workflow with the toolkit available to agents
+wf_generator = WorkFlowGenerator(llm=llm, tools=[arxiv_toolkit])
+workflow_graph = wf_generator.generate_workflow(goal="Find and summarize the latest research on AI in the field of finance on arXiv")
+
+# Instantiate agents with access to the toolkit
+agent_manager = AgentManager(tools=[arxiv_toolkit])
+agent_manager.add_agents_from_workflow(workflow_graph, llm_config=openai_config)
+
+workflow = WorkFlow(graph=workflow_graph, agent_manager=agent_manager, llm=llm)
+output = workflow.execute()
+print(output)
+```
+
+In this setup, the workflow generator may assign the `ArxivToolkit` to relevant agents, enabling them to execute shell commands as part of the workflow (e.g. creating directories and files)
+
+## Human-in-the-Loop (HITL) Support:
+
+In advanced scenarios, EvoAgentX supports integrating human-in-the-loop interactions within your agent workflows. This means you can pause an agent’s execution for manual approval or inject user-provided input at key steps, ensuring critical decisions are vetted by a human when needed.
+
+All human interactions are managed through a central `HITLManager` instance. The HITL module includes specialized agents like `HITLInterceptorAgent` for approval gating and `HITLUserInputCollectorAgent` for collecting user data.
+
+For instance, to require human approval before an email-sending agent executes its action:
+```python
+from evoagentx.hitl import HITLManager, HITLInterceptorAgent, HITLInteractionType, HITLMode
+
+hitl_manager = HITLManager()
+hitl_manager.activate()  # Enable HITL (disabled by default)
+
+# Interceptor agent to approve/reject the DummyEmailSendAction of DataSendingAgent
+interceptor = HITLInterceptorAgent(
+    target_agent_name="DataSendingAgent",
+    target_action_name="DummyEmailSendAction",
+    interaction_type=HITLInteractionType.APPROVE_REJECT,
+    mode=HITLMode.PRE_EXECUTION    # ask before action runs
+)
+# Map the interceptor’s output field back to the workflow’s input field for continuity
+hitl_manager.hitl_input_output_mapping = {"human_verified_data": "extracted_data"}
+
+# Add the interceptor to the AgentManager and include HITL in the workflow execution
+agent_manager.add_agent(interceptor)
+workflow = WorkFlow(graph=workflow_graph, agent_manager=agent_manager, llm=llm, hitl_manager=hitl_manager)
+```
+When this interceptor triggers, the workflow will pause and prompt in the console for `[a]pprove` or `[r]eject` before continuing. If approved, the flow proceeds using the human-verified data; if rejected, the action is skipped or handled accordingly.
+
+> 📂 For a complete working example, check out the [`tutorial
+/hitl.md`](https://github.com/EvoAgentX/EvoAgentX/blob/615b06d29264f47e58a6780bd24f0e73cbf7deee/docs/tutorial/hitl.md)
 
 ## Demo Video
 
@@ -284,15 +350,16 @@ We apply EvoAgentX to optimize their prompts. The performance of the optimized a
 
 Explore how to effectively use EvoAgentX with the following resources:
 
-| Cookbook | Description |
-|:---|:---|
-| **[Build Your First Agent](./docs/tutorial/first_agent.md)** | Quickly create and manage agents with multi-action capabilities. |
-| **[Build Your First Workflow](./docs/tutorial/first_workflow.md)** | Learn to build collaborative workflows with multiple agents. |
-| **[Working with Tools](./docs/tutorial/tools.md)** | Master EvoAgentX's powerful tool ecosystem for agent interactions |
-| **[Automatic Workflow Generation](./docs/quickstart.md#automatic-workflow-generation-and-execution)** | Automatically generate workflows from natural language goals. |
-| **[Benchmark and Evaluation Tutorial](./docs/tutorial/benchmark_and_evaluation.md)** | Evaluate agent performance using benchmark datasets. |
-| **[TextGrad Optimizer Tutorial](./docs/tutorial/textgrad_optimizer.md)** | Automatically optimise the prompts within multi-agent workflow with TextGrad. |
-| **[AFlow Optimizer Tutorial](./docs/tutorial/aflow_optimizer.md)** | Automatically optimise both the prompts and structure of multi-agent workflow with AFlow. |
+| Cookbook | Colab Notebook | Description |
+|:---|:---|:---|
+| **[Build Your First Agent](./docs/tutorial/first_agent.md)** | **[Build Your First Agent](./docs/ColabNotebook/tutorial_notebooks/first_agent.ipynb)** | Quickly create and manage agents with multi-action capabilities. |
+| **[Build Your First Workflow](./docs/tutorial/first_workflow.md)** | **[Build Your First Workflow](./docs/ColabNotebook/tutorial_notebooks/first_workflow.ipynb)** | Learn to build collaborative workflows with multiple agents. |
+| **[Working with Tools](./docs/tutorial/tools.md)** | **[Working with Tools](./docs/ColabNotebook/tutorial_notebooks/tools.ipynb)** | Master EvoAgentX's powerful tool ecosystem for agent interactions |
+| **[Automatic Workflow Generation](./docs/quickstart.md#automatic-workflow-generation-and-execution)** | **[Automatic Workflow Generation](./docs/ColabNotebook/tutorial_notebooks/quickstart.ipynb)** | Automatically generate workflows from natural language goals. |
+| **[Benchmark and Evaluation Tutorial](./docs/tutorial/benchmark_and_evaluation.md)** | **[Benchmark and Evaluation Tutorial](./docs/ColabNotebook/tutorial_notebooks/benchmark_and_evaluation.ipynb)** | Evaluate agent performance using benchmark datasets. |
+| **[TextGrad Optimizer Tutorial](./docs/tutorial/textgrad_optimizer.md)** | **[TextGrad Optimizer Tutorial](./docs/ColabNotebook/tutorial_notebooks/textgrad_optimizer.ipynb)** | Automatically optimise the prompts within multi-agent workflow with TextGrad. |
+| **[AFlow Optimizer Tutorial](./docs/tutorial/aflow_optimizer.md)** | **[AFlow Optimizer Tutorial](./docs/ColabNotebook/tutorial_notebooks/aflow_optimizer.ipynb)** | Automatically optimise both the prompts and structure of multi-agent workflow with AFlow. |
+| **[Human-In-The-Loop support](./docs/tutorial/hitl.md)** | | Enable HITL functionalities in your WorkFlow.
 <!-- | **[SEW Optimizer Tutorial](./docs/tutorial/sew_optimizer.md)** | Create SEW (Self-Evolving Workflows) to enhance agent systems. | -->
 
 🛠️ Follow the tutorials to build and optimize your EvoAgentX workflows.
@@ -314,9 +381,19 @@ Explore how to effectively use EvoAgentX with the following resources:
 📢 Stay connected and be part of the **EvoAgentX** journey!  
 🚩 Join our community to get the latest updates, share your ideas, and collaborate with AI enthusiasts worldwide.
 
-- [Discord](https://discord.gg/8hdQyKCY) — Chat, discuss, and collaborate in real-time.
+- [Discord](https://discord.gg/XWBZUJFwKe) — Chat, discuss, and collaborate in real-time.
 - [X (formerly Twitter)](https://x.com/EvoAgentX) — Follow us for news, updates, and insights.
 - [WeChat](https://github.com/EvoAgentX/EvoAgentX/blob/main/assets/wechat_info.md) — Connect with our Chinese community.
+
+### Add the meeting to your calendar
+
+📅 Click the link below to add the EvoAgentX Weekly Meeting (Sundays, 16:30–17:30 GMT+8) to your calendar:
+
+👉 [Add to your Google Calendar](https://calendar.google.com/calendar/u/0/r/eventedit?text=EvoAgentX+周会（腾讯会议）&dates=20250629T083000Z/20250629T093000Z&details=会议链接：https://meeting.tencent.com/dm/5UuNxo7Detz0&location=Online&recur=RRULE:FREQ=WEEKLY;BYDAY=SU;UNTIL=20270523T093000Z&ctz=Asia/Shanghai)
+
+👉 [Add to your Tencent Meeting](https://meeting.tencent.com/dm/5UuNxo7Detz0)
+
+👉 [Download the EvoAgentX_Weekly_Meeting.ics file](./EvoAgentX_Weekly_Meeting.ics)
 
 ### Contact Information
 
@@ -326,6 +403,9 @@ If you have any questions or feedback about this project, please feel free to co
 
 We will respond to all questions within 2-3 business days.
 
+### Community Call
+- [Bilibili](https://space.bilibili.com/3493105294641286/favlist?fid=3584589186&ftype=create&spm_id_from=333.788.0.0)
+- [Youtube](https://studio.youtube.com/playlist/PL_kuPS05qA1hyU6cLX--bJ93Km2-md8AA/edit)
 ## 🙌 Contributing to EvoAgentX
 Thanks go to these awesome contributors
 
@@ -337,6 +417,28 @@ We appreciate your interest in contributing to our open-source initiative. We pr
 
 [![Star History Chart](https://api.star-history.com/svg?repos=EvoAgentX/EvoAgentX&type=Date)](https://www.star-history.com/#EvoAgentX/EvoAgentX&Date)
 
+## 📖 Citation
+
+Please consider citing our work if you find EvoAgentX helpful:
+
+📄 [EvoAgentX](https://arxiv.org/abs/2507.03616)
+📄 [Survey Paper](https://arxiv.org/abs/2508.07407)
+
+```bibtex
+@article{wang2025evoagentx,
+  title={EvoAgentX: An Automated Framework for Evolving Agentic Workflows},
+  author={Wang, Yingxu and Liu, Siwei and Fang, Jinyuan and Meng, Zaiqiao},
+  journal={arXiv preprint arXiv:2507.03616},
+  year={2025}
+}
+@article{fang202survey,
+      title={A Comprehensive Survey of Self-Evolving AI Agents: A New Paradigm Bridging Foundation Models and Lifelong Agentic Systems}, 
+      author={Jinyuan Fang and Yanwen Peng and Xi Zhang and Yingxu Wang and Xinhao Yi and Guibin Zhang and Yi Xu and Bin Wu and Siwei Liu and Zihao Li and Zhaochun Ren and Nikos Aletras and Xi Wang and Han Zhou and Zaiqiao Meng},
+      year={2025},
+      journal={arXiv preprint arXiv:2508.07407},
+      url={https://arxiv.org/abs/2508.07407}, 
+}
+```
 
 ## 📚 Acknowledgements 
 This project builds upon several outstanding open-source projects: [AFlow](https://github.com/FoundationAgents/MetaGPT/tree/main/metagpt/ext/aflow), [TextGrad](https://github.com/zou-group/textgrad), [DSPy](https://github.com/stanfordnlp/dspy), [LiveCodeBench](https://github.com/LiveCodeBench/LiveCodeBench), and more. We would like to thank the developers and maintainers of these frameworks for their valuable contributions to the open-source community.

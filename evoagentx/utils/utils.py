@@ -9,7 +9,11 @@ from typing import Union, Any, List, Set
 from ..core.logging import logger
 
 def make_parent_folder(path: str):
+    """Checks if the parent folder of a given path exists, and creates it if not.
 
+    Args:
+        path (str): The file path for which to create the parent folder.
+    """
     dir_folder = os.path.dirname(path)
     if not os.path.exists(dir_folder):
         logger.info(f"creating folder {dir_folder} ...")

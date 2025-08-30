@@ -5,15 +5,15 @@ import importlib
 import sys
 import os
 import traceback
-from typing import List, Set, Optional, Union, Dict, Any, Callable
+from typing import List, Set, Optional, Union, Dict
 from .interpreter_base import BaseInterpreter
+from .tool import Tool,Toolkit
 from pydantic import Field
 
 # Constants
 DEFAULT_ENCODING = 'utf-8'
 
 class PythonInterpreter(BaseInterpreter):
-
 
     project_path:Optional[str] = Field(default=".", description="Path to the project directory")
     directory_names:Optional[List[str]] = Field(default_factory=list, description="List of directory names to check for imports")
@@ -45,6 +45,8 @@ class PythonInterpreter(BaseInterpreter):
             **kwargs
         )
         self.allowed_imports = allowed_imports or set()
+        self.namespace = {}
+        self.visited_modules = {}
 
     def _get_file_and_folder_names(self, target_path: str) -> List[str]:
         """Retrieves the names of files and folders (without extensions) in a given directory.
@@ -357,69 +359,94 @@ class PythonInterpreter(BaseInterpreter):
             
         return self.execute(code, language)
     
-    def get_tool_schemas(self) -> list[Dict[str, Any]]:
-        """
-        Returns the OpenAI-compatible function schema for the Python interpreter.
-        
-        Returns:
-            list[Dict[str, Any]]: Function schema in OpenAI format
-        """
-        return [{
-            "type": "function",
-            "function": {
-                "name": "execute",
-                "description": "Execute Python code in a secure environment with safety checks.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "code": {
-                            "type": "string",
-                            "description": "The Python code to execute"
-                        },
-                        "language": {
-                            "type": "string",
-                            "description": "The programming language of the code (only 'python' is supported)",
-                            "enum": ["python"]
-                        }
-                    },
-                    "required": ["code"]
-                }
-            }
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "execute_script",
-                "description": "Execute Python code from a file in a secure environment with safety checks.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "file_path": {
-                            "type": "string",
-                            "description": "The path to the Python file to be executed"
-                        },
-                        "language": {
-                            "type": "string",
-                            "description": "The programming language of the code (only 'python' is supported)",
-                            "enum": ["python"]
-                        }
-                    },
-                    "required": ["file_path"]
-                }
-            }
-        }]
-    
-    def get_tools(self) -> list[Callable]:
-        return [self.execute, self.execute_script]
 
-    def get_tool_descriptions(self) -> list[str]:
-        """
-        Returns a brief description of the Python interpreter tool.
+class PythonExecuteTool(Tool):
+    name: str = "python_execute"
+    description: str = "Execute Python code in a controlled environment with safety checks"
+    inputs: Dict[str, Dict[str, str]] = {
+        "code": {
+            "type": "string",
+            "description": "The Python code to execute"
+        },
+        "language": {
+            "type": "string",
+            "description": "The programming language of the code (only 'python' is supported)"
+        }
+    }
+    required: Optional[List[str]] = ["code"]
+    
+    def __init__(self, python_interpreter: PythonInterpreter = None):
+        super().__init__()
+        self.python_interpreter = python_interpreter
+    
+    def __call__(self, code: str, language: str = "python") -> str:
+        """Execute Python code using the Python interpreter."""
+        if not self.python_interpreter:
+            raise RuntimeError("Python interpreter not initialized")
         
-        Returns:
-            list[str]: Tool descriptions
-        """
-        return [
-            "Execute Python code in a secure environment with safety checks.",
-            "Execute Python code from a file in a secure environment with safety checks."
+        try:
+            return self.python_interpreter.execute(code, language)
+        except Exception as e:
+            return f"Error executing code: {str(e)}"
+
+
+class PythonExecuteScriptTool(Tool):
+    name: str = "python_execute_script"
+    description: str = "Execute Python code from a file in a controlled environment with safety checks"
+    inputs: Dict[str, Dict[str, str]] = {
+        "file_path": {
+            "type": "string",
+            "description": "The path to the Python file to be executed"
+        },
+        "language": {
+            "type": "string",
+            "description": "The programming language of the code (only 'python' is supported)"
+        }
+    }
+    required: Optional[List[str]] = ["file_path"]
+    
+    def __init__(self, python_interpreter: PythonInterpreter = None):
+        super().__init__()
+        self.python_interpreter = python_interpreter
+    
+    def __call__(self, file_path: str, language: str = "python") -> str:
+        """Execute Python script file using the Python interpreter."""
+        if not self.python_interpreter:
+            raise RuntimeError("Python interpreter not initialized")
+        
+        try:
+            return self.python_interpreter.execute_script(file_path, language)
+        except Exception as e:
+            return f"Error executing script: {str(e)}"
+
+
+class PythonInterpreterToolkit(Toolkit):
+    def __init__(
+        self,
+        name: str = "PythonInterpreterToolkit",
+        project_path: Optional[str] = ".",
+        directory_names: Optional[List[str]] = None,
+        allowed_imports: Optional[Set[str]] = None,
+        **kwargs
+    ):
+        # Create the shared Python interpreter instance
+        python_interpreter = PythonInterpreter(
+            name="PythonInterpreter",
+            project_path=project_path,
+            directory_names=directory_names or [],
+            allowed_imports=allowed_imports,
+            **kwargs
+        )
+        
+        # Create tools with the shared interpreter
+        tools = [
+            PythonExecuteTool(python_interpreter=python_interpreter),
+            PythonExecuteScriptTool(python_interpreter=python_interpreter)
         ]
+        
+        # Initialize parent with tools
+        super().__init__(name=name, tools=tools)
+        
+        # Store python_interpreter as instance variable
+        self.python_interpreter = python_interpreter
+    

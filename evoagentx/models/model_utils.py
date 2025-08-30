@@ -11,9 +11,12 @@ from ..models.base_model import BaseLLM
 
 def get_openai_model_cost() -> dict:
     import json 
-    import importlib.resources
-    with importlib.resources.open_text('litellm', 'model_prices_and_context_window_backup.json') as f:
-        model_cost = json.load(f)
+    from importlib.resources import files
+    # import importlib.resources
+    # with importlib.resources.open_text('litellm', 'model_prices_and_context_window_backup.json') as f:
+    #     model_cost = json.load(f)
+    json_path = files('litellm') / 'model_prices_and_context_window_backup.json' 
+    model_cost = json.loads(json_path.read_text(encoding="utf-8"))
     return model_cost
 
 def infer_litellm_company_from_model(model: str) -> str:
@@ -29,6 +32,8 @@ def infer_litellm_company_from_model(model: str) -> str:
             company = "deepseek"
         elif "openrouter" in model:
             company = "openrouter"
+        elif "azure" in model.lower():
+            company = "azure"
         else:
             company = "openai"
     return company
