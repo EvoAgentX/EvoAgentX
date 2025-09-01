@@ -2,17 +2,16 @@ import inspect
 import json
 import threading
 from collections import defaultdict
-from collections.abc import Callable
 from copy import deepcopy
 from enum import Enum
 from functools import wraps
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Literal, Optional, Tuple, Union
 
 import networkx as nx
 from networkx import MultiDiGraph
 from pydantic import Field, field_validator, model_validator
 
-from ..agents import Agent
+from ..agents import Agent, CustomizeAgent
 from ..core.base_config import Parameter
 from ..core.logging import logger
 from ..core.module import BaseModule
@@ -25,8 +24,7 @@ from ..utils.utils import (
     generate_dynamic_class_name,
     make_parent_folder,
     pydantic_to_parameters,
-    update_params,
-    validate_params,
+    validate_param,
 )
 from .action_graph import ActionGraph
 
@@ -170,12 +168,20 @@ class WorkFlowNode(BaseModule):
         return instance
 
     def to_dict(self, exclude_none: bool = True, ignore: List[str] = [], **kwargs) -> dict:
+        
+        agents_dict: List[dict] = []
+        if self.agents is not None and len(self.agents)>0:
+            for agent in self.agents:
+                if isinstance(agent, Agent):
+                    agents_dict.append(agent.get_config())
+                else:
+                    agents_dict.append(agent)
+
+        if "agents" not in ignore:
+            ignore.append("agents")
 
         data = super().to_dict(exclude_none=exclude_none, ignore=ignore, **kwargs)
-        for agent in data.get("agents", []):
-            # for CustomizeAgent 
-            if isinstance(agent, dict) and "parse_func" in agent and isinstance(agent["parse_func"], Callable):
-                agent["parse_func"] = agent["parse_func"].__name__
+        data["agents"] = agents_dict
         return data
 
     def get_agents(self) -> List[str]:
@@ -246,64 +252,140 @@ class WorkFlowNode(BaseModule):
         elif len(self.agents)==0:
             raise ValueError(f"No agents assigned to node '{self.name}'")
 
-        agent_inputs = []
-        agent_outputs = []
+        node_inputs_dict = {}
+        inputs_in_agents = {}
+        for node_input in self.inputs:
+            node_inputs_dict[node_input.name] = node_input
+            inputs_in_agents[node_input.name] = False
 
-        for agent in self.agents:
+        node_outputs_dict = {}
+        outputs_in_agents = {}
+        for node_output in self.outputs:
+            node_outputs_dict[node_output.name] = node_output
+            outputs_in_agents[node_output.name] = False
+
+        in_agents = {"inputs": inputs_in_agents, "outputs": outputs_in_agents}
+        node_inputs_outputs = {"inputs": node_inputs_dict, "outputs": node_outputs_dict}
+
+
+        def _check_agent_dict(agent_dict: dict, inputs_or_outputs: Literal["inputs", "outputs"]) -> dict:
+
+            # "input" or "output"
+            input_or_output = inputs_or_outputs[:-1]
+
+            for i, agent_input_or_output in enumerate(agent_dict[inputs_or_outputs]):
+                if agent_input_or_output["name"] in node_inputs_outputs[inputs_or_outputs]:
+                    in_agents[inputs_or_outputs][agent_input_or_output["name"]] = True
+                    agent_input_or_output_param = Parameter.from_dict(agent_input_or_output)
+                    try:
+                        validate_param(
+                            node_inputs_outputs[inputs_or_outputs][agent_input_or_output["name"]],
+                            agent_input_or_output_param,
+                            f"node '{self.name}' {input_or_output}",
+                            f"{agent_dict['name']} {input_or_output}",
+                        )
+                    except ValueError as e:
+                        if auto_fix:
+                            logger.warning(e)
+                            logger.info(f"Auto-fixed agent '{agent_dict['name']}' {input_or_output}: '{agent_input_or_output['name']}'")
+                            agent_dict[inputs_or_outputs][i] = node_inputs_outputs[inputs_or_outputs][agent_input_or_output["name"]].to_dict(ignore=["class_name"])
+                        else:
+                            raise e
+            
+            return agent_dict
+
+
+        def _check_agent(agent: Agent, inputs_or_outputs: Literal["inputs", "outputs"]) -> Agent:
+
+            # "input" or "output"
+            input_or_output = inputs_or_outputs[:-1]
+
+            for i, agent_actions in enumerate(agent.actions):
+                if agent_actions.name == "ContextExtraction":
+                    continue
+
+                action_format_name = "inputs_format" if inputs_or_outputs == "inputs" else "outputs_format"
+                action_format = getattr(agent_actions, action_format_name)
+                action_params = pydantic_to_parameters(action_format)
+
+                for j, param in enumerate(action_params):
+                    if param.name in node_inputs_outputs[inputs_or_outputs]:
+                        in_agents[inputs_or_outputs][param.name] = True
+                        try:
+                            validate_param(
+                                node_inputs_outputs[inputs_or_outputs][param.name],
+                                param,
+                                f"node '{self.name}' {input_or_output}",
+                                f"{agent_actions.name} {input_or_output}",
+                            )
+                        except ValueError as e:
+                            if auto_fix:
+                                logger.warning(e)
+                                logger.info(f"Auto-fixed agent '{agent_actions.name}' input: '{param.name}'")
+                                action_params[j] = node_inputs_outputs[inputs_or_outputs][param.name]
+                            else:
+                                raise e
+
+                action_params = [param.to_dict(ignore=["class_name"]) for param in action_params]
+                if inputs_or_outputs == "inputs":                      
+                    required_action_format = CustomizeAgent.create_action_input(action_params, agent_actions.name)
+                else:
+                    required_action_format = CustomizeAgent.create_action_output(action_params, agent_actions.name)
+                setattr(agent.actions[i], action_format_name, required_action_format)
+            return agent
+
+        
+        def _check_customize_agent(agent: CustomizeAgent, inputs_or_outputs: Literal["inputs", "outputs"]) -> CustomizeAgent:
+            # input or output
+            input_or_output = inputs_or_outputs[:-1]
+
+            new_inputs_or_outputs = []
+
+            for i, agent_input_or_output in enumerate(getattr(agent, inputs_or_outputs)):
+                new_inputs_or_outputs.append(agent_input_or_output)
+
+                if agent_input_or_output["name"] in node_inputs_outputs[inputs_or_outputs]:
+                    in_agents[inputs_or_outputs][agent_input_or_output["name"]] = True
+                    agent_input_or_output_param = Parameter.from_dict(agent_input_or_output)
+                    try:
+                        validate_param(
+                            node_inputs_outputs[inputs_or_outputs][agent_input_or_output["name"]],
+                            agent_input_or_output_param,
+                            f"node '{self.name}' {input_or_output}",
+                            f"{agent.name} {input_or_output}",
+                        )
+                    except ValueError as e:
+                        if auto_fix:
+                            logger.warning(e)
+                            logger.info(f"Auto-fixed agent '{agent.name}' {input_or_output}: '{agent_input_or_output['name']}'")
+                            new_inputs_or_outputs[i] = node_inputs_outputs[inputs_or_outputs][agent_input_or_output["name"]].to_dict(ignore=["class_name"])
+                        else:
+                            raise e
+
+            getattr(agent, f"update_{inputs_or_outputs}")(new_inputs_or_outputs)
+            return agent
+
+
+        for i, agent in enumerate(self.agents):
             if isinstance(agent, Agent):
-                agent_actions = [
-                    action for action in agent.actions if action.name != "ContextExtraction"
-                ]
-                for action in agent_actions:
-                    agent_inputs.extend(pydantic_to_parameters(action.inputs_format, ignore=["class_name"]))
-                    agent_outputs.extend(pydantic_to_parameters(action.outputs_format, ignore=["class_name"]))
+                if isinstance(agent, CustomizeAgent):
+                    self.agents[i] = _check_customize_agent(agent, "inputs")
+                    self.agents[i] = _check_customize_agent(agent, "outputs")
+                else:
+                    self.agents[i] = _check_agent(agent, "inputs")
+                    self.agents[i] = _check_agent(agent, "outputs")
             elif isinstance(agent, dict):
-                input_parameters = [Parameter.from_dict(input) for input in agent["inputs"]]
-                output_parameters = [Parameter.from_dict(output) for output in agent["outputs"]]
-                agent_inputs.extend(input_parameters)
-                agent_outputs.extend(output_parameters)
-            elif isinstance(agent, str):
-                logger.warning(f"Agent '{agent}' at node '{self.name}' is not an instance of Agent or dict. Cannot check agent inputs/outputs, skipping.")
+                self.agents[i] = _check_agent_dict(agent, "inputs")
+                self.agents[i] = _check_agent_dict(agent, "outputs")
             else:
                 raise TypeError(f"{type(agent)} is an unknown agent type!")
-
-
-        validated_inputs = validate_params(
-            self.inputs,
-            agent_inputs,
-            f"node '{self.name}' input",
-            "agent input",
-            auto_fix=auto_fix
-        )
         
-        validated_outputs = validate_params(
-            self.outputs,
-            agent_outputs,
-            f"node '{self.name}' output",
-            "agent output",
-            auto_fix=auto_fix
-        )
-
-
-        if auto_fix:
-            for agent_idx, agent in enumerate(self.agents):
-                
-                if isinstance(agent, Agent):
-                    self.agents[agent_idx].inputs = update_params(agent.inputs, validated_inputs)
-                    self.agents[agent_idx].outputs = update_params(agent.outputs, validated_outputs)
-                
-                elif isinstance(agent, dict):
-                    old_inputs = [Parameter.from_dict(input) for input in agent["inputs"]]
-                    old_outputs = [Parameter.from_dict(output) for output in agent["outputs"]]
-
-                    new_inputs = update_params(old_inputs, validated_inputs)
-                    new_outputs = update_params(old_outputs, validated_outputs)
-
-                    new_inputs_dict = [input.to_dict() for input in new_inputs]
-                    new_outputs_dict = [output.to_dict() for output in new_outputs]
-
-                    self.agents[agent_idx]["inputs"] = new_inputs_dict
-                    self.agents[agent_idx]["outputs"] = new_outputs_dict
+        if not all(in_agents["inputs"].values()):
+            missing_inputs = [input_name for input_name, in_agent in in_agents["inputs"].items() if not in_agent]
+            raise ValueError(f"Not all node inputs are used by agents: {missing_inputs}")
+        if not all(in_agents["outputs"].values()):
+            missing_outputs = [output_name for output_name, in_agent in in_agents["outputs"].items() if not in_agent]
+            raise ValueError(f"Not all node outputs can be found in agents: {missing_outputs}")
 
 
 class WorkFlowEdge(BaseModule):
@@ -1199,37 +1281,57 @@ class WorkFlowGraph(BaseModule):
             auto_fix: Whether to automatically fix mismatched `type` and `required` fields.
         """
         # Check if workflow inputs are also in workflow outputs
-        for workflow_input in self.workflow_inputs:
-            if workflow_input in self.workflow_outputs:
-                raise ValueError(f"Workflow input '{workflow_input.name}' is also in workflow outputs")
+        # use set
+        inputs_in_outputs = set(self.workflow_inputs_dict.keys()) & set(self.workflow_outputs_dict.keys())
+        if len(inputs_in_outputs)>0:
+            raise ValueError(f"Some workflow inputs are also in workflow outputs: {inputs_in_outputs}")
 
-        graph_inputs = []
-        graph_outputs = []
+        workflow_inputs_outputs = {"inputs": self.workflow_inputs_dict, "outputs": self.workflow_outputs_dict}
 
-        for node in self.nodes:
-            graph_inputs.extend(node.inputs)
-            graph_outputs.extend(node.outputs)
+        workflow_input_in_nodes = {workflow_input_name: False for workflow_input_name in self.workflow_inputs_dict}
+        workflow_output_in_nodes = {workflow_output_name: False for workflow_output_name in self.workflow_outputs_dict}
+        in_nodes = {"inputs": workflow_input_in_nodes, "outputs": workflow_output_in_nodes}
 
-        validated_inputs = validate_params(
-            self.workflow_inputs, 
-            graph_inputs, 
-            "required input", 
-            "actual workflow input",
-            auto_fix=auto_fix
-        )
+        def _check_node(node: WorkFlowNode, inputs_or_outputs: Literal["inputs", "outputs"]) -> WorkFlowNode:
 
-        validated_outputs = validate_params(
-            self.workflow_outputs, 
-            graph_outputs, 
-            "required output", 
-            "actual workflow output",
-            auto_fix=auto_fix
-        )
+            # "input" or "output"
+            input_or_output = inputs_or_outputs[:-1]
+            node_inputs_or_outputs = getattr(node, inputs_or_outputs)
 
-        if auto_fix:
-            for node_idx, node in enumerate(self.nodes):
-                self.nodes[node_idx].inputs = update_params(node.inputs, validated_inputs)
-                self.nodes[node_idx].outputs = update_params(node.outputs, validated_outputs)
+            for i, node_input_or_output in enumerate(node_inputs_or_outputs):
+                if node_input_or_output.name in in_nodes[inputs_or_outputs]:
+                    in_nodes[inputs_or_outputs][node_input_or_output.name] = True
+                
+                    try:
+                        validate_param(
+                            workflow_inputs_outputs[inputs_or_outputs][node_input_or_output.name], 
+                            node_input_or_output,
+                            f"workflow {input_or_output}",
+                            f"node '{node.name}' {input_or_output}",
+                        )
+                    except ValueError as e:
+                        if auto_fix:
+                            logger.warning(e)
+                            logger.info(f"Auto-fixed node '{node.name}' {input_or_output}: '{node_input_or_output.name}'")
+                            node_inputs_or_outputs[i] = workflow_inputs_outputs[inputs_or_outputs][node_input_or_output.name]
+                        else:
+                            raise e
+
+            setattr(node, inputs_or_outputs, node_inputs_or_outputs)
+            return node
+            
+
+        for i, node in enumerate(self.nodes):
+            self.nodes[i] = _check_node(node, "inputs")
+            self.nodes[i] = _check_node(node, "outputs")
+
+        if not all(in_nodes["inputs"].values()):
+            missing_inputs = [input_name for input_name, in_node in in_nodes["inputs"].items() if not in_node]
+            raise ValueError(f"Not all workflow inputs are used by nodes: {missing_inputs}")
+
+        if not all(in_nodes["outputs"].values()):
+            missing_outputs = [output_name for output_name, in_node in in_nodes["outputs"].items() if not in_node]
+            raise ValueError(f"Not all workflow outputs are found in nodes: {missing_outputs}")
 
 
     def _check_agents(self, auto_fix: bool = False):

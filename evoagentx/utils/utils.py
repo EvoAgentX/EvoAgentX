@@ -1,7 +1,7 @@
 import os
 import re
 import time
-from typing import Any, Dict, List, Optional, Set, Union, get_args, get_origin, Type
+from typing import Any, Dict, List, Optional, Set, Type, Union, get_args, get_origin
 
 import regex
 import requests
@@ -257,127 +257,39 @@ def pydantic_to_parameters(base_model: Type[BaseModel], ignore: List[str] = []) 
     return parameters
 
 
-def validate_params(
-    required_params: List[Parameter], 
-    actual_params: List[Parameter], 
-    required_params_name: str, 
+def validate_param(
+    required_param: Parameter,
+    actual_param: Parameter,
+    required_params_name: str,
     actual_params_name: str,
-    auto_fix: bool = False
-)-> Dict[str, Parameter]:
+):
     """
-    Checks if `actual_params` have `required_params` and if the `required_params` in `actual_params` have the same type and required value.
-    If `actual_params` doesn't have `required_params`, raises ValueError.
-    If `actual_params` has `required_params` but with different `type` or `required` value, raises ValueError. Fix the mismatch if `auto_fix` is True.
-    If `actual_params` has `required_params` but with different `description`, it will only warn. Fix the mismatch if `auto_fix` is True.
-
-    Args:
-        required_params: A list of parameters that are required. Raises error if `actual_params` doesn't contain these parameters.
-        actual_params: A list of parameters to check if `required_params` exist.
-        required_params_name: A name for `required params` to be shown in error messages.
-        actual_params_name: A name for `actual_params` to be shown in error messages.
-
-    Returns:
-        Dict[str, Parameter]: A dictionary of actual parameters with their names as keys.
-            If `auto_fix` is True, it will fix the mismatched `type`, `required` and `description` fields.
+    Checks if `actual_param` has the same type, required and description value as `required_param`.
     """
-    actual_params_dict = {param.name: param for param in actual_params}
 
-    def check_attr(
-        pass_condition: bool, 
-        param_name: str, 
-        attr_name: str, 
-        required_value: Any, 
-        actual_value: Any, 
-        auto_fix: bool
-    ):
-        if not pass_condition:
-            if auto_fix:
-                logger.warning(
-                    f"Mismatch for '{param_name}': {required_params_name} ({attr_name}={required_value}) vs. {actual_params_name} ({attr_name}={actual_value})"
-                )
-                logger.info(f"Fixing '{param_name}' `{attr_name}` from '{actual_value}' to '{required_value}'")
-                setattr(actual_params_dict[param_name], attr_name, required_value)
-            else:
-                raise ValueError(
-                    f"Mismatch for '{param_name}': {required_params_name} ({attr_name}={required_value}) vs. {actual_params_name} ({attr_name}={actual_value})"
-                )
+    def format_error_msg(
+        attr_name: str,
+        required_value: Any,
+        actual_value: Any,
+    ) -> str:
+        return f"Mismatch for '{required_param.name}': {required_params_name} ({attr_name}={required_value}) vs. {actual_params_name} ({attr_name}={actual_value})"
 
+    try:
+        actual_type = string_to_python_type[actual_param.type]
+        required_type = string_to_python_type[required_param.type]
+    except KeyError as e:
+        logger.warning(f"Unsupported type in {actual_param.name}: {e}")
+        actual_type = actual_param.type
+        required_type = required_param.type
 
-    for param in required_params:
-        if param.name not in actual_params_dict:
-            raise ValueError(f"{required_params_name} '{param.name}' is not found in {actual_params_name}: {list(actual_params_dict.keys())}")
+    if required_type != actual_type:
+        raise ValueError(format_error_msg("type", required_param.type, actual_param.type))
 
-        actual_type = actual_params_dict[param.name].type
+    if required_param.required != actual_param.required:
+        raise ValueError(format_error_msg("required", required_param.required, actual_param.required))
 
-        try:
-            # see if they map to the same python type
-            actual_python_type = string_to_python_type[actual_type]
-            required_param_python_type = string_to_python_type[param.type]
-
-            check_attr(
-                pass_condition=required_param_python_type is actual_python_type,
-                param_name=param.name,
-                attr_name="type",
-                required_value=required_param_python_type,
-                actual_value=actual_python_type,
-                auto_fix=auto_fix
-            )
-
-        except KeyError:
-            # if not supported type, issue an warning and check if they are the same
-            logger.warning(
-                f"Unsupported type '{actual_type}' for parameter '{param.name}' in {actual_params_name}"
-            )
-
-            check_attr(
-                pass_condition=actual_type == param.type,
-                param_name=param.name,
-                attr_name="type",
-                required_value=param.type,
-                actual_value=actual_type,
-                auto_fix=auto_fix
-            )
-
-        actual_required = actual_params_dict[param.name].required
-        actual_description = actual_params_dict[param.name].description
-
-        check_attr(
-            pass_condition=actual_required == param.required,
-            param_name=param.name,
-            attr_name="required",
-            required_value=param.required,
-            actual_value=actual_required,
-            auto_fix=auto_fix
-        )
-
-        if actual_description != param.description:
-            # only warn if description is different
-            logger.warning(
-                f"Mismatch for '{param.name}': {required_params_name} (description={param.description}) vs. {actual_params_name} (description={actual_description})"
-            )
-
-            if auto_fix:
-                logger.info(f"Fixing '{param.name}' `description` from '{actual_description}' to '{param.description}'")
-                actual_params_dict[param.name].description = param.description
-
-    return actual_params_dict
-
-
-def update_params(old_params: List[Parameter], new_params: Dict[str, Parameter]) -> List[Parameter]:
-    """
-    Updates a list of parameters with new parameters.
-
-    Args:
-        old_params: The list of parameters to update.
-        new_params: A dictionary of parameters to update with, where the key is the parameter name.
-
-    Returns:
-        List[Parameter]: The updated list of parameters.
-    """
-    for param_idx, param in enumerate(old_params):
-        if param.name in new_params:
-            old_params[param_idx] = new_params[param.name]
-    return old_params
+    if required_param.description != actual_param.description:
+        raise ValueError(format_error_msg("description", required_param.description, actual_param.description))
 
 
 string_to_python_type = {
