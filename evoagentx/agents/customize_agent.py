@@ -142,6 +142,9 @@ class CustomizeAgent(Agent):
             actions=[customize_action], 
             **kwargs
         )
+
+        self.inputs = inputs
+        self.outputs = outputs
         self.output_parser = output_parser 
         self.parse_mode = parse_mode 
         self.parse_func = parse_func 
@@ -151,7 +154,7 @@ class CustomizeAgent(Agent):
         self.custom_output_format = custom_output_format
 
     def _add_tools(self, tools: List[Toolkit]):
-        self.get_action(self.customize_action_name).add_tools(tools)
+        self.action.add_tools(tools)
 
     @property
     def customize_action_name(self) -> str:
