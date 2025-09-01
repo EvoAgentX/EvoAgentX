@@ -12,7 +12,6 @@ from ..models.base_model import BaseLLM, LLMOutputParser
 from ..prompts.output_extraction import OUTPUT_EXTRACTION_PROMPT
 from ..prompts.template import ChatTemplate, StringTemplate
 from ..prompts.tool_calling import (
-    OUTPUT_EXTRACTION_PROMPT,
     TOOL_CALLING_HISTORY_PROMPT,
     TOOL_CALLING_TEMPLATE,
     TOOL_CALLING_RETRY_PROMPT,
