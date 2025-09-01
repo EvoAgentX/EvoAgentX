@@ -90,11 +90,6 @@ class CustomizeAgent(Agent):
         system_prompt = system_prompt or DEFAULT_SYSTEM_PROMPT
         inputs = inputs or [] 
         outputs = outputs or [] 
-        if tools is not None:
-            raw_tool_map = {tool.name: tool for tool in tools}
-            tools = [tool if isinstance(tool, Toolkit) else Toolkit(name=tool.name, tools=[tool]) for tool in tools]
-        else:
-            raw_tool_map = None
 
         if prompt is not None and prompt_template is not None:
             logger.warning("Both `prompt` and `prompt_template` are provided in `CustomizeAgent`. `prompt_template` will be used.")
@@ -147,7 +142,6 @@ class CustomizeAgent(Agent):
             actions=[customize_action], 
             **kwargs
         )
-        self._store_inputs_outputs_info(inputs, outputs, raw_tool_map)
         self.output_parser = output_parser 
         self.parse_mode = parse_mode 
         self.parse_func = parse_func 
@@ -325,21 +319,25 @@ class CustomizeAgent(Agent):
         return customize_action
 
     @staticmethod
-    def create_action_input(inputs: List[Dict], action_name: str) -> ActionInput:
-        action_input_fields = {}
-        for field in inputs:
+    def _prepare_action_info(params: List[Dict]) -> Dict:
+        action_fields = {}
+        for field in params:
             required = field.get("required", True)
-            
             try:
                 field_type = string_to_python_type[field["type"]]
             except KeyError:
+                logger.warning(f'Could not find Python type for "{field["type"]}" (field: "{field["name"]}"), falling back to `Any`.')
                 field_type = Any
-
-            if required:                
-                action_input_fields[field["name"]] = (field_type, Field(description=field["description"]))
+            if required:
+                action_fields[field["name"]] = (field_type, Field(description=field["description"]))
             else:
-                action_input_fields[field["name"]] = (Optional[field_type], Field(default=None, description=field["description"]))
+                action_fields[field["name"]] = (Optional[field_type], Field(default=None, description=field["description"]))
 
+        return action_fields
+
+    @staticmethod
+    def create_action_input(inputs: List[Dict], action_name: str) -> Type[ActionInput]:
+        action_input_fields = CustomizeAgent._prepare_action_info(inputs)
         action_input_type = create_model(
             get_unique_class_name(
                 generate_dynamic_class_name(action_name+" action_input")
@@ -350,19 +348,8 @@ class CustomizeAgent(Agent):
         return action_input_type
 
     @staticmethod
-    def create_action_output(outputs: List[Dict], action_name: str) -> ActionOutput:
-        action_output_fields = {}
-        for field in outputs:
-            required = field.get("required", True)
-            try:
-                field_type = string_to_python_type[field["type"]]
-            except KeyError:
-                logger.warning(f'Could not find Python type for "{field["type"]}" (field: "{field["name"]}"), falling back to `Any`.')
-                field_type = Any
-            if required:
-                action_output_fields[field["name"]] = (field_type, Field(description=field["description"]))
-            else:
-                action_output_fields[field["name"]] = (Optional[field_type], Field(default=None, description=field["description"]))
+    def create_action_output(outputs: List[Dict], action_name: str) -> Type[ActionOutput]:
+        action_output_fields = CustomizeAgent._prepare_action_info(outputs)
         action_output_type = create_model(
             get_unique_class_name(
                 generate_dynamic_class_name(action_name+" action_output")
@@ -393,20 +380,31 @@ class CustomizeAgent(Agent):
                     f"The outputs: {all_output_names}.\n"
                     f"All the fields in the output parser must be present in the outputs." 
                 )
-    
-    def _store_inputs_outputs_info(self, inputs: List[dict], outputs: List[dict], tool_map: Dict[str, Union[Toolkit, Tool]]):
 
-        self._action_input_types, self._action_input_required = {}, {} 
-        for field in inputs:
-            required = field.get("required", True)
-            self._action_input_types[field["name"]] = field["type"]
-            self._action_input_required[field["name"]] = required
-        self._action_output_types, self._action_output_required = {}, {}
-        for field in outputs:
-            required = field.get("required", True)
-            self._action_output_types[field["name"]] = field["type"]
-            self._action_output_required[field["name"]] = required
-        self._raw_tool_map = tool_map
+
+    def update_inputs(self, inputs: List[dict]):
+        """
+        Update the inputs format of the customize agent.
+        
+        Args:
+            inputs (List[dict]): The new inputs format of the customize agent.
+        """
+        self.inputs = inputs
+        new_action_input = CustomizeAgent.create_action_input(inputs, self.name)
+        self.action.inputs_format = new_action_input
+
+
+    def update_outputs(self, outputs: List[dict]):
+        """
+        Update the outputs format of the customize agent.
+        
+        Args:
+            outputs (List[dict]): The new outputs format of the customize agent.
+        """
+        self.outputs = outputs
+        new_action_output = CustomizeAgent.create_action_output(outputs, self.name)
+        self.action.outputs_format = new_action_output
+
     
     def __call__(self, inputs: dict = None, return_msg_type: MessageType = MessageType.UNKNOWN, **kwargs) -> Message:
         """
@@ -428,8 +426,6 @@ class CustomizeAgent(Agent):
         Get the information of the customize agent.
         """
         customize_action = self.get_action(self.customize_action_name)
-        action_input_params = customize_action.inputs_format.get_attrs()
-        action_output_params = customize_action.outputs_format.get_attrs()
         
         config = {
             "class_name": "CustomizeAgent",
@@ -438,24 +434,8 @@ class CustomizeAgent(Agent):
             "prompt": customize_action.prompt,
             "prompt_template": customize_action.prompt_template.to_dict() if customize_action.prompt_template is not None else None, 
             # "llm_config": self.llm_config.to_dict(exclude_none=True),
-            "inputs": [
-                {
-                    "name": field,
-                    "type": self._action_input_types[field],
-                    "description": field_info.description,
-                    "required": self._action_input_required[field]
-                }
-                for field, field_info in customize_action.inputs_format.model_fields.items() if field in action_input_params
-            ],
-            "outputs": [
-                {
-                    "name": field,
-                    "type": self._action_output_types[field],
-                    "description": field_info.description,
-                    "required": self._action_output_required[field]
-                }
-                for field, field_info in customize_action.outputs_format.model_fields.items() if field in action_output_params
-            ],
+            "inputs": self.inputs,
+            "outputs": self.outputs,
             "system_prompt": self.system_prompt,
             "output_parser": self.output_parser.__name__ if self.output_parser is not None else None,
             "parse_mode": self.parse_mode,
