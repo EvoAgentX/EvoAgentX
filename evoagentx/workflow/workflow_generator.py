@@ -388,7 +388,7 @@ class WorkFlowGenerator(BaseModule):
         
         agents = self._process_agent_generator_output(agent_generator_output.content)
         node.set_agents(agents=agents)
-        node.check_agents()
+        node.check_agents(auto_fix=True)
         return node
 
 
