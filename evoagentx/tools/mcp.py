@@ -141,14 +141,27 @@ class MCPClient:
         self.tool_descriptions = None
     
     def _disconnect(self):
+        # Signal shutdown to the event loop
+        if hasattr(self, 'shutdown_event') and self.shutdown_event:
+            self.event_loop.call_soon_threadsafe(self.shutdown_event.set)
+        
+        # Cancel the main task
         if self.task and not self.task.done():
             self.event_loop.call_soon_threadsafe(self.task.cancel)
-        self.working_thread.join()
-        self.event_loop.close()
+        
+        # Wait for thread to finish with timeout
+        if hasattr(self, 'working_thread') and self.working_thread.is_alive():
+            self.working_thread.join(timeout=5)  # Add timeout to prevent hanging
+        
+        # Close the event loop
+        if hasattr(self, 'event_loop') and not self.event_loop.is_closed():
+            self.event_loop.close()
     
     def _connect(self):
         self.working_thread.start()
         if not self.thread_running.wait(timeout=self.connect_timeout):
+            # Clean up if connection times out
+            self._disconnect()
             raise TimeoutError(
                 f"Couldn't connect to the MCP server after {self.connect_timeout} seconds"
             )
@@ -158,7 +171,11 @@ class MCPClient:
         return self.get_toolkits()
     
     def __del__(self):
-        self._disconnect()
+        try:
+            self._disconnect()
+        except Exception:
+            # Ignore errors during cleanup in destructor
+            pass
     
     def __exit__(self, exc_type, exc_value, traceback):
         self._disconnect()
@@ -178,8 +195,9 @@ class MCPClient:
                     self.sessions, self.mcp_tools = [list(c) for c in zip(*connections)]
                     self.thread_running.set()
                     
-                    done_future = self.event_loop.create_future()
-                    await done_future
+                    # Instead of waiting indefinitely, wait for shutdown signal
+                    self.shutdown_event = asyncio.Event()
+                    await self.shutdown_event.wait()
             except Exception as e:
                 logger.error(f"Error in MCP event loop: {str(e)}")
                 self.thread_running.set()
@@ -193,6 +211,10 @@ class MCPClient:
             logger.info("MCP client event loop was cancelled")
         except Exception as e:
             logger.error(f"Error in MCP event loop: {str(e)}")
+        finally:
+            # Ensure the event loop is properly closed
+            if not self.event_loop.is_closed():
+                self.event_loop.close()
 
     @asynccontextmanager
     async def _start_server(self, config: Dict[str, Any]):
@@ -219,7 +241,7 @@ class MCPClient:
                 future = asyncio.run_coroutine_threadsafe(
                     session.call_tool(name, arguments), self.event_loop
                 )
-                result = future.result(timeout=60)
+                result = future.result(timeout=30)  # Reduced timeout to 30 seconds
                 logger.info(f"MCP tool {name} call completed successfully")
                 return result
             except (TimeoutError, ClientError, McpError) as e:
@@ -292,14 +314,22 @@ class MCPToolkit:
             self.servers.extend(servers)
         
         # Connect to all servers
+        failed_servers = []
         for server in self.servers:
             try:
                 server._connect()
                 logger.info("Successfully connected to MCP servers")
             except TimeoutError as e:
                 logger.warning(f"Timeout connecting to MCP servers: {str(e)}. Some tools may not be available.")
+                failed_servers.append(server)
             except Exception as e:
                 logger.error(f"Error connecting to MCP servers: {str(e)}")
+                failed_servers.append(server)
+        
+        # Remove failed servers
+        for failed_server in failed_servers:
+            if failed_server in self.servers:
+                self.servers.remove(failed_server)
     
     def _from_config_file(self, config_path: str):
         try:
@@ -336,7 +366,13 @@ class MCPToolkit:
     
     def disconnect(self):
         for server in self.servers:
-            server._disconnect()
+            try:
+                server._disconnect()
+            except Exception as e:
+                logger.warning(f"Error disconnecting from MCP server: {str(e)}")
+        
+        # Clear the servers list
+        self.servers.clear()
         
     def get_toolkits(self) -> List[Toolkit]:
         """Return a flattened list of all tools across all servers"""
@@ -347,9 +383,37 @@ class MCPToolkit:
             
         for server in self.servers:
             try:
-                tools = server.get_toolkits()
+                # Add timeout to prevent hanging
+                import threading
+                import queue
+                
+                result_queue = queue.Queue()
+                exception_queue = queue.Queue()
+                
+                def get_tools_with_timeout():
+                    try:
+                        tools = server.get_toolkits()
+                        result_queue.put(tools)
+                    except Exception as e:
+                        exception_queue.put(e)
+                
+                # Start tool retrieval in a separate thread with timeout
+                thread = threading.Thread(target=get_tools_with_timeout)
+                thread.daemon = True
+                thread.start()
+                thread.join(timeout=30)  # 30 second timeout
+                
+                if thread.is_alive():
+                    logger.warning("Timeout getting tools from MCP server after 30 seconds")
+                    continue
+                
+                if not exception_queue.empty():
+                    raise exception_queue.get()
+                
+                tools = result_queue.get()
                 all_tools.extend(tools)
                 logger.info(f"Added {len(tools)} tools from MCP server")
+                
             except Exception as e:
                 logger.error(f"Error getting tools from MCP server: {str(e)}")
         return all_tools

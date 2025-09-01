@@ -71,6 +71,7 @@ Pillow
 # tools
 docker>=6.0.0
 googlesearch-python>=1.2.0
+ddgs # Dux Distributed Global Search
 wikipedia>=1.4.0
 fastmcp>=0.1.0
 requests>=2.28.0
@@ -82,3 +83,6 @@ html2text>=2020.1.16
 browser-use; python_version >= "3.11"
 browser-use-py310; python_version < "3.11"
 mcp>=0.1.0
+psycopg2-binary>=2.9.0
+feedparser
+markdown
