@@ -1,10 +1,8 @@
 TOOL_CALLING_HISTORY_PROMPT = """
-Iteration {iteration_number}:
-Executed tool calls:
-{tool_call_args}
-Results:
+<ToolResults>
+Iteration {iteration_number} Results:
 {results}
-
+</ToolResults>
 """
 
 AGENT_GENERATION_TOOLS_PROMPT = """
@@ -88,21 +86,23 @@ If your next move cannot be completed by the tool, you should not call the tool
 
 
 TOOL_CALLING_TEMPLATE = """
-# Tool Calling Guide
+### Tool Calling Guide
 
-## When to Use Tools
-- Use tools only when necessary to complete your task
-- Check history first - if the information is already available, don't call tools
-- If tools can't help with the task, proceed without them
+The following tools are available:
+{tools_description}
 
-## How to Call Tools
-1. Include a brief explanation of:
-   - What you know from the history
-   - What information is needed
-   - Why you're using the tool
+#### Tool Calling Rules
+- Only use the tools provided. Do not invent or use non-existent ones.
+- Check the conversation history before calling a tool. If the information you need is already present, do not make another call.
+- If a tool call fails, try a different tool or adjust the arguments. Do not repeat the failed call.
+- Only use a tool when it is essential to complete the task, such as to retrieve external data.
+- Each tool call must include `function_name` and `function_args`.
+- The arguments in `function_args` must exactly match the tool's required parameters and their data types. Do not include any extra arguments.
+- Each argument must be a valid JSON type (e.g., string, number, boolean, array, object).
+- Output only the JSON format shown in the **Tool Calling Output Format** section. Do not include any additional text, explanations, or comments within the `<ToolCalling>` block. If no tools are needed, do not output this block at all.
 
-2. Format your tool calls exactly as shown:
-```ToolCalling
+#### Tool Calling Output Format
+<ToolCalling>
 [
     {{
         "function_name": "tool_name",
@@ -113,15 +113,47 @@ TOOL_CALLING_TEMPLATE = """
     }},
     ...
 ]
-```
+</ToolCalling>
 
-**Important Notes**
-- All content within the `ToolCalling` code block must be valid JSON. Do not include any text, explanations or comments within these code blocks.
-- Only use tools listed in Available Tools
-- Stop generating after the tool call JSON
-- Each tool call must include both function_name and function_args
+#### Tool Calling Examples
+Example 1: Single tool call for web search.
+<ToolCalling>
+[
+    {{
+        "function_name": "web_search",
+        "function_args": {{
+            "query": "example search term",
+            "num_results": 5
+        }}
+    }}
+]
+</ToolCalling>
 
-## Available Tools
-{tools_description}
+Example 2: Multiple calls that don't depend on each other (e.g., search and code execution).
+<ToolCalling>
+[
+    {{
+        "function_name": "web_search",
+        "function_args": {{
+            "query": "latest tech news",
+            "num_results": 5
+        }}
+    }},
+    {{
+        "function_name": "code_execution",
+        "function_args": {{
+            "code": "print('Hello world')"
+        }}
+    }}
+]
+</ToolCalling>
 """
 
+TOOL_CALLING_RETRY_PROMPT = """
+The following is an invalid JSON array. Please correct it and return only the valid JSON array.
+
+**Invalid JSON Array**
+```json
+{text}
+```
+"""

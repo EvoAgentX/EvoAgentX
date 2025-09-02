@@ -11,7 +11,11 @@ from ..core.module_utils import parse_json_from_llm_output, parse_json_from_text
 from ..models.base_model import BaseLLM, LLMOutputParser
 from ..prompts.output_extraction import OUTPUT_EXTRACTION_PROMPT
 from ..prompts.template import ChatTemplate, StringTemplate
-from ..prompts.tool_calling import TOOL_CALLING_HISTORY_PROMPT, TOOL_CALLING_TEMPLATE
+from ..prompts.tool_calling import (
+    TOOL_CALLING_HISTORY_PROMPT,
+    TOOL_CALLING_RETRY_PROMPT,
+    TOOL_CALLING_TEMPLATE,
+)
 from ..tools.tool import Toolkit
 from ..utils.utils import pydantic_to_parameters
 from .action import Action
@@ -182,35 +186,46 @@ class CustomizeAction(Action):
             except Exception as e:
                 logger.error(f"Failed to load tools from toolkit '{toolkit.name}': {e}")
     
-    def _extract_tool_calls(self, llm_output: str) -> List[dict]:
-        pattern = r"```ToolCalling\s*\n(.*?)\n\s*```"
-        
+    def _extract_tool_calls(self, llm_output: str, llm: Optional[BaseLLM] = None) -> List[dict]:
+        pattern = r"<ToolCalling>\s*(.*?)\s*</ToolCalling>"
+    
         # Find all ToolCalling blocks in the output
         matches = re.findall(pattern, llm_output, re.DOTALL)
 
         if not matches:
             return []
+
+        def _parse_tool_calls(text: str) -> List[dict]:
+            text = text.strip()
+            json_list = parse_json_from_text(text)
+            if not json_list:
+                logger.warning("No valid JSON found in ToolCalling block")
+                return []
+            # Only use the first JSON string from each block
+            parsed_tool_call = json.loads(json_list[0])
+            if isinstance(parsed_tool_call, dict):
+                return [parsed_tool_call]
+            elif isinstance(parsed_tool_call, list):
+                return parsed_tool_call
+            else:
+                logger.warning(f"Invalid tool call format: {parsed_tool_call}")
+                return []
         
         parsed_tool_calls = []
         for match_content in matches:
             try:
-                json_content = match_content.strip()
-                json_list = parse_json_from_text(json_content)
-                if not json_list:
-                    logger.warning("No valid JSON found in ToolCalling block")
-                    continue
-                # Only use the first JSON string from each block
-                parsed_tool_call = json.loads(json_list[0])
-                if isinstance(parsed_tool_call, dict):
-                    parsed_tool_calls.append(parsed_tool_call)
-                elif isinstance(parsed_tool_call, list):
-                    parsed_tool_calls.extend(parsed_tool_call)
-                else:
-                    logger.warning(f"Invalid tool call format: {parsed_tool_call}")
-                    continue
+                parsed_tool_calls.extend(_parse_tool_calls(match_content))
             except (json.JSONDecodeError, IndexError) as e:
                 logger.warning(f"Failed to parse tool calls from LLM output: {e}")
-                continue
+                if llm is not None:
+                    retry_prompt = TOOL_CALLING_RETRY_PROMPT.format(text=match_content)
+                    try:
+                        logger.info("Fixing tool call with LLM...")
+                        fixed_output = llm.generate(prompt=retry_prompt).content
+                        logger.info(f"Retrying with fixed tool call:\n{fixed_output}")
+                        parsed_tool_calls.extend(_parse_tool_calls(fixed_output))
+                    except Exception as retry_err:
+                        logger.error(f"Retry failed: {retry_err}")
 
         return parsed_tool_calls
     
@@ -405,7 +420,7 @@ class CustomizeAction(Action):
             # Store the final LLM response
             final_llm_response = llm_response
             
-            tool_call_args = self._extract_tool_calls(llm_response.content)
+            tool_call_args = self._extract_tool_calls(llm_response.content, llm=llm)
             if not tool_call_args:
                 break
             
@@ -417,9 +432,8 @@ class CustomizeAction(Action):
             logger.info("Tool call results:")
             logger.info(json.dumps(results, indent=4))
             
-            conversation.append({"role": "assistant", "content": TOOL_CALLING_HISTORY_PROMPT.format(
+            conversation.append({"role": "user", "content": TOOL_CALLING_HISTORY_PROMPT.format(
                 iteration_number=time_out,
-                tool_call_args=f"{tool_call_args}",
                 results=f"{results}"
             )})
         
@@ -486,7 +500,7 @@ class CustomizeAction(Action):
             # Store the final LLM response
             final_llm_response = llm_response
             
-            tool_call_args = self._extract_tool_calls(llm_response.content)
+            tool_call_args = self._extract_tool_calls(llm_response.content, llm=llm)
             if not tool_call_args:
                 break
             
