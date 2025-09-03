@@ -4,6 +4,7 @@
 import os 
 from dotenv import load_dotenv 
 import sys
+import asyncio
 
 from evoagentx.models import OpenAILLMConfig, OpenAILLM
 from evoagentx.workflow import WorkFlowGraph, WorkFlow
@@ -18,7 +19,7 @@ mcp_config_path = "examples/output/news/mcp_news.config"
 target_directory = "examples/output/news/"
 module_save_path = "examples/output/news/news_demo_4o_mini.json"
 
-def main(goal=None):
+async def main(goal=None):
     # LLM configuration
     openai_config = OpenAILLMConfig(model="gpt-4o-mini", openai_key=OPENAI_API_KEY, stream=True, output_response=True, max_tokens=16000)
     # Initialize the language model
@@ -90,7 +91,7 @@ Key things to note:
     output_file = "examples/output/news/output.md"
     
     workflow = WorkFlow(graph=workflow_graph, agent_manager=agent_manager, llm=llm)
-    output = workflow.execute(inputs={"goal": f"""Please write a newsletter on the topic of {topic}, here are some rss urls to collect articles: {rss_urls}; You should save the output into the file {output_file}"""})
+    output = await workflow.async_execute(inputs={"goal": f"""Please write a newsletter on the topic of {topic}, here are some rss urls to collect articles: {rss_urls}; You should save the output into the file {output_file}"""})
     
     
     ## _______________ Save Output _______________
@@ -111,4 +112,4 @@ if __name__ == "__main__":
     custom_goal = sys.argv[1] if len(sys.argv) > 1 else None
     
     # Run the main function with the provided goal
-    main(custom_goal)
+    asyncio.run(main(custom_goal))
