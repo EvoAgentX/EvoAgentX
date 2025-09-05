@@ -9,6 +9,8 @@ from .browser_tool import BrowserToolkit
 from .mcp import MCPToolkit
 from .request import RequestToolkit
 from .request_arxiv import ArxivToolkit
+from .request_craw4ai import Crawl4AIToolkit
+from .browser_use_auto import BrowserUseAutoToolkit
 from .browser_use import BrowserUseToolkit
 from .database_mongodb import MongoDBToolkit
 from .database_postgresql import PostgreSQLToolkit
@@ -37,6 +39,7 @@ __all__ = [
     "MCPToolkit",
     "RequestToolkit",
     "ArxivToolkit",
+    "Crawl4AIToolkit",
     "BrowserUseToolkit",
     "MongoDBToolkit",
     "PostgreSQLToolkit",
