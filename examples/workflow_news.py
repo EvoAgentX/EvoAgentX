@@ -19,7 +19,7 @@ mcp_config_path = "examples/output/news/mcp_news.config"
 target_directory = "examples/output/news/"
 module_save_path = "examples/output/news/news_demo_4o_mini.json"
 
-async def main(goal=None):
+def main(goal=None):
     # LLM configuration
     openai_config = OpenAILLMConfig(model="gpt-4o-mini", openai_key=OPENAI_API_KEY, stream=True, output_response=True, max_tokens=16000)
     # Initialize the language model
@@ -91,7 +91,7 @@ Key things to note:
     output_file = "examples/output/news/output.md"
     
     workflow = WorkFlow(graph=workflow_graph, agent_manager=agent_manager, llm=llm)
-    output = await workflow.async_execute(inputs={"goal": f"""Please write a newsletter on the topic of {topic}, here are some rss urls to collect articles: {rss_urls}; You should save the output into the file {output_file}"""})
+    output = workflow.execute(inputs={"goal": f"""Please write a newsletter on the topic of {topic}, here are some rss urls to collect articles: {rss_urls}; You should save the output into the file {output_file}"""})
     
     
     ## _______________ Save Output _______________
@@ -102,7 +102,7 @@ Key things to note:
             f.write(output)
         print(f"Direction recommendations have been saved to {back_up_path}")
     except Exception as e:
-        print(f"Error saving direction recommendations: {e}")
+        print(f"Error saving direction recompmendations: {e}")
     
     # from pdb import set_trace; set_trace()
     print(output)
@@ -112,4 +112,4 @@ if __name__ == "__main__":
     custom_goal = sys.argv[1] if len(sys.argv) > 1 else None
     
     # Run the main function with the provided goal
-    asyncio.run(main(custom_goal))
+    main(custom_goal)
