@@ -15,7 +15,7 @@ def make_parent_folder(path: str):
         path (str): The file path for which to create the parent folder.
     """
     dir_folder = os.path.dirname(path)
-    if not os.path.exists(dir_folder):
+    if dir_folder and not os.path.exists(dir_folder):
         logger.info(f"creating folder {dir_folder} ...")
         os.makedirs(dir_folder, exist_ok=True)
 
