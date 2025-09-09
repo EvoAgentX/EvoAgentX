@@ -8,7 +8,7 @@ from ..models.base_model import BaseLLM
 from .action import Action
 from ..core.message import Message
 from ..prompts.template import StringTemplate, ChatTemplate
-from ..prompts.tool_calling import OUTPUT_EXTRACTION_PROMPT, TOOL_CALLING_TEMPLATE, TOOL_CALLING_HISTORY_PROMPT
+from ..prompts.tool_calling import OUTPUT_EXTRACTION_PROMPT, TOOL_CALLING_TEMPLATE, TOOL_CALLING_HISTORY_PROMPT, TOOL_CALLING_RETRY_PROMPT
 from ..tools.tool import Toolkit
 from ..core.registry import MODULE_REGISTRY
 from ..models.base_model import LLMOutputParser
@@ -194,8 +194,10 @@ class CustomizeAction(Action):
             except Exception as e:
                 logger.error(f"Failed to load tools from toolkit '{toolkit.name}': {e}")
     
-    def _extract_tool_calls(self, llm_output: str) -> List[dict]:
-        pattern = r"```ToolCalling\s*\n(.*?)\n\s*```"
+    
+    def _extract_tool_calls(self, llm_output: str, llm: Optional[BaseLLM] = None) -> List[dict]:
+        pattern = r"<ToolCalling>\s*(.*?)\s*</ToolCalling>"
+    
         
         # Find all ToolCalling blocks in the output
         matches = re.findall(pattern, llm_output, re.DOTALL)
@@ -222,6 +224,23 @@ class CustomizeAction(Action):
                     continue
             except (json.JSONDecodeError, IndexError) as e:
                 logger.warning(f"Failed to parse tool calls from LLM output: {e}")
+                if llm is not None:
+                    retry_prompt = TOOL_CALLING_RETRY_PROMPT.format(text=match_content)
+                    try:
+                        fixed_output = llm.generate(prompt=retry_prompt).content.strip()
+                        logger.info(f"Retrying tool call parse with fixed output:\n{fixed_output}")
+                        
+                        fixed_list = parse_json_from_text(fixed_output)
+                        if fixed_list:
+                            parsed_tool_call = json.loads(fixed_list[0])
+                            if isinstance(parsed_tool_call, dict):
+                                parsed_tool_calls.append(parsed_tool_call)
+                        elif isinstance(parsed_tool_call, list):
+                            parsed_tool_calls.extend(parsed_tool_call)
+                    except Exception as retry_err:
+                        logger.error(f"Retry failed: {retry_err}")
+                        continue
+            else:
                 continue
 
         return parsed_tool_calls

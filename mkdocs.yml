@@ -192,6 +192,7 @@ plugins:
               - AFlow Optimizer: tutorial/aflow_optimizer.md
               - SEW Optimizer: tutorial/sew_optimizer.md
               - TextGrad Optimizer: tutorial/textgrad_optimizer.md
+              - Colab Notebooks: tutorial/colab_notebooks.md
             - Key Modules:
               - LLM: modules/llm.md 
               - Agent: modules/agent.md
@@ -233,6 +234,7 @@ plugins:
               - AFlow 优化器: tutorial/aflow_optimizer.md
               - SEW 优化器: tutorial/sew_optimizer.md
               - TextGrad 优化器: tutorial/textgrad_optimizer.md
+              - Colab 笔记本: tutorial/colab_notebooks.md
           - 核心模块:
               - 大语言模型（LLM）: modules/llm.md 
               - Agent 模块: modules/agent.md

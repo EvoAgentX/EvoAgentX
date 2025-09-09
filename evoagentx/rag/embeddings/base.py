@@ -33,6 +33,7 @@ class EmbeddingProvider(str, Enum):
     OPENAI = "openai"
     HUGGINGFACE = "huggingface"
     OLLAMA = "ollama"
+    VOYAGE = "voyage"
 
     @classmethod
     def validate_model(cls, provider: str, model_name: str) -> bool:
