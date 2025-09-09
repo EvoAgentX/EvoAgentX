@@ -116,6 +116,32 @@ def escape_json_values(string: str) -> str:
     
     return string
 
+def fix_json_booleans(string: str) -> str:
+    """
+    Finds and replaces isolated "True" and "False" with "true" and "false".
+
+    The '\b' in the regex stands for a "word boundary", which ensures that
+    we only match the full words and not substrings like "True" in "IsTrue".
+
+    Args:
+        json_string (str): The input JSON string.
+
+    Returns:
+        str: The modified JSON string with booleans in lowercase.
+    """
+    # Use re.sub() with a word boundary (\b) to ensure we only match
+    # the isolated words 'True' and 'False' and not substrings like "True" in "IsTrue"
+    modified_string = regex.sub(r'\bTrue\b', 'true', string)
+    modified_string = regex.sub(r'\bFalse\b', 'false', modified_string)
+    return modified_string
+
+
+def fix_json(string: str) -> str:
+    string = fix_json_booleans(string)
+    string = escape_json_values(string)
+    return string
+
+
 def parse_json_from_text(text: str) -> List[str]:
     """
     Autoregressively extract JSON object from text 
@@ -129,8 +155,9 @@ def parse_json_from_text(text: str) -> List[str]:
     json_pattern = r"""(?:\{(?:[^{}]*|(?R))*\}|\[(?:[^\[\]]*|(?R))*\])"""
     pattern = regex.compile(json_pattern, regex.VERBOSE)
     matches = pattern.findall(text)
-    matches = [escape_json_values(match) for match in matches]
+    matches = [fix_json(match) for match in matches]
     return matches
+
 
 def parse_xml_from_text(text: str, label: str) -> List[str]:
     pattern = rf"<{label}>(.*?)</{label}>"

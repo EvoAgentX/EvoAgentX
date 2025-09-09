@@ -48,71 +48,74 @@ tools: ["File Tool", "Browser Tool"]
 
 
 TOOL_CALLING_TEMPLATE = """
-### Tools Calling Instructions
-You should try to use tools if you are given a list of tools.
-You may have access to various tools that might help you accomplish your task.
-Once you have completed all preparations, you SHOULD NOT call any tool and just generate the final answer.
-If you need to use the tool, you should also include the ** very short ** thinking process before you call the tool and stop generating the output. 
-In your short thinking process, you give short summary on ** everything you got in the history **, what is needed, and why you need to use the tool.
-While you write the history summary, you should state information you got in each iteration.
-You should STOP GENERATING responds RIGHT AFTER you give the tool calling instructions.
-By checking the history, IF you get the information, you should **NOT** call any tool.
-Do not generate any tool calling instructions if you have the information. 
-Distinguish tool calls and tool calling arguments, only include "```ToolCalling" when you are calling the tool, otherwise you should pass arguments with out this catch phrase.
-The tools in the Example Output does not really exist, you should use the tools in the Available Tools section.
-Every tool call should contain the function name and function arguments. The function name should be the name of the tool you are calling. The function arguments in the next example are fake arguments, you should use the real arguments for the tool you are calling.
-You should keep the tool call a list even if it is a single tool call.
+# Tool Calling Guide
 
-** Example Output 1 **
-Base on the goal, I found out that I need to use the following tools:
-```ToolCalling
-[{{
-    "function_name": "search_repositories",
-    "function_args": {{
-        "query": "camel",
-        "owner": "camel-ai",
-        "repo": "camel",
-        ...
-    }}
-}},{{
-    "function_name": "search_jobs",
-    "function_args": {{
-        "query": "Data Scientist",
-        "limit": 5
-    }}
-}},...]
-```
-** Example Output 2 **
-To do this, I need to use the following tools call:
-```ToolCalling
-[{{
-    "function_name": "search_repositories",
-    "function_args": {{
-        "command": "dir examples/output/invest/data_cache/",
-        "timeout": 30
-    }}
-}}
-```
-
-** Example Output When Tool Calling not Needed **
-Based on the information, ... 
-There are the arguments I used for the tool call: [{{'function_name': 'read_file', 'function_args': {{'file_path': 'examples/output/jobs/test_pdf.pdf'}}}}, ...]// Normal output without ToolCalling & ignore the "Tools Calling Instructions" section
-
-
-** Tool Calling Notes **
-Remember, when you need to make a tool call, use ONLY the exact format specified above, as it will be parsed programmatically. The tool calls should be enclosed in triple backticks with the ToolCalling identifier, followed by JSON that specifies the tool name and parameters.
-After using a tool, analyze its output and determine next steps. 
-
-**Available Tools**
+You can call the following tools:
 {tools_description}
 
-** Tool Calling Key Points **
-You should strictly follow the tool calling structure, even if it is a single tool call.
-You should always check the history to determine if you have the information or the tool is not useful, if you have the information, you should not use the tool.
-You should try to use tools to get the information you need
-You should not call any tool if you completed the goal
-The tool you called must exist in the available tools
-You should never write comments in the call_tool function
-If your next move cannot be completed by the tool, you should not call the tool
+## Rules
+- ONLY use tools listed above. Do not invent or use non-existent tools.
+- Check the conversation history before calling: If the needed information is already available (e.g., from previous tool results), do not call tools again. Summarize and use it directly.
+- If a previous tool call failed (e.g., error in history), try a different tool or adjust arguments; do not repeat the same call.
+- Call tools ONLY when necessary for the task (e.g., external data, computation). Otherwise, proceed to the final output without tools.
+- Support multiple parallel calls: Use an array with multiple objects if needed.
+- Each call MUST include "function_name" (exact match from tool's Action) and "function_args" (a dict with exact argument names and values).
+- For arguments: Each parameter must be a valid JSON type (e.g., string, integer) and required/optional status as described. Do not add extra args.
+- Output STRICTLY in the format below. NO explanations, comments, thoughts, or extra text outside the <ToolCalling> block. If no tools needed, do not output this block at all.
+
+## Output format
+Always return a JSON array of tool calls, like:
+
+<ToolCalling>
+[
+  {{
+         "function_name": "tool_name",
+         "function_args": {{
+             "param1": "value1",
+             "param2": "value2"
+         }}
+     }},
+     ...
+]
+</ToolCalling>
+
+## Examples
+Example 1: Single tool call for web search.
+<ToolCalling>
+[
+    {{
+        "function_name": "web_search",
+        "function_args": {{
+            "query": "example search term",
+            "num_results": 5
+        }}
+    }}
+]
+</ToolCalling>
+
+Example 2: Multiple parallel calls (e.g., search and code execution).
+<ToolCalling>
+[
+    {{
+        "function_name": "web_search",
+        "function_args": {{
+            "query": "python tips"
+        }}
+    }},
+    {{
+        "function_name": "code_execution",
+        "function_args": {{
+            "code": "print('Hello world')"
+        }}
+    }}
+]
+</ToolCalling>
 """
 
+TOOL_CALLING_RETRY_PROMPT = """
+The following output is supposed to be a JSON list of tool calls, but it's invalid.
+Please fix it and return ONLY the valid JSON array:
+--- Invalid Output ---
+{text}
+--- End ---
+"""

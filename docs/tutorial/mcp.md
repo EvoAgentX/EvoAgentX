@@ -69,21 +69,18 @@ The configuration file should be a JSON file that follows FastMCP 2.0's configur
             ],
             "env": {
                 "GITHUB_PERSONAL_ACCESS_TOKEN": "your_github_token_here"
-            }
+            },
+            "timeout": 30
         },
-        "pdf-reader-mcp": {
-            "command": "node",
-            "args": ["/path/to/pdf-reader-mcp/dist/index.js"],
-            "name": "PDF Reader (Local Build)"
-        },
-        "hirebase": {
-            "command": "uvx",
+        "arxiv": {
+            "command": "uv",
             "args": [
-                "hirebase-mcp" 
+                "tool",
+                "run",
+                "arxiv-mcp-server",
+                "--storage-path", "./data/"
             ],
-            "env": {
-                "HIREBASE_API_KEY": "your_api_key_here" 
-            }
+            "timeout": 45
         }
     }
 }
@@ -107,20 +104,16 @@ from evoagentx.tools import MCPToolkit
 # Configuration dictionary
 config = {
     "mcpServers": {
-        "github": {
-            "command": "npx",
-            "args": ["-y", "@modelcontextprotocol/server-github"],
-            "env": {
-                "GITHUB_PERSONAL_ACCESS_TOKEN": os.environ.get("GITHUB_TOKEN")
-            }
+        "arxiv": {
+            "command": "uv",
+            "args": [
+                "tool", 
+                "run", 
+                "arxiv-mcp-server",
+                "--storage-path", "./data/"
+            ],
+            "timeout": 45
         },
-        "pythonTools": {
-            "command": "python",
-            "args": ["-m", "mcp_python_tools"],
-            "env": {
-                "PYTHONPATH": "/path/to/python"
-            }
-        }
     }
 }
 
@@ -139,93 +132,74 @@ Once your MCP toolkit is initialized, you can access and use the available tools
 
 ### 3.1 Getting Available Tools
 
-The `get_tools()` method returns a list of all available tools from all connected MCP servers:
+The `get_toolkits()` method returns a list of `Toolkit` objects from all connected MCP servers. Each `Toolkit` contains multiple tools:
 
 ```python
 # Initialize the MCP toolkit
 toolkit = MCPToolkit(config_path="examples/mcp.config")
 
-# Get all available tools
-tools = toolkit.get_toolkits()
+# Get all available toolkits (each toolkit contains multiple tools)
+toolkits = toolkit.get_toolkits()
 ```
 
 ### 3.2 Accessing Tool Information
 
-Each tool provides consistent access to its functionality:
+Each toolkit contains multiple tools that you can access through the `get_tools()` method:
 
 ```python
-# Loop through available tools
-for tool in tools:
-    # Get tool name
-    name = tool.name
-    print(f"Tool: {name}")
+# Loop through available toolkits
+for toolkit in toolkits:
+    print(f"Toolkit: {toolkit.name}")
     
-    # Get tool description
-    description = tool.description
-    print(f"Description: {description}")
+    # Get tools from this toolkit
+    tools = toolkit.get_tools()
     
-    # Get tool inputs schema
-    inputs = tool.inputs
-    print(f"Inputs: {inputs}")
-    
-    # Get required parameters
-    required = tool.required
-    print(f"Required: {required}")
+    for tool in tools:
+        # Get tool name
+        name = tool.name
+        print(f"  Tool: {name}")
+        
+        # Get tool description
+        description = tool.description
+        print(f"  Description: {description}")
+        
+        # Get tool inputs schema
+        inputs = tool.inputs
+        print(f"  Inputs: {inputs}")
+        
+        # Get required parameters
+        required = tool.required
+        print(f"  Required: {required}")
 ```
 
 **Sample Output:**
 
 ```
-Tool: HirebaseSearch
-Description: Search for job information by providing keywords and filters
-Inputs: {
-    "query": {
-        "anyOf": [{"type": "string"}, {"type": "null"}],
-        "default": None,
-        "title": "Query"
-    },
-    "and_keywords": {
-        "anyOf": [{"items": {"type": "string"}, "type": "array"}, {"type": "null"}],
-        "default": None,
-        "title": "And Keywords"
-    },
-    "or_keywords": {
-        "anyOf": [{"items": {"type": "string"}, "type": "array"}, {"type": "null"}],
-        "default": None,
-        "title": "Or Keywords"
-    },
-    "country": {
-        "anyOf": [{"items": {"type": "string"}, "type": "array"}, {"type": "null"}],
-        "default": None,
-        "title": "Country"
-    },
-    "city": {
-        "anyOf": [{"items": {"type": "string"}, "type": "array"}, {"type": "null"}],
-        "default": None,
-        "title": "City"
-    },
-    "company": {
-        "anyOf": [{"items": {"type": "string"}, "type": "array"}, {"type": "null"}],
-        "default": None,
-        "title": "Company"
-    },
-    "salary_from": {
-        "anyOf": [{"type": "number"}, {"type": "null"}],
-        "default": None,
-        "title": "Salary From"
-    },
-    "salary_to": {
-        "anyOf": [{"type": "number"}, {"type": "null"}],
-        "default": None,
-        "title": "Salary To"
-    },
-    "limit": {
-        "anyOf": [{"type": "integer"}, {"type": "null"}],
-        "default": 10,
-        "title": "Limit"
-    }
-}
-Required: []
+Toolkit: arxiv-mcp-server
+  Tool: arxiv_search
+  Description: Search for research papers on arXiv by providing keywords and filters
+  Inputs: {
+      "query": {
+          "type": "string",
+          "description": "Search query for arXiv papers"
+      },
+      "max_results": {
+          "type": "integer",
+          "description": "Maximum number of results to return",
+          "default": 10
+      },
+      "sort_by": {
+          "type": "string",
+          "description": "Sort results by relevance, lastUpdatedDate, or submittedDate",
+          "default": "relevance"
+      },
+      "sort_order": {
+          "type": "string",
+          "description": "Sort order: ascending or descending",
+          "default": "descending"
+      }
+  }
+  Required: ["query"]
 ...
 ```
 
@@ -239,22 +213,29 @@ from evoagentx.tools import MCPToolkit
 # Initialize the MCP toolkit
 toolkit = MCPToolkit(config_path="examples/mcp.config")
 
-# Get all available tools
-tools = toolkit.get_toolkits()
+# Get all available toolkits
+toolkits = toolkit.get_toolkits()
 
-# Find a specific tool by name
-hirebase_tool = next((tool for tool in tools if "hirebase" in tool.name.lower() or "search" in tool.name.lower()), None)
+# Find a specific tool by searching through toolkits
+arxiv_tool = None
+for toolkit in toolkits:
+    tools = toolkit.get_tools()
+    for tool in tools:
+        if "arxiv" in tool.name.lower() or "search" in tool.name.lower():
+            arxiv_tool = tool
+            break
+    if arxiv_tool:
+        break
 
-if hirebase_tool:
-    # Call the tool with appropriate parameters (showing complex input schema)
-    result = hirebase_tool(
-        query="data scientist",
-        and_keywords=["python", "machine learning"],
-        country=["United States", "Canada"],
-        salary_from=80000,
-        limit=20
+if arxiv_tool:
+    # Call the tool with appropriate parameters (showing arXiv search schema)
+    result = arxiv_tool(
+        query="artificial intelligence machine learning",
+        max_results=5,
+        sort_by="relevance",
+        sort_order="descending"
     )
-    print(f"Job search results: {result}")
+    print(f"arXiv search results: {result}")
 
 # Clean up when done
 toolkit.disconnect()
@@ -289,38 +270,46 @@ server_configs = {
     "env": {"GITHUB_PERSONAL_ACCESS_TOKEN": "your_token_here"}
 }
 
-with MCPClient(server_configs) as mcp_tools:
+with MCPClient(server_configs) as mcp_toolkits:
     # Use MCP tools here
     # Automatic disconnection happens when exiting the context
-    for tool in mcp_tools:
-        print(f"Available tool: {tool.name}")
+    for toolkit in mcp_toolkits:
+        print(f"Available toolkit: {toolkit.name}")
+        tools = toolkit.get_tools()
+        for tool in tools:
+            print(f"  - Tool: {tool.name}")
 ```
 
 ### 3.5 Using MCP in Practical Applications
 
-Once you've initialized your MCP toolkit and obtained the tools, you can use them directly:
+Once you've initialized your MCP toolkit and obtained the toolkits, you can use them directly:
 
 ```python
 # Initialize MCP toolkit
 toolkit = MCPToolkit(config_path="mcp_config.json")
-mcp_tools = toolkit.get_toolkits()
+mcp_toolkits = toolkit.get_toolkits()
 
 try:
-    # Find a specific tool by name
-    job_search = next((tool for tool in mcp_tools if "hirebase" in tool.name.lower() or "search" in tool.name.lower()), None)
+    # Find a specific tool by searching through toolkits
+    arxiv_search = None
+    for toolkit in mcp_toolkits:
+        tools = toolkit.get_tools()
+        for tool in tools:
+            if "arxiv" in tool.name.lower() or "search" in tool.name.lower():
+                arxiv_search = tool
+                break
+        if arxiv_search:
+            break
     
-    if job_search:
-        # Call the tool with appropriate parameters (demonstrating optional arrays and filters)
-        result = job_search(
-            query="software engineer",
-            and_keywords=["react", "javascript"],
-            or_keywords=["node.js", "typescript"],
-            city=["San Francisco", "New York"],
-            salary_from=100000,
-            salary_to=150000,
-            limit=15
+    if arxiv_search:
+        # Call the tool with appropriate parameters (demonstrating arXiv search options)
+        result = arxiv_search(
+            query="quantum computing algorithms",
+            max_results=10,
+            sort_by="submittedDate",
+            sort_order="descending"
         )
-        print(f"Job search results: {result}")
+        print(f"arXiv search results: {result}")
 finally:
     # Always disconnect when done
     toolkit.disconnect()
@@ -349,11 +338,11 @@ load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 openai_config = OpenAILLMConfig(model="gpt-4o-mini", openai_key=OPENAI_API_KEY, stream=True, output_response=True)
 
-# Initialize MCP toolkit and get tools
+# Initialize MCP toolkit and get toolkits
 toolkit = MCPToolkit(config_path="examples/mcp.config")
-tools = toolkit.get_toolkits()
+toolkits = toolkit.get_toolkits()
 
-# Create a customized agent with the tools
+# Create a customized agent with the toolkits
 mcp_agent = CustomizeAgent(
     name="MCPAgent",
     description="A MCP agent that can use the tools provided by the MCP server",
@@ -367,16 +356,16 @@ mcp_agent = CustomizeAgent(
     outputs=[
         {"name": "result", "type": "string", "description": "The result of the tool call"}
     ],
-    tools=tools  # Pass tools directly, not as tool_names and tool_dict
+    tools=toolkits  # Pass toolkits directly
 )
 
 # Optional: Save and load the agent configuration
 mcp_agent.save_module("examples/mcp_agent.json")
-mcp_agent.load_module("examples/mcp_agent.json", llm_config=openai_config, tools=tools)
+mcp_agent.load_module("examples/mcp_agent.json", llm_config=openai_config, tools=toolkits)
 
 # Execute the agent with a realistic task
 message = mcp_agent(
-    inputs={"instruction": "Search for data scientist jobs in San Francisco with Python skills"}
+    inputs={"instruction": "Search for recent research papers on machine learning and artificial intelligence"}
 )
 
 print(f"Response from {mcp_agent.name}:")
@@ -395,31 +384,171 @@ The agent can now use any of the MCP tools available through the toolkit.
 
 ### 4.2 Integration with Workflow and Agent Generation
 
-MCP tools can also be integrated into workflow and agent generation systems. Here's a simplified example:
+MCP tools can also be integrated into workflow and agent generation systems. Here's a complete example from generation to execution:
 
 ```python
 from evoagentx.tools import MCPToolkit
 from evoagentx.agents.agent_manager import AgentManager
 from evoagentx.workflow.workflow_generator import WorkFlowGenerator
+from evoagentx.workflow import WorkFlow
 from evoagentx.models.openai_model import OpenAILLM
+from evoagentx.models import OpenAILLMConfig
+import os
+from dotenv import load_dotenv
 
-# Initialize MCP toolkit and add to agent manager
+# Load environment variables
+load_dotenv()
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+# Initialize LLM
+llm_config = OpenAILLMConfig(model="gpt-4o-mini", openai_key=OPENAI_API_KEY)
+llm = OpenAILLM(llm_config)
+
+# Initialize MCP toolkit
 toolkit = MCPToolkit(config_path="mcp_config.json")
-mcp_tools = toolkit.get_toolkits()
+mcp_toolkits = toolkit.get_toolkits()
 
-agent_manager = AgentManager(tools=mcp_tools)
-workflow_generator = WorkFlowGenerator(llm=llm, tools=mcp_tools)
+# Create agent manager and workflow generator
+agent_manager = AgentManager(tools=mcp_toolkits)
+workflow_generator = WorkFlowGenerator(llm=llm, tools=mcp_toolkits)
 
-# Generate a workflow that can use MCP tools
-workflow = workflow_generator.generate_workflow(
-    goal="Analyze GitHub repositories and create a report"
+# Generate workflow
+workflow_graph = workflow_generator.generate_workflow(
+    goal="Search arXiv for research papers and create a summary report"
 )
 
-# Add generated agents to the agent manager
-agent_manager.add_agents_from_workflow(workflow_graph=workflow, llm_config=llm_config)
+# Add agents to manager
+agent_manager.add_agents_from_workflow(workflow_graph=workflow_graph, llm_config=llm_config)
+
+# Create and execute workflow
+workflow = WorkFlow(graph=workflow_graph, llm=llm, agent_manager=agent_manager)
+result = workflow.execute(inputs={
+    "research_topic": "machine learning",
+    "max_papers": 5,
+    "output_format": "summary"
+})
+
+print(f"Workflow result: {result}")
+
+# Clean up
+toolkit.disconnect()
 ```
 
-## 5. Troubleshooting
+This example demonstrates:
+1. **Workflow Generation**: Creating a workflow graph from a high-level goal
+2. **Agent Management**: Adding MCP-enabled agents to the agent manager
+3. **Workflow Execution**: Running the complete workflow with inputs
+4. **MCP Integration**: Using MCP tools throughout the workflow process
+
+## 5. Error Handling and Best Practices
+
+### 5.1 Proper Error Handling
+
+When working with MCP tools, it's important to handle errors gracefully:
+
+```python
+from evoagentx.tools import MCPToolkit
+from fastmcp.exceptions import ClientError, McpError
+import logging
+
+# Set up logging to see MCP connection details
+logging.basicConfig(level=logging.INFO)
+
+try:
+    # Initialize MCP toolkit with error handling
+    toolkit = MCPToolkit(config_path="examples/mcp.config")
+    
+    # Get toolkits with timeout handling
+    toolkits = toolkit.get_toolkits()
+    
+    if not toolkits:
+        print("No MCP servers connected. Check your configuration.")
+        return
+    
+    # Use tools with error handling
+    for toolkit in toolkits:
+        tools = toolkit.get_tools()
+        for tool in tools:
+            try:
+                # Call tool with appropriate parameters for arXiv search
+                if "arxiv" in tool.name.lower() or "search" in tool.name.lower():
+                    result = tool(query="machine learning", max_results=3)
+                else:
+                    result = tool(query="test query")
+                print(f"Tool {tool.name} result: {result}")
+            except ClientError as e:
+                print(f"Client error with tool {tool.name}: {e}")
+            except McpError as e:
+                print(f"MCP protocol error with tool {tool.name}: {e}")
+            except Exception as e:
+                print(f"Unexpected error with tool {tool.name}: {e}")
+
+except FileNotFoundError:
+    print("MCP configuration file not found")
+except json.JSONDecodeError:
+    print("Invalid JSON in MCP configuration file")
+except Exception as e:
+    print(f"Failed to initialize MCP toolkit: {e}")
+finally:
+    # Always clean up
+    if 'toolkit' in locals():
+        toolkit.disconnect()
+```
+
+### 5.2 Configuration Best Practices
+
+Create robust MCP configurations with proper error handling:
+
+```json
+{
+    "mcpServers": {
+        "arxiv": {
+            "command": "uv",
+            "args": [
+                "tool", 
+                "run", 
+                "arxiv-mcp-server",
+                "--storage-path", "./data/"
+            ],
+            "timeout": 45
+        },
+    }
+}
+```
+
+### 5.3 Connection Management
+
+Use context managers for automatic cleanup:
+
+```python
+from evoagentx.tools.mcp import MCPClient
+
+# Using MCPClient directly with context manager
+server_config = {
+    "mcpServers": {
+        "arxiv-server": {
+            "command": "uv",
+            "args": [
+                "tool", 
+                "run", 
+                "arxiv-mcp-server",
+                "--storage-path", "./data/"
+            ]
+        }
+    }
+}
+
+try:
+    with MCPClient(server_config) as toolkits:
+        for toolkit in toolkits:
+            print(f"Connected to: {toolkit.name}")
+            # Use tools here
+except Exception as e:
+    print(f"Failed to connect to MCP server: {e}")
+# Automatic cleanup happens here
+```
+
+## 6. Troubleshooting
 
 Here are some common issues and their solutions:
 
@@ -433,6 +562,8 @@ Here are some common issues and their solutions:
   Check the error message for details about what went wrong.
 
 - **Server Not Starting**: If an MCP server fails to start, verify the command path and environment variables in your configuration.
+
+- **Empty Toolkit List**: If `get_toolkits()` returns an empty list, check that your MCP servers are properly configured and running.
 
 For more information about MCP and FastMCP, visit:
 - [Model Context Protocol](https://github.com/modelcontextprotocol/protocol)

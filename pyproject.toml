@@ -34,7 +34,7 @@ dependencies = [
     "loguru>=0.7.3",
     "pandas>=2.2.3",
     "matplotlib>=3.10.0",
-    "transformers>=4.47.1",
+    "transformers>=4.50.0,<4.51.0",
     "datasets>=3.4.0",
     "faiss-cpu==1.8.0.post1",
     "docker>=6.1.2",
@@ -72,6 +72,10 @@ dependencies = [
     "selenium",
     "html2text",
     "fastmcp",
+    "colpali-engine==0.3.9",
+    "Pillow",
+    "torch",
+    "voyageai",
 ]
 
 [project.optional-dependencies]

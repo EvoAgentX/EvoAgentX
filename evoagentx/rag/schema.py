@@ -1,10 +1,10 @@
-
 import json
 import hashlib
 from uuid import uuid4
 from typing import List, Dict, Optional, Union, Any
-
 from pydantic import Field
+
+from llama_index.core.schema import ImageNode
 from llama_index.core.schema import QueryBundle
 from llama_index.core import Document as LlamaIndexDocument
 from llama_index.core.schema import BaseNode, TextNode, RelatedNodeInfo
@@ -15,12 +15,13 @@ from llama_index.core.graph_stores.types import (
 )
 
 from evoagentx.core.base_config import BaseModule
-
+from evoagentx.core.logging import logger
 
 DEAFULT_EXCLUDED = ['file_name', 'file_type', 'file_size', 'page_count', 'creation_date', 
                         'last_modified_date', 'language', 'word_count', 'custom_fields', 'hash_doc', 
                         'graph_node', # for graph store 
                     ]
+
 class DocumentMetadata(BaseModule):
     """
     This class ensures type safety and validation for metadata associated with a document,
@@ -215,8 +216,7 @@ class Document(BaseModule):
             f"fragment={self.get_fragment(max_length=300)})"
         )
 
-
-class Chunk(BaseModule):
+class TextChunk(BaseModule):
     """A single chunk of a document for RAG processing.
 
     Attributes:
@@ -407,21 +407,127 @@ class Chunk(BaseModule):
             f"text_template={self.text_template},"
             f"metadata={self.metadata.model_dump()}"
         )
+    
+# Backward compatibility alias
+Chunk = TextChunk
 
+class ImageChunk(BaseModule):
+    """An image-based chunk with lazy loading.
+    
+    Attributes:
+        image_path (str): Path to the image file.
+        image_mimetype (Optional[str]): MIME type of the image.
+        chunk_id (str): Unique identifier for the chunk.
+        metadata (ChunkMetadata): Metadata including embedding, similarity scores, etc.
+    """
 
+    def __init__(
+        self,
+        image_path: str,
+        image_mimetype: Optional[str] = None,
+        chunk_id: Optional[str] = None,
+        embedding: Optional[List[float]] = None,
+        excluded_embed_metadata_keys: List[str] = DEAFULT_EXCLUDED,
+        excluded_llm_metadata_keys: List[str] = DEAFULT_EXCLUDED,
+        text_template: str = '{metadata_str}\n\n{content}',
+        relationships: Dict[str, RelatedNodeInfo] = {},
+        metadata: Optional[Union[Dict, ChunkMetadata]] = None,
+    ):
+        metadata = (
+            ChunkMetadata.model_validate(metadata) if isinstance(metadata, dict) else metadata or ChunkMetadata()
+        )
+        super().__init__(
+            image_path=image_path,
+            image_mimetype=image_mimetype,
+            chunk_id=chunk_id or str(uuid4()),
+            embedding=embedding,
+            excluded_embed_metadata_keys=list(set(DEAFULT_EXCLUDED + excluded_embed_metadata_keys)),
+            excluded_llm_metadata_keys=list(set(DEAFULT_EXCLUDED + excluded_llm_metadata_keys)),
+            text_template=text_template,
+            relationships=relationships,
+            metadata=metadata,
+        )
+        
+        # Private cache for lazy loading
+        self._cached_image = None
+
+    def get_image(self):
+        """Load PIL Image on-demand with caching."""
+        if self._cached_image is None:
+            from PIL import Image
+            try:
+                logger.debug(f"Loading image from path: {self.image_path}")
+                if not self.image_path:
+                    logger.error("Image path is None or empty!")
+                    return None
+                self._cached_image = Image.open(self.image_path)
+                logger.debug(f"Successfully loaded image from {self.image_path}")
+            except Exception as e:
+                logger.error(f"Failed to load image from {self.image_path}: {str(e)}")
+                return None
+        return self._cached_image
+    
+    def get_image_bytes(self, format: str = "PNG") -> Optional[bytes]:
+        """Get image as bytes for embedding or processing."""
+        import io
+        image = self.get_image()
+        if image is None:
+            return None
+        
+        img_bytes = io.BytesIO()
+        image.save(img_bytes, format=format)
+        return img_bytes.getvalue()
+
+    def to_llama_node(self) -> ImageNode:
+        """Convert to LlamaIndex ImageNode with on-demand image loading."""
+        relationships = dict()
+        for k, v in self.relationships.items():
+            relationships[k] = v if isinstance(v, RelatedNodeInfo) else RelatedNodeInfo.from_dict(v)
+        
+        return ImageNode(
+            image=None,
+            image_path=self.image_path,
+            image_mimetype=self.image_mimetype,
+            metadata=self.metadata.model_dump(),
+            id_=self.chunk_id,
+            embedding=self.embedding,
+            excluded_llm_metadata_keys=self.excluded_llm_metadata_keys,
+            excluded_embed_metadata_keys=self.excluded_embed_metadata_keys,
+            text_template=self.text_template,
+            relationships=relationships
+        )
+
+    @classmethod
+    def from_llama_node(cls, node: ImageNode) -> "ImageChunk":
+        """Create ImageChunk from LlamaIndex ImageNode."""
+        metadata = ChunkMetadata.model_validate(node.metadata)
+        
+        logger.debug(f"Creating ImageChunk from ImageNode - image_path: {node.image_path}")
+        
+        return cls(
+            chunk_id=node.id_,
+            image_path=node.image_path,
+            image_mimetype=node.image_mimetype,
+            metadata=metadata,
+            embedding=node.embedding,
+            excluded_embed_metadata_keys=node.excluded_embed_metadata_keys,
+            excluded_llm_metadata_keys=node.excluded_llm_metadata_keys,
+            text_template=node.text_template,
+            relationships=node.relationships
+        )
 
 class Corpus(BaseModule):
-    """A collection of document chunks for RAG processing.
+    """A generic collection of document chunks for RAG processing.
 
     Attributes:
         corpus_id (str): The unique id for corpus.
-        chunks (List[Chunk]): List of chunks in the corpus.
-        chunk_index (Dict[str, Chunk]): Index of chunks by chunk_id for fast lookup.
+        chunks (List[Union[TextChunk, ImageChunk]]): List of chunks in the corpus.
+        chunk_index (Dict[str, Union[TextChunk, ImageChunk]]): Index of chunks by chunk_id for fast lookup.
         metadata (Optional[IndexMetadata]): the metadata for this corpus.
     """
 
-    def __init__(self, chunks: List[Chunk] = None, corpus_id: str = None, 
-                 metadata:Optional[Union[IndexMetadata, Dict]]=None):
+    def __init__(self, chunks: Optional[List[Union[TextChunk, ImageChunk]]] = None, corpus_id: Optional[str] = None, 
+                 metadata: Optional[Union[IndexMetadata, Dict]] = None):
         corpus_id = uuid4() if corpus_id is None else corpus_id
         chunks = [] if chunks is None else chunks
         chunk_index = {} if chunks is None else {chunk.chunk_id: chunk for chunk in chunks}
@@ -449,23 +555,29 @@ class Corpus(BaseModule):
 
         Args:
             nodes (List[BaseNode]): The LlamaIndex Nodes to convert.
-            doc_id (str): The ID of the parent document.
 
         Returns:
             Corpus: A new Corpus instance.
         """
-        return cls([Chunk.from_llama_node(node) for node in nodes])
+        chunks = []
+        for node in nodes:
+            if isinstance(node, ImageNode):
+                chunks.append(ImageChunk.from_llama_node(node))
+            else:
+                # Default to TextChunk for TextNode and other node types
+                chunks.append(TextChunk.from_llama_node(node))
+        return cls(chunks)
 
-    def add_chunk(self, batch_chunk: Union[Chunk, List[Chunk]]):
+    def add_chunk(self, batch_chunk: Union[TextChunk, ImageChunk, List[Union[TextChunk, ImageChunk]]]):
         """Add a batch chunk to the corpus and update index."""
-        if isinstance(batch_chunk, Chunk):
+        if not isinstance(batch_chunk, list):
             batch_chunk = [batch_chunk]
 
         for chunk in batch_chunk:
             self.chunks.append(chunk)
             self.chunk_index[chunk.chunk_id] = chunk
 
-    def get_chunk(self, chunk_id: str) -> Optional[Chunk]:
+    def get_chunk(self, chunk_id: str) -> Optional[Union[TextChunk, ImageChunk]]:
         """Retrieve a chunk by its ID."""
         return self.chunk_index.get(chunk_id)
 
@@ -474,15 +586,15 @@ class Corpus(BaseModule):
         self.chunks = [chunk for chunk in self.chunks if chunk.chunk_id != chunk_id]
         self.chunk_index.pop(chunk_id, None)
 
-    def filter_by_doc_id(self, doc_id: str) -> List[Chunk]:
+    def filter_by_doc_id(self, doc_id: str) -> List[Union[TextChunk, ImageChunk]]:
         """Filter chunks by parent document ID."""
-        return [chunk for chunk in self.chunks if chunk.doc_id == doc_id]
+        return [chunk for chunk in self.chunks if hasattr(chunk.metadata, 'doc_id') and chunk.metadata.doc_id == doc_id]
 
-    def filter_by_similarity(self, threshold: float) -> List[Chunk]:
+    def filter_by_similarity(self, threshold: float) -> List[Union[TextChunk, ImageChunk]]:
         """Filter chunks by similarity score."""
         return [chunk for chunk in self.chunks if chunk.metadata.similarity_score and chunk.metadata.similarity_score >= threshold]
 
-    def sort_by_similarity(self, reverse: bool = True) -> List[Chunk]:
+    def sort_by_similarity(self, reverse: bool = True) -> List[Union[TextChunk, ImageChunk]]:
         """Sort chunks by similarity score (descending by default)."""
         return sorted(
             [chunk for chunk in self.chunks if chunk.metadata.similarity_score is not None],
@@ -543,6 +655,38 @@ class Corpus(BaseModule):
     def __len__(self) -> int:
         return len(self.chunks)
     
+    def get_stats(self) -> Dict[str, Any]:
+        """Get statistics about the corpus."""
+        if not self.chunks:
+            return {
+                'chunk_count': 0,
+                'unique_docs': 0,
+                'avg_word_count': 0.0,
+                'strategies': set()
+            }
+        
+        # Count unique documents
+        unique_docs = set()
+        total_word_count = 0
+        strategies = set()
+        
+        for chunk in self.chunks:
+            if hasattr(chunk.metadata, 'doc_id') and chunk.metadata.doc_id:
+                unique_docs.add(chunk.metadata.doc_id)
+            if hasattr(chunk.metadata, 'word_count') and chunk.metadata.word_count:
+                total_word_count += chunk.metadata.word_count
+            if hasattr(chunk.metadata, 'chunking_strategy') and chunk.metadata.chunking_strategy:
+                strategies.add(chunk.metadata.chunking_strategy)
+        
+        avg_word_count = total_word_count / len(self.chunks) if self.chunks else 0.0
+        
+        return {
+            'chunk_count': len(self.chunks),
+            'unique_docs': len(unique_docs),
+            'avg_word_count': avg_word_count,
+            'strategies': strategies
+        }
+    
 
 class Query(BaseModule):
     """Represents a retrieval query."""
@@ -571,13 +715,25 @@ class Query(BaseModule):
         )
 
 class RagResult(BaseModule):
-    """Represents a retrieval result."""
+    """Represents a generic retrieval result."""
     
     corpus: Corpus = Field(description="Retrieved chunks.")
     scores: List[float] = Field(description="Similarity scores for each chunk.")
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional result metadata.")
     
-    def get_top_chunks(self, limit: int = None) -> List[Chunk]:
+    def get_top_chunks(self, limit: int = None) -> List[Union[TextChunk, ImageChunk]]:
         """Get top chunks sorted by similarity score."""
         chunks = self.corpus.sort_by_similarity(reverse=True)
         return chunks[:limit] if limit else chunks
+
+
+
+
+
+
+
+
+
+
+
+

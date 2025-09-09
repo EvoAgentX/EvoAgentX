@@ -11,6 +11,8 @@ from .mcp import MCPToolkit
 from .request import RequestToolkit
 from .request_arxiv import ArxivToolkit
 from .request_crawl4ai import Crawl4AIToolkit
+from .browser_use import BrowserUseToolkit
+from .google_maps_tool import GoogleMapsToolkit
 from .database_mongodb import MongoDBToolkit
 from .database_postgresql import PostgreSQLToolkit
 from .storage_handler import FileStorageHandler, LocalStorageHandler, SupabaseStorageHandler
@@ -27,7 +29,6 @@ from .file_tool import FileToolkit
 from .search_serperapi import SerperAPIToolkit
 from .search_serpapi import SerpAPIToolkit
 
-
 __all__ = [
     "Tool", 
     "Toolkit",
@@ -43,6 +44,7 @@ __all__ = [
     "ArxivToolkit",
     "Crawl4AIToolkit",
     "BrowserUseToolkit",
+    "GoogleMapsToolkit",
     "MongoDBToolkit",
     "PostgreSQLToolkit",
     "FileStorageHandler",

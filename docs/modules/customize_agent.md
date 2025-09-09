@@ -50,7 +50,7 @@ In this example, 1. We specify the input information (including its name, type, 
 The output after executing the agent is a `Message` object, which contains the raw LLM response in `message.content.content`. 
 
 !!! note
-    All the input names specified in the `CustomizeAgent(inputs=[...])` should appear in the `prompt`. Otherwise, an error will be raised.
+All the input names specified in the `CustomizeAgent(inputs=[...])` should appear in the `prompt`. Otherwise, an error will be raised.
 
 
 ### Structured Outputs 
@@ -96,9 +96,9 @@ In this example:
 You can also access the raw LLM response by `message.content.content`. 
 
 !!! note 
-    1. If the `outputs` parameter is set in `CustomizeAgent`, the agent will try to parse the LLM response based on the output field names. If you don't want to parse the LLM response, you should not set the `outputs` parameter. The raw LLM response can be accessed by `message.content.content`. 
+1. If the `outputs` parameter is set in `CustomizeAgent`, the agent will try to parse the LLM response based on the output field names. If you don't want to parse the LLM response, you should not set the `outputs` parameter. The raw LLM response can be accessed by `message.content.content`. 
 
-    2. CustomizeAgent supports different parsing modes, such as `['str', 'json', 'xml', 'title', 'custom']. Please refer to the [Parsing Modes](#parsing-modes) section for more details. 
+2. CustomizeAgent supports different parsing modes, such as `['str', 'json', 'xml', 'title', 'custom']. Please refer to the [Parsing Modes](#parsing-modes) section for more details. 
 
 #### Multiple Structured Outputs
 
@@ -219,9 +219,88 @@ The `PromptTemplate` provides a more structured way to define prompts and can in
 etc. 
 
 !!! note
-    1. When using `prompt_template`, you don't need to explicitly include input placeholders in the instruction string like `{input_name}`. The template will automatically handle the mapping of inputs. 
+1. When using `prompt_template`, you don't need to explicitly include input placeholders in the instruction string like `{input_name}`. The template will automatically handle the mapping of inputs. 
 
-    2. Also, you don't need to explicitly specify the output format in the `instruction` field of the `PromptTemplate`. The template will automatically formulate the output format based on the `outputs` parameter and the `parse_mode` parameter. However, `PromptTemplate` also supports explicitly specifying the output format by specifying `PromptTemplate.format(custom_output_format="...")`. 
+2. Also, you don't need to explicitly specify the output format in the `instruction` field of the `PromptTemplate`. The template will automatically formulate the output format based on the `outputs` parameter and the `parse_mode` parameter. However, `PromptTemplate` also supports explicitly specifying the output format by specifying `PromptTemplate.format(custom_output_format="...")`. 
+
+
+## Tools
+
+You can extend a CustomizeAgent with external capabilities by attaching toolkits through the tools parameter. In practice, this means you can equip the agent with different toolkits depending on your use case.
+
+Below we show two examples:File toolkit & MCP toolkit.
+
+### File toolkit
+
+The FileToolkit enables an agent to write and read files on disk. 
+This is useful when you want the agent to persist its outputs (for example, generating code or reports).
+
+```python
+from evoagentx.agents import CustomizeAgent
+from evoagentx.prompts import StringTemplate
+from evoagentx.tools.file_tool import FileToolkit
+
+agent = CustomizeAgent(
+    name="CodeWriter",
+    description="Writes Python code based on requirements",
+    prompt_template=StringTemplate(
+        instruction="Write Python code that implements the provided `requirement` and save it to the given `file_path`."
+    ),
+    llm_config=openai_config,
+    inputs=[
+        {"name": "requirement", "type": "string", "description": "The coding requirement"},
+        {"name": "file_path", "type": "string", "description": "The path to save the code"}
+    ],
+    tools=[FileToolkit()]
+)
+
+message = agent(
+    inputs={
+        "requirement": "Write a function that returns the sum of two numbers",
+        "file_path": "examples/output/test_code.py"
+    }
+)
+print(message.content.content)
+```
+
+### MCP toolkit
+
+The MCPToolkit loads tools defined in an MCP configuration file.
+This allows the agent to dynamically access a set of tools exposed by MCP servers.
+
+```python
+from evoagentx.agents import CustomizeAgent
+from evoagentx.prompts import StringTemplate
+from evoagentx.tools.mcp import MCPToolkit
+
+mcp_toolkit = MCPToolkit(config_path="examples/tools/sample_mcp.config")
+tools = mcp_toolkit.get_toolkits()
+
+agent = CustomizeAgent(
+    name="MCPToolUser",
+    description="Performs tasks using MCP tools",
+    prompt_template=StringTemplate(
+        instruction="Do some tasks using the tools"
+    ),
+    llm_config=openai_config,
+    inputs=[
+        {"name": "instruction", "type": "string", "description": "The instruction for the tool user"}
+    ],
+    outputs=[
+        {"name": "result", "type": "string", "description": "The result of the task"},
+        {"name": "tool_calls", "type": "string", "description": "The tool calls used to get the result (if any)"}
+    ],
+    tools=tools
+)
+
+message = agent(inputs={"instruction": "Summarize all your tools."})
+print(message.content)
+```
+
+!!! note
+- Multiple toolkits can be attached at the same time.
+- If outputs are not defined, the raw model text is available at message.content.content.
+- If outputs are defined, the message object will include fields corresponding to the defined outputs..
 
 
 ## Parsing Modes
@@ -275,7 +354,7 @@ Detailed analysis of the topic here.
 ```
 
 !!! note
-    The section titles output by the LLM should be exactly the same as the output field names. Otherwise, the parsing will fail. For instance, in above example, if the LLM outputs `### Analysis`, which is different from the output field name `analysis`, the parsing will fail. 
+The section titles output by the LLM should be exactly the same as the output field names. Otherwise, the parsing will fail. For instance, in above example, if the LLM outputs `### Analysis`, which is different from the output field name `analysis`, the parsing will fail. 
 
 ### 3. JSON Mode (`parse_mode="json"`)
 
@@ -367,9 +446,9 @@ agent = CustomizeAgent(
 ```
 
 !!! note 
-    1. The parsing function should have an input parameter `content` that takes the raw LLM response as input, and return a dictionary with keys matching the output field names. 
+1. The parsing function should have an input parameter `content` that takes the raw LLM response as input, and return a dictionary with keys matching the output field names. 
 
-    2. It is recommended to use the `@register_parse_function` decorator to register the parsing function for serialization, so that you can save the agent and load it later. 
+2. It is recommended to use the `@register_parse_function` decorator to register the parsing function for serialization, so that you can save the agent and load it later. 
 
 
 ## Saving and Loading Agents
