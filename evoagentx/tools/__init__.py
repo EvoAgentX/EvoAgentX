@@ -6,12 +6,11 @@ from .search_google_f import GoogleFreeSearchToolkit
 from .search_ddgs import DDGSSearchToolkit
 from .search_wiki import WikipediaSearchToolkit
 from .browser_tool import BrowserToolkit
+from .browser_use import BrowserUseToolkit
 from .mcp import MCPToolkit
 from .request import RequestToolkit
 from .request_arxiv import ArxivToolkit
-from .request_craw4ai import Crawl4AIToolkit
-from .browser_use_auto import BrowserUseAutoToolkit
-from .browser_use import BrowserUseToolkit
+from .request_crawl4ai import Crawl4AIToolkit
 from .database_mongodb import MongoDBToolkit
 from .database_postgresql import PostgreSQLToolkit
 from .storage_handler import FileStorageHandler, LocalStorageHandler, SupabaseStorageHandler

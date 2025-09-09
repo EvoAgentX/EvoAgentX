@@ -107,10 +107,7 @@ class Crawl4AIBase(BaseModule):
                 # Always set crawler to None
                 self._crawler = None
                 # Give a small delay for any remaining callbacks to complete
-                try:
-                    await asyncio.sleep(0.05)
-                except:
-                    pass
+                
     
     async def _force_cleanup_crawler(self):
         """Force cleanup of crawler resources when normal cleanup fails."""
@@ -240,10 +237,6 @@ class WebCrawlTool(Tool):
         "include_links": {
             "type": "boolean",
             "description": "Extract and include link information (default: true)"
-        },
-        "take_screenshot": {
-            "type": "boolean",
-            "description": "Capture page screenshot (default: false)"
         },
         "wait_for": {
             "type": "string",

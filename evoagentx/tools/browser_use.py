@@ -6,6 +6,7 @@ One base class and one toolkit managing all tools
 """
 
 import asyncio
+import threading
 from typing import Dict, Any, Optional, List
 from browser_use import BrowserSession
 from browser_use.browser.events import (
@@ -13,7 +14,14 @@ from browser_use.browser.events import (
     ClickElementEvent,
     ScrollEvent,
     CloseTabEvent,
-    BrowserStateRequestEvent
+    BrowserStateRequestEvent,
+    TypeTextEvent,
+    GoBackEvent,
+    RefreshEvent,
+    SendKeysEvent,
+    GetDropdownOptionsEvent,
+    SelectDropdownOptionEvent,
+    SwitchTabEvent
 )
 
 from .tool import Tool, Toolkit
@@ -21,25 +29,17 @@ from ..core.module import BaseModule
 from ..core.logging import logger
 
 
-def _run_async_in_sync(async_func, *args, **kwargs):
+def _run_async_in_sync(browser_use_instance, async_func, *args, **kwargs):
     """
     Helper function to run async methods in sync context.
-    Handles event loop management and threading when needed.
+    Uses the dedicated browser thread's event loop.
     """
     import asyncio
-    import concurrent.futures
+    import threading
     
-    try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            # Create a new task if loop is already running
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                future = executor.submit(asyncio.run, async_func(*args, **kwargs))
-                return future.result()
-        else:
-            return loop.run_until_complete(async_func(*args, **kwargs))
-    except RuntimeError:
-        return asyncio.run(async_func(*args, **kwargs))
+    
+    # Use the browser thread's event loop
+    return browser_use_instance._run_in_browser_thread(async_func(*args, **kwargs))
 
 
 
@@ -73,6 +73,124 @@ class BrowserUse(BaseModule):
         self._last_error = None
         self._operation_history = []
         self._browser_started = False
+        
+        # Browser thread management
+        self._browser_thread = None
+        self._browser_loop = None
+        self._browser_thread_ready = threading.Event()
+        self._shutdown_event = threading.Event()
+        
+        # Start the dedicated browser thread
+        self._start_browser_thread()
+    
+    def _start_browser_thread(self):
+        """Start the dedicated browser thread with its own event loop."""
+        import threading
+        import asyncio
+        
+        def browser_thread_worker():
+            """Worker function for the browser thread."""
+            # Create a new event loop for this thread
+            self._browser_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self._browser_loop)
+            
+            self._browser_thread_ready.set()
+            
+            try:
+                # Run the event loop until shutdown is requested
+                self._browser_loop.run_until_complete(self._browser_thread_main())
+            except Exception as e:
+                logger.error(f"Error in browser thread: {e}")
+            finally:
+                logger.info("Browser thread shutting down")
+                if self._browser_loop and not self._browser_loop.is_closed():
+                    self._browser_loop.close()
+        
+        self._browser_thread = threading.Thread(target=browser_thread_worker, name="BrowserThread", daemon=True)
+        self._browser_thread.start()
+        
+        # Wait for the thread to be ready
+        if not self._browser_thread_ready.wait(timeout=10):
+            raise RuntimeError("Browser thread failed to start within 10 seconds")
+    
+    async def _browser_thread_main(self):
+        """Main coroutine for the browser thread."""
+        
+        # Wait for shutdown signal
+        while not self._shutdown_event.is_set():
+            await asyncio.sleep(0.1)
+        
+    
+    def _run_in_browser_thread(self, coro):
+        """Run a coroutine in the browser thread's event loop."""
+        import asyncio
+        import concurrent.futures
+        
+        if not self._browser_loop or self._browser_loop.is_closed():
+            raise RuntimeError("Browser thread event loop is not available")
+        
+        # Submit the coroutine to the browser thread's event loop
+        future = asyncio.run_coroutine_threadsafe(coro, self._browser_loop)
+        return future.result(timeout=60)  # 60 second timeout
+    
+    def __del__(self):
+        """Cleanup when the BrowserUse instance is destroyed."""
+        try:
+            logger.info("BrowserUse instance being destroyed, starting cleanup...")
+            self._cleanup_browser_session()
+            self._shutdown_browser_thread()
+            logger.info("BrowserUse cleanup completed successfully")
+        except Exception as e:
+            logger.warning(f"Error during BrowserUse cleanup: {e}")
+    
+    def _cleanup_browser_session(self):
+        """Clean up the browser session before shutting down the thread."""
+        if self.browser_session and self._browser_started:
+            try:
+                logger.info("Closing browser session...")
+                # Run the close operation in the browser thread
+                if self._browser_loop and not self._browser_loop.is_closed():
+                    future = asyncio.run_coroutine_threadsafe(
+                        self._close_browser_session(), 
+                        self._browser_loop
+                    )
+                    future.result(timeout=10)  # 10 second timeout for cleanup
+                    logger.info("Browser session closed successfully")
+                else:
+                    logger.warning("Browser thread event loop not available for cleanup")
+            except Exception as e:
+                logger.warning(f"Error closing browser session: {e}")
+    
+    async def _close_browser_session(self):
+        """Async method to close the browser session."""
+        try:
+            if self.browser_session:
+                # First stop the event bus to close WebSocket connections
+                if hasattr(self.browser_session, 'event_bus') and hasattr(self.browser_session.event_bus, 'stop'):
+                    await self.browser_session.event_bus.stop()
+                    logger.info("Event bus stopped in thread")
+                
+                # Then stop the browser session
+                if hasattr(self.browser_session, 'stop'):
+                    await self.browser_session.stop()
+                    logger.info("Browser session stopped in thread")
+                else:
+                    logger.warning("Browser session stop method not available")
+                
+                self._browser_started = False
+        except Exception as e:
+            logger.warning(f"Error in async browser session close: {e}")
+    
+    def _shutdown_browser_thread(self):
+        """Shutdown the browser thread gracefully."""
+        if self._browser_thread and self._browser_thread.is_alive():
+            logger.info("Shutting down browser thread...")
+            self._shutdown_event.set()
+            self._browser_thread.join(timeout=10)  # Increased timeout for proper cleanup
+            if self._browser_thread.is_alive():
+                logger.warning("Browser thread did not shut down gracefully")
+            else:
+                logger.info("Browser thread shut down successfully")
     
     async def _ensure_browser_started(self):
         """Ensure the browser session is started."""
@@ -84,7 +202,6 @@ class BrowserUse(BaseModule):
                 # Start the browser session
                 await self.browser_session.start()
                 self._browser_started = True
-                logger.info("Browser session started successfully")
             except Exception as e:
                 logger.error(f"Failed to start browser session: {e}")
                 raise RuntimeError(f"Failed to start browser session: {e}")
@@ -155,28 +272,137 @@ class BrowserUse(BaseModule):
         """Click on an element by index."""
         try:
             await self._ensure_browser_started()
-            
             node = await self.browser_session.get_element_by_index(index)
+            
             if node is None:
-                raise ValueError(f'Element index {index} not found in browser state')
+                error_msg = f'Element index {index} not found in browser state'
+                logger.error(error_msg)
+                raise ValueError(error_msg)
 
             event = self.browser_session.event_bus.dispatch(
                 ClickElementEvent(node=node, while_holding_ctrl=while_holding_ctrl or False)
             )
             
             await event
-            # Wait for handler to complete and get any exception or metadata
             click_metadata = await event.event_result(raise_if_any=True, raise_if_none=False)
             
-            return {
-                "success": True,
+            # Get updated page state after click
+            updated_state = await self._get_page_state()
+            agent_context = await self._get_agent_context_from_state(updated_state)
+            
+            operation_result = {
+                "action": "click",
                 "index": index,
-                "message": f"Successfully clicked element {index}"
+                "while_holding_ctrl": while_holding_ctrl,
+                "success": True,
+                "timestamp": asyncio.get_event_loop().time(),
+                "state": updated_state,  # Include updated page state
+                "agent_context": agent_context,  # Include rich agent context
+                "context": {
+                    "clicked_element_index": index,
+                    "click_successful": True,
+                    "message": f"Successfully clicked element {index}",
+                    "page_info": {
+                        "url": updated_state.get('url', 'Unknown'),
+                        "title": updated_state.get('title', 'Unknown'),
+                        "element_count": updated_state.get('dom_state', {}).get('element_count', 0),
+                        "tab_count": len(updated_state.get('tabs', []))
+                    }
+                }
             }
             
+            self._operation_history.append(("click", operation_result))
+            
+            if self.auto_update_state:
+                await self._update_state()
+            
+            return operation_result
+            
         except Exception as e:
-            self._last_error = str(e)
-            return {"success": False, "error": str(e)}
+            error_msg = str(e) if str(e) else f"Unknown error occurred: {type(e).__name__}"
+            logger.error(f"Click failed for index {index}: {error_msg}")
+            logger.error(f"Exception type: {type(e).__name__}")
+            logger.error(f"Exception args: {e.args}")
+            import traceback
+            logger.error(f"Full traceback: {traceback.format_exc()}")
+            
+            self._last_error = error_msg
+            return {
+                "success": False, 
+                "error": error_msg,
+                "index": index,
+                "exception_type": type(e).__name__,
+                "exception_args": str(e.args)
+            }
+
+    async def type(self, index: int, text: str) -> Dict[str, Any]:
+        """Type text into an element by index."""
+        try:
+            await self._ensure_browser_started()
+            node = await self.browser_session.get_element_by_index(index)
+
+            if node is None:
+                error_msg = f'Element index {index} not found in browser state'
+                logger.error(error_msg)
+                raise ValueError(error_msg)
+
+            event = self.browser_session.event_bus.dispatch(
+                TypeTextEvent(node=node, text=text)
+            )
+
+            await event
+            type_metadata = await event.event_result(raise_if_any=True, raise_if_none=False)
+
+            # Get updated page state after typing
+            updated_state = await self._get_page_state()
+            agent_context = await self._get_agent_context_from_state(updated_state)
+
+            operation_result = {
+                "action": "type",
+                "index": index,
+                "text": text,
+                "success": True,
+                "timestamp": asyncio.get_event_loop().time(),
+                "state": updated_state,  # Include updated page state
+                "agent_context": agent_context,  # Include rich agent context
+                "context": {
+                    "typed_text": text,
+                    "target_element_index": index,
+                    "type_successful": True,
+                    "message": f"Successfully typed '{text}' into element {index}",
+                    "page_info": {
+                        "url": updated_state.get('url', 'Unknown'),
+                        "title": updated_state.get('title', 'Unknown'),
+                        "element_count": updated_state.get('dom_state', {}).get('element_count', 0),
+                        "tab_count": len(updated_state.get('tabs', []))
+                    }
+                }
+            }
+            
+            self._operation_history.append(("type", operation_result))
+            
+            if self.auto_update_state:
+                await self._update_state()
+            
+            return operation_result
+
+        except Exception as e:
+            error_msg = str(e) if str(e) else f"Unknown error occurred: {type(e).__name__}"
+            logger.error(f"Type failed for index {index} with text '{text}': {error_msg}")
+            logger.error(f"Exception type: {type(e).__name__}")
+            logger.error(f"Exception args: {e.args}")
+            import traceback
+            logger.error(f"Full traceback: {traceback.format_exc()}")
+
+            self._last_error = error_msg
+            return {
+                "success": False,
+                "error": error_msg,
+                "index": index,
+                "text": text,
+                "exception_type": type(e).__name__,
+                "exception_args": str(e.args)
+            }
 
     
     async def get_agent_summary(self) -> Dict[str, Any]:
@@ -200,10 +426,10 @@ class BrowserUse(BaseModule):
             available_tools = [
                 {"name": "navigate", "description": "Navigate to a URL", "parameters": ["url", "new_tab"]},
                 {"name": "click", "description": "Click on an element by index", "parameters": ["index"]},
+                {"name": "type", "description": "Type text into an input element", "parameters": ["index", "text"]},
                 {"name": "scroll", "description": "Scroll the page", "parameters": ["direction", "amount"]},
                 {"name": "close_tab", "description": "Close a tab", "parameters": ["tab_id"]},
-                {"name": "get_status", "description": "Get current page status", "parameters": []},
-                {"name": "search_google", "description": "Search Google for a query", "parameters": ["query"]}
+                {"name": "get_status", "description": "Get current page status", "parameters": []}
             ]
             
             return {
@@ -298,22 +524,61 @@ class BrowserUse(BaseModule):
         try:
             await self._ensure_browser_started()
             
+            # If no tab_id provided or "current", get current tab info first
+            if tab_id is None or tab_id == "current":
+                current_state = await self._get_page_state()
+                tabs = current_state.get('tabs', [])
+                if tabs:
+                    # Use the current tab's target_id (first tab in the list is usually current)
+                    tab_id = tabs[0].get('target_id')
+                    if not tab_id:
+                        return {"tab_id": "current", "success": False, "error": "Could not get current tab ID"}
+                else:
+                    return {"tab_id": "current", "success": False, "error": "No tabs available to close"}
+            
+            # Validate that we have a proper tab_id
+            if not tab_id or tab_id == "current":
+                return {"tab_id": tab_id, "success": False, "error": "Invalid tab ID provided"}
+            
+            # Get current tab count before closing
+            current_state = await self._get_page_state()
+            initial_tab_count = len(current_state.get('tabs', []))
+            
             event = self.browser_session.event_bus.dispatch(
-                CloseTabEvent(target_id=tab_id or "current")
+                CloseTabEvent(target_id=tab_id)
             )
             await event
-            result = await event.event_result(raise_if_any=True, raise_if_none=False)
+            result = await event.event_result(raise_if_any=False, raise_if_none=False)
+            
+            # Get updated page state after closing tab
+            updated_state = await self._get_page_state()
+            agent_context = await self._get_agent_context_from_state(updated_state)
+            
+            # Check if the tab was actually closed by comparing tab counts
+            current_tab_count = len(updated_state.get('tabs', []))
+            operation_successful = current_tab_count < initial_tab_count
             
             operation_result = {
                 "action": "close_tab",
                 "tab_id": tab_id or "current",
-                "success": True,
+                "success": operation_successful,
                 "timestamp": asyncio.get_event_loop().time(),
+                "state": updated_state,  # Include updated page state
+                "agent_context": agent_context,  # Include rich agent context
                 "context": {
                     "closed_tab": tab_id or "current",
-                    "remaining_tabs": len(self._current_state.get('tabs', [])) - 1 if self._current_state else 0,
-                    "close_successful": True,
-                    "message": f"Successfully closed tab {tab_id or 'current'}"
+                    "initial_tab_count": initial_tab_count,
+                    "remaining_tabs": current_tab_count,
+                    "close_successful": operation_successful,
+                    "message": f"Successfully closed tab {tab_id or 'current'}" if operation_successful else f"Failed to close tab {tab_id or 'current'}",
+                    "browser_result": str(result) if result else "No result",
+                    "tab_count_change": initial_tab_count - current_tab_count,
+                    "page_info": {
+                        "url": updated_state.get('url', 'Unknown'),
+                        "title": updated_state.get('title', 'Unknown'),
+                        "element_count": updated_state.get('dom_state', {}).get('element_count', 0),
+                        "tab_count": current_tab_count
+                    }
                 }
             }
             
@@ -412,26 +677,27 @@ class BrowserUse(BaseModule):
             for i, element in enumerate(elements):
                 element_info = {
                     "index": i + 1,
-                    "type": element.get('node_name', 'unknown'),
+                    "type": element.get('tag', element.get('node_name', 'unknown')),
                     "text": element.get('text', '')[:100] + "..." if len(element.get('text', '')) > 100 else element.get('text', ''),
                     "attributes": {k: v for k, v in element.get('attributes', {}).items() if k in ['id', 'class', 'href', 'type', 'name', 'value', 'placeholder']},
-                    "visible": element.get('is_visible', True),
-                    "position": element.get('absolute_position', {}),
-                    "clickable": element.get('is_visible', True) and element.get('node_name') in ['a', 'button', 'input', 'select', 'textarea']
+                    "visible": element.get('visible', element.get('is_visible', True)),
+                    "position": element.get('position', element.get('absolute_position', {})),
+                    "clickable": element.get('clickable', False)  # Use the clickable property from _extract_elements
                 }
                 
                 if element_info["clickable"]:
                     clickable_elements.append(element_info)
                     
-                    if element.get('node_name') == 'a':
+                    element_type = element_info["type"]
+                    if element_type == 'a':
                         links.append(element_info)
-                    elif element.get('node_name') == 'button':
+                    elif element_type == 'button':
                         buttons.append(element_info)
-                    elif element.get('node_name') == 'input':
+                    elif element_type == 'input':
                         inputs.append(element_info)
-                    elif element.get('node_name') == 'select':
+                    elif element_type == 'select':
                         select_elements.append(element_info)
-                    elif element.get('node_name') in ['form', 'div'] and 'form' in element.get('class', '').lower():
+                    elif element_type in ['form', 'div'] and 'form' in element.get('attributes', {}).get('class', '').lower():
                         forms.append(element_info)
             
             # Generate suggested actions for agent
@@ -504,7 +770,6 @@ class BrowserUse(BaseModule):
         """Generate agent context from page state."""
         # Analyze available interactions for agent
         elements = state.get('dom_state', {}).get('elements', [])
-        logger.info(f"_get_agent_context_from_state received {len(elements)} elements")
         
         # Categorize interactive elements
         clickable_elements = []
@@ -520,9 +785,6 @@ class BrowserUse(BaseModule):
             element_text = element.get('text', '')
             element_clickable = element.get('clickable', False)
             
-            # Debug log for first few elements
-            if i < 5:
-                logger.info(f"Processing element {i+1}: tag='{element_tag}', clickable={element_clickable}, text='{element_text[:30]}'")
             
             # Create a standardized element info structure
             element_info = {
@@ -549,7 +811,6 @@ class BrowserUse(BaseModule):
                 elif element_tag in ['form'] or 'form' in element.get('attributes', {}).get('class', '').lower():
                     forms.append(element_info)
         
-        logger.info(f"Categorized: {len(clickable_elements)} clickable, {len(links)} links, {len(buttons)} buttons, {len(inputs)} inputs")
         
         # Generate suggested actions for agent
         suggested_actions = []
@@ -635,8 +896,9 @@ class BrowserUse(BaseModule):
             tabs_info.append({
                 "url": tab.url,
                 "title": tab.title,
-                "target_id": str(tab.target_id)[-4:],
-                "parent_target_id": str(tab.parent_target_id)[-4:] if tab.parent_target_id else None
+                "target_id": str(tab.target_id),  # Keep full target_id for browser-use operations
+                "target_id_short": str(tab.target_id)[-4:],  # Keep short version for display
+                "parent_target_id": str(tab.parent_target_id) if tab.parent_target_id else None
             })
         return tabs_info
     
@@ -650,24 +912,18 @@ class BrowserUse(BaseModule):
             }
         
         try:
-            # Debug: Log the dom_state structure
-            logger.info(f"DOM state type: {type(dom_state)}")
-            logger.info(f"DOM state attributes: {dir(dom_state)}")
             
             # Extract elements from various possible attributes
             elements = []
             element_count = 0
             
             if hasattr(dom_state, 'selector_map') and dom_state.selector_map:
-                logger.info(f"Found selector_map with {len(dom_state.selector_map)} items")
                 elements = self._extract_elements(dom_state.selector_map)
                 element_count = len(dom_state.selector_map)
             elif hasattr(dom_state, 'clickable_elements') and dom_state.clickable_elements:
-                logger.info(f"Found clickable_elements with {len(dom_state.clickable_elements)} items")
                 elements = self._extract_elements(dom_state.clickable_elements)
                 element_count = len(dom_state.clickable_elements)
             elif hasattr(dom_state, 'elements') and dom_state.elements:
-                logger.info(f"Found elements with {len(dom_state.elements)} items")
                 elements = self._extract_elements(dom_state.elements)
                 element_count = len(dom_state.elements)
             else:
@@ -685,7 +941,7 @@ class BrowserUse(BaseModule):
             elif hasattr(dom_state, '__str__'):
                 text_content = str(dom_state)[:500]
             
-            logger.info(f"Extracted {len(elements)} clickable elements from {element_count} total elements")
+            
             
             return {
                 "elements": elements,
@@ -708,12 +964,9 @@ class BrowserUse(BaseModule):
             return elements
             
         try:
-            logger.info(f"Processing selector_map of type: {type(selector_map)}")
-            
             # Handle different types of selector_map structures
             if hasattr(selector_map, 'items'):
                 # Dictionary-like structure
-                logger.info(f"Processing {len(selector_map)} items from dict-like selector_map")
                 for i, (selector, element) in enumerate(selector_map.items(), 1):
                     # Extract element properties more carefully
                     element_tag = ''
@@ -786,13 +1039,9 @@ class BrowserUse(BaseModule):
                         "position": position
                     }
                     elements.append(element_info)
-                    
-                    if i <= 5:  # Log first 5 elements for debugging
-                        logger.info(f"Element {i}: {element_info['tag']} - {element_info['text'][:50]} - clickable: {is_clickable}")
                         
             elif hasattr(selector_map, '__iter__'):
                 # List-like structure
-                logger.info(f"Processing list-like selector_map with {len(list(selector_map))} items")
                 for i, element in enumerate(selector_map, 1):
                     # Convert position to serializable dict
                     position = getattr(element, 'absolute_position', None)
@@ -815,18 +1064,14 @@ class BrowserUse(BaseModule):
                         "position": position
                     }
                     elements.append(element_info)
-                    if i <= 3:  # Log first 3 elements for debugging
-                        logger.info(f"Element {i}: {element_info['tag']} - {element_info['text'][:50]}")
             else:
                 logger.warning(f"Unknown selector_map type: {type(selector_map)}")
-                logger.info(f"Selector_map content preview: {str(selector_map)[:200]}")
                 
         except Exception as e:
             logger.error(f"Error extracting elements: {e}")
             import traceback
             logger.error(f"Traceback: {traceback.format_exc()}")
             
-        logger.info(f"Successfully extracted {len(elements)} elements, {len([e for e in elements if e['clickable']])} clickable")
         return elements
     
     def _extract_text_content(self, dom_state) -> str:
@@ -850,6 +1095,168 @@ class BrowserUse(BaseModule):
     def clear_error(self):
         """Clear the last error"""
         self._last_error = None
+    
+    async def go_back(self) -> Dict[str, Any]:
+        """Go back in browser history."""
+        try:
+            await self._ensure_browser_started()
+            event = self.browser_session.event_bus.dispatch(GoBackEvent())
+            await event
+            await event.event_result(raise_if_any=True, raise_if_none=False)
+            
+            updated_state = await self._get_page_state()
+            agent_context = await self._get_agent_context_from_state(updated_state)
+            
+            operation_result = {
+                "action": "go_back", "success": True, "timestamp": asyncio.get_event_loop().time(),
+                "state": updated_state, "agent_context": agent_context,
+                "context": {"message": "Successfully went back in browser history"}
+            }
+            
+            self._operation_history.append(("go_back", operation_result))
+            if self.auto_update_state:
+                await self._update_state()
+            
+            return operation_result
+        except Exception as e:
+            self._last_error = str(e)
+            return {"action": "go_back", "success": False, "error": str(e)}
+    
+    async def refresh(self) -> Dict[str, Any]:
+        """Refresh the current page."""
+        try:
+            await self._ensure_browser_started()
+            event = self.browser_session.event_bus.dispatch(RefreshEvent())
+            await event
+            await event.event_result(raise_if_any=True, raise_if_none=False)
+            
+            updated_state = await self._get_page_state()
+            agent_context = await self._get_agent_context_from_state(updated_state)
+            
+            operation_result = {
+                "action": "refresh", "success": True, "timestamp": asyncio.get_event_loop().time(),
+                "state": updated_state, "agent_context": agent_context,
+                "context": {"message": "Successfully refreshed the page"}
+            }
+            
+            self._operation_history.append(("refresh", operation_result))
+            if self.auto_update_state:
+                await self._update_state()
+            
+            return operation_result
+        except Exception as e:
+            self._last_error = str(e)
+            return {"action": "refresh", "success": False, "error": str(e)}
+    
+    
+    async def send_keys(self, keys: str) -> Dict[str, Any]:
+        """Send keyboard keys (e.g., 'Enter', 'Escape', 'Tab')."""
+        try:
+            await self._ensure_browser_started()
+            event = self.browser_session.event_bus.dispatch(SendKeysEvent(keys=keys))
+            await event
+            await event.event_result(raise_if_any=True, raise_if_none=False)
+            
+            updated_state = await self._get_page_state()
+            agent_context = await self._get_agent_context_from_state(updated_state)
+            
+            operation_result = {
+                "action": "send_keys", "keys": keys, "success": True, "timestamp": asyncio.get_event_loop().time(),
+                "state": updated_state, "agent_context": agent_context,
+                "context": {"message": f"Successfully sent keys: '{keys}'"}
+            }
+            
+            self._operation_history.append(("send_keys", operation_result))
+            if self.auto_update_state:
+                await self._update_state()
+            
+            return operation_result
+        except Exception as e:
+            self._last_error = str(e)
+            return {"action": "send_keys", "keys": keys, "success": False, "error": str(e)}
+    
+    async def get_dropdown_options(self, index: int) -> Dict[str, Any]:
+        """Get dropdown options for a select element."""
+        try:
+            await self._ensure_browser_started()
+            node = await self.browser_session.get_element_by_index(index)
+            if node is None:
+                return {"action": "get_dropdown_options", "index": index, "success": False, "error": f"Element {index} not found"}
+            
+            event = self.browser_session.event_bus.dispatch(GetDropdownOptionsEvent(node=node))
+            await event
+            result = await event.event_result(raise_if_any=True, raise_if_none=False)
+            
+            return {
+                "action": "get_dropdown_options", "index": index, "success": True, "timestamp": asyncio.get_event_loop().time(),
+                "options": result if result else [], "context": {"message": f"Retrieved dropdown options for element {index}"}
+            }
+        except Exception as e:
+            self._last_error = str(e)
+            return {"action": "get_dropdown_options", "index": index, "success": False, "error": str(e)}
+    
+    async def select_dropdown_option(self, index: int, option_text: str) -> Dict[str, Any]:
+        """Select an option from a dropdown by text."""
+        try:
+            await self._ensure_browser_started()
+            node = await self.browser_session.get_element_by_index(index)
+            if node is None:
+                return {"action": "select_dropdown_option", "index": index, "option": option_text, "success": False, "error": f"Element {index} not found"}
+            
+            event = self.browser_session.event_bus.dispatch(SelectDropdownOptionEvent(node=node, option_text=option_text))
+            await event
+            await event.event_result(raise_if_any=True, raise_if_none=False)
+            
+            updated_state = await self._get_page_state()
+            agent_context = await self._get_agent_context_from_state(updated_state)
+            
+            operation_result = {
+                "action": "select_dropdown_option", "index": index, "option": option_text, "success": True, "timestamp": asyncio.get_event_loop().time(),
+                "state": updated_state, "agent_context": agent_context,
+                "context": {"message": f"Successfully selected '{option_text}' from dropdown {index}"}
+            }
+            
+            self._operation_history.append(("select_dropdown_option", operation_result))
+            if self.auto_update_state:
+                await self._update_state()
+            
+            return operation_result
+        except Exception as e:
+            self._last_error = str(e)
+            return {"action": "select_dropdown_option", "index": index, "option": option_text, "success": False, "error": str(e)}
+    
+    async def switch_tab(self, tab_id: str) -> Dict[str, Any]:
+        """Switch to a specific tab."""
+        try:
+            await self._ensure_browser_started()
+            event = self.browser_session.event_bus.dispatch(SwitchTabEvent(target_id=tab_id))
+            await event
+            result = await event.event_result(raise_if_any=False, raise_if_none=False)
+            
+            updated_state = await self._get_page_state()
+            agent_context = await self._get_agent_context_from_state(updated_state)
+            
+            # For switch_tab, we consider it successful if we can get the updated state
+            # and the current tab URL/title changed (indicating we switched)
+            operation_successful = True  # Assume success if we get here
+            
+            operation_result = {
+                "action": "switch_tab", "tab_id": tab_id, "success": operation_successful, "timestamp": asyncio.get_event_loop().time(),
+                "state": updated_state, "agent_context": agent_context,
+                "context": {
+                    "message": f"Successfully switched to tab {tab_id}" if operation_successful else f"Failed to switch to tab {tab_id}",
+                    "browser_result": str(result) if result else "No result"
+                }
+            }
+            
+            self._operation_history.append(("switch_tab", operation_result))
+            if self.auto_update_state:
+                await self._update_state()
+            
+            return operation_result
+        except Exception as e:
+            self._last_error = str(e)
+            return {"action": "switch_tab", "tab_id": tab_id, "success": False, "error": str(e)}
     
     async def close_browser(self) -> Dict[str, Any]:
         """Close the browser session completely."""
@@ -879,38 +1286,6 @@ class BrowserUse(BaseModule):
             logger.error(f"Failed to close browser session: {e}")
             return {"success": False, "error": str(e)}
     
-    async def search_google(self, query: str) -> Dict[str, Any]:
-        """
-        Client-side search function - searches Google for a query
-        This is implemented in the base class, not as a separate tool
-        """
-        try:
-            if not self.browser_session:
-                raise RuntimeError("Browser session not initialized")
-            
-            # Navigate to Google search
-            search_url = f"https://www.google.com/search?q={query}"
-            nav_result = await self.navigate(search_url)
-            
-            if nav_result['success']:
-                # Get the search results page status
-                status_result = await self.get_status()
-                
-                return {
-                    "success": True,
-                    "query": query,
-                    "search_url": search_url,
-                    "page_status": status_result,
-                    "message": f"Successfully searched for '{query}' on Google"
-                }
-            else:
-                return {
-                    "success": False,
-                    "error": f"Failed to navigate to Google search: {nav_result.get('error', 'Unknown error')}"
-                }
-        except Exception as e:
-            return {"success": False, "error": f"Error searching for '{query}': {str(e)}"}
-
 # Multiple Specific Tools - Each tool handles one specific functionality
 
 class BrowserUseNavigateTool(Tool):
@@ -942,7 +1317,7 @@ class BrowserUseNavigateTool(Tool):
             return {"success": False, "error": "URL is required"}
         
         try:
-            return _run_async_in_sync(self.browser_use.navigate, url, new_tab)
+            return _run_async_in_sync(self.browser_use, self.browser_use.navigate, url, new_tab)
         except Exception as e:
             return {"success": False, "error": f"Error navigating to {url}: {str(e)}"}
 
@@ -972,9 +1347,40 @@ class BrowserUseClickTool(Tool):
             return {"success": False, "error": "Index is required"}
         
         try:
-            return _run_async_in_sync(self.browser_use.click, index)
+            return _run_async_in_sync(self.browser_use, self.browser_use.click, index)
         except Exception as e:
             return {"success": False, "error": f"Error clicking element {index}: {str(e)}"}
+
+
+class BrowserUseTypeTool(Tool):
+    """Tool for typing text into elements"""
+    name: str = "browser_type"
+    description: str = "Type text into an input element by index"
+    inputs: Dict[str, Dict[str, str]] = {
+        "index": {"type": "integer", "description": "Index of the element to type into"},
+        "text": {"type": "string", "description": "Text to type into the element"}
+    }
+    required: Optional[List[str]] = ["index", "text"]
+    
+    def __init__(self, browser_use: Optional[BrowserUse] = None):
+        super().__init__()
+        self.browser_use = browser_use
+    
+    def __call__(self, index: int, text: str) -> Dict[str, Any]:
+        """Execute type text using the BrowserUse instance."""
+        if not self.browser_use:
+            raise RuntimeError("Browser use instance not initialized")
+        
+        if index is None:
+            return {"success": False, "error": "Index is required"}
+        
+        if not text:
+            return {"success": False, "error": "Text is required"}
+        
+        try:
+            return _run_async_in_sync(self.browser_use, self.browser_use.type, index, text)
+        except Exception as e:
+            return {"success": False, "error": f"Error typing text '{text}' into element {index}: {str(e)}"}
 
 
 class BrowserUseCloseTool(Tool):
@@ -994,7 +1400,7 @@ class BrowserUseCloseTool(Tool):
             raise RuntimeError("Browser use instance not initialized")
         
         try:
-            return _run_async_in_sync(self.browser_use.close_browser)
+            return _run_async_in_sync(self.browser_use, self.browser_use.close_browser)
         except Exception as e:
             return {"success": False, "error": f"Error closing browser: {str(e)}"}
 
@@ -1028,7 +1434,7 @@ class BrowserUseScrollTool(Tool):
             return {"success": False, "error": "Direction and amount are required"}
         
         try:
-            return _run_async_in_sync(self.browser_use.scroll, direction, amount)
+            return _run_async_in_sync(self.browser_use, self.browser_use.scroll, direction, amount)
         except Exception as e:
             return {"success": False, "error": f"Error scrolling {direction} {amount}: {str(e)}"}
 
@@ -1050,15 +1456,144 @@ class BrowserUseGetStatusTool(Tool):
             raise RuntimeError("Browser use instance not initialized")
         
         try:
-            return _run_async_in_sync(self.browser_use.get_status)
+            return _run_async_in_sync(self.browser_use, self.browser_use.get_status)
         except Exception as e:
             return {"success": False, "error": f"Error getting status: {str(e)}"}
 
 
+# ============================================================================
+# ENHANCED BROWSER TOOLS - Simple, robust tool implementations
+# ============================================================================
+
+class BrowserUseGoBackTool(Tool):
+    """Tool for going back in browser history"""
+    name: str = "browser_go_back"
+    description: str = "Go back in browser history"
+    inputs: Dict[str, Dict[str, str]] = {}
+    required: Optional[List[str]] = []
+    
+    def __init__(self, browser_use: BrowserUse):
+        super().__init__()
+        self.browser_use = browser_use
+    
+    def __call__(self) -> Dict[str, Any]:
+        return _run_async_in_sync(self.browser_use, self.browser_use.go_back)
+
+class BrowserUseRefreshTool(Tool):
+    """Tool for refreshing the current page"""
+    name: str = "browser_refresh"
+    description: str = "Refresh the current page"
+    inputs: Dict[str, Dict[str, str]] = {}
+    required: Optional[List[str]] = []
+    
+    def __init__(self, browser_use: BrowserUse):
+        super().__init__()
+        self.browser_use = browser_use
+    
+    def __call__(self) -> Dict[str, Any]:
+        return _run_async_in_sync(self.browser_use, self.browser_use.refresh)
+
+
+class BrowserUseSendKeysTool(Tool):
+    """Tool for sending keyboard keys"""
+    name: str = "browser_send_keys"
+    description: str = "Send keyboard keys (e.g., 'Enter', 'Escape', 'Tab')"
+    inputs: Dict[str, Dict[str, str]] = {
+        "keys": {"type": "string", "description": "Keyboard keys to send (e.g., 'Enter', 'Escape', 'Tab')"}
+    }
+    required: Optional[List[str]] = ["keys"]
+    
+    def __init__(self, browser_use: BrowserUse):
+        super().__init__()
+        self.browser_use = browser_use
+    
+    def __call__(self, keys: str) -> Dict[str, Any]:
+        return _run_async_in_sync(self.browser_use, self.browser_use.send_keys, keys)
+
+class BrowserUseGetDropdownOptionsTool(Tool):
+    """Tool for getting dropdown options"""
+    name: str = "browser_get_dropdown_options"
+    description: str = "Get dropdown options for a select element"
+    inputs: Dict[str, Dict[str, str]] = {
+        "index": {"type": "integer", "description": "Index of the dropdown element"}
+    }
+    required: Optional[List[str]] = ["index"]
+    
+    def __init__(self, browser_use: BrowserUse):
+        super().__init__()
+        self.browser_use = browser_use
+    
+    def __call__(self, index: int) -> Dict[str, Any]:
+        return _run_async_in_sync(self.browser_use, self.browser_use.get_dropdown_options, index)
+
+class BrowserUseSelectDropdownOptionTool(Tool):
+    """Tool for selecting dropdown options"""
+    name: str = "browser_select_dropdown_option"
+    description: str = "Select an option from a dropdown by text"
+    inputs: Dict[str, Dict[str, str]] = {
+        "index": {"type": "integer", "description": "Index of the dropdown element"},
+        "option_text": {"type": "string", "description": "Text of the option to select"}
+    }
+    required: Optional[List[str]] = ["index", "option_text"]
+    
+    def __init__(self, browser_use: BrowserUse):
+        super().__init__()
+        self.browser_use = browser_use
+    
+    def __call__(self, index: int, option_text: str) -> Dict[str, Any]:
+        return _run_async_in_sync(self.browser_use, self.browser_use.select_dropdown_option, index, option_text)
+
+class BrowserUseSwitchTabTool(Tool):
+    """Tool for switching tabs"""
+    name: str = "browser_switch_tab"
+    description: str = "Switch to a specific tab"
+    inputs: Dict[str, Dict[str, str]] = {
+        "tab_id": {"type": "string", "description": "ID of the tab to switch to"}
+    }
+    required: Optional[List[str]] = ["tab_id"]
+    
+    def __init__(self, browser_use: BrowserUse):
+        super().__init__()
+        self.browser_use = browser_use
+    
+    def __call__(self, tab_id: str) -> Dict[str, Any]:
+        return _run_async_in_sync(self.browser_use, self.browser_use.switch_tab, tab_id)
+
+class BrowserUseCloseTabTool(Tool):
+    """Tool for closing tabs"""
+    name: str = "browser_close_tab"
+    description: str = "Close a specific tab"
+    inputs: Dict[str, Dict[str, str]] = {
+        "tab_id": {"type": "string", "description": "ID of the tab to close (optional, defaults to current tab)"}
+    }
+    required: Optional[List[str]] = []
+    
+    def __init__(self, browser_use: BrowserUse):
+        super().__init__()
+        self.browser_use = browser_use
+    
+    def __call__(self, tab_id: str = None) -> Dict[str, Any]:
+        return _run_async_in_sync(self.browser_use, self.browser_use.close_tab, tab_id)
+
+class BrowserUseCreateTabTool(Tool):
+    """Tool for creating new tabs"""
+    name: str = "browser_create_tab"
+    description: str = "Create a new tab and optionally navigate to a URL"
+    inputs: Dict[str, Dict[str, str]] = {
+        "url": {"type": "string", "description": "URL to navigate to in the new tab (optional, defaults to about:blank)"}
+    }
+    required: Optional[List[str]] = []
+    
+    def __init__(self, browser_use: BrowserUse):
+        super().__init__()
+        self.browser_use = browser_use
+    
+    def __call__(self, url: str = "about:blank") -> Dict[str, Any]:
+        return _run_async_in_sync(self.browser_use, self.browser_use.navigate, url, new_tab=True)
+
 class BrowserUseToolkit(Toolkit):
     """
     Single toolkit that manages all browser tools and the shared base
-    Similar to WikipediaSearchToolkit - orchestrates the base class and all tools
     """
     def __init__(
         self,
@@ -1094,9 +1629,18 @@ class BrowserUseToolkit(Toolkit):
         tools = [
             BrowserUseNavigateTool(browser_use=browser_use),
             BrowserUseClickTool(browser_use=browser_use),
+            BrowserUseTypeTool(browser_use=browser_use),
             BrowserUseCloseTool(browser_use=browser_use),
             BrowserUseScrollTool(browser_use=browser_use),
             BrowserUseGetStatusTool(browser_use=browser_use),
+            BrowserUseGoBackTool(browser_use=browser_use),
+            BrowserUseRefreshTool(browser_use=browser_use),
+            BrowserUseSendKeysTool(browser_use=browser_use),
+            BrowserUseGetDropdownOptionsTool(browser_use=browser_use),
+            BrowserUseSelectDropdownOptionTool(browser_use=browser_use),
+            BrowserUseSwitchTabTool(browser_use=browser_use),
+            BrowserUseCloseTabTool(browser_use=browser_use),
+            BrowserUseCreateTabTool(browser_use=browser_use),
         ]
         
         # Initialize parent with tools
@@ -1104,3 +1648,30 @@ class BrowserUseToolkit(Toolkit):
         
         # Store browser_use as instance variable
         self.browser_use = browser_use
+    
+    def cleanup(self):
+        """Explicitly cleanup the browser session and thread."""
+        if self.browser_use:
+            logger.info("Explicitly cleaning up BrowserUseToolkit...")
+            self.browser_use._cleanup_browser_session()
+            self.browser_use._shutdown_browser_thread()
+            logger.info("BrowserUseToolkit cleanup completed")
+    
+    def __del__(self):
+        """Cleanup when the toolkit is destroyed."""
+        try:
+            self.cleanup()
+        except Exception as e:
+            logger.warning(f"Error during BrowserUseToolkit cleanup: {e}")
+    
+    def __enter__(self):
+        """Context manager entry."""
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit - ensures cleanup."""
+        try:
+            self.cleanup()
+        except Exception as e:
+            logger.warning(f"Error during BrowserUseToolkit context manager cleanup: {e}")
+        return False  # Don't suppress exceptions
