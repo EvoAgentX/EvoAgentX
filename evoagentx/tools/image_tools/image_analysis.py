@@ -1,8 +1,9 @@
 import requests
 import base64
 from typing import Dict, Optional, List
-from .tool import Tool, Toolkit
-from .storage_handler import FileStorageHandler
+from ..tool import Tool, Toolkit
+from ..storage_handler import FileStorageHandler
+
 
 class ImageAnalysisTool(Tool):
     name: str = "image_analysis"
@@ -64,7 +65,6 @@ class ImageAnalysisTool(Tool):
             if result["success"]:
                 image_content = result["content"]
                 if isinstance(image_content, str):
-                    # If content is string, encode it
                     image_content = image_content.encode('utf-8')
                 base64_image = base64.b64encode(image_content).decode("utf-8")
             else:
@@ -80,7 +80,6 @@ class ImageAnalysisTool(Tool):
             if result["success"]:
                 pdf_content = result["content"]
                 if isinstance(pdf_content, str):
-                    # If content is string, encode it
                     pdf_content = pdf_content.encode('utf-8')
                 base64_pdf = base64.b64encode(pdf_content).decode("utf-8")
             else:
@@ -108,7 +107,7 @@ class ImageAnalysisTool(Tool):
         response = requests.post(url, headers=headers, json=payload)
         try:
             data = response.json()
-            # 只提取 message.content 和 usage
+            # Extract message.content and usage only
             result = {
                 "content": data.get("choices", [{}])[0].get("message", {}).get("content", ""),
                 "usage": data.get("usage", {})
@@ -135,7 +134,7 @@ class ImageAnalysisToolkit(Toolkit):
         """
         # Initialize storage handler if not provided
         if storage_handler is None:
-            from .storage_file import LocalStorageHandler
+            from ..storage_file import LocalStorageHandler
             storage_handler = LocalStorageHandler(base_path="./workplace/analysis")
         
         # Create the image analysis tool
@@ -154,4 +153,6 @@ class ImageAnalysisToolkit(Toolkit):
         # Store instance variables
         self.api_key = api_key
         self.model = model
-        self.storage_handler = storage_handler 
+        self.storage_handler = storage_handler
+
+

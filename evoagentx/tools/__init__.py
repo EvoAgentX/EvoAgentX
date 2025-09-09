@@ -15,9 +15,9 @@ from .database_mongodb import MongoDBToolkit
 from .database_postgresql import PostgreSQLToolkit
 from .storage_handler import FileStorageHandler, LocalStorageHandler, SupabaseStorageHandler
 from .storage_file import StorageToolkit
-from .images_flux_generation import FluxImageGenerationToolkit
-from .images_openai_generation import OpenAIImageGenerationToolkit
-from .image_analysis import ImageAnalysisToolkit
+from .image_generation_edit_flux import FluxImageGenerationToolkit
+from .image_tools.openai_image_tools.toolkit import OpenAIImageToolkitV2
+from .image_tools.image_analysis import ImageAnalysisToolkit
 from .cmd_toolkit import CMDToolkit
 from .rss_feed import RSSToolkit
 from .file_tool import FileToolkit
@@ -47,7 +47,7 @@ __all__ = [
     "SupabaseStorageHandler",
     "StorageToolkit",
     "FluxImageGenerationToolkit",
-    "OpenAIImageGenerationToolkit",
+    "OpenAIImageToolkitV2",
     "ImageAnalysisToolkit",
     "CMDToolkit",
     "RSSToolkit",

@@ -941,6 +941,8 @@ class StorageBase(BaseModule, ABC):
             # Check if content is already a PIL Image object
             if hasattr(content, 'save') and callable(getattr(content, 'save', None)):
                 # Content is a PIL Image object
+                # Ensure directory exists
+                Path(file_path).parent.mkdir(parents=True, exist_ok=True)
                 content.save(file_path)
                 return {
                     "success": True,
@@ -951,6 +953,8 @@ class StorageBase(BaseModule, ABC):
                 }
             elif isinstance(content, bytes):
                 # Content is binary image data
+                # Ensure directory exists
+                Path(file_path).parent.mkdir(parents=True, exist_ok=True)
                 with open(file_path, 'wb') as f:
                     f.write(content)
                 return {

@@ -5,6 +5,7 @@ Example demonstrating how to use image handling toolkits from EvoAgentX.
 This script provides comprehensive examples for:
 - ImageAnalysisToolkit for analyzing images using AI
 - OpenAI Image Generation for creating images from text prompts
+- OpenAI Image Editing for editing existing images
 - Flux Image Generation for creating images using Flux Kontext Max
 """
 
@@ -20,7 +21,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 from evoagentx.tools import (
     ImageAnalysisToolkit,
-    OpenAIImageGenerationToolkit,
+    OpenAIImageToolkitV2,
     FluxImageGenerationToolkit
 )
 
@@ -81,71 +82,90 @@ def run_image_analysis_example():
         print(f"Error: {str(e)}")
 
 
-def run_openai_image_generation_example():
-    """Simple example using OpenAI Image Generation Toolkit."""
-    print("\n===== OPENAI IMAGE GENERATION TOOL EXAMPLE =====\n")
-    
-    # Check for OpenAI API key
+## (Removed) standalone OpenAI image generation example
+
+
+## (Removed) standalone OpenAI image editing example
+
+
+def run_openai_image_toolkit_pipeline():
+    """Pipeline: generate → edit → analyze using OpenAIImageToolkitV2."""
+    print("\n===== OPENAI IMAGE TOOLKIT PIPELINE (GEN → EDIT → ANALYZE) =====\n")
+
     openai_api_key = os.getenv("OPENAI_API_KEY")
     openai_org_id = os.getenv("OPENAI_ORGANIZATION_ID")
-    
     if not openai_api_key:
         print("❌ OPENAI_API_KEY not found in environment variables")
-        print("To test OpenAI image generation, set your OpenAI API key:")
-        print("export OPENAI_API_KEY='your-openai-api-key-here'")
-        print("Get your key from: https://platform.openai.com/")
         return
-    
-    try:
-        # Initialize the OpenAI image generation toolkit
-        toolkit = OpenAIImageGenerationToolkit(
-            name="DemoOpenAIImageToolkit",
-            api_key=openai_api_key,
-            organization_id=openai_org_id,
-            model="gpt-4o",
-            save_path="./generated_images"
-        )
-        
-        print("✓ OpenAI Image Generation Toolkit initialized")
-        print(f"✓ Using OpenAI API key: {openai_api_key[:8]}...")
-        if openai_org_id:
-            print(f"✓ Using OpenAI Organization ID: {openai_org_id[:8]}...")
-        
-        # Get the generation tool - the actual tool name is "image_generation"
-        generate_tool = toolkit.get_tool("image_generation")
-        
-        # Test image generation
-        test_prompt = "A futuristic cyberpunk city with neon lights and flying cars, digital art style"
-        print(f"Generating image with prompt: '{test_prompt}'")
-        
-        result = generate_tool(
-            prompt=test_prompt,
-            size="1024x1024",
-            quality="high"
-        )
-        
-        # The tool returns file_path directly, not in a success wrapper
-        if 'error' not in result:
-            print("✓ Image generation successful")
-            print(f"Generated image path: {result.get('file_path', 'No path')}")
-            print(f"Storage handler: {result.get('storage_handler', 'Unknown')}")
-            
-            # Check if file exists
-            file_path = result.get('file_path', '')
-            if file_path and os.path.exists(file_path):
-                file_size = os.path.getsize(file_path)
-                print(f"File size: {file_size} bytes")
-                print("✓ Generated image file saved successfully")
-            else:
-                print("⚠ Generated image file not found")
-        else:
-            print(f"❌ Image generation failed: {result.get('error', 'Unknown error')}")
-        
-        print("\n✓ OpenAI Image Generation Toolkit test completed")
-        
-    except Exception as e:
-        print(f"Error: {str(e)}")
 
+    toolkit = OpenAIImageToolkitV2(
+        name="DemoOpenAIImageToolkitV2",
+        api_key=openai_api_key,
+        organization_id=openai_org_id,
+        generation_model="gpt-image-1",
+        save_path="./generated_images"
+    )
+
+    gen = toolkit.get_tool("openai_image_generation_v2")
+    edit = toolkit.get_tool("openai_gpt_image1_edit_v2")
+    analyze = toolkit.get_tool("openai_image_analysis_v2")
+
+    # 1) Generate
+    gen_prompt = "A cute baby owl sitting on a tree branch at sunset, digital art"
+    print(f"Generating: {gen_prompt}")
+    gen_result = gen(prompt=gen_prompt, model="gpt-image-1", size="1024x1024")
+    if 'error' in gen_result:
+        print(f"❌ Generation failed: {gen_result['error']}")
+        return
+    gen_paths = gen_result.get('results', [])
+    if not gen_paths:
+        print("❌ No generated images returned")
+        return
+    src_path = gen_paths[0]
+    print(f"Generated image: {src_path}")
+
+    # 2) Edit
+    print("Editing the generated image...")
+    edit_result = edit(
+        prompt="Add a red scarf around the owl's neck",
+        images=src_path,
+        size="1024x1024",
+        background="opaque",
+        quality="high",
+        n=1,
+        image_name="edited_minimal"
+    )
+    if 'error' in edit_result:
+        print(f"❌ Edit failed: {edit_result['error']}")
+        return
+    edited_paths = edit_result.get('results', [])
+    if not edited_paths:
+        print("❌ No edited images returned")
+        return
+    edited_path = edited_paths[0]
+    print(f"Edited image: {edited_path}")
+
+    # 3) Analyze (convert local file → data URL)
+    print("Analyzing the edited image...")
+    try:
+        import base64, mimetypes
+        with open(edited_path, 'rb') as f:
+            b64 = base64.b64encode(f.read()).decode('utf-8')
+        mime, _ = mimetypes.guess_type(edited_path)
+        mime = mime or 'image/png'
+        data_url = f"data:{mime};base64,{b64}"
+        analysis = analyze(
+            prompt="Summarize what's in this image in one sentence.",
+            image_url=data_url,
+            model="gpt-4o-mini"
+        )
+        if 'error' in analysis:
+            print(f"❌ Analyze failed: {analysis['error']}")
+        else:
+            print("✓ Analysis:")
+            print(analysis.get('content', ''))
+    except Exception as e:
+        print(f"❌ Failed to analyze edited image: {e}")
 
 def run_flux_image_generation_example():
     """Simple example using Flux Image Generation Toolkit."""
@@ -190,7 +210,6 @@ def run_flux_image_generation_example():
         if 'error' not in result:
             print("✓ Image generation successful")
             print(f"Generated image path: {result.get('file_path', 'No path')}")
-            print(f"Storage handler: {result.get('storage_handler', 'Unknown')}")
             
             # Check if file exists
             file_path = result.get('file_path', '')
@@ -214,13 +233,12 @@ def main():
     print("===== IMAGE TOOL EXAMPLES =====")
     
     # Run image analysis example
-    run_image_analysis_example()
+    # run_image_analysis_example()
     
-    # # Run OpenAI image generation example
-    run_openai_image_generation_example()
+    run_openai_image_toolkit_pipeline()
     
     # Run Flux image generation example
-    run_flux_image_generation_example()
+    # run_flux_image_generation_example()
     
     print("\n===== ALL IMAGE TOOL EXAMPLES COMPLETED =====")
 
