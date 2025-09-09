@@ -136,7 +136,6 @@ def run_openai_image_toolkit_pipeline():
     except Exception as e:
         print(f"❌ Failed to analyze edited image: {e}")
 
-def run_flux_image_generation_example():
     """Simple example using Flux Image Generation Toolkit."""
     print("\n===== IMAGE GENERATION TOOL EXAMPLE =====\n")
     
@@ -330,15 +329,14 @@ def main():
     """Main function to run all image tool examples"""
     print("===== IMAGE TOOL EXAMPLES =====")
     
-    # Run image analysis example
     # run_image_analysis_example()
     
     # run_openai_image_toolkit_pipeline()
-    # run_flux_image_toolkit_pipeline()
-    run_openrouter_edit_pipeline()
     
-    # Run Flux image generation example
-    # run_flux_image_generation_example()
+    # run_flux_image_toolkit_pipeline()
+
+    # run_openrouter_edit_pipeline()
+    
     
     print("\n===== ALL IMAGE TOOL EXAMPLES COMPLETED =====")
 

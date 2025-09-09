@@ -19,9 +19,6 @@ from .image_tools.flux_image_tools.image_generation_edit import FluxImageGenerat
 from .image_tools.flux_image_tools.toolkit import FluxImageGenerationToolkit
 from .image_tools.openai_image_tools.toolkit import OpenAIImageToolkitV2
 from .image_tools.openrouter_image_tools.image_analysis import ImageAnalysisTool as OpenRouterImageAnalysisTool
-from .image_tools.gemini_image_tools.gemini_image_analysis import GeminiImageAnalysisTool
-from .image_tools.gemini_image_tools.generation import GeminiImageGenerationEditTool
-from .image_tools.gemini_image_tools.toolkit import GeminiImageToolkit
 from .image_tools.openrouter_image_tools.image_generation import OpenRouterImageGenerationEditTool
 from .image_tools.openrouter_image_tools.toolkit import OpenRouterImageToolkit
 from .cmd_toolkit import CMDToolkit
@@ -56,9 +53,6 @@ __all__ = [
     "FluxImageGenerationToolkit",
     "OpenAIImageToolkitV2",
     "OpenRouterImageAnalysisTool",
-    "GeminiImageAnalysisTool",
-    "GeminiImageGenerationEditTool",
-    "GeminiImageToolkit",
     "OpenRouterImageGenerationEditTool",
     "OpenRouterImageToolkit",
     "CMDToolkit",

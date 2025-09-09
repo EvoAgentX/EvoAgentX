@@ -215,7 +215,7 @@ class BrowserUse(BaseModule):
                 NavigateToUrlEvent(url=url, new_tab=new_tab)
             )
             await event
-            result = await event.event_result(raise_if_any=True, raise_if_none=False)
+            await event.event_result(raise_if_any=True, raise_if_none=False)
             
             # Get complete page state after navigation
             page_state = await self._get_page_state()
@@ -351,7 +351,7 @@ class BrowserUse(BaseModule):
             )
 
             await event
-            type_metadata = await event.event_result(raise_if_any=True, raise_if_none=False)
+            await event.event_result(raise_if_any=True, raise_if_none=False)
 
             # Get updated page state after typing
             updated_state = await self._get_page_state()
@@ -599,7 +599,7 @@ class BrowserUse(BaseModule):
             await self._ensure_browser_started()
             
             # Convert direction to valid value and amount to pixels
-            from typing import Literal
+            # avoid unused import; using string literals
             
             # Map direction string to valid literal
             direction_map = {
@@ -616,7 +616,7 @@ class BrowserUse(BaseModule):
                 ScrollEvent(direction=valid_direction, amount=pixels)  # type: ignore
             )
             await event
-            result = await event.event_result(raise_if_any=True, raise_if_none=False)
+            await event.event_result(raise_if_any=True, raise_if_none=False)
             
             # Get updated page state after scrolling
             updated_state = await self._get_page_state()
