@@ -227,7 +227,7 @@ class BrowserUse(BaseModule):
                 NavigateToUrlEvent(url=url, new_tab=new_tab)
             )
             await event
-            await event.event_result(raise_if_any=True, raise_if_none=False)
+            result = await event.event_result(raise_if_any=True, raise_if_none=False)
             
             # Get complete page state after navigation
             page_state = await self._get_page_state()
@@ -363,7 +363,7 @@ class BrowserUse(BaseModule):
             )
 
             await event
-            await event.event_result(raise_if_any=True, raise_if_none=False)
+            type_metadata = await event.event_result(raise_if_any=True, raise_if_none=False)
 
             # Get updated page state after typing
             updated_state = await self._get_page_state()
@@ -611,7 +611,7 @@ class BrowserUse(BaseModule):
             await self._ensure_browser_started()
             
             # Convert direction to valid value and amount to pixels
-            # avoid unused import; using string literals
+            from typing import Literal
             
             # Map direction string to valid literal
             direction_map = {
@@ -628,7 +628,7 @@ class BrowserUse(BaseModule):
                 ScrollEvent(direction=valid_direction, amount=pixels)  # type: ignore
             )
             await event
-            await event.event_result(raise_if_any=True, raise_if_none=False)
+            result = await event.event_result(raise_if_any=True, raise_if_none=False)
             
             # Get updated page state after scrolling
             updated_state = await self._get_page_state()
@@ -866,73 +866,36 @@ class BrowserUse(BaseModule):
         }
 
     async def _get_page_state(self) -> Dict[str, Any]:
-        """Get comprehensive current page state using browser-use's optimized method"""
+        """Get comprehensive current page state"""
         await self._ensure_browser_started()
         
-        # Use browser-use's optimized state retrieval
-        browser_state = await self.browser_session.get_browser_state_summary(
-            cache_clickable_elements_hashes=True,
-            include_screenshot=False,
-            include_recent_events=False
+        event = self.browser_session.event_bus.dispatch(
+            BrowserStateRequestEvent(
+                include_screenshot=False,
+                cache_clickable_elements_hashes=False
+            )
         )
+        await event
+        result = await event.event_result(raise_if_any=True, raise_if_none=False)
         
-        # Convert to our format
+        if not result:
+            return {
+                "url": "Unknown",
+                "title": "Unknown",
+                "tabs": [],
+                "dom_state": {"elements": [], "text_content": "", "element_count": 0},
+                "screenshot": False,
+                "timestamp": asyncio.get_event_loop().time()
+            }
+        
         return {
-            "url": browser_state.url,
-            "title": browser_state.title,
-            "tabs": self._extract_tabs_info(browser_state.tabs),
-            "dom_state": self._extract_dom_state_from_browser_use(browser_state.dom_state),
-            "screenshot": bool(browser_state.screenshot),
+            "url": getattr(result, 'url', 'Unknown'),
+            "title": getattr(result, 'title', 'Unknown'),
+            "tabs": self._extract_tabs_info(getattr(result, 'tabs', [])),
+            "dom_state": self._extract_dom_state(getattr(result, 'dom_state', None)),
+            "screenshot": getattr(result, 'screenshot', None) is not None,
             "timestamp": asyncio.get_event_loop().time()
         }
-    
-    def _extract_dom_state_from_browser_use(self, dom_state) -> Dict[str, Any]:
-        """Extract DOM state from browser-use's BrowserStateSummary format."""
-        if not dom_state:
-            return {
-                "elements": [],
-                "text_content": "",
-                "element_count": 0
-            }
-        
-        try:
-            # Get elements from browser-use's selector_map
-            elements = []
-            if hasattr(dom_state, 'selector_map') and dom_state.selector_map:
-                for index, node in dom_state.selector_map.items():
-                    element_info = {
-                        "index": index,
-                        "type": node.tag_name.lower() if node.tag_name else 'unknown',
-                        "text": node.node_value or '',
-                        "attributes": node.attributes or {},
-                        "visible": node.is_visible,
-                        "clickable": True,  # All elements in selector_map are clickable
-                        "position": {
-                            "x": node.absolute_position.x if node.absolute_position else 0,
-                            "y": node.absolute_position.y if node.absolute_position else 0,
-                            "width": node.absolute_position.width if node.absolute_position else 0,
-                            "height": node.absolute_position.height if node.absolute_position else 0
-                        } if node.absolute_position else {}
-                    }
-                    elements.append(element_info)
-            
-            # Get text content
-            text_content = ""
-            if hasattr(dom_state, 'llm_representation'):
-                text_content = dom_state.llm_representation()
-            
-            return {
-                "elements": elements,
-                "text_content": text_content,
-                "element_count": len(elements)
-            }
-        except Exception as e:
-            logger.error(f"Error extracting DOM state from browser-use: {e}")
-            return {
-                "elements": [],
-                "text_content": "",
-                "element_count": 0
-            }
     
     def _extract_tabs_info(self, tabs) -> List[Dict[str, Any]]:
         """Extract tab information from browser tabs"""
