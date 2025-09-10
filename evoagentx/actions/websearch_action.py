@@ -3,7 +3,10 @@ from ..prompts.web_agent import WEB_AGENT_OPERATION_PROMPT, WEB_AGENT_RESULT_EXT
 from ..models.base_model import BaseLLM
 from ..prompts.template import PromptTemplate, StringTemplate
 from pydantic import Field
+from datetime import datetime
 from typing import Optional
+from ..models.base_model import LLMOutputParser
+from ..core.module_utils import parse_json_from_llm_output
 from ..actions.action import ActionOutput
 from ..core.logging import logger
 import json
@@ -140,8 +143,6 @@ class WebSearchAction(CustomizeAction):
                 thinking = operation_result.content
                 decision = ""
             
-            from pdb import set_trace; set_trace()
-            
             tool_call_args = self._extract_tool_calls(operation_result.content)
             if not tool_call_args:
                 break
@@ -174,7 +175,7 @@ class WebSearchAction(CustomizeAction):
             
         # Get the appropriate prompt for return
         current_prompt = self._generate_operation_prompt(inputs or {})
-        content_to_extract = f"{self.searching_memory}"
+        content_to_extract = f"{self.searching_memory['collected_information']}"
         extraction_prompt = self.prepare_extraction_prompt(content_to_extract)
         llm_extracted_output: LLMOutputParser = llm.generate(prompt=extraction_prompt)
         llm_extracted_data: dict = parse_json_from_llm_output(llm_extracted_output.content)

@@ -20,7 +20,7 @@ class SearchSerpAPI(SearchBase):
     default_location: Optional[str] = Field(default=None, description="Default geographic location")
     default_language: Optional[str] = Field(default="en", description="Default interface language")
     default_country: Optional[str] = Field(default="us", description="Default country code")
-    enable_content_scraping: Optional[bool] = Field(default=True, description="Enable full content scraping")
+    enable_content_scraping: Optional[bool] = Field(default=False, description="Enable full content scraping")
     
     def __init__(
         self,
@@ -32,7 +32,7 @@ class SearchSerpAPI(SearchBase):
         default_location: Optional[str] = None,
         default_language: Optional[str] = "en",
         default_country: Optional[str] = "us",
-        enable_content_scraping: Optional[bool] = True,
+        enable_content_scraping: Optional[bool] = False,
         **kwargs
     ):
         """

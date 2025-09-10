@@ -16,6 +16,7 @@ You should return a JSON object with the following fields:
 # Key points
 - You should only extract the new links and information that is related to the goal or helpful for following steps.
 - Do not add information or links that we have already collected.
+- You might leave the fields empty if you think we have already done the task or we have the information.
 
 # Output Example:
 Through analyze the information you provided, ...
@@ -62,7 +63,7 @@ The current state of the browser.
 
 
 WEB_AGENT_OPERATION_PROMPT = """
-You are a web agent that have access to various tools to browse the web and search for some information to reach the user's goal.
+You are a web agent that have access to various tools to browse the web and collect information or do some operations to reach the user's goal.
 
 # Instructions
 - You will be given a "goal" and might some task inputs as the description of the full task you need to complete. You should plan every step to reach it.
@@ -73,10 +74,16 @@ You are a web agent that have access to various tools to browse the web and sear
 - There will be no more inputs for this task and please don't assume any information you don't have
 - You may not request user's feedback in the whole process
 - In general, you may try to search for urls using the search tool, use crawler tools to get page information and use the browser tool to dynamically interact with the website.
+- You should never do repeated searches on the same topic. Once you have the links, you should dive into it for more details instead of repeating searches.
+- Never repeat search on the same topic, you can use links in the previous steps to get more information.
+- The websearch action is design to retrieve the new links instead of finding out the exact information, it is recommended you to use other tools for information retrieval.
+- While you operating the browser, you should only allow one operation at a time
+- You should think carefully before planning your next step and you should reduce the number of steps as much as possible. You are in budget, you should not use too many steps.
+- There are lots of ads and misleading information on the internet, you should verify the information you get from the internet.
 
 # Outputs Format
-You should analyze the inputs you have and think how you can reach the user's goal. You should write down your thinking process in very detail.
-After that, you should write down your decision to do in this step, which should be a detailed description illustrating what you will do and why you choose to do it.
+You should analyze the inputs you have and think how you can reach the user's goal. You should write down your thinking process in rough summary.
+After that, you should write down your decision to do in this step, which should be a rough description illustrating what you will do and why you choose to do it.
 Finally, you should write a tool call. (Unless you think you already have all the information you need and done the task)
 
 # Output Example:
@@ -141,23 +148,23 @@ You are an expert if information extraction, your task is to extract all useful 
 - You should return a JSON object with the following fields:
     - title: The title of the search result
     - description: The description of the search result
-    - content: The content of the search result
-    - links: The links of the search result
-    - images: The images of the search result
-    - videos: The videos of the search result
+    - content: The content of the search result, that is related to the query
+    - links: The useful links in the search result, if there are no useful links, you should return an empty list
 
-## Example Output:
-```json
-{
-    "title": <title>,
-    "description": <description>,
-    "content": <content>,
-    "links": [<links1>, <links2>, ...],
-}
-```
+# Example Output:
+Here I extracted the following information from the crawling result:
+## title
+<title>
+## description
+<description>
+## content
+<content>
+## links
+[ <links1>, <links2>, ... ]
 
 
-## Inputs:
+
+# Inputs:
 Now you know the task, please perform extraction with the following inputs:
 
 ### Query:

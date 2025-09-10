@@ -106,7 +106,7 @@ class BrowserUse(BaseModule):
                 if self._browser_loop and not self._browser_loop.is_closed():
                     self._browser_loop.close()
         
-        self._browser_thread = threading.Thread(target=browser_thread_worker, name="BrowserThread", daemon=True)
+        self._browser_thread = threading.Thread(target=browser_thread_worker, name="BrowserThread", daemon=False)
         self._browser_thread.start()
         
         # Wait for the thread to be ready
@@ -119,6 +119,12 @@ class BrowserUse(BaseModule):
         # Wait for shutdown signal
         while not self._shutdown_event.is_set():
             await asyncio.sleep(0.1)
+        
+        # Cleanup browser session when shutdown is requested
+        try:
+            await self._close_browser_session()
+        except Exception as e:
+            logger.warning(f"Error closing browser session in thread: {e}")
         
     
     def _run_in_browser_thread(self, coro):
@@ -137,8 +143,14 @@ class BrowserUse(BaseModule):
         """Cleanup when the BrowserUse instance is destroyed."""
         try:
             logger.info("BrowserUse instance being destroyed, starting cleanup...")
-            self._cleanup_browser_session()
-            self._shutdown_browser_thread()
+            # Set shutdown event to stop the thread
+            if hasattr(self, '_shutdown_event'):
+                self._shutdown_event.set()
+            
+            # Wait for thread to finish (with timeout)
+            if hasattr(self, '_browser_thread') and self._browser_thread and self._browser_thread.is_alive():
+                self._browser_thread.join(timeout=5)
+            
             logger.info("BrowserUse cleanup completed successfully")
         except Exception as e:
             logger.warning(f"Error during BrowserUse cleanup: {e}")
@@ -656,7 +668,7 @@ class BrowserUse(BaseModule):
             return {"direction": direction, "amount": amount, "success": False, "error": str(e)}
     
     async def get_status(self) -> Dict[str, Any]:
-        """Get current browser status and state with rich agent context."""
+        """Get current browser status and state with essential information."""
         try:
             await self._ensure_browser_started()
             
@@ -723,32 +735,28 @@ class BrowserUse(BaseModule):
                 "content_density": "high" if len(elements) > 50 else "medium" if len(elements) > 20 else "low"
             }
             
+            # Return only essential information
             operation_result = {
                 "action": "get_status",
                 "success": True,
-                "state": state,  # Complete DOM state
                 "timestamp": asyncio.get_event_loop().time(),
-                "agent_context": {
-                    "page_info": {
-                        "url": state.get('url', 'Unknown'),
-                        "title": state.get('title', 'Unknown'),
-                        "element_count": state.get('dom_state', {}).get('element_count', 0),
-                        "tab_count": len(state.get('tabs', []))
-                    },
-                    "interactive_elements": {
-                        "total_clickable": len(clickable_elements),
-                        "all_elements": clickable_elements,  # ALL clickable elements with indices
-                        "links": links,  # ALL links
-                        "buttons": buttons,  # ALL buttons
-                        "inputs": inputs,  # ALL inputs
-                        "selects": select_elements,  # ALL selects
-                        "forms": forms  # ALL forms
-                    },
-                    "suggested_actions": suggested_actions,
-                    "page_analysis": page_analysis,
-                    "recent_elements": clickable_elements[:15],  # Top 15 clickable elements
-                    "message": f"Page loaded with {len(clickable_elements)} interactive elements. {len(links)} links, {len(buttons)} buttons, {len(inputs)} inputs available."
-                }
+                "page_info": {
+                    "url": state.get('url', 'Unknown'),
+                    "title": state.get('title', 'Unknown'),
+                    "element_count": state.get('dom_state', {}).get('element_count', 0),
+                    "tab_count": len(state.get('tabs', []))
+                },
+                "interactive_summary": {
+                    "total_clickable": len(clickable_elements),
+                    "links_count": len(links),
+                    "buttons_count": len(buttons),
+                    "inputs_count": len(inputs),
+                    "selects_count": len(select_elements),
+                    "forms_count": len(forms)
+                },
+                "suggested_actions": suggested_actions[:3],  # Only top 3 suggestions
+                "page_analysis": page_analysis,
+                "message": f"Page loaded with {len(clickable_elements)} interactive elements. {len(links)} links, {len(buttons)} buttons, {len(inputs)} inputs available."
             }
             
             self._operation_history.append(("get_status", operation_result))
@@ -858,36 +866,73 @@ class BrowserUse(BaseModule):
         }
 
     async def _get_page_state(self) -> Dict[str, Any]:
-        """Get comprehensive current page state"""
+        """Get comprehensive current page state using browser-use's optimized method"""
         await self._ensure_browser_started()
         
-        event = self.browser_session.event_bus.dispatch(
-            BrowserStateRequestEvent(
-                include_screenshot=False,
-                cache_clickable_elements_hashes=False
-            )
+        # Use browser-use's optimized state retrieval
+        browser_state = await self.browser_session.get_browser_state_summary(
+            cache_clickable_elements_hashes=True,
+            include_screenshot=False,
+            include_recent_events=False
         )
-        await event
-        result = await event.event_result(raise_if_any=True, raise_if_none=False)
         
-        if not result:
-            return {
-                "url": "Unknown",
-                "title": "Unknown",
-                "tabs": [],
-                "dom_state": {"elements": [], "text_content": "", "element_count": 0},
-                "screenshot": False,
-                "timestamp": asyncio.get_event_loop().time()
-            }
-        
+        # Convert to our format
         return {
-            "url": getattr(result, 'url', 'Unknown'),
-            "title": getattr(result, 'title', 'Unknown'),
-            "tabs": self._extract_tabs_info(getattr(result, 'tabs', [])),
-            "dom_state": self._extract_dom_state(getattr(result, 'dom_state', None)),
-            "screenshot": getattr(result, 'screenshot', None) is not None,
+            "url": browser_state.url,
+            "title": browser_state.title,
+            "tabs": self._extract_tabs_info(browser_state.tabs),
+            "dom_state": self._extract_dom_state_from_browser_use(browser_state.dom_state),
+            "screenshot": bool(browser_state.screenshot),
             "timestamp": asyncio.get_event_loop().time()
         }
+    
+    def _extract_dom_state_from_browser_use(self, dom_state) -> Dict[str, Any]:
+        """Extract DOM state from browser-use's BrowserStateSummary format."""
+        if not dom_state:
+            return {
+                "elements": [],
+                "text_content": "",
+                "element_count": 0
+            }
+        
+        try:
+            # Get elements from browser-use's selector_map
+            elements = []
+            if hasattr(dom_state, 'selector_map') and dom_state.selector_map:
+                for index, node in dom_state.selector_map.items():
+                    element_info = {
+                        "index": index,
+                        "type": node.tag_name.lower() if node.tag_name else 'unknown',
+                        "text": node.node_value or '',
+                        "attributes": node.attributes or {},
+                        "visible": node.is_visible,
+                        "clickable": True,  # All elements in selector_map are clickable
+                        "position": {
+                            "x": node.absolute_position.x if node.absolute_position else 0,
+                            "y": node.absolute_position.y if node.absolute_position else 0,
+                            "width": node.absolute_position.width if node.absolute_position else 0,
+                            "height": node.absolute_position.height if node.absolute_position else 0
+                        } if node.absolute_position else {}
+                    }
+                    elements.append(element_info)
+            
+            # Get text content
+            text_content = ""
+            if hasattr(dom_state, 'llm_representation'):
+                text_content = dom_state.llm_representation()
+            
+            return {
+                "elements": elements,
+                "text_content": text_content,
+                "element_count": len(elements)
+            }
+        except Exception as e:
+            logger.error(f"Error extracting DOM state from browser-use: {e}")
+            return {
+                "elements": [],
+                "text_content": "",
+                "element_count": 0
+            }
     
     def _extract_tabs_info(self, tabs) -> List[Dict[str, Any]]:
         """Extract tab information from browser tabs"""
@@ -1289,17 +1334,17 @@ class BrowserUse(BaseModule):
 # Multiple Specific Tools - Each tool handles one specific functionality
 
 class BrowserUseNavigateTool(Tool):
-    """Tool for navigating to URLs"""
+    """Tool for navigating to URLs and managing browser tabs"""
     name: str = "browser_navigate"
-    description: str = "Navigate to a URL or open new tab"
+    description: str = "Navigate to a specific URL in the current tab or open a new tab. Use this to visit websites, load pages, or open new browser tabs. Returns page state with clickable elements, page title, and current URL after navigation."
     inputs: Dict[str, Dict[str, str]] = {
         "url": {
             "type": "string",
-            "description": "URL to navigate to"
+            "description": "Complete URL to navigate to (e.g., 'https://www.google.com', 'https://example.com/page'). Must include protocol (http:// or https://)."
         },
         "new_tab": {
             "type": "boolean",
-            "description": "Open in new tab (default: false)"
+            "description": "Whether to open the URL in a new browser tab (true) or current tab (false). Default: false. Use true when you want to keep the current page open."
         }
     }
     required: Optional[List[str]] = ["url"]
@@ -1323,13 +1368,13 @@ class BrowserUseNavigateTool(Tool):
 
 
 class BrowserUseClickTool(Tool):
-    """Tool for clicking on elements"""
+    """Tool for clicking on interactive web elements"""
     name: str = "browser_click"
-    description: str = "Click on an element by index"
+    description: str = "Click on a clickable web element (links, buttons, inputs, etc.) by its index number. Use browser_get_status first to see all available clickable elements with their indices. Returns updated page state after the click action."
     inputs: Dict[str, Dict[str, str]] = {
         "index": {
             "type": "integer",
-            "description": "Index of element to click (1-based)"
+            "description": "1-based index number of the clickable element to click. Get available indices from browser_get_status tool. Must be a positive integer corresponding to a clickable element on the current page."
         }
     }
     required: Optional[List[str]] = ["index"]
@@ -1353,12 +1398,12 @@ class BrowserUseClickTool(Tool):
 
 
 class BrowserUseTypeTool(Tool):
-    """Tool for typing text into elements"""
+    """Tool for typing text into input fields and form elements"""
     name: str = "browser_type"
-    description: str = "Type text into an input element by index"
+    description: str = "Type text into input fields, text areas, or other text-entry elements on a webpage. Use this for filling forms, entering search queries, or any text input. Use browser_get_status first to find input elements and their indices."
     inputs: Dict[str, Dict[str, str]] = {
-        "index": {"type": "integer", "description": "Index of the element to type into"},
-        "text": {"type": "string", "description": "Text to type into the element"}
+        "index": {"type": "integer", "description": "1-based index number of the input element to type into. Get available input indices from browser_get_status tool. Must be a positive integer corresponding to an input field on the current page."},
+        "text": {"type": "string", "description": "The text content to type into the input field. Can be any string including numbers, special characters, and spaces. Will be entered exactly as provided."}
     }
     required: Optional[List[str]] = ["index", "text"]
     
@@ -1384,9 +1429,9 @@ class BrowserUseTypeTool(Tool):
 
 
 class BrowserUseCloseTool(Tool):
-    """Tool for closing browser session"""
+    """Tool for closing the entire browser session"""
     name: str = "browser_close"
-    description: str = "Close the browser session completely"
+    description: str = "Completely close the browser session and terminate all browser processes. Use this when you're done with all browser automation tasks. This will close all tabs and free up system resources. Cannot be undone - you'll need to restart browser automation if you need to continue."
     inputs: Dict[str, Dict[str, str]] = {}
     required: Optional[List[str]] = []
     
@@ -1406,17 +1451,17 @@ class BrowserUseCloseTool(Tool):
 
 
 class BrowserUseScrollTool(Tool):
-    """Tool for scrolling pages"""
+    """Tool for scrolling web pages to reveal more content"""
     name: str = "browser_scroll"
-    description: str = "Scroll the page up or down"
+    description: str = "Scroll the current webpage up or down to reveal more content, load additional elements, or navigate through long pages. Useful when you need to see more clickable elements or content that's not currently visible. Returns updated page state with newly visible elements."
     inputs: Dict[str, Dict[str, str]] = {
         "direction": {
             "type": "string",
-            "description": "Direction to scroll: up or down"
+            "description": "Scroll direction: 'up' to scroll towards the top of the page, 'down' to scroll towards the bottom. Only these two values are accepted."
         },
         "amount": {
             "type": "number",
-            "description": "Amount to scroll (0.5 = half page, 1.0 = full page)"
+            "description": "Scroll amount as a decimal number: 0.1 = small scroll, 0.5 = half page, 1.0 = full page, 2.0 = two pages. Higher values scroll more. Recommended: 0.5-1.0 for normal scrolling."
         }
     }
     required: Optional[List[str]] = ["direction", "amount"]
@@ -1440,9 +1485,9 @@ class BrowserUseScrollTool(Tool):
 
 
 class BrowserUseGetStatusTool(Tool):
-    """Tool for getting browser status"""
+    """Tool for getting essential browser and page information"""
     name: str = "browser_get_status"
-    description: str = "Get current browser status and state"
+    description: str = "Get essential information about the current browser state including page URL, title, interactive element counts, and suggested actions. Use this before clicking or typing to see what elements are available. Returns concise summary with element counts and top suggestions."
     inputs: Dict[str, Dict[str, str]] = {}
     required: Optional[List[str]] = []
     
@@ -1466,9 +1511,9 @@ class BrowserUseGetStatusTool(Tool):
 # ============================================================================
 
 class BrowserUseGoBackTool(Tool):
-    """Tool for going back in browser history"""
+    """Tool for navigating back in browser history"""
     name: str = "browser_go_back"
-    description: str = "Go back in browser history"
+    description: str = "Navigate back to the previous page in browser history (equivalent to clicking the back button). Use this to return to a previously visited page. Returns updated page state after going back."
     inputs: Dict[str, Dict[str, str]] = {}
     required: Optional[List[str]] = []
     
@@ -1480,9 +1525,9 @@ class BrowserUseGoBackTool(Tool):
         return _run_async_in_sync(self.browser_use, self.browser_use.go_back)
 
 class BrowserUseRefreshTool(Tool):
-    """Tool for refreshing the current page"""
+    """Tool for refreshing/reloading the current webpage"""
     name: str = "browser_refresh"
-    description: str = "Refresh the current page"
+    description: str = "Reload/refresh the current webpage (equivalent to pressing F5 or clicking refresh button). Use this to reload the page content, refresh dynamic content, or retry failed page loads. Returns updated page state after refresh."
     inputs: Dict[str, Dict[str, str]] = {}
     required: Optional[List[str]] = []
     
@@ -1495,11 +1540,11 @@ class BrowserUseRefreshTool(Tool):
 
 
 class BrowserUseSendKeysTool(Tool):
-    """Tool for sending keyboard keys"""
+    """Tool for sending keyboard shortcuts and special keys"""
     name: str = "browser_send_keys"
-    description: str = "Send keyboard keys (e.g., 'Enter', 'Escape', 'Tab')"
+    description: str = "Send special keyboard keys and shortcuts to the current page. Use this for keyboard shortcuts, form submissions, navigation, or triggering JavaScript events. Common keys: Enter (submit forms), Escape (close dialogs), Tab (navigate between elements), Arrow keys (navigation)."
     inputs: Dict[str, Dict[str, str]] = {
-        "keys": {"type": "string", "description": "Keyboard keys to send (e.g., 'Enter', 'Escape', 'Tab')"}
+        "keys": {"type": "string", "description": "Special keyboard key to send. Common values: 'Enter' (submit/confirm), 'Escape' (cancel/close), 'Tab' (next element), 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space' (click/activate), 'Backspace' (delete). Use exact key names as shown."}
     }
     required: Optional[List[str]] = ["keys"]
     
@@ -1511,11 +1556,11 @@ class BrowserUseSendKeysTool(Tool):
         return _run_async_in_sync(self.browser_use, self.browser_use.send_keys, keys)
 
 class BrowserUseGetDropdownOptionsTool(Tool):
-    """Tool for getting dropdown options"""
+    """Tool for retrieving dropdown menu options"""
     name: str = "browser_get_dropdown_options"
-    description: str = "Get dropdown options for a select element"
+    description: str = "Get all available options from a dropdown/select menu element. Use this before selecting a dropdown option to see what choices are available. Returns a list of all selectable options with their text values."
     inputs: Dict[str, Dict[str, str]] = {
-        "index": {"type": "integer", "description": "Index of the dropdown element"}
+        "index": {"type": "integer", "description": "1-based index number of the dropdown/select element. Get available indices from browser_get_status tool. Must be a positive integer corresponding to a select element on the current page."}
     }
     required: Optional[List[str]] = ["index"]
     
@@ -1527,12 +1572,12 @@ class BrowserUseGetDropdownOptionsTool(Tool):
         return _run_async_in_sync(self.browser_use, self.browser_use.get_dropdown_options, index)
 
 class BrowserUseSelectDropdownOptionTool(Tool):
-    """Tool for selecting dropdown options"""
+    """Tool for selecting options from dropdown menus"""
     name: str = "browser_select_dropdown_option"
-    description: str = "Select an option from a dropdown by text"
+    description: str = "Select a specific option from a dropdown/select menu by matching the option text. Use browser_get_dropdown_options first to see available options. Returns updated page state after selection."
     inputs: Dict[str, Dict[str, str]] = {
-        "index": {"type": "integer", "description": "Index of the dropdown element"},
-        "option_text": {"type": "string", "description": "Text of the option to select"}
+        "index": {"type": "integer", "description": "1-based index number of the dropdown/select element. Get available indices from browser_get_status tool. Must be a positive integer corresponding to a select element on the current page."},
+        "option_text": {"type": "string", "description": "Exact text of the option to select from the dropdown. Must match one of the options returned by browser_get_dropdown_options. Case-sensitive and must match exactly."}
     }
     required: Optional[List[str]] = ["index", "option_text"]
     
@@ -1544,11 +1589,11 @@ class BrowserUseSelectDropdownOptionTool(Tool):
         return _run_async_in_sync(self.browser_use, self.browser_use.select_dropdown_option, index, option_text)
 
 class BrowserUseSwitchTabTool(Tool):
-    """Tool for switching tabs"""
+    """Tool for switching between browser tabs"""
     name: str = "browser_switch_tab"
-    description: str = "Switch to a specific tab"
+    description: str = "Switch the active browser tab to a different open tab. Use this to navigate between multiple open tabs. Get available tab IDs from browser_get_status. Returns updated page state of the newly active tab."
     inputs: Dict[str, Dict[str, str]] = {
-        "tab_id": {"type": "string", "description": "ID of the tab to switch to"}
+        "tab_id": {"type": "string", "description": "Unique identifier of the tab to switch to. Get available tab IDs from browser_get_status tool. Must be a valid tab ID from the current browser session."}
     }
     required: Optional[List[str]] = ["tab_id"]
     
@@ -1560,11 +1605,11 @@ class BrowserUseSwitchTabTool(Tool):
         return _run_async_in_sync(self.browser_use, self.browser_use.switch_tab, tab_id)
 
 class BrowserUseCloseTabTool(Tool):
-    """Tool for closing tabs"""
+    """Tool for closing browser tabs"""
     name: str = "browser_close_tab"
-    description: str = "Close a specific tab"
+    description: str = "Close a specific browser tab or the current tab if no ID provided. Use this to clean up unused tabs or close tabs you're done with. Cannot close the last remaining tab. Returns updated page state after closing."
     inputs: Dict[str, Dict[str, str]] = {
-        "tab_id": {"type": "string", "description": "ID of the tab to close (optional, defaults to current tab)"}
+        "tab_id": {"type": "string", "description": "ID of the specific tab to close. Get available tab IDs from browser_get_status. If not provided or null, closes the current active tab. Must be a valid tab ID from the current browser session."}
     }
     required: Optional[List[str]] = []
     
@@ -1576,11 +1621,11 @@ class BrowserUseCloseTabTool(Tool):
         return _run_async_in_sync(self.browser_use, self.browser_use.close_tab, tab_id)
 
 class BrowserUseCreateTabTool(Tool):
-    """Tool for creating new tabs"""
+    """Tool for creating new browser tabs"""
     name: str = "browser_create_tab"
-    description: str = "Create a new tab and optionally navigate to a URL"
+    description: str = "Create a new browser tab and optionally navigate to a URL. Use this to open additional tabs for multitasking or to keep the current page open while navigating elsewhere. Returns updated page state of the new tab."
     inputs: Dict[str, Dict[str, str]] = {
-        "url": {"type": "string", "description": "URL to navigate to in the new tab (optional, defaults to about:blank)"}
+        "url": {"type": "string", "description": "URL to navigate to in the new tab. If not provided, defaults to 'about:blank' (empty page). Must include protocol (http:// or https://) for external URLs."}
     }
     required: Optional[List[str]] = []
     
@@ -1607,10 +1652,10 @@ class BrowserUseToolkit(Toolkit):
             from browser_use import BrowserSession, BrowserProfile
             # Create optimized browser profile for performance
             browser_profile = BrowserProfile(
-                headless=False,  # Use headless for better performance
-                minimum_wait_page_load_time=0.1,  # Reduce wait times
-                wait_for_network_idle_page_load_time=0.2,
-                wait_between_actions=0.1,
+                headless=False,
+                minimum_wait_page_load_time=1,
+                wait_for_network_idle_page_load_time=2,
+                wait_between_actions=1,
                 highlight_elements=False,  # Disable highlighting for performance
                 cross_origin_iframes=False,  # Disable for performance
                 enable_default_extensions=False,  # Disable extensions for performance
@@ -1639,8 +1684,8 @@ class BrowserUseToolkit(Toolkit):
             BrowserUseGetDropdownOptionsTool(browser_use=browser_use),
             BrowserUseSelectDropdownOptionTool(browser_use=browser_use),
             BrowserUseSwitchTabTool(browser_use=browser_use),
-            BrowserUseCloseTabTool(browser_use=browser_use),
-            BrowserUseCreateTabTool(browser_use=browser_use),
+            # BrowserUseCloseTabTool(browser_use=browser_use),
+            # BrowserUseCreateTabTool(browser_use=browser_use),
         ]
         
         # Initialize parent with tools
