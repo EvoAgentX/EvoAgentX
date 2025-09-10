@@ -96,17 +96,16 @@ class Crawl4AIBase(BaseModule):
             try:
                 # First, try to gracefully close the crawler
                 # Set a short timeout to avoid hanging
-                await asyncio.wait_for(self._crawler.close(), timeout=2.0)
-            except asyncio.TimeoutError:
-                # If graceful close times out, force cleanup
-                await self._force_cleanup_crawler()
-            except Exception:
-                # If any other error occurs, also force cleanup
-                await self._force_cleanup_crawler()
+                await asyncio.wait_for(self._crawler.close(), timeout=1.0)
+            except (asyncio.TimeoutError, RuntimeError, Exception):
+                # If any error occurs, force cleanup
+                try:
+                    await self._force_cleanup_crawler()
+                except Exception:
+                    pass  # Ignore force cleanup errors
             finally:
                 # Always set crawler to None
                 self._crawler = None
-                # Give a small delay for any remaining callbacks to complete
                 
     
     async def _force_cleanup_crawler(self):
@@ -405,12 +404,8 @@ class Crawl4AIToolkit(Toolkit):
         """Cleanup shared resources with timeout."""
         if hasattr(self, 'crawl4ai_base'):
             try:
-                await asyncio.wait_for(self.crawl4ai_base._cleanup_crawler(), timeout=3.0)
-            except asyncio.TimeoutError:
-                # Force set crawler to None
-                if hasattr(self.crawl4ai_base, '_crawler'):
-                    self.crawl4ai_base._crawler = None
-            except Exception as e:
+                await asyncio.wait_for(self.crawl4ai_base._cleanup_crawler(), timeout=2.0)
+            except (asyncio.TimeoutError, RuntimeError, Exception):
                 # Force set crawler to None on any error
                 if hasattr(self.crawl4ai_base, '_crawler'):
                     self.crawl4ai_base._crawler = None
@@ -419,25 +414,9 @@ class Crawl4AIToolkit(Toolkit):
         """Cleanup on deletion with proper event loop handling."""
         try:
             if hasattr(self, 'crawl4ai_base') and self.crawl4ai_base._crawler is not None:
-                # Check if there's a running event loop
-                try:
-                    current_loop = asyncio.get_running_loop()
-                    # If we're in a running loop, schedule cleanup for later
-                    current_loop.call_soon_threadsafe(self._schedule_cleanup)
-                except RuntimeError:
-                    # No running loop, create a new one for cleanup
-                    try:
-                        loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(loop)
-                        # Run cleanup with a very short timeout
-                        loop.run_until_complete(
-                            asyncio.wait_for(self.crawl4ai_base._cleanup_crawler(), timeout=1.0)
-                        )
-                        loop.close()
-                    except Exception:
-                        # If all else fails, just set to None
-                        if hasattr(self, 'crawl4ai_base'):
-                            self.crawl4ai_base._crawler = None
+                # Simply set crawler to None to avoid event loop issues
+                # The browser will be cleaned up by the OS when the process exits
+                self.crawl4ai_base._crawler = None
         except Exception:
             pass  # Ignore all destructor errors
     
