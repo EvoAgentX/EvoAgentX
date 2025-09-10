@@ -17,7 +17,7 @@ We'll cover:
 
 1. **Understanding the Tool Architecture**: Learn about the base Tool class and Toolkit system
 2. **Code Interpreters**: Execute Python code safely using Python and Docker interpreters
-3. **Search Tools**: Access information from the web using Wikipedia and Google search tools
+3. **Search Tools**: Access information from the web using various search tools
 4. **File Operations**: Handle file reading and writing with special support for different file formats
 5. **Database Tools**: Comprehensive database management with MongoDB, PostgreSQL, and FAISS
 6. **Image Handling Tools**: Comprehensive capabilities for image analysis, generation, and manipulation using various AI services and APIs
@@ -34,31 +34,47 @@ By the end of this tutorial, you'll understand how to leverage these tools in yo
 
 **⚠️ Import Note**: Some toolkits (like `FaissToolkit`) need to be imported directly from their specific modules (e.g., `from evoagentx.tools.database_faiss import FaissToolkit`) rather than from the main `evoagentx.tools` package.
 
-| Category | Toolkit Name | Tool Description | Code File Path | Test File Path |
-|----------|--------------|------------------|----------------|----------------|
-| **[1) Code Interpreters](#1-understanding-the-tool-architecture)** | [PythonInterpreterToolkit](#21-pythoninterpretertoolkit) | Safely execute Python code snippets or scripts with controlled imports and filesystem access. Perfect for testing untrusted code. | `evoagentx/tools/interpreter_python.py` | `examples/tools/tools_interpreter.py` |
-| | [DockerInterpreterToolkit](#22-dockerinterpretertoolkit) | Run code in isolated Docker containers for maximum security. Ideal for untrusted code, special dependencies, or strict isolation requirements. | `evoagentx/tools/interpreter_docker.py` | `examples/tools/tools_interpreter.py` |
-| **[2) Search & Request Tools](#2-code-interpreters)** | [WikipediaSearchToolkit](#31-wikipediasearchtoolkit) | Search Wikipedia for articles with summaries and content. Great for research and educational content. | `evoagentx/tools/search_wiki.py` | `examples/tools/tools_search.py` |
-| | [GoogleSearchToolkit](#32-googlesearchtoolkit) | Google Custom Search with official API. High-quality results for professional applications. | `evoagentx/tools/search_google.py` | `examples/tools/tools_search.py` |
-| | [GoogleFreeSearchToolkit](#33-googlefreesearchtoolkit) | Google-style search without API keys. Lightweight alternative for simple queries. | `evoagentx/tools/search_google_f.py` | `examples/tools/tools_search.py` |
-| | [DDGSSearchToolkit](#34-ddgssearchtoolkit) | Privacy-focused search with multiple backends. Ideal for applications requiring user privacy. | `evoagentx/tools/search_ddgs.py` | `examples/tools/tools_search.py` |
-| | [SerpAPIToolkit](#35-serpapitoolkit) | Multi-engine search (Google/Bing/Baidu/Yahoo/DDG). Comprehensive results from multiple sources. | `evoagentx/tools/search_serpapi.py` | `examples/tools/tools_search.py` |
-| | [SerperAPIToolkit](#36-serperapitoolkit) | Google search with content extraction. Enhanced results with webpage content scraping. | `evoagentx/tools/search_serperapi.py` | `examples/tools/tools_search.py` |
-| | [RequestToolkit](#37-requesttoolkit) | HTTP client for API calls and web scraping. Essential for building web-connected agents. | `evoagentx/tools/request.py` | `examples/tools/tools_search.py` |
-| | [ArxivToolkit](#38-arxivtoolkit) | Search arXiv research papers. Perfect for academic and scientific research applications. | `evoagentx/tools/request_arxiv.py` | `examples/tools/tools_search.py` |
-| | [RSSToolkit](#39-rsstoolkit) | Fetch and validate RSS feeds. Monitor news sources and content updates automatically. | `evoagentx/tools/rss_feed.py` | `examples/tools/tools_search.py` |
-| **[3) FileSystem Tools](#3-search-and-request-tools)** | [StorageToolkit](#41-storagetoolkit) | Complete file management with save/read/append/delete/move/copy operations. Essential for data persistence and file handling. | `evoagentx/tools/storage_file.py` | `examples/tools/tools_files.py` |
-| | [CMDToolkit](#42-cmdtoolkit) | Execute shell commands with safety checks and cross-platform support. Perfect for system administration and automation. | `evoagentx/tools/cmd_toolkit.py` | `examples/tools/tools_files.py` |
-| | [FileToolkit](#43-storage-handler-introduction) | File operations toolkit for managing files and directories. | `evoagentx/tools/file_tool.py` | `examples/tools/tools_files.py` |
-| **[4) Database Tools](#4-filesystem-tools)** | [MongoDBToolkit](#51-mongodbtoolkit) | MongoDB operations with automatic local/remote detection. Perfect for document storage and flexible data schemas. | `evoagentx/tools/database_mongodb.py` | `examples/tools/tools_database.py` |
-| | [PostgreSQLToolkit](#52-postgresqltoolkit) | PostgreSQL operations with SQL execution and targeted operations. Ideal for structured data and complex queries. | `evoagentx/tools/database_postgresql.py` | `examples/tools/tools_database.py` |
-| | [FaissToolkit](#53-faisstoolkit) | Vector database for semantic search and similarity matching. Great for AI applications and content discovery. | `evoagentx/tools/database_faiss.py` | `examples/tools/tools_database.py` |
-| **[5) Image Handling Tools](#5-database-tools)** | [ImageAnalysisToolkit](#61-imageanalysistoolkit) | Analyze images and PDFs using AI vision models. Perfect for content moderation and visual understanding. | `evoagentx/tools/image_analysis.py` | `examples/tools/tools_images.py` |
-| | [OpenAIImageGenerationToolkit](#62-openaiimagegenerationtoolkit) | Generate images from text using OpenAI's DALL-E. Great for creative content and visual design. | `evoagentx/tools/images_openai_generation.py` | `examples/tools/tools_images.py` |
-| | [FluxImageGenerationToolkit](#63-fluximagegenerationtoolkit) | Generate images with Flux Kontext Max. Advanced control over aspect ratios and artistic styles. | `evoagentx/tools/images_flux_generation.py` | `examples/tools/tools_images.py` |
-| **[6) Browser Tools](#6-image-handling-tools)** | [BrowserToolkit](#7-browser-tools) | Fine-grained browser automation with precise control. Perfect for complex web scraping and testing workflows. | `evoagentx/tools/browser_tool.py` | `examples/tools/tools_browser.py` |
-| | [BrowserUseToolkit](#7-browser-tools) | Natural language browser automation using AI. Ideal for simple tasks described in plain English. | `evoagentx/tools/browser_use.py` | `examples/tools/tools_browser.py` |
-| **[7) MCP Tools](#8-mcp-tools)** | [MCPToolkit](#81-mcptoolkit) | Connect to external MCP servers and discover their tools. Extends EvoAgentX with third-party capabilities. | `evoagentx/tools/mcp.py` | `examples/tools/tools_integration.py` |
+
+<details>
+<summary>Click to expand full table 🔽</summary>
+
+<br>
+  
+| Toolkit Name | Description | Code File Path | Test File Path |
+|--------------|-------------|----------------|----------------|
+| **🧰 Code Interpreters** |  |  |  |
+| [PythonInterpreterToolkit](#21-pythoninterpretertoolkit) | Safely execute Python code snippets or local .py scripts with sandboxed imports and controlled filesystem access. | [evoagentx/tools/interpreter_python.py](../../evoagentx/tools/interpreter_python.py) | [examples/tools/tools_interpreter.py](../../examples/tools/tools_interpreter.py) |
+| [DockerInterpreterToolkit](#22-dockerinterpretertoolkit) | Run code (e.g., Python) inside an isolated Docker container—useful for untrusted code, special deps, or strict isolation. | [evoagentx/tools/interpreter_docker.py](../../evoagentx/tools/interpreter_docker.py) | [examples/tools/tools_interpreter.py](../../examples/tools/tools_interpreter.py) |
+| **🧰 Search & Request Tools** |  |  |  |
+| [WikipediaSearchToolkit](#31-wikipediasearchtoolkit) | Search Wikipedia and retrieve results with title, summary, full content, and URL. | [evoagentx/tools/search_wiki.py](../../evoagentx/tools/search_wiki.py) | [examples/tools/tools_search.py](../../examples/tools/tools_search.py) |
+| [GoogleSearchToolkit](#32-googlesearchtoolkit) | Google Custom Search (official API). Requires GOOGLE_API_KEY and GOOGLE_SEARCH_ENGINE_ID. | [evoagentx/tools/search_google.py](../../evoagentx/tools/search_google.py) | [examples/tools/tools_search.py](../../examples/tools/tools_search.py) |
+| [GoogleFreeSearchToolkit](#33-googlefreesearchtoolkit) | Google-style search without API credentials (lightweight alternative). | [evoagentx/tools/search_google_f.py](../../evoagentx/tools/search_google_f.py) | [examples/tools/tools_search.py](../../examples/tools/tools_search.py) |
+| [DDGSSearchToolkit](#34-ddgssearchtoolkit) | Search using DDGS with multiple backends and privacy-focused results | [evoagentx/tools/search_ddgs.py](../../evoagentx/tools/search_ddgs.py) | [examples/tools/tools_search.py](../../examples/tools/tools_search.py) |
+| [SerpAPIToolkit](#35-serpapitoolkit) | Multi-engine search via SerpAPI (Google/Bing/Baidu/Yahoo/DDG) with optional content scraping. Requires SERPAPI_KEY. | [evoagentx/tools/search_serpapi.py](../../evoagentx/tools/search_serpapi.py) | [examples/tools/tools_search.py](../../examples/tools/tools_search.py) |
+| [SerperAPIToolkit](#36-serperapitoolkit) | Google search via SerperAPI with content extraction. Requires SERPERAPI_KEY. | [evoagentx/tools/search_serperapi.py](../../evoagentx/tools/search_serperapi.py) | [examples/tools/tools_search.py](../../examples/tools/tools_search.py) |
+| [RequestToolkit](#37-requesttoolkit) | General HTTP client (GET/POST/PUT/DELETE) with params, form, JSON, headers, raw/processed response, and optional save to file. | [evoagentx/tools/request.py](../../evoagentx/tools/request.py) | [examples/tools/tools_search.py](../../examples/tools/tools_search.py) |
+| [ArxivToolkit](#38-arxivtoolkit) | Search arXiv for research papers (title, authors, abstract, links/categories). | [evoagentx/tools/request_arxiv.py](../../evoagentx/tools/request_arxiv.py) | [examples/tools/tools_search.py](../../examples/tools/tools_search.py) |
+| [RSSToolkit](#39-rsstoolkit) | Fetch RSS feeds (with optional webpage content extraction) and validate feeds. | [evoagentx/tools/rss_feed.py](../../evoagentx/tools/rss_feed.py) | [examples/tools/tools_search.py](../../examples/tools/tools_search.py) |
+| [GoogleMapsToolkit](#310-googlemapstoolkit) | Geoinformation retrieval and path planning via Google API service. | [evoagentx/tools/google_maps_tool.py](../../evoagentx/tools/google_maps_tool.py) | [examples/tools/google_maps_example.py](../../examples/tools/google_maps_example.py) |
+| **🧰 FileSystem Tools** |  |  |  |
+| [StorageToolkit](#41-storagetoolkit) | File I/O utilities: save/read/append/delete, check existence, list files, list supported formats (pluggable storage backends). | [evoagentx/tools/storage_file.py](../../evoagentx/tools/storage_file.py) | [examples/tools/tools_files.py](../../examples/tools/tools_files.py) |
+| [CMDToolkit](#42-cmdtoolkit) | Execute shell/CLI commands with working directory and timeout control; returns stdout/stderr/return code. | [evoagentx/tools/cmd_toolkit.py](../../evoagentx/tools/cmd_toolkit.py) | [examples/tools/tools_files.py](../../examples/tools/tools_files.py) |
+| [FileToolkit](#43-storage-handler-introduction) | File operations toolkit for managing files and directories | [evoagentx/tools/file_tool.py](../../evoagentx/tools/file_tool.py) | [examples/tools/tools_files.py](../../examples/tools/tools_files.py) |
+| **🧰 Database Tools** |  |  |  |
+| [MongoDBToolkit](#51-mongodbtoolkit) | MongoDB operations—execute queries/aggregations, find with filter/projection/sort, update, delete, info. | [evoagentx/tools/database_mongodb.py](../../evoagentx/tools/database_mongodb.py) | [examples/tools/tools_database.py](../../examples/tools/tools_database.py) |
+| [PostgreSQLToolkit](#52-postgresqltoolkit) | PostgreSQL operations—generic SQL execution, targeted SELECT (find), UPDATE, CREATE, DELETE, INFO. | [evoagentx/tools/database_postgresql.py](../../evoagentx/tools/database_postgresql.py) | [examples/tools/tools_database.py](../../examples/tools/tools_database.py) |
+| [FaissToolkit](#53-faisstoolkit) | Vector database (FAISS) for semantic search—insert documents (auto chunk+embed), query by similarity, delete by id/metadata, stats. | [evoagentx/tools/database_faiss.py](../../evoagentx/tools/database_faiss.py) | [examples/tools/tools_database.py](../../examples/tools/tools_database.py) |
+| **🧰 Image Handling Tools** |  |  |  |
+| [ImageAnalysisToolkit](#61-imageanalysistoolkit) | Vision analysis (OpenRouter GPT-4o family): describe images, extract objects/UI info, answer questions about an image. | [evoagentx/tools/image_analysis.py](../../evoagentx/tools/image_analysis.py) | [examples/tools/tools_images.py](../../examples/tools/tools_images.py) |
+| [OpenAIImageGenerationToolkit](#62-openaiimagegenerationtoolkit) | Text-to-image via OpenAI (DALL·E family) with size/quality/style controls. | [evoagentx/tools/images_openai_generation.py](../../evoagentx/tools/images_openai_generation.py) | [examples/tools/tools_images.py](../../examples/tools/tools_images.py) |
+| [FluxImageGenerationToolkit](#63-fluximagegenerationtoolkit) | Text-to-image via Flux Kontext Max (BFL) with aspect ratio, seed, format, prompt upsampling, and safety tolerance. | [evoagentx/tools/images_flux_generation.py](../../evoagentx/tools/images_flux_generation.py) | [examples/tools/tools_images.py](../../examples/tools/tools_images.py) |
+| **🧰 Browser Tools** |  |  |  |
+| [BrowserToolkit](#7-browser-tools) | Fine-grained browser automation: initialize, navigate, type, click, resnapshot page, read console logs, and close. | [evoagentx/tools/browser_tool.py](../../evoagentx/tools/browser_tool.py) | [examples/tools/tools_browser.py](../../examples/tools/tools_browser.py) |
+| [BrowserUseToolkit](#7-browser-tools) | High-level, natural-language browser automation (navigate, fill forms, click, search, etc.) driven by an LLM. | [evoagentx/tools/browser_use.py](../../evoagentx/tools/browser_use.py) | [examples/tools/tools_browser.py](../../examples/tools/tools_browser.py) |
+| **🧰 MCP Tools** |  |  |  |
+| [MCPToolkit](#81-mcptoolkit) | Connect to external MCP servers and discover their tools. Extends EvoAgentX with third-party capabilities. | [evoagentx/tools/mcp.py](../../evoagentx/tools/mcp.py) | [examples/tools/tools_integration.py](../../examples/tools/tools_integration.py) |
+
+</details>
 
 **🔗 Quick Navigation Links:**
 - [Code Interpreters](#1-understanding-the-tool-architecture) - Execute code safely
@@ -82,13 +98,14 @@ python -m examples.tools.tools
 **📚 Individual Tool Categories**:
 ```bash
 # Run specific tool categories
-python -m examples.tools.tools_interpreter    # Code interpreters
-python -m examples.tools.tools_search         # Search and request tools  
-python -m examples.tools.tools_files          # File system tools
-python -m examples.tools.tools_database       # Database tools
-python -m examples.tools.tools_images         # Image handling tools
-python -m examples.tools.tools_browser        # Browser automation tools
-python -m examples.tools.tools_integration    # MCP and integration tools
+python -m examples.tools.tools_interpreter        # Code interpreters
+python -m examples.tools.tools_search             # Search and request tools  
+python -m examples.tools.tools_files              # File system tools
+python -m examples.tools.tools_database           # Database tools
+python -m examples.tools.tools_images             # Image handling tools
+python -m examples.tools.tools_browser            # Browser automation tools
+python -m examples.tools.tools_integration        # MCP and integration tools
+python -m examples.tools.google_maps_example.py   # Google maps tool
 ```
 
 **Note**: The original `tools.py` file contains all examples in one place, while the separated files focus on specific tool categories for easier learning and testing.
@@ -1211,7 +1228,492 @@ else:
 
 ---
 
-## Summary of Search and Request Tools
+
+### 3.10 GoogleMapsToolkit
+
+**The GoogleMapsToolkit provides access to Google's comprehensive mapping and location services, including geocoding, places search, directions, distance calculations, and time zone information. It's designed to work seamlessly with AI agents by automatically retrieving API keys from environment variables.**
+
+#### 3.10.1 Setup
+
+```python
+from evoagentx.tools import GoogleMapsToolkit
+
+# Initialize the toolkit - API key will be automatically retrieved from environment
+toolkit = GoogleMapsToolkit()
+
+# Or initialize with explicit API key
+toolkit = GoogleMapsToolkit(api_key="your_api_key_here")
+```
+
+#### 3.10.2 Available Methods
+
+The `GoogleMapsToolkit` provides **7 callable tools**:
+
+##### Tool 1: geocode_address
+
+**Description**: Convert a street address into geographic coordinates (latitude and longitude).
+
+**Usage Example**:
+```python
+# Get the geocoding tool
+geocode_tool = toolkit.get_tool("geocode_address")
+
+# Convert address to coordinates
+result = geocode_tool(address="1600 Amphitheatre Parkway, Mountain View, CA")
+
+if result["success"]:
+    print(f"Address: {result['formatted_address']}")
+    print(f"Coordinates: {result['latitude']}, {result['longitude']}")
+    print(f"Place ID: {result['place_id']}")
+else:
+    print(f"Error: {result['error']}")
+```
+
+**Parameters**:
+- `address` (str, required): The street address to geocode
+- `components` (str, optional): Component filters (e.g., 'country:US|locality:Mountain View')
+- `region` (str, optional): Region code for biasing results (e.g., 'us', 'uk')
+
+**Return Type**: `Dict[str, Any]`
+
+**Sample Return**:
+```python
+{
+    "success": True,
+    "address": "1600 Amphitheatre Parkway, Mountain View, CA",
+    "formatted_address": "Google Building 41, 1600 Amphitheatre Pkwy, Mountain View, CA 94043, USA",
+    "latitude": 37.4205384,
+    "longitude": -122.0865117,
+    "place_id": "ChIJxQvW8wK6j4AR3ukttGy3w2s",
+    "location_type": "ROOFTOP",
+    "address_components": [...]
+}
+```
+
+---
+
+##### Tool 2: reverse_geocode
+
+**Description**: Convert geographic coordinates (latitude and longitude) into a human-readable address.
+
+**Usage Example**:
+```python
+# Get the reverse geocoding tool
+reverse_geocode_tool = toolkit.get_tool("reverse_geocode")
+
+# Convert coordinates to address
+result = reverse_geocode_tool(latitude=37.4205384, longitude=-122.0865117)
+
+if result["success"]:
+    print("Addresses found:")
+    for i, addr in enumerate(result['addresses'][:3]):
+        print(f"  {i+1}. {addr['formatted_address']}")
+else:
+    print(f"Error: {result['error']}")
+```
+
+**Parameters**:
+- `latitude` (float, required): Latitude coordinate
+- `longitude` (float, required): Longitude coordinate
+- `result_type` (str, optional): Filter for result types (e.g., 'street_address|route')
+
+**Return Type**: `Dict[str, Any]`
+
+**Sample Return**:
+```python
+{
+    "success": True,
+    "latitude": 37.4205384,
+    "longitude": -122.0865117,
+    "addresses": [
+        {
+            "formatted_address": "Google Building 41, 1600 Amphitheatre Pkwy, Mountain View, CA 94043, USA",
+            "place_id": "ChIJxQvW8wK6j4AR3ukttGy3w2s",
+            "types": ["premise"],
+            "address_components": [...]
+        }
+    ]
+}
+```
+
+---
+
+##### Tool 3: places_search
+
+**Description**: Search for places (restaurants, shops, landmarks) using text queries. Can search near a specific location.
+
+**Usage Example**:
+```python
+# Get the places search tool
+places_search_tool = toolkit.get_tool("places_search")
+
+# Search for restaurants near a location
+result = places_search_tool(
+    query="restaurants near Mountain View, CA",
+    location="37.4205384,-122.0865117",
+    radius=2000
+)
+
+if result["success"]:
+    print(f"Found {result['places_found']} restaurants")
+    for i, place in enumerate(result['places'][:3]):
+        print(f"  {i+1}. {place['name']}")
+        print(f"     Address: {place['formatted_address']}")
+        print(f"     Rating: {place.get('rating', 'N/A')}")
+else:
+    print(f"Error: {result['error']}")
+```
+
+**Parameters**:
+- `query` (str, required): Text search query (e.g., 'pizza restaurants near Times Square')
+- `location` (str, optional): Location bias as 'latitude,longitude' (e.g., '40.7589,-73.9851')
+- `radius` (float, optional): Search radius in meters (max 50000)
+- `type` (str, optional): Place type filter (e.g., 'restaurant', 'gas_station')
+
+**Return Type**: `Dict[str, Any]`
+
+**Sample Return**:
+```python
+{
+    "success": True,
+    "query": "restaurants near Mountain View, CA",
+    "places_found": 5,
+    "places": [
+        {
+            "name": "Restaurant Name",
+            "place_id": "ChIJ...",
+            "formatted_address": "123 Main St, Mountain View, CA",
+            "rating": 4.5,
+            "user_ratings_total": 150,
+            "price_level": 2,
+            "types": ["restaurant", "food"],
+            "geometry": {...},
+            "business_status": "OPERATIONAL"
+        }
+    ]
+}
+```
+
+---
+
+##### Tool 4: place_details
+
+**Description**: Get comprehensive information about a specific place using its Place ID, including contact info, hours, reviews.
+
+**Usage Example**:
+```python
+# Get the place details tool
+place_details_tool = toolkit.get_tool("place_details")
+
+# Get detailed information about a place
+result = place_details_tool(place_id="ChIJxQvW8wK6j4AR3ukttGy3w2s")
+
+if result["success"]:
+    print(f"Name: {result['name']}")
+    print(f"Address: {result['formatted_address']}")
+    print(f"Phone: {result.get('phone_number', 'N/A')}")
+    print(f"Website: {result.get('website', 'N/A')}")
+    print(f"Rating: {result.get('rating', 'N/A')} ({result.get('user_ratings_total', 0)} reviews)")
+else:
+    print(f"Error: {result['error']}")
+```
+
+**Parameters**:
+- `place_id` (str, required): Unique Place ID from a place search
+- `fields` (str, optional): Comma-separated list of fields to return (e.g., 'name,rating,formatted_phone_number')
+
+**Return Type**: `Dict[str, Any]`
+
+**Sample Return**:
+```python
+{
+    "success": True,
+    "place_id": "ChIJxQvW8wK6j4AR3ukttGy3w2s",
+    "name": "Google Building 41",
+    "formatted_address": "1600 Amphitheatre Pkwy, Mountain View, CA 94043, USA",
+    "phone_number": "+1 650-253-0000",
+    "website": "https://www.google.com/",
+    "rating": 4.2,
+    "user_ratings_total": 1250,
+    "price_level": None,
+    "types": ["premise"],
+    "opening_hours": {...},
+    "geometry": {...},
+    "business_status": "OPERATIONAL",
+    "reviews": [...]
+}
+```
+
+---
+
+##### Tool 5: directions
+
+**Description**: Calculate directions between two or more locations with different travel modes (driving, walking, bicycling, transit).
+
+**Usage Example**:
+```python
+# Get the directions tool
+directions_tool = toolkit.get_tool("directions")
+
+# Get driving directions
+result = directions_tool(
+    origin="San Francisco, CA",
+    destination="Mountain View, CA",
+    mode="driving"
+)
+
+if result["success"] and result['routes']:
+    route = result['routes'][0]
+    print(f"Route from {result['origin']} to {result['destination']}")
+    print(f"Distance: {route['total_distance_meters']} meters")
+    print(f"Duration: {route['total_duration_seconds']} seconds")
+    
+    # Show first few steps
+    if route['legs'] and route['legs'][0]['steps']:
+        print("First 3 steps:")
+        for i, step in enumerate(route['legs'][0]['steps'][:3]):
+            instructions = step['instructions'].replace('<b>', '').replace('</b>', '')
+            print(f"  {i+1}. {instructions}")
+else:
+    print(f"Error: {result['error']}")
+```
+
+**Parameters**:
+- `origin` (str, required): Starting location (address, coordinates, or place ID)
+- `destination` (str, required): Ending location (address, coordinates, or place ID)
+- `mode` (str, optional): Travel mode: 'driving', 'walking', 'bicycling', or 'transit' (default: driving)
+- `waypoints` (str, optional): Waypoints separated by '|' (e.g., 'via:San Francisco|via:Los Angeles')
+- `alternatives` (bool, optional): Whether to return alternative routes (default: false)
+
+**Return Type**: `Dict[str, Any]`
+
+**Sample Return**:
+```python
+{
+    "success": True,
+    "origin": "San Francisco, CA",
+    "destination": "Mountain View, CA",
+    "mode": "driving",
+    "routes": [
+        {
+            "summary": "I-280 S",
+            "legs": [...],
+            "total_distance_meters": 50000,
+            "total_duration_seconds": 3600,
+            "overview_polyline": {...},
+            "warnings": [],
+            "copyrights": "Map data ©2024 Google"
+        }
+    ]
+}
+```
+
+---
+
+##### Tool 6: distance_matrix
+
+**Description**: Calculate travel times and distances between multiple origins and destinations. Useful for finding the closest location.
+
+**Usage Example**:
+```python
+# Get the distance matrix tool
+distance_matrix_tool = toolkit.get_tool("distance_matrix")
+
+# Calculate distances between multiple locations
+result = distance_matrix_tool(
+    origins="San Francisco,CA|Oakland,CA",
+    destinations="Mountain View,CA|Palo Alto,CA",
+    mode="driving",
+    units="imperial"
+)
+
+if result["success"]:
+    print("Distance Matrix Results:")
+    for origin_data in result['matrix']:
+        print(f"\nFrom: {origin_data['origin_address']}")
+        for dest in origin_data['destinations']:
+            if dest['status'] == 'OK':
+                print(f"  To {dest['destination_address']}: {dest['distance'].get('text', 'N/A')} - {dest['duration'].get('text', 'N/A')}")
+else:
+    print(f"Error: {result['error']}")
+```
+
+**Parameters**:
+- `origins` (str, required): Origin locations separated by '|' (e.g., 'Seattle,WA|Portland,OR')
+- `destinations` (str, required): Destination locations separated by '|' (e.g., 'San Francisco,CA|Los Angeles,CA')
+- `mode` (str, optional): Travel mode: 'driving', 'walking', 'bicycling', or 'transit' (default: driving)
+- `units` (str, optional): Unit system: 'metric' or 'imperial' (default: metric)
+
+**Return Type**: `Dict[str, Any]`
+
+**Sample Return**:
+```python
+{
+    "success": True,
+    "origins": ["San Francisco,CA", "Oakland,CA"],
+    "destinations": ["Mountain View,CA", "Palo Alto,CA"],
+    "mode": "driving",
+    "units": "imperial",
+    "matrix": [
+        {
+            "origin_address": "San Francisco, CA, USA",
+            "destinations": [
+                {
+                    "destination_address": "Mountain View, CA, USA",
+                    "status": "OK",
+                    "distance": {"text": "35.2 mi", "value": 56644},
+                    "duration": {"text": "45 mins", "value": 2700}
+                }
+            ]
+        }
+    ]
+}
+```
+
+---
+
+##### Tool 7: timezone
+
+**Description**: Get time zone information for a specific location using coordinates.
+
+**Usage Example**:
+```python
+# Get the timezone tool
+timezone_tool = toolkit.get_tool("timezone")
+
+# Get timezone information
+result = timezone_tool(latitude=37.4205384, longitude=-122.0865117)
+
+if result["success"]:
+    print(f"Location: {result['latitude']}, {result['longitude']}")
+    print(f"Time Zone: {result['time_zone_name']} ({result['time_zone_id']})")
+    print(f"UTC Offset: {result['raw_offset']} seconds")
+    print(f"DST Offset: {result['dst_offset']} seconds")
+else:
+    print(f"Error: {result['error']}")
+```
+
+**Parameters**:
+- `latitude` (float, required): Latitude coordinate
+- `longitude` (float, required): Longitude coordinate
+- `timestamp` (float, optional): Unix timestamp for the desired time (default: current time)
+
+**Return Type**: `Dict[str, Any]`
+
+**Sample Return**:
+```python
+{
+    "success": True,
+    "latitude": 37.4205384,
+    "longitude": -122.0865117,
+    "time_zone_id": "America/Los_Angeles",
+    "time_zone_name": "Pacific Standard Time",
+    "dst_offset": 3600,
+    "raw_offset": -28800,
+    "status": "OK"
+}
+```
+
+#### 3.10.3 Setup Hints
+
+- **API Key Requirements**: The toolkit requires a Google Maps Platform API key. Set it in your environment:
+  ```bash
+  export GOOGLE_MAPS_API_KEY="your_api_key_here"
+  ```
+
+- **Required APIs**: Enable the following APIs in your Google Cloud Console:
+  - **Geocoding API**: For address-to-coordinates conversion
+  - **Places API**: For place search and details
+  - **Directions API**: For route calculation
+  - **Distance Matrix API**: For multi-point distance calculations
+  - **Time Zone API**: For timezone information
+
+- **API Key Security**: 
+  - Never hardcode API keys in your source code
+  - Use environment variables or secure configuration management
+  - Restrict your API key to only the required APIs
+  - Set up billing alerts to monitor usage
+
+- **Error Handling**: The toolkit provides comprehensive error handling:
+  - Missing API key: Returns clear error message with setup instructions
+  - Invalid API key: Returns Google Maps API error messages
+  - Network issues: Returns appropriate error messages
+  - Rate limiting: Handles Google's rate limits gracefully
+
+- **Usage Limits**: Google Maps Platform has usage quotas and billing:
+  - Free tier provides generous limits for development and testing
+  - Monitor your usage in the Google Cloud Console
+  - Consider implementing caching for frequently accessed data
+
+#### 3.10.4 Complete Example
+
+```python
+from evoagentx.tools import GoogleMapsToolkit
+
+# Initialize the toolkit
+toolkit = GoogleMapsToolkit()
+
+# Check if API key is available
+if not toolkit.google_maps_base.api_key:
+    print("Please set GOOGLE_MAPS_API_KEY environment variable")
+    print("Get your API key from: https://console.cloud.google.com/apis/")
+    exit(1)
+
+print("=== Google Maps Platform Tools Demo ===\n")
+
+# 1. Geocoding - Convert address to coordinates
+print("1. Geocoding Address to Coordinates")
+geocode_tool = toolkit.get_tool("geocode_address")
+result = geocode_tool(address="1600 Amphitheatre Parkway, Mountain View, CA")
+
+if result["success"]:
+    print(f"Address: {result['formatted_address']}")
+    print(f"Coordinates: {result['latitude']}, {result['longitude']}")
+    lat, lng = result['latitude'], result['longitude']
+else:
+    print(f"Geocoding failed: {result['error']}")
+    exit(1)
+
+# 2. Places Search - Find nearby restaurants
+print("\n2. Places Search - Find Restaurants")
+places_search_tool = toolkit.get_tool("places_search")
+result = places_search_tool(
+    query="restaurants near Mountain View, CA",
+    location=f"{lat},{lng}",
+    radius=2000
+)
+
+if result["success"]:
+    print(f"Found {result['places_found']} restaurants")
+    for i, place in enumerate(result['places'][:3]):
+        print(f"  {i+1}. {place['name']} - Rating: {place.get('rating', 'N/A')}")
+else:
+    print(f"Places search failed: {result['error']}")
+
+# 3. Directions - Get driving directions
+print("\n3. Directions - Driving Route")
+directions_tool = toolkit.get_tool("directions")
+result = directions_tool(
+    origin="San Francisco, CA",
+    destination="Mountain View, CA",
+    mode="driving"
+)
+
+if result["success"] and result['routes']:
+    route = result['routes'][0]
+    print(f"Route from {result['origin']} to {result['destination']}")
+    print(f"Distance: {route['total_distance_meters']} meters")
+    print(f"Duration: {route['total_duration_seconds']} seconds")
+else:
+    print(f"Directions failed: {result['error']}")
+
+print("\n=== Demo Complete ===")
+```
+
+---
+
+
+### Summary of Search and Request Tools
 
 The search and request tools in EvoAgentX provide comprehensive access to information from various sources:
 
@@ -1226,6 +1728,7 @@ The search and request tools in EvoAgentX provide comprehensive access to inform
 | **RequestToolkit** | HTTP operations | ❌ | API interactions, web scraping |
 | **ArxivToolkit** | Research papers | ❌ | Academic research, scientific content |
 | **RSSToolkit** | News and updates | ❌ | Real-time information, monitoring |
+| **GoogleMapsToolkit** | Geoinformation | ✅ | Geoinformation retrieval, path planning |
 
 Choose the appropriate toolkit based on your specific needs, API key availability, and the type of information you need to retrieve.
 
@@ -3028,13 +3531,17 @@ Search Results:
 --------------------------------------------------
 Result type: <class 'dict'>
 Result content: {'papers': [{'title': 'Deep Learning for AI'...}]}
-
 ✓ MCP arXiv example completed
 ✓ MCP connection closed
-
 ===== ALL MCP TOOL EXAMPLES COMPLETED =====
 ```
 
+1. **Tool Architecture**: Understood the base Tool class and Toolkit system providing standardized interfaces
+2. **Code Interpreters**: Learned how to execute Python code securely using both Python and Docker interpreter toolkits
+3. **Search Tools**: Discovered how to access web information using Wikipedia and Google search toolkits
+4. **File Operations**: Learned how to handle file operations with special support for different file formats
+5. **Browser Automation**: Learned how to control web browsers using both Selenium-based fine-grained control and AI-driven natural language automation
+6. **MCP Tools**: Learned how to connect to external services using the Model Context Protocol
 **Note**: Make sure you have the required MCP server packages installed and running before testing the examples.
 
 ---

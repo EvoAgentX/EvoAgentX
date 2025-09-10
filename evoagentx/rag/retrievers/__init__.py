@@ -26,13 +26,14 @@ class RetrieverFactory:
         graph_store: Optional[GraphStore] = None,
         embed_model: Optional[BaseEmbedding] = None,
         query: Optional[Query] = None,    # Only for set topk
-        storage_handler: Optional[StorageHandler] = None  # Only use in graph_retrieve
+        storage_handler: Optional[StorageHandler] = None,  # Only use in graph_retrieve
+        chunk_class = None  # Chunk class based on modality
     ) -> BaseRetrieverWrapper:
         """Create a retriever based on configuration."""
         if retriever_type == RetrieverType.VECTOR.value:
             if not index:
                 raise ValueError("Index required for vector retriever")
-            retriever = VectorRetriever(index=index, top_k=query.top_k if query else 5)
+            retriever = VectorRetriever(index=index, top_k=query.top_k if query else 5, chunk_class=chunk_class)
         elif retriever_type == RetrieverType.GRAPH.value:
             if not (graph_store and embed_model and llm):
                 raise ValueError("Graph store, embed model and llm model required for graph retriever")

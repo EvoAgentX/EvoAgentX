@@ -121,3 +121,9 @@ examples/output/**
 debug*/
 debug*.py
 logs/
+server/config/app.env 
+server/tunnel_info.json 
+workflows/
+workflows.db 
+evaluation_pipeline/checkpoints/ 
+evaluation_pipeline/results/

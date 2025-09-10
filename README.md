@@ -41,11 +41,82 @@
   <img src="./assets/framework_en.jpg">
 </p>
 
+## What is EvoAgentX
+EvoAgentX is an open-source framework for building, evaluating, and evolving LLM-based agents or agentic workflows in an automated, modular, and goal-driven manner.
 
-## 🔥 Latest News
-- **[July 2025]** 🎉 **EvoAgentX** is on [arxiv](https://arxiv.org/abs/2507.03616)!
-- **[July 2025]** 🎉 **EvoAgentX** has achieved 1,000 stars!
-- **[May 2025]** 🎉 **EvoAgentX** has been officially released!
+At its core, EvoAgentX enables developers and researchers to move beyond static prompt chaining or manual workflow orchestration. It introduces a self-evolving agent ecosystem, where AI agents can be constructed, assessed, and optimized through iterative feedback loops—much like how software is continuously tested and improved.
+
+### ✨ Key Features
+
+- 🧱 **Agent Workflow Autoconstruction**
+  
+  From a single prompt, EvoAgentX builds structured, multi-agent workflows tailored to the task.
+
+- 🔍 **Built-in Evaluation**
+  
+  It integrates automatic evaluators to score agent behavior using task-specific criteria.
+
+- 🔁 **Self-Evolution Engine**
+  
+  Agents don’t just work—they learn. EvoAgentX improves workflows using self-evolving algorithms.
+- 🧩 **Plug-and-Play Compatibility**
+  
+  Easily integrate original [OpenAI](https://github.com/EvoAgentX/EvoAgentX/blob/main/evoagentx/models/openai_model.py) and [qwen](https://github.com/EvoAgentX/EvoAgentX/blob/main/evoagentx/models/aliyun_model.py) or other popular models, including Claude, Deepseek, kimi models through ([LiteLLM](https://github.com/EvoAgentX/EvoAgentX/blob/main/evoagentx/models/litellm_model.py), [siliconflow](https://github.com/EvoAgentX/EvoAgentX/blob/main/evoagentx/models/siliconflow_model.py) or [openrouter](https://github.com/EvoAgentX/EvoAgentX/blob/main/evoagentx/models/openrouter_model.py)). If you want to use LLMs locally deployed on your own machine, you can try LiteLLM. 
+
+- 🧰 **Comprehensive Built-in Tools**
+  
+  EvoAgentX ships with a rich set of built-in tools that empower agents to interact with real-world environments.
+
+- 🧠 **Memory Module**
+  
+  EvoAgentX supports both ephemeral (short-term) and persistent (long-term) memory systems.
+
+- 🧑‍💻 **Human-in-the-Loop (HITL) Interactions**
+  
+  EvoAgentX supports interactive workflows where humans review, correct, and guide agent behavior.
+
+
+### 🚀 What You Can Do with EvoAgentX
+
+EvoAgentX isn’t just a framework — it’s your **launchpad for real-world AI agents**.
+
+Whether you're an AI researcher, workflow engineer, or startup team, EvoAgentX helps you **go from a vague idea to a fully functional agentic system** — with minimal engineering and maximum flexibility.
+
+Here’s how:
+
+- 🔍 **Struggling to improve your workflows?**  
+  EvoAgentX can **automatically evolve and optimize your agentic workflows** using SOTA self-evolving algorithms, driven by your dataset and goals.
+- 🧑‍💻 **Want to supervise the agent and stay in control?**  
+  Insert yourself into the loop! EvoAgentX supports **Human-in-the-Loop (HITL)** checkpoints, so you can step in, review, or guide the workflow as needed — and step out again.
+
+- 🧠 **Frustrated by agents that forget everything?**  
+  EvoAgentX provides **both short-term and long-term memory modules**, enabling your agents to remember, reflect, and improve across interactions.
+
+- ⚙️ **Lost in manual workflow orchestration?**  
+  Just describe your goal — EvoAgentX will **automatically assemble a multi-agent workflow** that matches your intent.
+
+- 🌍 **Want your agents to actually *do* things?**  
+  With a rich library of built-in tools (search, code, browser, file I/O, APIs, and more), EvoAgentX empowers agents to **interact with the real world**, not just talk about it.
+
+
+
+## 🔥 EAX Latest News
+
+- **[Aug 2025]** 🚀 **New Survey Released!**  
+  Our team just published a comprehensive survey on **Self-Evolving AI Agents**—exploring how agents can learn, adapt, and optimize over time.  
+  👉 [Read it on arXiv](https://arxiv.org/abs/2508.07407)
+  👉 [Check the repo](https://github.com/EvoAgentX/Awesome-Self-Evolving-Agents)
+
+- **[July 2025]** 📚 **EvoAgentX Framework Paper is Live!**  
+  We officially published the EvoAgentX framework paper on arXiv, detailing our approach to building evolving agentic workflows.  
+  👉 [Check it out](https://arxiv.org/abs/2507.03616)
+
+- **[July 2025]** ⭐️ **1,000 Stars Reached!**  
+  Thanks to our amazing community, **EvoAgentX** has surpassed 1,000 GitHub stars!
+
+- **[May 2025]** 🚀 **Official Launch!**  
+  **EvoAgentX** is now live! Start building self-evolving AI workflows from day one.  
+  🔧 [Get Started on GitHub](https://github.com/EvoAgentX/EvoAgentX)
 
 ## ⚡ Get Started
 - [🔥 Latest News](#-latest-news)
@@ -55,7 +126,8 @@
   - [API Key Configuration](#api-key-configuration)
   - [Configure and Use the LLM](#configure-and-use-the-llm)
 - [Automatic WorkFlow Generation](#automatic-workflow-generation)
-- [Tool-Enabled Workflows Generation:](#tool-enabled-workflows-generation)
+- [EvoAgentX Built-in Tools Summary](#-evoagentx-built-in-tools-summary)
+- [Tool-Enabled Workflows Generation](#tool-enabled-workflows-generation)
 - [Demo Video](#demo-video)
   - [✨ Final Results](#-final-results)
 - [Evolution Algorithms](#evolution-algorithms)
@@ -78,6 +150,11 @@
 ## Installation
 
 We recommend installing EvoAgentX using `pip`:
+
+```bash
+pip install evoagentx
+```
+or install from source:
 
 ```bash
 pip install git+https://github.com/EvoAgentX/EvoAgentX.git
@@ -211,6 +288,64 @@ You can also:
 
 > 📂 For a complete working example, check out the [`workflow_demo.py`](https://github.com/EvoAgentX/EvoAgentX/blob/main/examples/workflow_demo.py)
 
+
+## 🧰 EvoAgentX Built-in Tools Summary
+EvoAgentX ships with a comprehensive suite of **built-in tools**, enabling agents to interact with code environments, search engines, databases, filesystems, images, and browsers. These modular toolkits form the backbone of multi-agent workflows and are easy to extend, customize, and test.
+
+Categories include:
+- 🧮 Code Interpreters (Python, Docker)
+- 🔍 Search & HTTP Requests (Google, Wikipedia, arXiv, RSS)
+- 🗂️ Filesystem Utilities (read/write, shell commands)
+- 🧠 Databases (MongoDB, PostgreSQL, FAISS)
+- 🖼️ Image Tools (analysis, generation)
+- 🌐 Browser Automation (low-level & LLM-driven)
+
+We actively welcome contributions from the community!  
+Feel free to propose or submit new tools via [pull requests](https://github.com/EvoAgentX/EvoAgentX/pulls) or [discussions](https://github.com/EvoAgentX/EvoAgentX/discussions).
+
+
+<details>
+<summary>Click to expand full table 🔽</summary>
+
+<br>
+  
+| Toolkit Name | Description | Code File Path | Test File Path |
+|--------------|-------------|----------------|----------------|
+| **🧰 Code Interpreters** |  |  |  |
+| PythonInterpreterToolkit | Safely execute Python code snippets or local .py scripts with sandboxed imports and controlled filesystem access. | [link](evoagentx/tools/interpreter_python.py) | [link](examples/tools/tools_interpreter.py) |
+| DockerInterpreterToolkit | Run code (e.g., Python) inside an isolated Docker container—useful for untrusted code, special deps, or strict isolation. | [link](evoagentx/tools/interpreter_docker.py) | [link](examples/tools/tools_interpreter.py) |
+| **🧰 Search & Request Tools** |  |  |  |
+| WikipediaSearchToolkit | Search Wikipedia and retrieve results with title, summary, full content, and URL. | [link](evoagentx/tools/search_wiki.py) | [link](examples/tools/tools_search.py) |
+| GoogleSearchToolkit | Google Custom Search (official API). Requires GOOGLE_API_KEY and GOOGLE_SEARCH_ENGINE_ID. | [link](evoagentx/tools/search_google.py) | [link](examples/tools/tools_search.py) |
+| GoogleFreeSearchToolkit | Google-style search without API credentials (lightweight alternative). | [link](evoagentx/tools/search_google_f.py) | [link](examples/tools/tools_search.py) |
+| DDGSSearchToolkit | Search using DDGS with multiple backends and privacy-focused results | [link](evoagentx/tools/search_ddgs.py) | [link](examples/tools/tools_search.py) |
+| SerpAPIToolkit | Multi-engine search via SerpAPI (Google/Bing/Baidu/Yahoo/DDG) with optional content scraping. Requires SERPAPI_KEY. | [link](evoagentx/tools/search_serpapi.py) | [link](examples/tools/tools_search.py) |
+| SerperAPIToolkit | Google search via SerperAPI with content extraction. Requires SERPERAPI_KEY. | [link](evoagentx/tools/search_serperapi.py) | [link](examples/tools/tools_search.py) |
+| RequestToolkit | General HTTP client (GET/POST/PUT/DELETE) with params, form, JSON, headers, raw/processed response, and optional save to file. | [link](evoagentx/tools/request.py) | [link](examples/tools/tools_search.py) |
+| ArxivToolkit | Search arXiv for research papers (title, authors, abstract, links/categories). | [link](evoagentx/tools/request_arxiv.py) | [link](examples/tools/tools_search.py) |
+| RSSToolkit | Fetch RSS feeds (with optional webpage content extraction) and validate feeds. | [link](evoagentx/tools/rss_feed.py) | [link](examples/tools/tools_search.py) |
+| GoogleMapsToolkit | Geoinformation retrieval and path planning via Google API service. | [link](evoagentx/tools/google_maps_tool.py) | [link](examples/tools/google_maps_example.py) |
+| **🧰 FileSystem Tools** |  |  |  |
+| StorageToolkit | File I/O utilities: save/read/append/delete, check existence, list files, list supported formats (pluggable storage backends). | [link](evoagentx/tools/storage_file.py) | [link](examples/tools/tools_files.py) |
+| CMDToolkit | Execute shell/CLI commands with working directory and timeout control; returns stdout/stderr/return code. | [link](evoagentx/tools/cmd_toolkit.py) | [link](examples/tools/tools_files.py) |
+| FileToolkit | File operations toolkit for managing files and directories | [link](evoagentx/tools/file_tool.py) | [link](examples/tools/tools_files.py) |
+| **🧰 Database Tools** |  |  |  |
+| MongoDBToolkit | MongoDB operations—execute queries/aggregations, find with filter/projection/sort, update, delete, info. | [link](evoagentx/tools/database_mongodb.py) | [link](examples/tools/tools_database.py) |
+| PostgreSQLToolkit | PostgreSQL operations—generic SQL execution, targeted SELECT (find), UPDATE, CREATE, DELETE, INFO. | [link](evoagentx/tools/database_postgresql.py) | [link](examples/tools/tools_database.py) |
+| FaissToolkit | Vector database (FAISS) for semantic search—insert documents (auto chunk+embed), query by similarity, delete by id/metadata, stats. | [link](evoagentx/tools/database_faiss.py) | [link](examples/tools/tools_database.py) |
+| **🧰 Image Handling Tools** |  |  |  |
+| ImageAnalysisToolkit | Vision analysis (OpenRouter GPT-4o family): describe images, extract objects/UI info, answer questions about an image. | [link](evoagentx/tools/OpenAI_Image_Generation.py) | [link](examples/tools/tools_images.py) |
+| OpenAIImageGenerationToolkit | Text-to-image via OpenAI (DALL·E family) with size/quality/style controls. | [link](evoagentx/tools/OpenAI_Image_Generation.py) | [link](examples/tools/tools_images.py) |
+| FluxImageGenerationToolkit | Text-to-image via Flux Kontext Max (BFL) with aspect ratio, seed, format, prompt upsampling, and safety tolerance. | [link](evoagentx/tools/flux_image_generation.py) | [link](examples/tools/tools_images.py) |
+| **🧰 Browser Tools** |  |  |  |
+| BrowserToolkit | Fine-grained browser automation: initialize, navigate, type, click, resnapshot page, read console logs, and close. | [link](evoagentx/tools/browser_tool.py) | [link](examples/tools/tools_browser.py) |
+| BrowserUseToolkit | High-level, natural-language browser automation (navigate, fill forms, click, search, etc.) driven by an LLM. | [link](evoagentx/tools/browser_use.py) | [link](examples/tools/tools_browser.py) |
+
+</details>
+
+**EvoAgentX also supports MCP tools.**  
+Check out our [tutorial](https://github.com/EvoAgentX/EvoAgentX/blob/main/docs/tutorial/mcp.md) to learn how to configure your preferred MCP tools with EvoAgentX.
+
 ## Tool-Enabled Workflows Generation:
 
 In more advanced scenarios, your workflow agents may need to use external tools. EvoAgentX allows Automatic tool integration: Provide a list of toolkits to WorkFlowGenerator. The generator will consider these and include them in the agents if appropriate.
@@ -272,20 +407,29 @@ When this interceptor triggers, the workflow will pause and prompt in the consol
 ## Demo Video
 
 
-[![Watch on YouTube](https://img.shields.io/badge/-Watch%20on%20YouTube-red?logo=youtube&labelColor=grey)](https://www.youtube.com/watch?v=Wu0ZydYDqgg)
-[![Watch on Bilibili](https://img.shields.io/badge/-Watch%20on%20Bilibili-00A1D6?logo=bilibili&labelColor=white)](https://www.bilibili.com/video/BV1mEJizyE7H/?vd_source=02f8f3a7c8865b3af6378d9680393f5a)
+[![Watch on YouTube](https://img.shields.io/badge/-Watch%20on%20YouTube-red?logo=youtube&labelColor=grey)](https://www.youtube.com/watch?v=8ALcspHOe0o)
+[![Watch on Bilibili](https://img.shields.io/badge/-Watch%20on%20Bilibili-00A1D6?logo=bilibili&labelColor=white)](https://www.bilibili.com/video/BV1AjahzRECi/?vd_source=02f8f3a7c8865b3af6378d9680393f5a)
 
 <div align="center">
-  <video src="https://github.com/user-attachments/assets/906a6086-e98d-4df3-84b0-808020ddd520.mp4" autoplay loop muted playsinline width="600">
+  <video src="https://github.com/user-attachments/assets/65af8cce-43ad-4e81-ab8d-fc085a7fdc05.mp4" autoplay loop muted playsinline width="600">
     Your browser does not support the video tag.
   </video>
 </div>
 
 In this demo, we showcase the workflow generation and execution capabilities of EvoAgentX through two examples:
 
-- Application 1: Intelligent Job Recommendation from Resume
-- Application 2: Visual Analysis of A-Share Stocks
+- **Application 1: Financial Information Agentic Workflow**
+- 
+  In this example, we use a workflow generated by EvoAgentX to collect public information about a company based on a given index.  
+  The collected data includes the overall market index, the company’s current stock price, institutional buy/sell activity, and more.  
+  Finally, the workflow generates an **HTML report** summarizing the information and providing a buy/sell/hold recommendation. This workflow is only an alpha version.
+  If you're interested in turning it into a **truly practical investment assistant**, you can consider integrating more financial indicators and analytical tools—and let these tools join your
+  workflow through agents! Check [here](https://github.com/EvoAgentX/EvoAgentX/blob/main/examples/workflow/invest/stock_analysis.py) to try this workflow.
+  
+- **Application 2: ArXiv Research Summarizer Workflow**
 
+  This workflow, generated by EvoAgentX and powered by the ArXiv MCP tool, can retrieve and summarize relevant papers from arXiv based on your provided keywords and selected time range.  
+  If you're interested, you can even **extend this workflow beyond arXiv**, integrating it with other academic search platforms like **Google Scholar**, and turn it into a fully functional research assistant application! Check [here](https://github.com/EvoAgentX/EvoAgentX/blob/main/examples/workflow/arxiv_workflow.py) to play with this workflow. 
 
 ### ✨ Final Results
 
@@ -293,18 +437,26 @@ In this demo, we showcase the workflow generation and execution capabilities of 
   <tr>
     <td align="center">
       <img src="./assets/demo_result_1.png" width="400"><br>
-      <strong>Application&nbsp;1:</strong><br>Job Recommendation
+      <strong>Application&nbsp;1:</strong><br>Stock Recommendation
     </td>
     <td align="center">
-      <img src="./assets/demo_result_2.jpeg" width="400"><br>
-      <strong>Application&nbsp;2:</strong><br>Stock Visual Analysis
+      <img src="./assets/demo_result_2.png" width="400"><br>
+      <strong>Application&nbsp;2:</strong><br>Arxiv Daily Paper Recommendation
     </td>
   </tr>
 </table>
 
 ## Evolution Algorithms 
 
-We have integrated some existing agent/workflow evolution algorithms into EvoAgentX, including [TextGrad](https://www.nature.com/articles/s41586-025-08661-4), [MIPRO](https://arxiv.org/abs/2406.11695) and [AFlow](https://arxiv.org/abs/2410.10762).
+We have integrated some effective agent/workflow evolution algorithms into EvoAgentX:
+
+| **Algorithm** | **Description** | **Link** |
+|---------------|-----------------|----------|
+| **TextGrad**  | Gradient-based optimization for LLM prompts and reasoning chains, enabling differentiable planning. | [📄 Nature (2025)](https://www.nature.com/articles/s41586-025-08661-4) |
+| **MIPRO**     | Model-agnostic Iterative Prompt Optimization using black-box evaluations and adaptive reranking. | [📄 arXiv:2406.11695](https://arxiv.org/abs/2406.11695) |
+| **AFlow**     | Reinforcement learning-inspired agent workflow evolution using Monte Carlo Tree Search. | [📄 arXiv:2410.10762](https://arxiv.org/abs/2410.10762) |
+
+**Please suggest the latest self-evolving algorithm by submitting an issue or a Pull Request.**
 
 To evaluate the performance, we use them to optimize the same agent system on three different tasks: multi-hop QA (HotPotQA), code generation (MBPP) and reasoning (MATH). We randomly sample 50 examples for validation and other 100 examples for testing. 
 

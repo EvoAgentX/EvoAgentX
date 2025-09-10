@@ -20,64 +20,33 @@ load_dotenv(override=True)
 sys.path.append(str(Path(__file__).parent.parent))
 
 from evoagentx.tools import (
-    ImageAnalysisToolkit,
     OpenAIImageToolkitV2,
-    FluxImageGenerationToolkit
+    FluxImageGenerationToolkit,
+    GeminiImageToolkit,
+    OpenRouterImageToolkit
 )
 
 
 def run_image_analysis_example():
-    """Simple example using ImageAnalysisToolkit to analyze images."""
+    """Simple example using OpenRouter image analysis to analyze images."""
     print("\n===== IMAGE ANALYSIS TOOL EXAMPLE =====\n")
-    
-    # Check for OpenRouter API key
+
     openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
     if not openrouter_api_key:
         print("❌ OPENROUTER_API_KEY not found in environment variables")
-        print("To test image analysis, set your OpenRouter API key:")
-        print("export OPENROUTER_API_KEY='your-openrouter-api-key-here'")
-        print("Get your key from: https://openrouter.ai/")
         return
-    
+
     try:
-        # Initialize the image analysis toolkit
-        toolkit = ImageAnalysisToolkit(
-            name="DemoImageAnalysisToolkit",
-            api_key=openrouter_api_key,
-            model="openai/gpt-4o-mini"
-        )
-        
-        print("✓ ImageAnalysisToolkit initialized")
-        print(f"✓ Using OpenRouter API key: {openrouter_api_key[:8]}...")
-        
-        # Get the analysis tool - the actual tool name is "image_analysis"
-        analyze_tool = toolkit.get_tool("image_analysis")
-        
-        # Test image analysis with a sample image
+        ortk = OpenRouterImageToolkit(name="DemoORImageToolkit", api_key=openrouter_api_key)
+        analyze_tool = ortk.get_tool("image_analysis")
         test_image_url = "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Gfp-wisconsin-madison-the-nature-boardwalk.jpg/2560px-Gfp-wisconsin-madison-the-nature-boardwalk.jpg"
-        
         print(f"Analyzing image: {test_image_url}")
-        print("Prompt: Describe this image in detail.")
-        
-        result = analyze_tool(
-            prompt="Describe this image in detail.",
-            image_url=test_image_url
-        )
-        
-        # The tool returns content and usage directly, not in a success wrapper
-        if 'error' not in result:
-            print("✓ Image analysis successful")
-            print(f"Analysis: {result.get('content', 'No content')}")
-            
-            # Display usage information if available
-            if 'usage' in result:
-                usage = result['usage']
-                print(f"Token usage: {usage}")
+        result = analyze_tool(prompt="Describe this image in detail.", image_url=test_image_url)
+        if 'error' in result:
+            print(f"❌ Image analysis failed: {result['error']}")
         else:
-            print(f"❌ Image analysis failed: {result.get('error', 'Unknown error')}")
-        
-        print("\n✓ ImageAnalysisToolkit test completed")
-        
+            print("✓ Analysis:")
+            print(result.get('content', ''))
     except Exception as e:
         print(f"Error: {str(e)}")
 
@@ -167,9 +136,8 @@ def run_openai_image_toolkit_pipeline():
     except Exception as e:
         print(f"❌ Failed to analyze edited image: {e}")
 
-def run_flux_image_generation_example():
     """Simple example using Flux Image Generation Toolkit."""
-    print("\n===== FLUX IMAGE GENERATION TOOL EXAMPLE =====\n")
+    print("\n===== IMAGE GENERATION TOOL EXAMPLE =====\n")
     
     # Check for BFL API key
     bfl_api_key = os.getenv("BFL_API_KEY")
@@ -188,7 +156,7 @@ def run_flux_image_generation_example():
             save_path="./flux_generated_images"
         )
         
-        print("✓ Flux Image Generation Toolkit initialized")
+        print("✓ Image Generation Toolkit initialized")
         print(f"✓ Using BFL API key: {bfl_api_key[:8]}...")
         
         # Get the generation tool - the actual tool name is "flux_image_generation"
@@ -222,23 +190,153 @@ def run_flux_image_generation_example():
         else:
             print(f"❌ Image generation failed: {result.get('error', 'Unknown error')}")
         
-        print("\n✓ Flux Image Generation Toolkit test completed")
+        print("\n✓ Image Generation Toolkit test completed")
         
     except Exception as e:
         print(f"Error: {str(e)}")
+
+
+def run_flux_image_toolkit_pipeline():
+    """Pipeline: generate → edit → analyze using Flux backend (input_image editing)."""
+    print("\n===== IMAGE TOOLKIT PIPELINE (GEN → EDIT → ANALYZE) =====\n")
+
+    bfl_api_key = os.getenv("BFL_API_KEY")
+    if not bfl_api_key:
+        print("❌ BFL_API_KEY not found in environment variables")
+        return
+
+    # Initialize toolkit
+    flux = FluxImageGenerationToolkit(
+        name="DemoFluxImageToolkitPipeline",
+        api_key=bfl_api_key,
+        save_path="./flux_generated_images"
+    )
+    gen = flux.get_tool("flux_image_generation")
+    analyze = flux.get_tool("image_analysis") if flux.get_tool("image_analysis") else None
+
+    # 1) Generate base image
+    gen_prompt = "A neon-lit cyberpunk alley with rain reflections, cinematic"
+    print(f"Generating: {gen_prompt}")
+    gen_res = gen(
+        prompt=gen_prompt,
+        seed=42,
+        output_format="jpeg",
+        prompt_upsampling=False,
+        safety_tolerance=2
+    )
+    if 'error' in gen_res:
+        print(f"❌ Generation failed: {gen_res['error']}")
+        return
+    base_path = gen_res.get('file_path')
+    if not base_path or not os.path.exists(base_path):
+        print("❌ Generation did not return a valid file path")
+        return
+    print(f"Generated: {base_path}")
+
+    # 2) Edit by sending input_image (base64)
+    try:
+        import base64
+        with open(base_path, 'rb') as f:
+            b64_img = base64.b64encode(f.read()).decode('utf-8')
+        edit_prompt = "Add a glowing red umbrella held by a person in the foreground"
+        print("Editing the generated image...")
+        edit_res = gen(
+            prompt=edit_prompt,
+            input_image=b64_img,
+            seed=43,
+            output_format="jpeg",
+            prompt_upsampling=False,
+            safety_tolerance=2
+        )
+        if 'error' in edit_res:
+            print(f"❌ Edit failed: {edit_res['error']}")
+            return
+        edited_path = edit_res.get('file_path')
+        if not edited_path or not os.path.exists(edited_path):
+            print("❌ Edit did not return a valid file path")
+            return
+        print(f"Edited: {edited_path}")
+    except Exception as e:
+        print(f"❌ Failed to edit: {e}")
+
+    # 3) Analyze
+    if analyze and edited_path and os.path.exists(edited_path):
+        try:
+            import base64, mimetypes
+            with open(edited_path, 'rb') as f:
+                b64 = base64.b64encode(f.read()).decode('utf-8')
+            mime, _ = mimetypes.guess_type(edited_path)
+            mime = mime or 'image/jpeg'
+            data_url = f"data:{mime};base64,{b64}"
+            analysis = analyze(
+                prompt="Summarize what's in this image in one sentence.",
+                image_url=data_url,
+            )
+            if 'error' in analysis:
+                print(f"❌ Analyze failed: {analysis['error']}")
+            else:
+                print("✓ Analysis:")
+                print(analysis.get('content', ''))
+        except Exception as e:
+            print(f"❌ Failed to analyze: {e}")
+
+
+def run_openrouter_edit_pipeline():
+    """OpenRouter: generate → edit (with generated image as input) → save."""
+    print("\n===== OPENROUTER EDIT PIPELINE (GEN → EDIT) =====\n")
+
+    or_key = os.getenv("OPENROUTER_API_KEY")
+    if not or_key:
+        print("❌ OPENROUTER_API_KEY not found")
+        return
+
+    from evoagentx.tools.image_tools.openrouter_image_tools.utils import path_to_image_part
+
+    ortk = OpenRouterImageToolkit(name="DemoORImageToolkit", api_key=or_key)
+    gen = ortk.get_tool("openrouter_image_generation_edit")
+
+    # 1) generate
+    res = gen(
+        prompt="A minimalist poster of a mountain at sunrise",
+        model="google/gemini-2.5-flash-image-preview",
+        save_path="./openrouter_images",
+        output_basename="base"
+    )
+    bases = res.get('saved_paths', [])
+    if not bases:
+        print("❌ No base image saved; cannot proceed to edit")
+        return
+    base_path = bases[0]
+    print(f"Base image: {base_path}")
+
+    # 2) edit
+    edit_prompt = "Add a bold 'GEMINI' text at the top"
+    edit_res = gen(
+        prompt=edit_prompt,
+        image_urls=[path_to_image_part(base_path)["image_url"]["url"]],
+        model="google/gemini-2.5-flash-image-preview",
+        save_path="./openrouter_images",
+        output_basename="edited"
+    )
+    edited = edit_res.get('saved_paths', [])
+    if not edited:
+        print("❌ No edited image saved")
+        return
+    print(f"Edited image: {edited[0]}")
 
 
 def main():
     """Main function to run all image tool examples"""
     print("===== IMAGE TOOL EXAMPLES =====")
     
-    # Run image analysis example
     # run_image_analysis_example()
     
-    run_openai_image_toolkit_pipeline()
+    # run_openai_image_toolkit_pipeline()
     
-    # Run Flux image generation example
-    # run_flux_image_generation_example()
+    # run_flux_image_toolkit_pipeline()
+
+    # run_openrouter_edit_pipeline()
+    
     
     print("\n===== ALL IMAGE TOOL EXAMPLES COMPLETED =====")
 

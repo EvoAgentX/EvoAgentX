@@ -3,16 +3,16 @@ from llama_index.core.retrievers import VectorIndexRetriever
 
 from .base import BaseRetrieverWrapper
 from evoagentx.core.logging import logger
-from evoagentx.rag.schema import Query, RagResult, Corpus, Chunk
-
+from evoagentx.rag.schema import Query, RagResult, Corpus
 
 class VectorRetriever(BaseRetrieverWrapper):
     """Wrapper for vector-based retrieval."""
     
-    def __init__(self, index: BaseIndex, top_k: int = 5):
+    def __init__(self, index: BaseIndex, top_k: int = 5, chunk_class=None):
         super().__init__()
         self.index = index
         self.top_k = top_k
+        self.chunk_class = chunk_class  # Use chunk class passed from RAGEngine based on config
         self.retriever = VectorIndexRetriever(
             index=self.index,
             similarity_top_k=self.top_k
@@ -31,7 +31,9 @@ class VectorRetriever(BaseRetrieverWrapper):
                 return RagResult(corpus=corpus, scores=scores, metadata={"query": query.query_str, "retriever": "vector"})
             
             for score_node in nodes:
-                chunk = Chunk.from_llama_node(score_node.node)
+                if self.chunk_class is None:
+                    raise ValueError("chunk_class not set - RAGEngine must pass chunk class based on config")
+                chunk = self.chunk_class.from_llama_node(score_node.node)
                 chunk.metadata.similarity_score = score_node.score or 0.0
                 corpus.add_chunk(chunk)
                 scores.extend([score_node.score or 0.0])
@@ -59,7 +61,9 @@ class VectorRetriever(BaseRetrieverWrapper):
                 return RagResult(corpus=corpus, scores=scores, metadata={"query": query.query_str, "retriever": "vector"})
             
             for score_node in nodes:
-                chunk = Chunk.from_llama_node(score_node.node)
+                if self.chunk_class is None:
+                    raise ValueError("chunk_class not set - RAGEngine must pass chunk class based on config")
+                chunk = self.chunk_class.from_llama_node(score_node.node)
                 chunk.metadata.similarity_score = score_node.score or 0.0
                 corpus.add_chunk(chunk)
                 scores.extend([score_node.score or 0.0])

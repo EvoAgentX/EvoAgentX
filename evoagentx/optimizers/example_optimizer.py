@@ -59,7 +59,6 @@ class ExampleOptimizer(BaseOptimizer):
         return best_cfg, history
     
 
-# optimizers/evaluators.py (可选文件)
 
 def simple_accuracy_evaluator(output: Dict[str, Any]) -> float:
     """

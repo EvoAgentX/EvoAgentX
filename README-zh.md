@@ -41,11 +41,77 @@
   <img src="./assets/framework_zh.jpg">
 </p>
 
+## 什么是 EvoAgentX  
+EvoAgentX 是一个开源框架，用于**构建、评估和进化基于大语言模型 (LLM) 的智能体或智能体工作流**，并以自动化、模块化和目标驱动的方式运行。  
 
-## 🔥 最新消息
-- **[2025年7月]** 🎉 **EvoAgentX** 已在 [arXiv](https://arxiv.org/abs/2507.03616) 发布！
-- **[2025年7月]** 🎉 **EvoAgentX** 已获得 1,000 stars！
-- **[2025年5月]** 🎉 **EvoAgentX** 正式发布！
+其核心思想是让开发者和研究人员突破静态的提示链（prompt chaining）或人工工作流编排，转而进入一个**自我进化的智能体生态**。在这个生态中，AI 智能体能够被构建、评测，并通过迭代反馈循环不断优化——就像软件需要持续测试和改进一样。  
+
+### ✨ 关键特性  
+
+- 🧱 **智能体工作流自动构建**  
+  只需一个简单提示，EvoAgentX 就能生成结构化的多智能体工作流，并根据任务需求自动适配。  
+
+- 🔍 **内置评估机制**  
+  集成自动化评估器，可根据任务特定标准对智能体行为进行评分。  
+
+- 🔁 **自我进化引擎**  
+  智能体不仅能执行任务，还能学习。EvoAgentX 使用自进化算法不断改进工作流。  
+
+- 🧩 **即插即用的模型兼容性**  
+  可轻松集成 [OpenAI](https://github.com/EvoAgentX/EvoAgentX/blob/main/evoagentx/models/openai_model.py)、[qwen](https://github.com/EvoAgentX/EvoAgentX/blob/main/evoagentx/models/aliyun_model.py) 等主流模型，也可通过 [LiteLLM](https://github.com/EvoAgentX/EvoAgentX/blob/main/evoagentx/models/litellm_model.py)、[siliconflow](https://github.com/EvoAgentX/EvoAgentX/blob/main/evoagentx/models/siliconflow_model.py)、[openrouter](https://github.com/EvoAgentX/EvoAgentX/blob/main/evoagentx/models/openrouter_model.py) 接入 Claude、Deepseek、kimi 等热门模型。若希望在本地部署 LLM，可尝试使用 LiteLLM。  
+
+- 🧰 **丰富的内置工具**  
+  EvoAgentX 提供一整套内置工具，赋能智能体与真实世界环境交互。  
+
+- 🧠 **记忆模块**  
+  支持短期（临时）与长期（持久）记忆系统，让智能体具备“记忆力”。  
+
+- 🧑‍💻 **人类在环 (HITL)**  
+  支持交互式工作流，允许人类对智能体的行为进行审阅、修正和引导。  
+
+
+### 🚀 你能用 EvoAgentX 做什么  
+
+EvoAgentX 不仅仅是一个框架，它是你打造**现实可用 AI 智能体的发射台**。  
+
+无论你是 AI 研究者、工作流工程师，还是创业团队，EvoAgentX 都能帮你**从一个初步的想法出发，快速构建成一个完整的智能体系统**——以最小的工程成本实现最大的灵活性。  
+
+以下是一些场景：  
+
+- 🔍 **难以优化工作流？**  
+  EvoAgentX 可利用最先进的自进化算法，**自动优化智能体工作流**，并根据你的数据集和目标不断改进。  
+
+- 🧑‍💻 **希望保持监督和控制？**  
+  你可以随时插入工作流！EvoAgentX 支持 **人机协同 (HITL)** 检查点，让你在需要时介入审查或引导流程，完成后再退出。  
+
+- 🧠 **厌倦了健忘的智能体？**  
+  EvoAgentX 内置 **短期与长期记忆模块**，让智能体能够记住、反思并在多轮交互中不断提升。  
+
+- ⚙️ **困在繁琐的手动编排中？**  
+  只需描述目标，EvoAgentX 会 **自动组装多智能体工作流**，精准匹配你的意图。  
+
+- 🌍 **希望智能体真正“做事”？**  
+  借助丰富的工具库（搜索、代码、浏览器、文件 I/O、API 等），EvoAgentX 让智能体能**与现实世界交互**，而不仅仅是生成对话。  
+
+
+
+## 🔥 EAX 最新动态  
+
+- **[2025年8月]** 🚀 **全新综述发布！**  
+  我们团队刚刚发布了一篇关于 **自进化 AI 智能体** 的综合性综述，深入探讨了智能体如何学习、适应与持续优化。  
+  👉 [在 arXiv 阅读](https://arxiv.org/abs/2508.07407)  
+  👉 [查看仓库](https://github.com/EvoAgentX/Awesome-Self-Evolving-Agents)  
+
+- **[2025年7月]** 📚 **EvoAgentX 框架论文上线！**  
+  我们已在 arXiv 正式发表了 EvoAgentX 框架论文，详细介绍了构建自进化智能体工作流的方法。  
+  👉 [点击查看](https://arxiv.org/abs/2507.03616)  
+
+- **[2025年7月]** ⭐️ **突破 1,000 Star！**  
+  感谢我们出色的社区支持，**EvoAgentX** 在 GitHub 上已突破 1,000 颗 Star！  
+
+- **[2025年5月]** 🚀 **正式发布！**  
+  **EvoAgentX** 正式上线！从第一天起就能开始构建自进化 AI 工作流。  
+  🔧 [GitHub 快速上手](https://github.com/EvoAgentX/EvoAgentX)  
 
 ## ⚡ 快速开始
 - [🔥 最新消息](#-最新消息)
@@ -56,7 +122,7 @@
   - [配置并使用LLM](#配置并使用llm)
 - [自动工作流生成](#自动工作流生成)
 - [工具驱动的工作流生成](#工具驱动的工作流生成)
-- [人机协同（HITL）支持](#Human-in-the-Loop支持)
+- [Human-in-the-Loop支持](#Human-in-the-Loop支持)
 - [演示视频](#演示视频)
   - [✨ 最终结果](#-最终结果)
 - [进化算法](#进化算法)
@@ -74,9 +140,17 @@
 - [📚 致谢](#-致谢)
 - [📄 许可证](#-许可证)
 
+
+
 ## 安装
 
-我们建议使用 `pip` 安装 EvoAgentX：
+我们推荐通过 `pip` 安装 EvoAgentX：
+
+```bash
+pip install evoagentx
+```
+
+或者从源码安装：
 
 ```bash
 pip install git+https://github.com/EvoAgentX/EvoAgentX.git
@@ -211,6 +285,64 @@ print(output)
 > 📂 完整的工作示例，请查看[`workflow_demo.py`](https://github.com/EvoAgentX/EvoAgentX/blob/main/examples/workflow_demo.py)
 
 
+## 🧰 EvoAgentX 内置工具概览  
+
+EvoAgentX 提供了一整套功能全面的 **内置工具**，支持智能体与代码环境、搜索引擎、数据库、文件系统、图像以及浏览器进行交互。  
+这些模块化工具包构成了多智能体工作流的基础，且易于扩展、定制和测试。  
+
+工具类别包括：  
+- 🧮 代码解释器（Python、Docker）  
+- 🔍 搜索与 HTTP 请求（Google、Wikipedia、arXiv、RSS）  
+- 🗂️ 文件系统工具（读/写、shell 命令）  
+- 🧠 数据库（MongoDB、PostgreSQL、FAISS）  
+- 🖼️ 图像工具（分析、生成）  
+- 🌐 浏览器自动化（底层与 LLM 驱动）  
+
+我们非常欢迎社区贡献！  
+你可以通过 [Pull Requests](https://github.com/EvoAgentX/EvoAgentX/pulls) 或 [Discussions](https://github.com/EvoAgentX/EvoAgentX/discussions) 提出或提交新的工具。  
+
+<details>
+<summary>点击展开完整工具表 🔽</summary>
+
+<br>
+  
+| 工具包名称 | 描述 | 代码文件路径 | 测试文件路径 |
+|------------|------|--------------|--------------|
+| **🧰 代码解释器** |  |  |  |
+| PythonInterpreterToolkit | 安全执行 Python 代码片段或本地 .py 脚本，支持沙箱导入与受控文件系统访问。 | [link](evoagentx/tools/interpreter_python.py) | [link](examples/tools/tools_interpreter.py) |
+| DockerInterpreterToolkit | 在隔离的 Docker 容器中运行代码（如 Python）——适用于不受信任代码、特殊依赖或严格隔离场景。 | [link](evoagentx/tools/interpreter_docker.py) | [link](examples/tools/tools_interpreter.py) |
+| **🧰 搜索与请求工具** |  |  |  |
+| WikipediaSearchToolkit | 搜索维基百科并返回结果（标题、摘要、完整内容与链接）。 | [link](evoagentx/tools/search_wiki.py) | [link](examples/tools/tools_search.py) |
+| GoogleSearchToolkit | 谷歌自定义搜索（官方 API）。需要 GOOGLE_API_KEY 和 GOOGLE_SEARCH_ENGINE_ID。 | [link](evoagentx/tools/search_google.py) | [link](examples/tools/tools_search.py) |
+| GoogleFreeSearchToolkit | 无需 API 凭证的 Google 风格搜索（轻量替代方案）。 | [link](evoagentx/tools/search_google_f.py) | [link](examples/tools/tools_search.py) |
+| DDGSSearchToolkit | 使用 DDGS 进行搜索，支持多种后端，结果更注重隐私。 | [link](evoagentx/tools/search_ddgs.py) | [link](examples/tools/tools_search.py) |
+| SerpAPIToolkit | 通过 SerpAPI 提供多引擎搜索（Google/Bing/Baidu/Yahoo/DDG），支持内容抓取。需要 SERPAPI_KEY。 | [link](evoagentx/tools/search_serpapi.py) | [link](examples/tools/tools_search.py) |
+| SerperAPIToolkit | 使用 SerperAPI 进行 Google 搜索并提取内容。需要 SERPERAPI_KEY。 | [link](evoagentx/tools/search_serperapi.py) | [link](examples/tools/tools_search.py) |
+| RequestToolkit | 通用 HTTP 客户端（GET/POST/PUT/DELETE），支持参数、表单、JSON、Headers、原始/处理响应，可选保存到文件。 | [link](evoagentx/tools/request.py) | [link](examples/tools/tools_search.py) |
+| ArxivToolkit | 检索 arXiv 研究论文（标题、作者、摘要、链接/类别）。 | [link](evoagentx/tools/request_arxiv.py) | [link](examples/tools/tools_search.py) |
+| RSSToolkit | 抓取 RSS 源（可选网页内容提取）并验证 feed。 | [link](evoagentx/tools/rss_feed.py) | [link](examples/tools/tools_search.py) |
+| GoogleMapsToolkit | 基于 Google API 的地理信息检索与路径规划。 | [link](evoagentx/tools/google_maps_tool.py) | [link](examples/tools/google_maps_example.py) |
+| **🧰 文件系统工具** |  |  |  |
+| StorageToolkit | 文件 I/O 工具：保存/读取/追加/删除，检查是否存在，列出文件，支持可插拔存储后端。 | [link](evoagentx/tools/storage_file.py) | [link](examples/tools/tools_files.py) |
+| CMDToolkit | 执行 Shell/CLI 命令，支持工作目录与超时控制；返回 stdout/stderr/返回码。 | [link](evoagentx/tools/cmd_toolkit.py) | [link](examples/tools/tools_files.py) |
+| FileToolkit | 文件操作工具包，用于管理文件和目录。 | [link](evoagentx/tools/file_tool.py) | [link](examples/tools/tools_files.py) |
+| **🧰 数据库工具** |  |  |  |
+| MongoDBToolkit | MongoDB 操作——执行查询/聚合，支持过滤/投影/排序的查找，更新、删除与信息获取。 | [link](evoagentx/tools/database_mongodb.py) | [link](examples/tools/tools_database.py) |
+| PostgreSQLToolkit | PostgreSQL 操作——支持通用 SQL 执行，定向 SELECT、UPDATE、CREATE、DELETE 与信息获取。 | [link](evoagentx/tools/database_postgresql.py) | [link](examples/tools/tools_database.py) |
+| FaissToolkit | 向量数据库（FAISS）语义检索——插入文档（自动切分+嵌入）、相似度查询、按 ID/元数据删除、统计。 | [link](evoagentx/tools/database_faiss.py) | [link](examples/tools/tools_database.py) |
+| **🧰 图像处理工具** |  |  |  |
+| ImageAnalysisToolkit | 视觉分析（基于 OpenRouter GPT-4o 系列）：描述图像、提取对象/界面信息、回答图像相关问题。 | [link](evoagentx/tools/OpenAI_Image_Generation.py) | [link](examples/tools/tools_images.py) |
+| OpenAIImageGenerationToolkit | 文生图工具（OpenAI DALL·E 系列），支持尺寸/质量/风格控制。 | [link](evoagentx/tools/OpenAI_Image_Generation.py) | [link](examples/tools/tools_images.py) |
+| FluxImageGenerationToolkit | 文生图工具（Flux Kontext Max, BFL），支持宽高比、种子、格式、提示词增强与安全容忍度。 | [link](evoagentx/tools/flux_image_generation.py) | [link](examples/tools/tools_images.py) |
+| **🧰 浏览器工具** |  |  |  |
+| BrowserToolkit | 细粒度浏览器自动化：初始化、跳转、输入、点击、页面快照、读取控制台日志、关闭浏览器。 | [link](evoagentx/tools/browser_tool.py) | [link](examples/tools/tools_browser.py) |
+| BrowserUseToolkit | 高层级自然语言驱动的浏览器自动化：跳转、填表、点击、搜索等，由 LLM 控制。 | [link](evoagentx/tools/browser_use.py) | [link](examples/tools/tools_browser.py) |
+
+</details>  
+
+**EvoAgentX 同样支持 MCP 工具。**  
+请参考我们的 [教程](https://github.com/EvoAgentX/EvoAgentX/blob/main/docs/tutorial/mcp.md)，了解如何在 EvoAgentX 中配置你偏好的 MCP 工具。  
+
 ## 工具驱动的工作流生成
 
 在更高级的场景中，您的工作流Agent可能需要使用外部工具。EvoAgentX 支持自动工具集成：您可以将工具列表传递给 WorkFlowGenerator，生成器会根据需要将这些工具分配给合适的Agent。
@@ -280,20 +412,31 @@ workflow = WorkFlow(graph=workflow_graph, agent_manager=agent_manager, llm=llm, 
 ## 演示视频
 
 
-[![在YouTube上观看](https://img.shields.io/badge/-在YouTube上观看-red?logo=youtube&labelColor=grey)](https://www.youtube.com/watch?v=Wu0ZydYDqgg)
-[![在bilibili上观看](https://img.shields.io/badge/-在bilibili上观看-00A1D6?logo=bilibili&labelColor=white)](https://www.bilibili.com/video/BV1mEJizyE7H/?vd_source=02f8f3a7c8865b3af6378d9680393f5a)
+[![在YouTube中观看](https://img.shields.io/badge/-Watch%20on%20YouTube-red?logo=youtube&labelColor=grey)](https://www.youtube.com/watch?v=8ALcspHOe0o)
+[![在Bilibili中观看](https://img.shields.io/badge/-Watch%20on%20Bilibili-00A1D6?logo=bilibili&labelColor=white)](https://www.bilibili.com/video/BV1AjahzRECi/?vd_source=02f8f3a7c8865b3af6378d9680393f5a)
 
 <div align="center">
-  <video src="https://github.com/user-attachments/assets/906a6086-e98d-4df3-84b0-808020ddd520.mp4" autoplay loop muted playsinline width="600">
-    您的浏览器不支持视频标签。
+  <video src="https://github.com/user-attachments/assets/65af8cce-43ad-4e81-ab8d-fc085a7fdc05.mp4" autoplay loop muted playsinline width="600">
+    你的浏览器不支持此视频标签。
   </video>
 </div>
 
-在此演示中，我们通过两个示例展示了EvoAgentX的工作流生成和执行能力：
+在本演示中，我们将通过两个示例展示 EvoAgentX 的工作流生成与执行能力：  
 
-- 应用1：简历的智能职位推荐
-- 应用2：A股股票的视觉分析
+- **应用场景 1：金融信息智能体工作流**  
 
+  在该示例中，我们使用 EvoAgentX 自动生成的工作流，根据给定指数收集某家公司的公开信息。收集的数据包括整体市场指数、公司当前股价、机构买卖行为等。  
+  最终，该工作流会生成一份 **HTML 报告**，对信息进行总结并提供买入/卖出/持有的推荐。需要注意的是，这个工作流目前仅为 alpha 版本。
+  
+  如果你希望将它变成一个**真正实用的投资助手**，可以尝试整合更多金融指标与分析工具——并让这些工具通过智能体加入到你的工作流中！  
+  👉 [点击这里体验该工作流](https://github.com/EvoAgentX/EvoAgentX/blob/main/examples/workflow/invest/stock_analysis.py)  
+
+- **应用场景 2：ArXiv 研究论文总结工作流**  
+
+  该工作流由 EvoAgentX 自动生成，并由 ArXiv MCP 工具驱动。它能够根据你提供的关键词和时间范围，从 arXiv 获取并总结相关论文。
+  
+  如果你感兴趣，还可以**将此工作流扩展到 arXiv 之外**，与 **Google Scholar** 等其他学术搜索平台集成，从而打造一个功能完整的研究助手应用！  
+  👉 [点击这里尝试该工作流](https://github.com/EvoAgentX/EvoAgentX/blob/main/examples/workflow/arxiv_workflow.py)  
 
 ### ✨ 最终结果
 
@@ -301,22 +444,31 @@ workflow = WorkFlow(graph=workflow_graph, agent_manager=agent_manager, llm=llm, 
   <tr>
     <td align="center">
       <img src="./assets/demo_result_1.png" width="400"><br>
-      <strong>应用1：</strong><br>职位推荐
+      <strong>Application&nbsp;1:</strong><br>金融信息智能体工作流
     </td>
     <td align="center">
-      <img src="./assets/demo_result_2.jpeg" width="400"><br>
-      <strong>应用2：</strong><br>股票视觉分析
+      <img src="./assets/demo_result_2.png" width="400"><br>
+      <strong>Application&nbsp;2:</strong><br>ArXiv 研究论文总结工作流
     </td>
   </tr>
 </table>
 
-## 进化算法
+## 进化算法  
 
-我们将一些现有的智能体/工作流进化算法集成到EvoAgentX中，包括[TextGrad](https://www.nature.com/articles/s41586-025-08661-4)、[MIPRO](https://arxiv.org/abs/2406.11695)和[AFlow](https://arxiv.org/abs/2410.10762)。
+我们在 EvoAgentX 中集成了一些高效的智能体/工作流进化算法：  
 
-为了评估性能，我们使用它们在三个不同任务上优化相同的智能体系统：多跳问答(HotPotQA)、代码生成(MBPP)和推理(MATH)。我们随机抽取50个样本进行验证，另外100个样本用于测试。
+| **算法** | **描述** | **链接** |
+|----------|----------|----------|
+| **TextGrad**  | 基于梯度的优化方法，用于改进 LLM 提示与推理链，实现可微分的规划。 | [📄 Nature (2025)](https://www.nature.com/articles/s41586-025-08661-4) |
+| **MIPRO**     | 与模型无关的迭代提示优化方法，利用黑箱评估与自适应重排序。 | [📄 arXiv:2406.11695](https://arxiv.org/abs/2406.11695) |
+| **AFlow**     | 借鉴强化学习的智能体工作流进化方法，使用蒙特卡洛树搜索。 | [📄 arXiv:2410.10762](https://arxiv.org/abs/2410.10762) |
 
-> 提示：我们已将这些基准测试和评估代码集成到EvoAgentX中。有关更多详情，请参考[基准测试和评估教程](https://github.com/EvoAgentX/EvoAgentX/blob/main/docs/zh/tutorial/benchmark_and_evaluation.md)。
+**欢迎通过提交 issue 或 Pull Request 来推荐最新的自进化算法。**  
+
+为了评估性能，我们使用这些算法在三个不同任务上优化相同的智能体系统：多跳问答（HotPotQA）、代码生成（MBPP）以及推理（MATH）。  
+我们随机抽取 50 个样例作为验证集，另取 100 个样例作为测试集。  
+
+> 提示：我们已在 EvoAgentX 中集成了这些基准测试与评估代码。详情请参考 [基准测试与评估教程](https://github.com/EvoAgentX/EvoAgentX/blob/main/docs/tutorial/benchmark_and_evaluation.md)。  
 
 ### 📊 结果 
 

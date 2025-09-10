@@ -173,16 +173,36 @@ We now support calling local models for your tasks, built on the LiteLLM framewo
 
 You're now ready to leverage your local model seamlessly!
 
-**Basic Usage:**
+**Basic Usage(ollama):**
 
 ```python
-
 from evoagentx.models.model_configs import LiteLLMConfig
 from evoagentx.models import LiteLLM
 
 # use local model
 config = LiteLLMConfig(
     model="ollama/llama3",
+    api_base="http://localhost:11434",
+    is_local=True,
+    temperature=0.7,
+    max_tokens=1000,
+    output_response=True
+)
+
+# Generate 
+llm = LiteLLM(config)
+response = llm.generate(prompt="What is Agentic Workflow?")
+
+```
+**Basic Usage(vllm: https://docs.litellm.ai/docs/providers/vllm):**
+
+```python
+from evoagentx.models.model_configs import LiteLLMConfig
+from evoagentx.models import LiteLLM
+
+# use local model
+config = LiteLLMConfig(
+    model="hosted_vllm/model_name",  # replace model_name with the actual model name you have
     api_base="http://localhost:11434",
     is_local=True,
     temperature=0.7,

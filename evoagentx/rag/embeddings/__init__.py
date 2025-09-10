@@ -5,11 +5,13 @@ from .base import EmbeddingProvider, BaseEmbeddingWrapper
 from .openai_embedding import OpenAIEmbeddingWrapper
 from .huggingface_embedding import HuggingFaceEmbeddingWrapper
 from .ollama_embedding import OllamaEmbeddingWrapper
+from .voyage import VoyageEmbeddingWrapper
 
 __all__ = [
     'OpenAIEmbeddingWrapper',
     'HuggingFaceEmbeddingWrapper',
     'OllamaEmbeddingWrapper',
+    'VoyageEmbeddingWrapper',
     'EmbeddingFactory',
     'BaseEmbedding',
     'EmbeddingProvider'
@@ -44,6 +46,8 @@ class EmbeddingFactory:
             wrapper = HuggingFaceEmbeddingWrapper(**model_config)
         elif provider == EmbeddingProvider.OLLAMA:
             wrapper = OllamaEmbeddingWrapper(**model_config)
+        elif provider == EmbeddingProvider.VOYAGE:
+            wrapper = VoyageEmbeddingWrapper(**model_config)
         else:
             raise ValueError(f"Unsupported embedding provider: {provider}")
         

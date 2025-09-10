@@ -1,34 +1,22 @@
 import requests
 import base64
 from typing import Dict, Optional, List
-from ..tool import Tool, Toolkit
-from ..storage_handler import FileStorageHandler
+from ...tool import Tool, Toolkit
+from ...storage_handler import FileStorageHandler
 
 
 class ImageAnalysisTool(Tool):
     name: str = "image_analysis"
     description: str = (
-        "Analyze and understand images and PDF documents using a multimodal LLM (e.g., OpenRouter gpt-4o-mini). "
+        "Analyze and understand images and PDF documents using a multimodal LLM (via OpenRouter). "
         "Supports image URLs, local image files, and local PDF files."
     )
 
     inputs: Dict[str, Dict[str, str]] = {
-        "prompt": {
-            "type": "string",
-            "description": "The question or instruction for image or PDF analysis. Required."
-        },
-        "image_url": {
-            "type": "string",
-            "description": "The URL of the image to analyze. Optional."
-        },
-        "image_path": {
-            "type": "string",
-            "description": "The local file path of the image to analyze. Optional."
-        },
-        "pdf_path": {
-            "type": "string",
-            "description": "The local file path of the PDF document to analyze. Optional."
-        }
+        "prompt": {"type": "string", "description": "Question or instruction for image/PDF analysis."},
+        "image_url": {"type": "string", "description": "URL of the image (optional)."},
+        "image_path": {"type": "string", "description": "Local image file path (optional)."},
+        "pdf_path": {"type": "string", "description": "Local PDF file path (optional)."},
     }
     required: Optional[List[str]] = ["prompt"]
 
@@ -43,7 +31,7 @@ class ImageAnalysisTool(Tool):
         prompt: str,
         image_url: str = None,
         image_path: str = None,
-        pdf_path: str = None
+        pdf_path: str = None,
     ):
         messages = [
             {
@@ -60,7 +48,6 @@ class ImageAnalysisTool(Tool):
                 "image_url": {"url": image_url}
             })
         elif image_path:
-            # Read image using storage handler
             result = self.storage_handler.read(image_path)
             if result["success"]:
                 image_content = result["content"]
@@ -75,7 +62,6 @@ class ImageAnalysisTool(Tool):
                 "image_url": {"url": data_url}
             })
         elif pdf_path:
-            # Read PDF using storage handler
             result = self.storage_handler.read(pdf_path)
             if result["success"]:
                 pdf_content = result["content"]
@@ -87,27 +73,15 @@ class ImageAnalysisTool(Tool):
             data_url = f"data:application/pdf;base64,{base64_pdf}"
             messages[0]["content"].append({
                 "type": "file",
-                "file": {
-                    "filename": pdf_path.split("/")[-1],
-                    "file_data": data_url
-                }
+                "file": {"filename": pdf_path.split("/")[-1], "file_data": data_url}
             })
 
-        payload = {
-            "model": self.model,
-            "messages": messages
-        }
-
+        payload = {"model": self.model, "messages": messages}
         url = "https://openrouter.ai/api/v1/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
-        }
-
+        headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
         response = requests.post(url, headers=headers, json=payload)
         try:
             data = response.json()
-            # Extract message.content and usage only
             result = {
                 "content": data.get("choices", [{}])[0].get("message", {}).get("content", ""),
                 "usage": data.get("usage", {})
@@ -118,39 +92,12 @@ class ImageAnalysisTool(Tool):
 
 
 class ImageAnalysisToolkit(Toolkit):
-    """
-    Toolkit for image analysis with storage handler integration.
-    """
-    
     def __init__(self, name: str = "ImageAnalysisToolkit", api_key: str = None, model: str = "openai/gpt-4o", storage_handler: FileStorageHandler = None):
-        """
-        Initialize the image analysis toolkit.
-        
-        Args:
-            name: Name of the toolkit
-            api_key: API key for OpenRouter
-            model: Model to use for image analysis
-            storage_handler: Storage handler for file operations
-        """
-        # Initialize storage handler if not provided
         if storage_handler is None:
-            from ..storage_file import LocalStorageHandler
+            from ...storage_file import LocalStorageHandler
             storage_handler = LocalStorageHandler(base_path="./workplace/analysis")
-        
-        # Create the image analysis tool
-        tool = ImageAnalysisTool(
-            api_key=api_key,
-            model=model,
-            storage_handler=storage_handler
-        )
-        
-        # Create tools list
-        tools = [tool]
-        
-        # Initialize parent with tools
-        super().__init__(name=name, tools=tools)
-        
-        # Store instance variables
+        tool = ImageAnalysisTool(api_key=api_key, model=model, storage_handler=storage_handler)
+        super().__init__(name=name, tools=[tool])
         self.api_key = api_key
         self.model = model
         self.storage_handler = storage_handler

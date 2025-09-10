@@ -11,19 +11,23 @@ from .mcp import MCPToolkit
 from .request import RequestToolkit
 from .request_arxiv import ArxivToolkit
 from .request_crawl4ai import Crawl4AIToolkit
+from .browser_use import BrowserUseToolkit
+from .google_maps_tool import GoogleMapsToolkit
 from .database_mongodb import MongoDBToolkit
 from .database_postgresql import PostgreSQLToolkit
 from .storage_handler import FileStorageHandler, LocalStorageHandler, SupabaseStorageHandler
 from .storage_file import StorageToolkit
-from .image_generation_edit_flux import FluxImageGenerationToolkit
+from .image_tools.flux_image_tools.image_generation_edit import FluxImageGenerationEditTool
+from .image_tools.flux_image_tools.toolkit import FluxImageGenerationToolkit
 from .image_tools.openai_image_tools.toolkit import OpenAIImageToolkitV2
-from .image_tools.image_analysis import ImageAnalysisToolkit
+from .image_tools.openrouter_image_tools.image_analysis import ImageAnalysisTool as OpenRouterImageAnalysisTool
+from .image_tools.openrouter_image_tools.image_generation import OpenRouterImageGenerationEditTool
+from .image_tools.openrouter_image_tools.toolkit import OpenRouterImageToolkit
 from .cmd_toolkit import CMDToolkit
 from .rss_feed import RSSToolkit
 from .file_tool import FileToolkit
 from .search_serperapi import SerperAPIToolkit
 from .search_serpapi import SerpAPIToolkit
-
 
 __all__ = [
     "Tool", 
@@ -40,15 +44,19 @@ __all__ = [
     "ArxivToolkit",
     "Crawl4AIToolkit",
     "BrowserUseToolkit",
+    "GoogleMapsToolkit",
     "MongoDBToolkit",
     "PostgreSQLToolkit",
     "FileStorageHandler",
     "LocalStorageHandler",
     "SupabaseStorageHandler",
     "StorageToolkit",
+    "FluxImageGenerationEditTool",
     "FluxImageGenerationToolkit",
     "OpenAIImageToolkitV2",
-    "ImageAnalysisToolkit",
+    "OpenRouterImageAnalysisTool",
+    "OpenRouterImageGenerationEditTool",
+    "OpenRouterImageToolkit",
     "CMDToolkit",
     "RSSToolkit",
     "FileToolkit",

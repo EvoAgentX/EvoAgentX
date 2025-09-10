@@ -29,7 +29,7 @@ If you want to contribute to EvoAgentX or need the latest development version, y
 
 ```bash
 # Clone the repository
-git clone https://github.com/EvoAgentX/EvoAgentX/
+git clone https://github.com/EvoAgentX/EvoAgentX.git
 
 # Navigate to the project directory
 cd EvoAgentX
@@ -49,10 +49,10 @@ conda create -n evoagentx python=3.11
 # Activate the environment
 conda activate evoagentx
 
-# Install the package
-pip install -r requirements.txt
+# Install the package dependencies
+pip install -r requirements.txt  # Use this to replicate the repository dependencies
 # OR install in development mode
-pip install -e .
+pip install -e .                 # Use this if you want to work on EvoAgentX itself
 ```
 
 ## Verifying Installation
