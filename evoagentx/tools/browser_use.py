@@ -691,7 +691,7 @@ class BrowserUse(BaseModule):
                     "index": i + 1,
                     "type": element.get('tag', element.get('node_name', 'unknown')),
                     "text": element.get('text', '')[:100] + "..." if len(element.get('text', '')) > 100 else element.get('text', ''),
-                    "attributes": {k: v for k, v in element.get('attributes', {}).items() if k in ['id', 'class', 'href', 'type', 'name', 'value', 'placeholder']},
+                    "attributes": self._filter_attributes(element.get('attributes', {})),
                     "visible": element.get('visible', element.get('is_visible', True)),
                     "position": element.get('position', element.get('absolute_position', {})),
                     "clickable": element.get('clickable', False)  # Use the clickable property from _extract_elements
@@ -799,7 +799,7 @@ class BrowserUse(BaseModule):
                 "index": element.get('index', i + 1),  # Use original index or fallback
                 "type": element_tag,
                 "text": element_text[:100] + "..." if len(element_text) > 100 else element_text,
-                "attributes": element.get('attributes', {}),
+                "attributes": self._filter_attributes(element.get('attributes', {})),
                 "visible": element.get('visible', True),
                 "position": element.get('position', {}),
                 "clickable": element_clickable
@@ -1043,7 +1043,7 @@ class BrowserUse(BaseModule):
                         "tag": element_tag.lower(),
                         "clickable": is_clickable,
                         "visible": getattr(element, 'is_visible', True),
-                        "attributes": element_attrs,
+                        "attributes": self._filter_attributes(element_attrs),
                         "position": position
                     }
                     elements.append(element_info)
@@ -1068,7 +1068,7 @@ class BrowserUse(BaseModule):
                         "tag": getattr(element, 'tag_name', '') or getattr(element, 'node_name', ''),
                         "clickable": True,
                         "visible": getattr(element, 'is_visible', True),
-                        "attributes": getattr(element, 'attributes', {}),
+                        "attributes": self._filter_attributes(getattr(element, 'attributes', {})),
                         "position": position
                     }
                     elements.append(element_info)
@@ -1081,6 +1081,19 @@ class BrowserUse(BaseModule):
             logger.error(f"Traceback: {traceback.format_exc()}")
             
         return elements
+    
+    def _filter_attributes(self, attributes: Dict[str, Any]) -> Dict[str, Any]:
+        """Filter element attributes to only keep href and aria-label."""
+        if not attributes:
+            return {}
+        
+        # Only keep href and aria-label attributes
+        filtered_attrs = {}
+        for key, value in attributes.items():
+            if key in ['href', 'aria-label']:
+                filtered_attrs[key] = value
+        
+        return filtered_attrs
     
     def _extract_text_content(self, dom_state) -> str:
         """Extract text content from DOM state"""
@@ -1615,10 +1628,10 @@ class BrowserUseToolkit(Toolkit):
             from browser_use import BrowserSession, BrowserProfile
             # Create optimized browser profile for performance
             browser_profile = BrowserProfile(
-                headless=False,
-                minimum_wait_page_load_time=1,
-                wait_for_network_idle_page_load_time=2,
-                wait_between_actions=1,
+                headless=True,
+                minimum_wait_page_load_time=2,  # Increased from 1 to 3 seconds
+                wait_for_network_idle_page_load_time=3,  # Increased from 2 to 5 seconds
+                wait_between_actions=2,  # Increased from 1 to 2 seconds
                 highlight_elements=False,  # Disable highlighting for performance
                 cross_origin_iframes=False,  # Disable for performance
                 enable_default_extensions=False,  # Disable extensions for performance
@@ -1661,8 +1674,8 @@ class BrowserUseToolkit(Toolkit):
         """Explicitly cleanup the browser session and thread."""
         if self.browser_use:
             logger.info("Explicitly cleaning up BrowserUseToolkit...")
-            self.browser_use._cleanup_browser_session()
-            self.browser_use._shutdown_browser_thread()
+            # Call the BrowserUse __del__ method for comprehensive cleanup
+            self.browser_use.__del__()
             logger.info("BrowserUseToolkit cleanup completed")
     
     def __del__(self):

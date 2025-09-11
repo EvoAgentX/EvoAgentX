@@ -1763,7 +1763,7 @@ class BrowserToolkit(Toolkit):
         self,
         name: str = "BrowserToolkit",
         browser_type: str = "chrome",
-        headless: bool = False,
+        headless: bool = True,
         timeout: int = 10,
         **kwargs
 

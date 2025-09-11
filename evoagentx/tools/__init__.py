@@ -7,6 +7,7 @@ from .search_ddgs import DDGSSearchToolkit
 from .search_wiki import WikipediaSearchToolkit
 from .browser_tool import BrowserToolkit
 from .browser_use import BrowserUseToolkit
+from .browser_use_auto import BrowserUseAutoToolkit
 from .mcp import MCPToolkit
 from .request import RequestToolkit
 from .request_arxiv import ArxivToolkit
@@ -39,6 +40,7 @@ __all__ = [
     "DDGSSearchToolkit",
     "WikipediaSearchToolkit",
     "BrowserToolkit",
+    "BrowserUseAutoToolkit",
     "MCPToolkit",
     "RequestToolkit",
     "ArxivToolkit",
