@@ -287,7 +287,9 @@ def run_advanced_file_operations():
     
     try:
         # Initialize storage toolkit
-        storage_toolkit = StorageToolkit(name="AdvancedStorageToolkit")
+        storage_toolkit = StorageToolkit()
+        save_tool = storage_toolkit.get_tool("save")
+        read_tool = storage_toolkit.get_tool("read")
         
         # Test CSV file operations
         print("1. Testing CSV file operations...")
@@ -296,8 +298,7 @@ John Doe,30,New York
 Jane Smith,25,Los Angeles
 Bob Johnson,35,Chicago"""
         
-        csv_save_tool = storage_toolkit.get_tool("save")
-        csv_result = csv_save_tool(
+        csv_result = save_tool(
             file_path="sample_data.csv",
             content=csv_content
         )
@@ -306,12 +307,15 @@ Bob Johnson,35,Chicago"""
             print("✓ CSV file saved successfully")
             
             # Read CSV file
-            csv_read_tool = storage_toolkit.get_tool("read")
-            csv_read_result = csv_read_tool(file_path="sample_data.csv")
+            csv_read_result = read_tool(file_path="sample_data.csv")
             
             if csv_read_result.get("success"):
                 print("✓ CSV file read successfully")
                 print(f"Content: {csv_read_result.get('content', '')[:100]}...")
+            else:
+                print(f"❌ Failed to read CSV file: {csv_read_result.get('error')}")
+        else:
+            print(f"❌ Failed to save CSV file: {csv_result.get('error')}")
         
         # Test YAML file operations
         print("\n2. Testing YAML file operations...")
@@ -324,7 +328,7 @@ metadata:
   author: Test User
   date: 2024-01-01"""
         
-        yaml_result = csv_save_tool(
+        yaml_result = save_tool(
             file_path="sample_config.yaml",
             content=yaml_content
         )
@@ -333,21 +337,59 @@ metadata:
             print("✓ YAML file saved successfully")
             
             # Read YAML file
-            yaml_read_result = csv_read_tool(file_path="sample_config.yaml")
+            yaml_read_result = read_tool(file_path="sample_config.yaml")
             
             if yaml_read_result.get("success"):
                 print("✓ YAML file read successfully")
                 print(f"Content: {yaml_read_result.get('content', '')[:100]}...")
+            else:
+                print(f"❌ Failed to read YAML file: {yaml_read_result.get('error')}")
+        else:
+            print(f"❌ Failed to save YAML file: {yaml_result.get('error')}")
+
+        # Test PDF file operations
+        print("\n3. Testing PDF file operations...")
+        
+        # Create PDF file first
+        pdf_content = """Test PDF Document
+
+This is a test PDF created by EvoAgentX.
+
+Features:
+• PDF creation from text
+• Automatic formatting
+• Professional layout
+
+This demonstrates the storage system's PDF capabilities."""
+        
+        pdf_result = save_tool(
+            file_path="test_pdf.pdf",
+            content=pdf_content
+        )
+        
+        if pdf_result.get("success"):
+            print("✓ PDF file created successfully")
+        else:
+            print(f"❌ Failed to create PDF file: {pdf_result.get('error')}")
+        
+        # Read PDF file
+        pdf_read_result = read_tool(file_path="test_pdf.pdf")
+        
+        if pdf_read_result.get("success"):
+            print("✓ PDF file read successfully")
+            print(f"Content: {pdf_read_result.get('content', '')[:100]}...")
+        else:
+            print(f"❌ Failed to read PDF file: {pdf_read_result.get('error')}")
         
         # Test file deletion
-        print("\n3. Testing file deletion...")
+        print("\n4. Testing file deletion...")
         delete_tool = storage_toolkit.get_tool("delete")
         
         # Delete test files
         test_files = ["sample_document.txt", "sample_data.json", "custom_test.txt"]
         for test_file in test_files:
             if os.path.exists(test_file):
-                delete_result = delete_tool(file_path=test_file)
+                delete_result = delete_tool(path=test_file)
                 if delete_result.get("success"):
                     print(f"✓ Deleted {test_file}")
                 else:
@@ -363,14 +405,14 @@ def main():
     """Main function to run all file system examples"""
     print("===== FILE SYSTEM TOOLS EXAMPLES =====")
     
-    # Run storage tool example
-    run_file_tool_example()
+    # # Run storage tool example
+    # run_file_tool_example()
     
-    # Run CMD tool example
-    run_cmd_tool_example()
+    # # Run CMD tool example
+    # run_cmd_tool_example()
     
-    # Run storage handler examples
-    run_storage_handler_examples()
+    # # Run storage handler examples
+    # run_storage_handler_examples()
     
     # Run advanced file operations
     run_advanced_file_operations()

@@ -65,9 +65,9 @@ By the end of this tutorial, you'll understand how to leverage these tools in yo
 | [PostgreSQLToolkit](#52-postgresqltoolkit) | PostgreSQL operations—generic SQL execution, targeted SELECT (find), UPDATE, CREATE, DELETE, INFO. | [evoagentx/tools/database_postgresql.py](../../evoagentx/tools/database_postgresql.py) | [examples/tools/tools_database.py](../../examples/tools/tools_database.py) |
 | [FaissToolkit](#53-faisstoolkit) | Vector database (FAISS) for semantic search—insert documents (auto chunk+embed), query by similarity, delete by id/metadata, stats. | [evoagentx/tools/database_faiss.py](../../evoagentx/tools/database_faiss.py) | [examples/tools/tools_database.py](../../examples/tools/tools_database.py) |
 | **🧰 Image Handling Tools** |  |  |  |
-| [ImageAnalysisToolkit](#61-imageanalysistoolkit) | Vision analysis (OpenRouter GPT-4o family): describe images, extract objects/UI info, answer questions about an image. | [evoagentx/tools/image_analysis.py](../../evoagentx/tools/image_analysis.py) | [examples/tools/tools_images.py](../../examples/tools/tools_images.py) |
-| [OpenAIImageGenerationToolkit](#62-openaiimagegenerationtoolkit) | Text-to-image via OpenAI (DALL·E family) with size/quality/style controls. | [evoagentx/tools/images_openai_generation.py](../../evoagentx/tools/images_openai_generation.py) | [examples/tools/tools_images.py](../../examples/tools/tools_images.py) |
-| [FluxImageGenerationToolkit](#63-fluximagegenerationtoolkit) | Text-to-image via Flux Kontext Max (BFL) with aspect ratio, seed, format, prompt upsampling, and safety tolerance. | [evoagentx/tools/images_flux_generation.py](../../evoagentx/tools/images_flux_generation.py) | [examples/tools/tools_images.py](../../examples/tools/tools_images.py) |
+| [OpenAIImageToolkit](#61-openaiimagetoolkit) | OpenAI image generation, editing, and analysis. Complete image workflow with DALL-E and GPT-4 Vision. | [evoagentx/tools/image_tools/openai_image_tools/](../../evoagentx/tools/image_tools/openai_image_tools/) | [examples/tools/tools_images.py](../../examples/tools/tools_images.py) |
+| [OpenRouterImageToolkit](#62-openrouterimagetoolkit) | OpenRouter image generation, editing, and analysis. Multi-model support with flexible storage. | [evoagentx/tools/image_tools/openrouter_image_tools/](../../evoagentx/tools/image_tools/openrouter_image_tools/) | [examples/tools/tools_images.py](../../examples/tools/tools_images.py) |
+| [FluxImageGenerationToolkit](#63-fluximagegenerationtoolkit) | Flux image generation and editing with Kontext Max. Advanced artistic control and customization. | [evoagentx/tools/image_tools/flux_image_tools/](../../evoagentx/tools/image_tools/flux_image_tools/) | [examples/tools/tools_images.py](../../examples/tools/tools_images.py) |
 | **🧰 Browser Tools** |  |  |  |
 | [BrowserToolkit](#7-browser-tools) | Fine-grained browser automation: initialize, navigate, type, click, resnapshot page, read console logs, and close. | [evoagentx/tools/browser_tool.py](../../evoagentx/tools/browser_tool.py) | [examples/tools/tools_browser.py](../../examples/tools/tools_browser.py) |
 | [BrowserUseToolkit](#7-browser-tools) | High-level, natural-language browser automation (navigate, fill forms, click, search, etc.) driven by an LLM. | [evoagentx/tools/browser_use.py](../../evoagentx/tools/browser_use.py) | [examples/tools/tools_browser.py](../../examples/tools/tools_browser.py) |
@@ -75,6 +75,7 @@ By the end of this tutorial, you'll understand how to leverage these tools in yo
 | [MCPToolkit](#81-mcptoolkit) | Connect to external MCP servers and discover their tools. Extends EvoAgentX with third-party capabilities. | [evoagentx/tools/mcp.py](../../evoagentx/tools/mcp.py) | [examples/tools/tools_integration.py](../../examples/tools/tools_integration.py) |
 
 </details>
+
 
 **🔗 Quick Navigation Links:**
 - [Code Interpreters](#1-understanding-the-tool-architecture) - Execute code safely
@@ -1754,7 +1755,7 @@ FileSystem tools provide capabilities for file operations, storage management, a
 
 ```python
 from evoagentx.tools import StorageToolkit
-from evoagentx.tools.storage_file import LocalStorageHandler
+from evoagentx.tools.storage_handler import LocalStorageHandler
 
 # Initialize with local storage
 storage_handler = LocalStorageHandler(base_path="./data")
@@ -2038,7 +2039,7 @@ Returns `dict` with command execution results.
 
 **LocalStorageHandler:**
 ```python
-from evoagentx.tools.storage_file import LocalStorageHandler
+from evoagentx.tools.storage_handler import LocalStorageHandler
 
 # Basic local storage
 handler = LocalStorageHandler()
@@ -2451,9 +2452,9 @@ delete_result = delete_tool(
 **📁 Example File**: `examples/tools/tools_images.py`
 
 **🔧 Toolkit Files**: 
-- `evoagentx/tools/image_analysis.py` - ImageAnalysisToolkit implementation
-- `evoagentx/tools/images_openai_generation.py` - OpenAIImageGenerationToolkit implementation
-- `evoagentx/tools/images_flux_generation.py` - FluxImageGenerationToolkit implementation
+- `evoagentx/tools/image_tools/openai_image_tools/` - OpenAI image tools (generation, editing, analysis)
+- `evoagentx/tools/image_tools/openrouter_image_tools/` - OpenRouter image tools (generation, editing, analysis)
+- `evoagentx/tools/image_tools/flux_image_tools/` - Flux image tools (generation, editing)
 
 **🚀 Run Examples**: `python -m examples.tools.tools_images`
 
@@ -2463,34 +2464,46 @@ delete_result = delete_tool(
 
 **📁 View Source Code**: 
 ```bash
-# View toolkit implementations
-ls evoagentx/tools/image_*.py
+# View image tools directory structure
+ls -la evoagentx/tools/image_tools/
 
 # View example file
 cat examples/tools/tools_images.py
 
 # View toolkit source files
-cat evoagentx/tools/image_analysis.py
-cat evoagentx/tools/images_openai_generation.py
-cat evoagentx/tools/images_flux_generation.py
+ls evoagentx/tools/image_tools/openai_image_tools/
+ls evoagentx/tools/image_tools/openrouter_image_tools/
+ls evoagentx/tools/image_tools/flux_image_tools/
 ```
 
 Image handling tools provide comprehensive capabilities for image analysis, generation, and manipulation using various AI services and APIs. These tools enable agents to work with visual content, generate images from text descriptions, and analyze image content.
 
-### 6.1 ImageAnalysisToolkit
+**Storage Support**: All image toolkits support flexible file storage options through the `storage_handler` parameter, allowing you to use local storage, remote storage (Supabase), or custom storage implementations.
 
-**The ImageAnalysisToolkit provides AI-powered image analysis capabilities using OpenAI's GPT-4 Vision model through OpenRouter API. It can analyze images, extract information, and provide detailed descriptions of visual content.**
+### 6.1 OpenAIImageToolkit
+
+**The OpenAIImageToolkit provides comprehensive image capabilities including generation, editing, and analysis using OpenAI's DALL-E and GPT-4 Vision models. It offers a complete image workflow with flexible storage options.**
 
 #### 6.1.1 Setup
 
 ```python
-from evoagentx.tools import ImageAnalysisToolkit
+from evoagentx.tools import OpenAIImageToolkit
 
-# Initialize with OpenRouter API (requires OPENROUTER_API_KEY)
-toolkit = ImageAnalysisToolkit(
-    name="DemoImageAnalysisToolkit",
-    api_key="your-openrouter-api-key",  # Or set OPENROUTER_API_KEY environment variable
-    model="gpt-4o"  # Default model for image analysis
+# Basic setup with default local storage
+toolkit = OpenAIImageToolkit(
+    name="DemoOpenAIImageToolkit",
+    api_key="your-openai-api-key",  # Or set OPENAI_API_KEY environment variable
+    organization_id="your-organization-id",  # Optional
+    generation_model="dall-e-3",
+    save_path="./generated_images"
+)
+
+# With custom storage handler
+from evoagentx.tools import LocalStorageHandler
+storage_handler = LocalStorageHandler(base_path="./custom_images")
+toolkit = OpenAIImageToolkit(
+    api_key="your-openai-api-key",
+    storage_handler=storage_handler
 )
 ```
 
@@ -2502,293 +2515,209 @@ tools = toolkit.get_tools()
 print(f"Available tools: {[tool.name for tool in tools]}")
 
 # Available tools:
-# - image_analysis: Analyze images and extract information
+# - openai_image_generation: Generate images from text descriptions
+# - openai_image_edit: Edit existing images with text prompts
+# - openai_image_analysis: Analyze images using GPT-4 Vision
 ```
 
 #### 6.1.3 Usage Example
 
 ```python
-# Get the image analysis tool
-analysis_tool = toolkit.get_tool("image_analysis")
+# Get tools
+gen_tool = toolkit.get_tool("openai_image_generation")
+edit_tool = toolkit.get_tool("openai_image_edit")
+analysis_tool = toolkit.get_tool("openai_image_analysis")
 
-# Analyze an image file
-result = analysis_tool(
-    image_path="path/to/image.jpg",
-    prompt="Describe what you see in this image in detail"
+# Generate an image
+result = gen_tool(
+    prompt="A serene mountain landscape at sunset with a lake in the foreground",
+    size="1024x1024",
+    quality="high"
 )
 
-# Analyze an image URL
-result = analysis_tool(
-    image_url="https://example.com/image.jpg",
-    prompt="What objects and activities can you identify in this image?"
+# Edit the generated image
+edit_result = edit_tool(
+    prompt="Add a red scarf around the owl's neck",
+    images=result["results"][0],
+    size="1024x1024"
 )
 
-# Analyze with custom model
-result = analysis_tool(
-    image_path="screenshot.png",
-    prompt="Analyze this screenshot and identify the main UI elements",
-    model="gpt-4o-mini"
+# Analyze the edited image
+analysis_result = analysis_tool(
+    prompt="Describe what you see in this image",
+    image_path=edit_result["results"][0]
 )
 ```
-
-#### 6.1.4 Parameters
-
-**image_analysis:**
-- `image_path` (str, optional): Local file path to the image
-- `image_url` (str, optional): URL of the image to analyze
-- `prompt` (str, required): Text prompt describing what to analyze
-- `model` (str, optional): AI model to use for analysis (default: "gpt-4o")
-
-**Note**: Provide either `image_path` or `image_url`, not both.
-
-#### 6.1.5 Return Type
-
-Returns `dict` with analysis results and metadata.
-
-#### 6.1.6 Sample Return
-
-```python
-# Success response
-{
-    "content": "This image shows a modern office workspace with a laptop computer, a coffee mug, and several documents arranged on a wooden desk. The lighting appears to be natural daylight coming from a window on the left side. The workspace looks organized and professional, with a minimalist aesthetic.",
-    "usage": {
-        "prompt_tokens": 15,
-        "completion_tokens": 45,
-        "total_tokens": 60
-    }
-}
-
-# Error response
-{
-    "error": "Image file not found at specified path"
-}
-```
-
-#### 6.1.7 Setup Hints
-
-- **API Key**: Set `OPENROUTER_API_KEY` environment variable or pass directly to toolkit
-- **Image Formats**: Supports common formats: JPEG, PNG, GIF, WebP
-- **File Size**: Images should be under 20MB for optimal processing
-- **Models**: Uses GPT-4 Vision models for best image understanding
 
 ---
 
-### 6.2 OpenAIImageGenerationToolkit
+### 6.2 OpenRouterImageToolkit
 
-**The OpenAIImageGenerationToolkit provides access to OpenAI's DALL-E image generation capabilities, allowing you to create high-quality images from text descriptions with various customization options.**
+**The OpenRouterImageToolkit provides image generation, editing, and analysis capabilities through OpenRouter's multi-model API, supporting various AI models with flexible storage options.**
 
 #### 6.2.1 Setup
 
 ```python
-from evoagentx.tools import OpenAIImageGenerationToolkit
+from evoagentx.tools import OpenRouterImageToolkit
 
-# Initialize with OpenAI API (requires OPENAI_API_KEY)
-toolkit = OpenAIImageGenerationToolkit(
-    name="DemoOpenAIImageToolkit",
-    api_key="your-openai-api-key",  # Or set OPENAI_API_KEY environment variable
-    organization_id="your-organization-id",  # Or set OPENAI_ORGANIZATION_ID environment variable
-    model="gpt-4o"  # Default model for image generation
+# Basic setup
+toolkit = OpenRouterImageToolkit(
+    name="DemoOpenRouterImageToolkit",
+    api_key="your-openrouter-api-key"  # Or set OPENROUTER_API_KEY environment variable
+)
+
+# With custom storage
+from evoagentx.tools import SupabaseStorageHandler
+storage_handler = SupabaseStorageHandler(bucket_name="my-images")
+toolkit = OpenRouterImageToolkit(
+    api_key="your-openrouter-api-key",
+    storage_handler=storage_handler
 )
 ```
 
 #### 6.2.2 Available Methods
 
 ```python
-# Get available tools
-tools = toolkit.get_tools()
-print(f"Available tools: {[tool.name for tool in tools]}")
-
 # Available tools:
-# - image_generation: Generate images from text descriptions
+# - openrouter_image_generation_edit: Generate or edit images
+# - image_analysis: Analyze images using various models
 ```
 
 #### 6.2.3 Usage Example
 
 ```python
-# Get the image generation tool
-gen_tool = toolkit.get_tool("image_generation")
+# Get tools
+gen_tool = toolkit.get_tool("openrouter_image_generation_edit")
+analysis_tool = toolkit.get_tool("image_analysis")
 
-# Generate a simple image
+# Generate an image
 result = gen_tool(
-    prompt="A serene mountain landscape at sunset with a lake in the foreground",
-    size="1024x1024",
-    quality="standard",
-    style="vivid"
+    prompt="A minimalist poster of a mountain at sunrise",
+    model="google/gemini-2.5-flash-image-preview",
+    save_path="./openrouter_images",
+    output_basename="mountain"
 )
 
-# Generate with specific parameters
-result = gen_tool(
-    prompt="A futuristic city skyline with flying cars and neon lights",
-    size="1792x1024",
-    quality="hd",
-    style="natural"
+# Edit the image
+edit_result = gen_tool(
+    prompt="Add a bold 'GEMINI' text at the top",
+    image_paths=[result["saved_paths"][0]],
+    model="google/gemini-2.5-flash-image-preview",
+    save_path="./openrouter_images",
+    output_basename="edited"
 )
 
-# Generate with custom settings
-result = gen_tool(
-    prompt="A cute robot playing with a cat in a garden",
-    size="1024x1024",
-    quality="standard"
-)
-
-# Generate with custom settings
-result = gen_tool(
-    prompt="A cute robot playing with a cat in a garden",
-    size="1024x1024",
-    quality="standard"
+# Analyze the image
+analysis_result = analysis_tool(
+    prompt="Describe this image",
+    image_path=edit_result["saved_paths"][0]
 )
 ```
-
-#### 6.2.4 Parameters
-
-**image_generation:**
-- `prompt` (str, required): Detailed description of the image to generate
-- `size` (str, optional): Image dimensions (default: "1024x1024")
-  - Options: "1024x1024", "1792x1024", "1024x1792"
-- `quality` (str, optional): Image quality (default: "standard")
-  - Options: "standard", "hd"
-- `style` (str, optional): Artistic style (default: "vivid")
-  - Options: "vivid", "natural"
-
-
-#### 6.2.5 Return Type
-
-Returns `dict` with generation results including file path and storage handler information.
-
-#### 6.2.6 Sample Return
-
-```python
-# Success response
-{
-    "file_path": "generated_image.png",
-    "storage_handler": "LocalStorageHandler"
-}
-
-# Error response
-{
-    "error": "Your request was rejected as a result of our safety system. Your prompt may contain text that is not allowed by our safety system."
-}
-```
-
-#### 6.2.7 Setup Hints
-
-- **API Key**: Set `OPENAI_API_KEY` environment variable or pass directly to toolkit
-- **Organization ID**: Set `OPENAI_ORGANIZATION_ID` environment variable or pass directly to toolkit
-- **Prompt Quality**: Detailed, descriptive prompts produce better results
-- **Safety Filters**: Content must comply with OpenAI's safety guidelines
-- **Rate Limits**: Be mindful of API rate limits and costs
 
 ---
 
 ### 6.3 FluxImageGenerationToolkit
 
-**The FluxImageGenerationToolkit provides access to Flux Kontext Max image generation capabilities, offering high-quality image creation with advanced customization options and various artistic styles.**
+**The FluxImageGenerationToolkit provides advanced image generation and editing capabilities using Flux Kontext Max, offering high-quality artistic control with flexible storage options.**
 
 #### 6.3.1 Setup
 
 ```python
 from evoagentx.tools import FluxImageGenerationToolkit
 
-# Initialize with BFL API (requires BFL_API_KEY)
+# Basic setup
 toolkit = FluxImageGenerationToolkit(
     name="DemoFluxImageToolkit",
     api_key="your-bfl-api-key",  # Or set BFL_API_KEY environment variable
-    model="kontext-max"  # Default model for image generation
+    save_path="./flux_generated_images"
+)
+
+# With custom storage
+from evoagentx.tools import LocalStorageHandler
+storage_handler = LocalStorageHandler(base_path="./flux_images")
+toolkit = FluxImageGenerationToolkit(
+    api_key="your-bfl-api-key",
+    storage_handler=storage_handler
 )
 ```
 
 #### 6.3.2 Available Methods
 
 ```python
-# Get available tools
-tools = toolkit.get_tools()
-print(f"Available tools: {[tool.name for tool in tools]}")
-
 # Available tools:
-# - flux_image_generation: Generate images using Flux Kontext Max
+# - flux_image_generation_edit: Generate or edit images with Flux
 ```
 
 #### 6.3.3 Usage Example
 
 ```python
-# Get the image generation tool
-gen_tool = toolkit.get_tool("flux_image_generation")
+# Get the generation tool
+gen_tool = toolkit.get_tool("flux_image_generation_edit")
 
-# Generate a basic image
+# Generate an image
 result = gen_tool(
-    prompt="A magical forest with glowing mushrooms and fairy lights",
-    aspect_ratio="1:1"
-)
-
-# Generate with advanced parameters
-result = gen_tool(
-    prompt="A steampunk airship flying over Victorian London",
-    aspect_ratio="16:9",
+    prompt="A futuristic cyberpunk city with neon lights and flying cars",
     seed=42,
-    output_format="png",
-    prompt_upsampling=True,
+    output_format="jpeg",
+    prompt_upsampling=False,
     safety_tolerance=2
 )
 
-# Generate with specific style
-result = gen_tool(
-    prompt="A cyberpunk street scene with neon lights and rain",
-    aspect_ratio="2:1",
-    seed=12345,
-    output_format="webp"
+# Edit an existing image
+import base64
+with open("existing_image.jpg", "rb") as f:
+    b64_image = base64.b64encode(f.read()).decode("utf-8")
+
+edit_result = gen_tool(
+    prompt="Add a glowing red umbrella held by a person in the foreground",
+    input_image=b64_image,
+    seed=43,
+    output_format="jpeg"
 )
 ```
 
-#### 6.3.4 Parameters
+---
 
-**flux_image_generation:**
-- `prompt` (str, required): Detailed description of the image to generate
-- `aspect_ratio` (str, optional): Image aspect ratio (default: "1:1")
-  - Options: "1:1", "16:9", "9:16", "2:1", "1:2", "4:3", "3:4"
-- `seed` (int, optional): Random seed for reproducible results
-- `output_format` (str, optional): Output image format (default: "png")
-  - Options: "png", "webp", "jpeg"
-- `prompt_upsampling` (bool, optional): Enable prompt upsampling for better quality
-- `safety_tolerance` (int, optional): Safety filter tolerance (default: 2)
-  - Options: 1 (low), 2 (medium), 3 (high)
+### 6.4 Storage Options
 
-#### 6.3.5 Return Type
+All image toolkits support flexible storage through the `storage_handler` parameter:
 
-Returns `dict` with generation results including file path and storage handler information.
-
-#### 6.3.6 Sample Return
-
+#### 6.4.1 Local Storage (Default)
 ```python
-# Success response
-{
-    "file_path": "./flux_generated_images/flux_42.jpeg",
-    "storage_handler": "LocalStorageHandler"
-}
+from evoagentx.tools import LocalStorageHandler
 
-# Error response
-{
-    "success": False,
-    "error": "Invalid API key provided",
-    "error_code": "AUTH_ERROR"
-}
+# Default local storage
+toolkit = OpenAIImageToolkit(api_key=API_KEY)
+
+# Custom local storage path
+storage_handler = LocalStorageHandler(base_path="./custom_images")
+toolkit = OpenAIImageToolkit(api_key=API_KEY, storage_handler=storage_handler)
 ```
 
-#### 6.3.7 Setup Hints
+#### 6.4.2 Remote Storage (Supabase)
+```python
+from evoagentx.tools import SupabaseStorageHandler
+import os
 
-- **API Key**: Set `BFL_API_KEY` environment variable or pass directly to toolkit
-- **Aspect Ratios**: Choose appropriate ratios for your use case
-- **Seeds**: Use consistent seeds for reproducible results
-- **Safety**: Adjust safety tolerance based on your content requirements
+# Set environment variables
+os.environ["SUPABASE_URL_STORAGE"] = "your-supabase-url"
+os.environ["SUPABASE_KEY_STORAGE"] = "your-supabase-key"
+os.environ["SUPABASE_BUCKET_STORAGE"] = "your-bucket-name"
+
+# Use Supabase storage
+storage_handler = SupabaseStorageHandler(bucket_name="my-images")
+toolkit = OpenAIImageToolkit(api_key=API_KEY, storage_handler=storage_handler)
+```
 
 ---
 
-### 6.4 Image Handling Tools Summary
+### 6.5 Image Handling Tools Summary
 
 | Toolkit | Purpose | Key Features | Use Cases |
 |---------|---------|--------------|-----------|
-| **ImageAnalysisToolkit** | Image understanding | Visual analysis, content extraction | Content moderation, image description, visual QA |
-| **OpenAIImageGenerationToolkit** | AI image creation | DALL-E 3, high quality, safety filters | Creative content, marketing materials, concept art |
-| **FluxImageGenerationToolkit** | Advanced image generation | Kontext Max, multiple formats, style control | Professional graphics, artistic content, design work |
+| **OpenAIImageToolkit** | Complete image workflow | DALL-E generation, editing, GPT-4 Vision analysis | Creative content, marketing, visual understanding |
+| **OpenRouterImageToolkit** | Multi-model image tools | Various AI models, flexible storage | Research, experimentation, multi-provider support |
+| **FluxImageGenerationToolkit** | Advanced image generation | Kontext Max, artistic control | Professional graphics, artistic content, design work |
 
 **Common Use Cases:**
 - **Content Creation**: Generate images for websites, presentations, and marketing
@@ -2803,15 +2732,16 @@ Returns `dict` with generation results including file path and storage handler i
 - Be mindful of content safety guidelines and API rate limits
 - Consider image formats and aspect ratios for your specific use case
 - Test with different models and parameters to find optimal settings
+- Use appropriate storage handlers for your deployment environment
 
 **API Key Requirements:**
-- **ImageAnalysisToolkit**: `OPENROUTER_API_KEY` (for GPT-4 Vision access)
-- **OpenAIImageGenerationToolkit**: `OPENAI_API_KEY` (for DALL-E access)
+- **OpenAIImageToolkit**: `OPENAI_API_KEY` (for DALL-E and GPT-4 Vision access)
+- **OpenRouterImageToolkit**: `OPENROUTER_API_KEY` (for multi-model access)
 - **FluxImageGenerationToolkit**: `BFL_API_KEY` (for Flux Kontext Max access)
 
 ---
 
-### 6.5 Running the Examples
+### 6.6 Running the Examples
 
 To run the image handling tool examples:
 
@@ -2828,21 +2758,16 @@ python tools_images.py
 ```
 ===== IMAGE TOOL EXAMPLES =====
 
-===== IMAGE ANALYSIS TOOL EXAMPLE =====
-✓ ImageAnalysisToolkit initialized
-✓ Using OpenRouter API key: your-key...
-Analyzing image: https://upload.wikimedia.org/...
-Prompt: Describe this image in detail.
-✓ Image analysis successful
-Analysis: This image shows a modern office workspace...
-
-===== FLUX IMAGE GENERATION TOOL EXAMPLE =====
-✓ Flux Image Generation Toolkit initialized
-✓ Using BFL API key: your-key...
-Generating image with prompt: 'A futuristic cyberpunk city...'
+===== OPENAI IMAGE TOOLKIT PIPELINE (GEN → EDIT → ANALYZE) =====
+✓ OpenAIImageToolkit initialized
+✓ Using OpenAI API key: your-key...
+Generating: A cute baby owl sitting on a tree branch at sunset, digital art
 ✓ Image generation successful
-Generated image path: ./flux_generated_images/flux_42.jpeg
-✓ Generated image file saved successfully
+Generated image: ./generated_images/generated_1757661778_1.png
+✓ Image editing successful
+Edited image: ./generated_images/edited_minimal_1757661779_1.png
+✓ Image analysis successful
+Analysis: This image shows a cute baby owl...
 
 ===== ALL IMAGE TOOL EXAMPLES COMPLETED =====
 ```
@@ -2851,7 +2776,7 @@ Generated image path: ./flux_generated_images/flux_42.jpeg
 
 ---
 
-### 6.6 File Organization Benefits
+### 6.7 File Organization Benefits
 
 The separated `tools_images.py` file provides several advantages:
 

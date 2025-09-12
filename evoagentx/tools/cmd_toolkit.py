@@ -323,7 +323,7 @@ class CMDToolkit(Toolkit):
         """
         # Initialize storage handler if not provided
         if storage_handler is None:
-            from .storage_file import LocalStorageHandler
+            from .storage_handler import LocalStorageHandler
             storage_handler = LocalStorageHandler(base_path="./workplace/cmd")
         
         # Create the shared command base instance with storage handler

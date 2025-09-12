@@ -89,14 +89,16 @@ class SaveTool(Tool):
                 if isinstance(content, list):
                     parsed_content = content
                 else:
-                    # If content is a string, try to parse it as JSON
+                    # Try to parse as JSON first (for structured data)
                     try:
                         import json
                         parsed_content = json.loads(content)
                         if not isinstance(parsed_content, list):
-                            return {"success": False, "error": "CSV content must be a list of dictionaries"}
+                            # If JSON parsing succeeded but it's not a list, treat as raw CSV
+                            parsed_content = content
                     except json.JSONDecodeError:
-                        return {"success": False, "error": "CSV content must be valid JSON array"}
+                        # If JSON parsing fails, treat as raw CSV string
+                        parsed_content = content
             
             # Handle Excel content
             elif file_extension == '.xlsx':
@@ -245,9 +247,11 @@ class AppendTool(Tool):
                     import json
                     parsed_content = json.loads(content)
                     if not isinstance(parsed_content, list):
-                        return {"success": False, "error": "CSV content must be a list of dictionaries"}
+                        # If JSON parsing succeeded but it's not a list, treat as raw CSV
+                        parsed_content = content
                 except json.JSONDecodeError:
-                    return {"success": False, "error": "CSV content must be valid JSON array"}
+                    # If JSON parsing fails, treat as raw CSV string
+                    parsed_content = content
             
             # Handle Excel content
             elif file_extension == '.xlsx':
@@ -501,31 +505,6 @@ class ExistsTool(Tool):
             return {"success": False, "error": str(e), "path": path}
 
 
-class ListSupportedFormatsTool(Tool):
-    name: str = "list_supported_formats"
-    description: str = "List all supported file formats and their capabilities"
-    inputs: Dict[str, Dict[str, str]] = {}
-    required: Optional[List[str]] = []
-
-    def __init__(self, storage_handler: FileStorageHandler = None):
-        super().__init__()
-        self.storage_handler = storage_handler or LocalStorageHandler()
-
-    def __call__(self) -> Dict[str, Any]:
-        """
-        List all supported file formats and their capabilities.
-        
-        Returns:
-            Dictionary containing supported formats information
-        """
-        try:
-            result = self.storage_handler.get_supported_formats()
-            return result
-            
-        except Exception as e:
-            logger.error(f"Error in ListSupportedFormatsTool: {str(e)}")
-            return {"success": False, "error": str(e)}
-
 
 class StorageToolkit(Toolkit):
     """
@@ -534,7 +513,7 @@ class StorageToolkit(Toolkit):
     creating directories, and listing files with support for various file formats.
     """
     
-    def __init__(self, name: str = "StorageToolkit", base_path: str = "./workplace/storage", storage_handler: FileStorageHandler = None):
+    def __init__(self, name: str = "StorageToolkit", base_path: str = "./workplace/storage", storage_handler: LocalStorageHandler = None):
         """
         Initialize the storage toolkit.
         
@@ -543,8 +522,7 @@ class StorageToolkit(Toolkit):
             base_path: Base directory for storage operations (default: ./workplace/storage)
             storage_handler: Storage handler instance (defaults to LocalStorageHandler)
         """
-        # Create the shared storage handler instance
-        if storage_handler is None:
+        if not storage_handler:
             storage_handler = LocalStorageHandler(base_path=base_path)
         
         # Create tools with the storage handler
@@ -557,8 +535,7 @@ class StorageToolkit(Toolkit):
             CopyTool(storage_handler=storage_handler),
             CreateDirectoryTool(storage_handler=storage_handler),
             ListFileTool(storage_handler=storage_handler),
-            ExistsTool(storage_handler=storage_handler),
-            ListSupportedFormatsTool(storage_handler=storage_handler)
+            ExistsTool(storage_handler=storage_handler)
         ]
         
         super().__init__(name=name, tools=tools)

@@ -15,9 +15,12 @@ from .database_mongodb import MongoDBToolkit
 from .database_postgresql import PostgreSQLToolkit
 from .storage_handler import FileStorageHandler, LocalStorageHandler, SupabaseStorageHandler
 from .storage_file import StorageToolkit
-from .images_flux_generation import FluxImageGenerationToolkit
-from .images_openai_generation import OpenAIImageGenerationToolkit
-from .image_analysis import ImageAnalysisToolkit
+from .image_tools.flux_image_tools.image_generation_edit import FluxImageGenerationEditTool
+from .image_tools.flux_image_tools.toolkit import FluxImageGenerationToolkit
+from .image_tools.openai_image_tools.toolkit import OpenAIImageToolkit
+from .image_tools.openrouter_image_tools.image_analysis import ImageAnalysisTool as OpenRouterImageAnalysisTool
+from .image_tools.openrouter_image_tools.image_generation import OpenRouterImageGenerationEditTool
+from .image_tools.openrouter_image_tools.toolkit import OpenRouterImageToolkit
 from .cmd_toolkit import CMDToolkit
 from .rss_feed import RSSToolkit
 from .file_tool import FileToolkit
@@ -45,13 +48,15 @@ __all__ = [
     "LocalStorageHandler",
     "SupabaseStorageHandler",
     "StorageToolkit",
+    "FluxImageGenerationEditTool",
     "FluxImageGenerationToolkit",
-    "OpenAIImageGenerationToolkit",
-    "ImageAnalysisToolkit",
+    "OpenAIImageToolkit",
+    "OpenRouterImageAnalysisTool",
+    "OpenRouterImageGenerationEditTool",
+    "OpenRouterImageToolkit",
     "CMDToolkit",
     "RSSToolkit",
     "FileToolkit",
     "SerperAPIToolkit",
     "SerpAPIToolkit"
 ]
-

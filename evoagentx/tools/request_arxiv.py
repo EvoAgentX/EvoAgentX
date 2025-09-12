@@ -362,7 +362,7 @@ class ArxivToolkit(Toolkit):
     def __init__(self, name: str = "ArxivToolkit", storage_handler: FileStorageHandler = None):
         # Initialize storage handler if not provided
         if storage_handler is None:
-            from .storage_file import LocalStorageHandler
+            from .storage_handler import LocalStorageHandler
             storage_handler = LocalStorageHandler()
         
         # Create the shared arxiv base instance

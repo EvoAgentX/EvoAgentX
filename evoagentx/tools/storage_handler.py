@@ -1,9 +1,9 @@
 import os
-import json
 import shutil
 from typing import Dict, Any, List
 from pathlib import Path
 from datetime import datetime
+from abc import abstractmethod
 
 from .storage_base import StorageBase
 from ..core.logging import logger
@@ -11,9 +11,9 @@ from ..core.logging import logger
 
 class FileStorageHandler(StorageBase):
     """
-    Unified storage handler that provides a consistent interface for all storage operations.
-    This class serves as the main entry point for storage operations, inheriting from StorageBase
-    and providing the core CRUD operations (Create, Read, Update, Delete).
+    Reference implementation showing all available _raw_xxx methods.
+    This class serves as a template for developers creating new storage handlers.
+    Concrete handlers only need to implement the _raw_xxx methods they need.
     """
     
     def __init__(self, base_path: str = ".", **kwargs):
@@ -26,556 +26,87 @@ class FileStorageHandler(StorageBase):
         """
         super().__init__(base_path=base_path, **kwargs)
     
-    def translate_in(self, file_path: str) -> str:
-        """
-        Translate input file path by combining it with base_path.
-        This method takes a user-provided path and converts it to the full system path.
-        
-        Args:
-            file_path (str): User-provided file path (can be relative or absolute)
-            
-        Returns:
-            str: Full system path combining base_path and file_path
-        """
-        # If the path is already absolute, return as is
-        if os.path.isabs(file_path):
-            return file_path
-        
-        # Always combine base_path with file_path to ensure working directory is respected
-        # Check if this is a remote storage handler (like Supabase)
-        if hasattr(self, 'bucket_name') and hasattr(self, 'supabase'):
-            # For remote storage, treat base_path as a prefix within the bucket
-            # Don't use os.path.join as it's designed for local filesystems
-            if self.base_path.startswith('/'):
-                # Remove leading slash and combine
-                clean_base = self.base_path.lstrip('/')
-                if clean_base:
-                    return f"{clean_base}/{file_path}"
-                else:
-                    return file_path
-            else:
-                # Combine base_path and file_path with forward slash
-                return f"{self.base_path}/{file_path}"
-        else:
-            # For local storage, use os.path.join for proper filesystem handling
-            combined_path = os.path.join(self.base_path, file_path)
-            normalized_path = os.path.normpath(combined_path)
-            return normalized_path
+    # ____________________ How to use it ____________________ #
+    def create(self, file_path: str, content: Any, **kwargs) -> Dict[str, Any]:
+        return super().save(file_path, content, **kwargs)
     
-    def translate_out(self, full_path: str) -> str:
-        """
-        Translate output full path by removing the base_path prefix.
-        This method takes a full system path and converts it back to the user-relative path.
-        
-        Args:
-            full_path (str): Full system path
-            
-        Returns:
-            str: User-relative path with base_path removed
-        """
-        # If base_path is just "." or empty, return the full_path as is
-        if self.base_path in [".", "", None]:
-            return full_path
-        
-        # Check if this is a remote storage handler (like Supabase)
-        if hasattr(self, 'bucket_name') and hasattr(self, 'supabase'):
-            # For remote storage, handle path prefix removal
-            if self.base_path.startswith('/'):
-                clean_base = self.base_path.lstrip('/')
-            else:
-                clean_base = self.base_path
-            
-            if clean_base and full_path.startswith(f"{clean_base}/"):
-                # Remove the base_path prefix
-                relative_path = full_path[len(f"{clean_base}/"):]
-                return relative_path
-            elif clean_base and full_path == clean_base:
-                # If the full_path is exactly the base_path, return empty string
-                return ""
-            else:
-                # If the path doesn't start with base_path, return as is
-                return full_path
-        else:
-            # For local storage, use os.path operations for proper filesystem handling
-            # Convert both paths to absolute paths for comparison
-            base_abs = os.path.abspath(self.base_path)
-            full_abs = os.path.abspath(full_path)
-            
-            # Check if the full_path starts with base_path
-            if full_abs.startswith(base_abs):
-                # Remove the base_path prefix
-                relative_path = full_abs[len(base_abs):]
-                # Remove leading separator if present
-                if relative_path.startswith(os.sep):
-                    relative_path = relative_path[1:]
-                return relative_path
-            
-            # If the path doesn't start with base_path, return as is
-            return full_path
+    def read(self, file_path: str, **kwargs) -> Dict[str, Any]:
+        return super().read(file_path, **kwargs)
     
+    def list(self, path: str = None, max_depth: int = 3, include_hidden: bool = False) -> Dict[str, Any]:
+        return super().list(path, max_depth, include_hidden)
+    
+    def delete(self, file_path: str, **kwargs) -> Dict[str, Any]:
+        return super().delete(file_path, **kwargs)
+    
+    def move(self, source: str, destination: str, **kwargs) -> Dict[str, Any]:
+        return super().move(source, destination, **kwargs)
+    
+    def copy(self, source: str, destination: str, **kwargs) -> Dict[str, Any]:
+        return super().copy(source, destination, **kwargs)
+    
+    def create_directory(self, path: str, **kwargs) -> Dict[str, Any]:
+        return super().create_directory(path, **kwargs)
+    
+    
+    
+    # ____________________ Required Methods ____________________ #
+    @abstractmethod
+    def _initialize_storage(self):
+        """Initialize storage - must be implemented by subclasses"""
+        pass
+    
+    @abstractmethod
+    def _read_raw(self, path: str, **kwargs) -> bytes:
+        """Read raw file content - must be implemented by subclasses"""
+        pass
+    
+    @abstractmethod
+    def _write_raw(self, path: str, content: bytes, **kwargs) -> bool:
+        """Write raw file content - must be implemented by subclasses"""
+        pass
+    
+    @abstractmethod
+    def _delete_raw(self, path: str) -> bool:
+        """Delete file or directory - must be implemented by subclasses"""
+        pass
+    
+    @abstractmethod
+    def _exists_raw(self, path: str) -> bool:
+        """Check if path exists - must be implemented by subclasses"""
+        pass
+    
+    @abstractmethod
+    def _create_directory_raw(self, path: str) -> bool:
+        """Create directory - must be implemented by subclasses"""
+        pass
+    
+    @abstractmethod
+    def _list_raw(self, path: str = None, **kwargs) -> List[Dict[str, Any]]:
+        """List files and directories - must be implemented by subclasses"""
+        pass
+    
+    
+
+
+    # ____________________ Extra Mapping ____________________ #
     def create_file(self, file_path: str, content: Any, **kwargs) -> Dict[str, Any]:
-        """
-        Create a new file with the specified content.
-        
-        Args:
-            file_path (str): Path where the file should be created
-            content (Any): Content to write to the file
-            **kwargs: Additional arguments for file creation (encoding, format, etc.)
-            
-        Returns:
-            Dict[str, Any]: Result of the operation with success status and details
-        """
-        try:
-            # Get file type to determine the appropriate save method
-            file_extension = self.get_file_type(file_path)
-            target_file_path = self.translate_in(file_path)
-            
-            # Route to specialized save methods based on file type
-            if file_extension == '.json':
-                return self._save_json(target_file_path, content, **kwargs)
-            elif file_extension in ['.txt', '.md', '.log']:
-                return self._save_text(target_file_path, content, **kwargs)
-            elif file_extension == '.csv':
-                return self._save_csv(target_file_path, content, **kwargs)
-            elif file_extension in ['.yaml', '.yml']:
-                return self._save_yaml(target_file_path, content, **kwargs)
-            elif file_extension == '.xml':
-                return self._save_xml(target_file_path, content, **kwargs)
-            elif file_extension == '.xlsx':
-                return self._save_excel(target_file_path, content, **kwargs)
-            elif file_extension == '.pickle':
-                return self._save_pickle(target_file_path, content, **kwargs)
-            elif file_extension == '.pdf':
-                return self._save_pdf(target_file_path, content, **kwargs)
-            elif file_extension in ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff']:
-                return self._save_image(target_file_path, content, **kwargs)
-            else:
-                # For other file types, use the generic approach
-                # Convert content to bytes if it's not already
-                if isinstance(content, str):
-                    content_bytes = content.encode(kwargs.get('encoding', 'utf-8'))
-                elif isinstance(content, bytes):
-                    content_bytes = content
-                else:
-                    content_bytes = str(content).encode(kwargs.get('encoding', 'utf-8'))
-                
-                # Write the file using the raw method
-                success = self._write_raw(target_file_path, content_bytes, **kwargs)
-            
-                if success:
-                    return {
-                        "success": True,
-                        "message": f"File '{file_path}' created successfully",
-                        "file_path": file_path,
-                        "full_path": target_file_path,
-                        "size": len(content_bytes)
-                    }
-                else:
-                    return {
-                        "success": False,
-                        "message": f"Failed to create file '{file_path}'",
-                        "file_path": file_path,
-                        "full_path": target_file_path
-                    }
-        except Exception as e:
-            logger.error(f"Error creating file {file_path}: {str(e)}")
-            return {
-                "success": False,
-                "message": f"Error creating file: {str(e)}",
-                "file_path": file_path
-            }
+        return self.save(file_path, content, **kwargs)
     
     def read_file(self, file_path: str, **kwargs) -> Dict[str, Any]:
-        """
-        Read content from an existing file.
-        
-        Args:
-            file_path (str): Path of the file to read
-            **kwargs: Additional arguments for file reading (encoding, format, etc.)
-            
-        Returns:
-            Dict[str, Any]: Result of the operation with file content and success status
-        """
-        try:
-            # Use translate_in to get the full path
-            full_path = self.translate_in(file_path)
-            
-            # Read the file using the raw method
-            content_bytes = self._read_raw(full_path, **kwargs)
-            
-            # Convert to string if encoding is specified
-            if 'encoding' in kwargs:
-                content = content_bytes.decode(kwargs['encoding'])
-            else:
-                content = content_bytes
-            
-            return {
-                "success": True,
-                "message": f"File '{file_path}' read successfully",
-                "file_path": file_path,
-                "full_path": full_path,
-                "content": content,
-                "size": len(content_bytes)
-            }
-        except Exception as e:
-            logger.error(f"Error reading file {file_path}: {str(e)}")
-            return {
-                "success": False,
-                "message": f"Error reading file: {str(e)}",
-                "file_path": file_path
-            }
-    
-    def update_file(self, file_path: str, content: Any, **kwargs) -> Dict[str, Any]:
-        """
-        Update an existing file with new content.
-        
-        Args:
-            file_path (str): Path of the file to update
-            content (Any): New content to write to the file
-            **kwargs: Additional arguments for file update (encoding, format, etc.)
-            
-        Returns:
-            Dict[str, Any]: Result of the operation with success status and details
-        """
-        # For update, we use the same create_file method as it handles both create and update
-        return self.create_file(file_path, content, **kwargs)
-    
-    def delete_file(self, file_path: str) -> Dict[str, Any]:
-        """
-        Delete a file or directory.
-        
-        Args:
-            file_path (str): Path of the file or directory to delete
-            
-        Returns:
-            Dict[str, Any]: Result of the operation with success status and details
-        """
-        try:
-            # Use translate_in to get the full path
-            full_path = self.translate_in(file_path)
-            
-            # Delete the file using the raw method
-            success = self._delete_raw(full_path)
-            
-            if success:
-                return {
-                    "success": True,
-                    "message": f"File '{file_path}' deleted successfully",
-                    "file_path": file_path,
-                    "full_path": full_path
-                }
-            else:
-                return {
-                    "success": False,
-                    "message": f"Failed to delete file '{file_path}'",
-                    "file_path": file_path,
-                    "full_path": full_path
-                }
-        except Exception as e:
-            logger.error(f"Error deleting file {file_path}: {str(e)}")
-            return {
-                "success": False,
-                "message": f"Error deleting file: {str(e)}",
-                "file_path": file_path
-            }
+        return self.read(file_path, **kwargs)
     
     def list_files(self, path: str = None, max_depth: int = 3, include_hidden: bool = False) -> Dict[str, Any]:
-        """
-        List files and directories in the specified path.
-        
-        Args:
-            path (str): Path to list (default: base_path)
-            max_depth (int): Maximum depth for recursive listing
-            include_hidden (bool): Whether to include hidden files
-            
-        Returns:
-            Dict[str, Any]: Result of the operation with file list and success status
-        """
-        try:
-            # Use translate_in to get the full path if provided
-            full_path = self.translate_in(path) if path else self.base_path
-            
-            # List files using the raw method
-            items = self._list_raw(full_path, max_depth, include_hidden)
-            
-            return {
-                "success": True,
-                "message": f"Listed {len(items)} items from '{path or 'base directory'}'",
-                "path": path,
-                "full_path": full_path,
-                "items": items,
-                "total_count": len(items)
-            }
-        except Exception as e:
-            logger.error(f"Error listing files in {path}: {str(e)}")
-            return {
-                "success": False,
-                "message": f"Error listing files: {str(e)}",
-                "path": path
-            }
+        return self.list(path, max_depth, include_hidden)
     
-    def file_exists(self, file_path: str) -> bool:
-        """
-        Check if a file exists.
-        
-        Args:
-            file_path (str): Path of the file to check
-            
-        Returns:
-            bool: True if file exists, False otherwise
-        """
-        try:
-            # Use translate_in to get the full path
-            full_path = self.translate_in(file_path)
-            return self._exists_raw(full_path)
-        except Exception as e:
-            logger.error(f"Error checking if file exists {file_path}: {str(e)}")
-            return False
+    def delete_file(self, file_path: str, **kwargs) -> Dict[str, Any]:
+        return self.delete(file_path, **kwargs)
     
-    def get_file_information(self, file_path: str) -> Dict[str, Any]:
-        """
-        Get comprehensive information about a file.
-        
-        Args:
-            file_path (str): Path of the file to get information for
-            
-        Returns:
-            Dict[str, Any]: File information including size, type, timestamps, etc.
-        """
-        try:
-            # Use translate_in to get the full path
-            full_path = self.translate_in(file_path)
-            
-            if hasattr(self, '_get_file_info_raw'):
-                file_info = self._get_file_info_raw(full_path)
-                # Add the translated paths to the result
-                file_info['file_path'] = file_path
-                file_info['full_path'] = full_path
-                return file_info
-            else:
-                # Fallback to basic info
-                return {
-                    'file_path': file_path,
-                    'full_path': full_path,
-                    'exists': self._exists_raw(full_path),
-                    'type': 'file'  # Default assumption
-                }
-        except Exception as e:
-            logger.error(f"Error getting file info for {file_path}: {str(e)}")
-            return {}
+    def move_file(self, source: str, destination: str, **kwargs) -> Dict[str, Any]:
+        return self.move(source, destination, **kwargs)
     
-    def create_directory(self, path: str) -> Dict[str, Any]:
-        """
-        Create a new directory.
-        
-        Args:
-            path (str): Path where the directory should be created
-            
-        Returns:
-            Dict[str, Any]: Result of the operation with success status and details
-        """
-        try:
-            # Use translate_in to get the full path
-            full_path = self.translate_in(path)
-            
-            # Create directory using the raw method
-            success = self._create_directory_raw(full_path)
-            
-            if success:
-                return {
-                    "success": True,
-                    "message": f"Directory '{path}' created successfully",
-                    "path": path,
-                    "full_path": full_path
-                }
-            else:
-                return {
-                    "success": False,
-                    "message": f"Failed to create directory '{path}'",
-                    "path": path,
-                    "full_path": full_path
-                }
-        except Exception as e:
-            logger.error(f"Error creating directory {path}: {str(e)}")
-            return {
-                "success": False,
-                "message": f"Error creating directory: {str(e)}",
-                "path": path
-            }
-    
-    def copy_file(self, source: str, destination: str) -> Dict[str, Any]:
-        """
-        Copy a file from source to destination.
-        
-        Args:
-            source (str): Source file path
-            destination (str): Destination file path
-            
-        Returns:
-            Dict[str, Any]: Result of the operation with success status and details
-        """
-        try:
-            # Use translate_in to get the full paths
-            full_source = self.translate_in(source)
-            full_destination = self.translate_in(destination)
-            
-            # Read source file
-            source_content = self._read_raw(full_source)
-            
-            # Write to destination
-            success = self._write_raw(full_destination, source_content)
-            
-            if success:
-                return {
-                    "success": True,
-                    "message": f"File copied from '{source}' to '{destination}'",
-                    "source": source,
-                    "destination": destination,
-                    "full_source": full_source,
-                    "full_destination": full_destination
-                }
-            else:
-                return {
-                    "success": False,
-                    "message": f"Failed to copy file from '{source}' to '{destination}'",
-                    "source": source,
-                    "destination": destination
-                }
-        except Exception as e:
-            logger.error(f"Error copying file from {source} to {destination}: {str(e)}")
-            return {
-                "success": False,
-                "message": f"Error copying file: {str(e)}",
-                "source": source,
-                "destination": destination
-            }
-    
-    def move_file(self, source: str, destination: str) -> Dict[str, Any]:
-        """
-        Move/rename a file from source to destination.
-        
-        Args:
-            source (str): Source file path
-            destination (str): Destination file path
-            
-        Returns:
-            Dict[str, Any]: Result of the operation with success status and details
-        """
-        try:
-            # Use translate_in to get the full paths
-            full_source = self.translate_in(source)
-            full_destination = self.translate_in(destination)
-            
-            # Copy file to destination
-            copy_success = self._write_raw(full_destination, self._read_raw(full_source))
-            
-            if copy_success:
-                # Delete source file
-                delete_success = self._delete_raw(full_source)
-                
-                if delete_success:
-                    return {
-                        "success": True,
-                        "message": f"File moved from '{source}' to '{destination}'",
-                        "source": source,
-                        "destination": destination,
-                        "full_source": full_source,
-                        "full_destination": full_destination
-                    }
-                else:
-                    return {
-                        "success": False,
-                        "message": f"File copied but failed to delete source '{source}'",
-                        "source": source,
-                        "destination": destination
-                    }
-            else:
-                return {
-                    "success": False,
-                    "message": f"Failed to copy file from '{source}' to '{destination}'",
-                    "source": source,
-                    "destination": destination
-                }
-        except Exception as e:
-            logger.error(f"Error moving file from {source} to {destination}: {str(e)}")
-            return {
-                "success": False,
-                "message": f"Error moving file: {str(e)}",
-                "source": source,
-                "destination": destination
-            }
-    
-    def append_to_file(self, file_path: str, content: Any, **kwargs) -> Dict[str, Any]:
-        """
-        Append content to an existing file.
-        
-        Args:
-            file_path (str): Path of the file to append to
-            content (Any): Content to append
-            **kwargs: Additional arguments for appending (encoding, format, etc.)
-            
-        Returns:
-            Dict[str, Any]: Result of the operation with success status and details
-        """
-        try:
-            # Use translate_in to get the full path
-            full_path = self.translate_in(file_path)
-            
-            # Read existing content
-            existing_content = self._read_raw(full_path)
-            
-            # Convert new content to bytes
-            if isinstance(content, str):
-                new_content_bytes = content.encode(kwargs.get('encoding', 'utf-8'))
-                # For text files, decode existing content and append
-                existing_content_str = existing_content.decode(kwargs.get('encoding', 'utf-8'))
-                combined_content = existing_content_str + content
-                combined_bytes = combined_content.encode(kwargs.get('encoding', 'utf-8'))
-            else:
-                new_content_bytes = str(content).encode(kwargs.get('encoding', 'utf-8'))
-                # For binary files, just concatenate bytes
-                combined_bytes = existing_content + new_content_bytes
-            
-            # Write back to file
-            success = self._write_raw(full_path, combined_bytes, **kwargs)
-            
-            if success:
-                return {
-                    "success": True,
-                    "message": f"Content appended to '{file_path}'",
-                    "file_path": file_path,
-                    "full_path": full_path,
-                    "content_length": len(new_content_bytes)
-                }
-            else:
-                return {
-                    "success": False,
-                    "message": f"Failed to append content to '{file_path}'",
-                    "file_path": file_path,
-                    "full_path": full_path
-                }
-        except Exception as e:
-            logger.error(f"Error appending to file {file_path}: {str(e)}")
-            return {
-                "success": False,
-                "message": f"Error appending to file: {str(e)}",
-                "file_path": file_path
-            }
-    
-    def save(self, file_path: str, content: Any, **kwargs) -> Dict[str, Any]:
-        """
-        Save content to a file (alias for create_file).
-        This method is expected by some tools like flux image generation.
-        
-        Args:
-            file_path (str): Path where the file should be saved
-            content (Any): Content to save to the file
-            **kwargs: Additional arguments for file creation
-            
-        Returns:
-            Dict[str, Any]: Result of the operation
-        """
-        return self.create_file(file_path, content, **kwargs)
+    def copy_file(self, source: str, destination: str, **kwargs) -> Dict[str, Any]:
+        return self.copy(source, destination, **kwargs)
 
 
 class LocalStorageHandler(FileStorageHandler):
@@ -593,21 +124,16 @@ class LocalStorageHandler(FileStorageHandler):
             **kwargs: Additional keyword arguments for parent class initialization
         """
         super().__init__(base_path=base_path, **kwargs)
-    
+   
     def _initialize_storage(self):
-        """Initialize local storage - create base directory if it doesn't exist"""
-        # Convert base_path to Path for local filesystem operations
-        base_path = Path(self.base_path)
-        # Ensure base directory exists
-        base_path.mkdir(parents=True, exist_ok=True)
-    
-    def _resolve_path(self, file_path: str) -> str:
-        """Resolve file path for local filesystem"""
-        path = Path(file_path)
-        if not path.is_absolute():
-            # If it's a relative path, prepend the base path
-            path = Path(self.base_path) / path
-        return str(path)
+        """Initialize local storage - ensure base directory exists"""
+        try:
+            # Ensure the base directory exists
+            Path(self.base_path).mkdir(parents=True, exist_ok=True)
+            logger.info(f"Local storage initialized with base path: {self.base_path}")
+        except Exception as e:
+            logger.error(f"Error initializing local storage: {str(e)}")
+            raise
     
     def _read_raw(self, path: str, **kwargs) -> bytes:
         """Read raw file content from local filesystem"""
@@ -713,35 +239,6 @@ class LocalStorageHandler(FileStorageHandler):
             logger.error(f"Error creating directory {path}: {str(e)}")
             return False
     
-    def get_file_info(self, file_path: str) -> Dict[str, Any]:
-        """Get comprehensive information about a file"""
-        try:
-            resolved_path = self._resolve_path(file_path)
-            path_obj = Path(resolved_path)
-            
-            if not path_obj.exists():
-                return {"success": False, "error": f"File {file_path} does not exist"}
-            
-            stat = path_obj.stat()
-            return {
-                "success": True,
-                "file_path": resolved_path,
-                "file_name": path_obj.name,
-                "file_extension": path_obj.suffix.lower(),
-                "mime_type": self.get_mime_type(resolved_path),
-                "size_bytes": stat.st_size,
-                "size_mb": round(stat.st_size / (1024 * 1024), 2),
-                "created_time": datetime.fromtimestamp(stat.st_ctime).isoformat(),
-                "modified_time": datetime.fromtimestamp(stat.st_mtime).isoformat(),
-                "is_file": path_obj.is_file(),
-                "is_directory": path_obj.is_dir(),
-                "is_readable": os.access(path_obj, os.R_OK),
-                "is_writable": os.access(path_obj, os.W_OK),
-                "exists": True
-            }
-        except Exception as e:
-            logger.error(f"Error getting file info for {file_path}: {str(e)}")
-            return {"success": False, "error": str(e), "file_path": file_path}
 
 
 class SupabaseStorageHandler(FileStorageHandler):
@@ -808,7 +305,7 @@ class SupabaseStorageHandler(FileStorageHandler):
             logger.warning(f"Could not verify bucket access: {str(e)}")
             # Don't raise error as bucket might be empty or have different permissions
     
-    def _resolve_path(self, file_path: str) -> str:
+    def translate_in(self, file_path: str) -> str:
         """Resolve file path for remote storage"""
         # Use the translate_in method to combine base_path with file_path
         # For Supabase, we need to handle the special case where base_path is "/"
@@ -817,7 +314,7 @@ class SupabaseStorageHandler(FileStorageHandler):
             return file_path.lstrip('/')
         else:
             # Use the standard translate_in method
-            return self.translate_in(file_path)
+            return super().translate_in(file_path)
     
     def _read_raw(self, path: str, **kwargs) -> bytes:
         """Read raw file content from Supabase Storage"""
@@ -890,9 +387,19 @@ class SupabaseStorageHandler(FileStorageHandler):
             response = self.supabase.storage.from_(self.bucket_name).remove([file_path])
             
             # Check if deletion was successful
-            if response and (not isinstance(response, dict) or response.get("error") is None):
-                logger.info(f"Successfully deleted file from Supabase: {file_path}")
-                return True
+            # Supabase remove() returns an empty list [] when successful
+            if response is not None:
+                if isinstance(response, list):
+                    # Empty list means successful deletion
+                    logger.info(f"Successfully deleted file from Supabase: {file_path}")
+                    return True
+                elif isinstance(response, dict) and response.get("error") is None:
+                    # Some responses might be dict format
+                    logger.info(f"Successfully deleted file from Supabase: {file_path}")
+                    return True
+                else:
+                    logger.error(f"Deletion failed: {response}")
+                    return False
             else:
                 logger.error(f"Deletion failed: {response}")
                 return False
@@ -999,141 +506,4 @@ class SupabaseStorageHandler(FileStorageHandler):
             logger.error(f"Error creating directory {path} in Supabase: {str(e)}")
             return False
     
-    def _save_text(self, file_path: str, content: Any, encoding: str = 'utf-8', **kwargs) -> Dict[str, Any]:
-        """Save text content to Supabase Storage"""
-        try:
-            # Convert content to bytes with specified encoding
-            if isinstance(content, str):
-                content_bytes = content.encode(encoding)
-            else:
-                content_bytes = str(content).encode(encoding)
-            
-            # Use the raw write method
-            success = self._write_raw(file_path, content_bytes, **kwargs)
-            
-            if success:
-                return {
-                    "success": True,
-                    "message": f"Text file saved to Supabase: {file_path}",
-                    "file_path": file_path,
-                    "content_length": len(content_bytes)
-                }
-            else:
-                return {"success": False, "error": "Failed to upload to Supabase", "file_path": file_path}
-                
-        except Exception as e:
-            logger.error(f"Error saving text file {file_path} to Supabase: {str(e)}")
-            return {"success": False, "error": str(e), "file_path": file_path}
     
-    def _read_text(self, file_path: str, encoding: str = 'utf-8', **kwargs) -> Dict[str, Any]:
-        """Read text content from storage"""
-        try:
-            # Resolve the path and use the raw read method
-            resolved_path = self._resolve_path(file_path)
-            content_bytes = self._read_raw(resolved_path, **kwargs)
-            content = content_bytes.decode(encoding)
-            
-            return {
-                "success": True,
-                "content": content,
-                "file_path": file_path,
-                "content_length": len(content)
-            }
-        except Exception as e:
-            logger.error(f"Error reading text file {file_path}: {str(e)}")
-            return {"success": False, "error": str(e), "file_path": file_path}
-    
-    def _save_json(self, file_path: str, content: Any, indent: int = 2, **kwargs) -> Dict[str, Any]:
-        """Save JSON content to Supabase Storage"""
-        try:
-            # Convert content to JSON string
-            if isinstance(content, str):
-                # If it's already a string, try to parse it to validate JSON
-                json.loads(content)
-                json_content = content
-            else:
-                json_content = json.dumps(content, indent=indent, ensure_ascii=False)
-            
-            # Convert to bytes
-            content_bytes = json_content.encode('utf-8')
-            
-            # Resolve the path and use the raw write method
-            resolved_path = self._resolve_path(file_path)
-            success = self._write_raw(resolved_path, content_bytes, **kwargs)
-            
-            if success:
-                return {
-                    "success": True,
-                    "message": f"JSON file saved to Supabase: {file_path}",
-                    "file_path": file_path
-                }
-            else:
-                return {"success": False, "error": "Failed to upload to Supabase", "file_path": file_path}
-                
-        except Exception as e:
-            logger.error(f"Error saving JSON file {file_path} to Supabase: {str(e)}")
-            return {"success": False, "error": str(e), "file_path": file_path}
-    
-    def _read_json(self, file_path: str, **kwargs) -> Dict[str, Any]:
-        """Read JSON content from storage"""
-        try:
-            # Resolve the path and use the raw read method
-            resolved_path = self._resolve_path(file_path)
-            content_bytes = self._read_raw(resolved_path, **kwargs)
-            content_str = content_bytes.decode('utf-8')
-            
-            # Parse JSON
-            content = json.loads(content_str)
-            
-            return {
-                "success": True,
-                "content": content,
-                "file_path": file_path
-            }
-        except Exception as e:
-            logger.error(f"Error reading JSON file {file_path}: {str(e)}")
-            return {"success": False, "error": str(e), "file_path": file_path}
-    
-    def get_file_info(self, file_path: str) -> Dict[str, Any]:
-        """Get comprehensive information about a file in Supabase Storage"""
-        try:
-            resolved_path = self._resolve_path(file_path)
-            
-            if not self._exists_raw(resolved_path):
-                return {"success": False, "error": f"File {file_path} does not exist"}
-            
-            # Get file content to determine size
-            content = self._read_raw(resolved_path)
-            
-            # Try to get additional metadata from list
-            list_path = os.path.dirname(resolved_path.lstrip('/'))
-            file_name = os.path.basename(resolved_path)
-            
-            metadata = {}
-            try:
-                files = self.supabase.storage.from_(self.bucket_name).list(list_path)
-                for file_info in files:
-                    if file_info.get('name') == file_name:
-                        metadata = file_info.get('metadata', {})
-                        break
-            except Exception:
-                pass
-            
-            return {
-                "success": True,
-                "file_path": resolved_path,
-                "file_name": Path(resolved_path).name,
-                "file_extension": Path(resolved_path).suffix.lower(),
-                "mime_type": metadata.get('mimetype', self.get_mime_type(resolved_path)),
-                "size_bytes": len(content),
-                "size_mb": round(len(content) / (1024 * 1024), 2),
-                "modified_time": metadata.get('updated_at', datetime.now().isoformat()),
-                "is_file": True,
-                "is_directory": False,
-                "is_readable": True,
-                "is_writable": True,
-                "exists": True
-            }
-        except Exception as e:
-            logger.error(f"Error getting file info for {file_path}: {str(e)}")
-            return {"success": False, "error": str(e), "file_path": file_path}
