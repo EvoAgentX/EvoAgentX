@@ -1,5 +1,6 @@
 from typing import Dict, Optional, List
 from ...tool import Tool
+from ...storage_handler import FileStorageHandler, LocalStorageHandler
 from .openai_utils import (
     create_openai_client,
     build_validation_params,
@@ -8,8 +9,8 @@ from .openai_utils import (
 )
 
 
-class OpenAIImageGenerationV2(Tool):
-    name: str = "openai_image_generation_v2"
+class OpenAIImageGenerationTool(Tool):
+    name: str = "openai_image_generation"
     description: str = "OpenAI image generation supporting dall-e-2, dall-e-3, gpt-image-1 (with validation)."
 
     inputs: Dict[str, Dict[str, str]] = {
@@ -30,12 +31,14 @@ class OpenAIImageGenerationV2(Tool):
     }
     required: Optional[List[str]] = ["prompt"]
 
-    def __init__(self, api_key: str, organization_id: str = None, model: str = "dall-e-3", save_path: str = "./generated_images"):
+    def __init__(self, api_key: str, organization_id: str = None, model: str = "dall-e-3", 
+                 save_path: str = "./generated_images", storage_handler: Optional[FileStorageHandler] = None):
         super().__init__()
         self.api_key = api_key
         self.organization_id = organization_id
         self.model = model
         self.save_path = save_path
+        self.storage_handler = storage_handler or LocalStorageHandler(base_path=save_path)
 
     def __call__(
         self,
@@ -84,9 +87,8 @@ class OpenAIImageGenerationV2(Tool):
 
             response = client.images.generate(**api_params)
 
-            # Save results (b64 or url)
-            import os, base64, time
-            os.makedirs(self.save_path, exist_ok=True)
+            # Save results using storage handler
+            import base64
             results = []
             for i, image_data in enumerate(response.data):
                 try:
@@ -100,21 +102,44 @@ class OpenAIImageGenerationV2(Tool):
                     else:
                         raise Exception("No valid image data in response")
 
-                    ts = int(time.time())
-                    if image_name:
-                        base = image_name.rsplit(".", 1)[0]
-                        filename = f"{base}_{i+1}.png"
+                    # Generate unique filename
+                    filename = self._get_unique_filename(image_name, i)
+                    
+                    # Save using storage handler
+                    result = self.storage_handler.save(filename, image_bytes)
+                    
+                    if result["success"]:
+                        results.append(filename)
                     else:
-                        filename = f"generated_v2_{ts}_{i+1}.png"
-                    out_path = os.path.join(self.save_path, filename)
-                    with open(out_path, "wb") as f:
-                        f.write(image_bytes)
-                    results.append(out_path)
+                        results.append(f"Error saving image {i+1}: {result.get('error', 'Unknown error')}")
                 except Exception as e:
                     results.append(f"Error saving image {i+1}: {e}")
 
             return {"results": results, "count": len(results)}
         except Exception as e:
             return {"error": f"Image generation failed: {e}"}
+    
+    def _get_unique_filename(self, image_name: str, index: int) -> str:
+        """Generate a unique filename for the image"""
+        import time
+        
+        if image_name:
+            base = image_name.rsplit(".", 1)[0]
+            filename = f"{base}_{index+1}.png"
+        else:
+            ts = int(time.time())
+            filename = f"generated_{ts}_{index+1}.png"
+        
+        # Check if file exists and generate unique name
+        counter = 1
+        while self.storage_handler.exists(filename):
+            if image_name:
+                base = image_name.rsplit(".", 1)[0]
+                filename = f"{base}_{index+1}_{counter}.png"
+            else:
+                filename = f"generated_{ts}_{index+1}_{counter}.png"
+            counter += 1
+            
+        return filename
 
 

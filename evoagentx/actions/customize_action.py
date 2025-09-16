@@ -2,6 +2,9 @@ from pydantic import Field
 from typing import Optional, Any, Callable, List, Union
 import re
 import json
+import asyncio
+import inspect
+import concurrent.futures
 
 from ..core.logging import logger
 from ..models.base_model import BaseLLM
@@ -335,51 +338,80 @@ class CustomizeAction(Action):
             # print(output)
             return output
     
-    def _calling_tools(self, tool_call_args) -> dict:
-        ## ___________ Call the tools ___________
-        errors = []
-        results  =[]
-        for function_param in tool_call_args:
-            try:
-                function_name = function_param.get("function_name")
-                function_args = function_param.get("function_args") or {}
-        
-                # Check if we have a valid function to call
-                if not function_name:
-                    errors.append("No function name provided")
-                    break
-                
-                # Try to get the callable from our tools_caller dictionary
-                callable_fn = None
-                if self.tools_caller and function_name in self.tools_caller:
-                    callable_fn = self.tools_caller[function_name]
-                elif callable(function_name):
-                    callable_fn = function_name
-                        
-                if not callable_fn:
-                    errors.append(f"Function '{function_name}' not found or not callable")
-                    break
-                
-                try:
-                    # Determine if the function is async or not
-                    print("_____________________ Start Function Calling _____________________")
-                    print(f"Executing function calling: {function_name} with parameters: {function_args}")
-                    result = callable_fn(**function_args)
-                
-                except Exception as e:
-                    logger.error(f"Error executing tool {function_name}: {e}")
-                    errors.append(f"Error executing tool {function_name}: {str(e)}")
-                    break
-            
-                results.append(result)
-            except Exception as e:
-                logger.error(f"Error executing tool: {e}")
-                errors.append(f"Error executing tool: {str(e)}")
-        
+    def _call_single_tool(self, function_param: dict) -> tuple:
+        try:
+            function_name = function_param.get("function_name")
+            function_args = function_param.get("function_args") or {}
+    
+            if not function_name:
+                return None, "No function name provided"
 
-        ## 3. Add the tool call results to the query and continue the conversation
-        results = {"result": results, "error": errors}
-        return results
+            callable_fn = self.tools_caller.get(function_name)
+            if not callable(callable_fn):
+                return None, f"Function '{function_name}' not found or not callable"
+            
+            print("_____________________ Start Function Calling _____________________")
+            print(f"Executing function calling: {function_name} with parameters: {function_args}")
+            result = callable_fn(**function_args)
+            return result, None
+
+        except Exception as e:
+            logger.error(f"Error executing tool {function_name}: {e}")
+            return None, f"Error executing tool {function_name}: {str(e)}"
+
+    def _calling_tools(self, tool_call_args: List[dict]) -> dict:
+        ## ___________ Call the tools in parallel___________
+        errors = []
+        results = []
+        
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future_to_tool = {executor.submit(self._call_single_tool, param): param for param in tool_call_args}
+            
+            for future in concurrent.futures.as_completed(future_to_tool):
+                result, error = future.result()
+                if error:
+                    errors.append(error)
+                if result is not None:
+                    results.append(result)
+
+        return {"result": results, "error": errors}
+
+    async def _async_call_single_tool(self, function_param: dict) -> tuple:
+        try:
+            function_name = function_param.get("function_name")
+            function_args = function_param.get("function_args") or {}
+
+            if not function_name:
+                return None, "No function name provided"
+
+            callable_fn = self.tools_caller.get(function_name)
+            if not callable(callable_fn):
+                return None, f"Function '{function_name}' not found or not callable"
+
+            print("_____________________ Start Function Calling _____________________")
+            print(f"Executing function calling: {function_name} with parameters: {function_args}")
+
+            if inspect.iscoroutinefunction(callable_fn):
+                result = await callable_fn(**function_args)
+            else:
+                loop = asyncio.get_running_loop()
+                result = await loop.run_in_executor(None, lambda: callable_fn(**function_args))
+            
+            return result, None
+        
+        except Exception as e:
+            logger.error(f"Error executing tool {function_name}: {e}")
+            return None, f"Error executing tool {function_name}: {str(e)}"
+
+    async def _async_calling_tools(self, tool_call_args: List[dict]) -> dict:
+        ## ___________ Call the tools concurrently ___________
+        tasks = [self._async_call_single_tool(param) for param in tool_call_args]
+        results_with_errors = await asyncio.gather(*tasks)
+
+        results = [res for res, err in results_with_errors if err is None and res is not None]
+        errors = [err for _, err in results_with_errors if err is not None]
+
+        return {"result": results, "error": errors}
     
     def execute(self, llm: Optional[BaseLLM] = None, inputs: Optional[dict] = None, sys_msg: Optional[str]=None, return_prompt: bool = False, time_out = 0, **kwargs):
         # Allow empty inputs if the action has no required input attributes

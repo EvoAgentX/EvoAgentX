@@ -505,31 +505,6 @@ class ExistsTool(Tool):
             return {"success": False, "error": str(e), "path": path}
 
 
-class ListSupportedFormatsTool(Tool):
-    name: str = "list_supported_formats"
-    description: str = "List all supported file formats and their capabilities"
-    inputs: Dict[str, Dict[str, str]] = {}
-    required: Optional[List[str]] = []
-
-    def __init__(self, storage_handler: FileStorageHandler = None):
-        super().__init__()
-        self.storage_handler = storage_handler or LocalStorageHandler()
-
-    def __call__(self) -> Dict[str, Any]:
-        """
-        List all supported file formats and their capabilities.
-        
-        Returns:
-            Dictionary containing supported formats information
-        """
-        try:
-            result = self.storage_handler.get_supported_formats()
-            return result
-            
-        except Exception as e:
-            logger.error(f"Error in ListSupportedFormatsTool: {str(e)}")
-            return {"success": False, "error": str(e)}
-
 
 class StorageToolkit(Toolkit):
     """
@@ -560,8 +535,7 @@ class StorageToolkit(Toolkit):
             CopyTool(storage_handler=storage_handler),
             CreateDirectoryTool(storage_handler=storage_handler),
             ListFileTool(storage_handler=storage_handler),
-            ExistsTool(storage_handler=storage_handler),
-            ListSupportedFormatsTool(storage_handler=storage_handler)
+            ExistsTool(storage_handler=storage_handler)
         ]
         
         super().__init__(name=name, tools=tools)

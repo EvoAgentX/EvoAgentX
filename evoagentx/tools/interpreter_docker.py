@@ -407,7 +407,7 @@ class DockerInterpreterToolkit(Toolkit):
     ):
         # Initialize storage handler if not provided
         if storage_handler is None:
-            from .storage_file import LocalStorageHandler
+            from .storage_handler import LocalStorageHandler
             storage_handler = LocalStorageHandler(base_path="./workplace/docker")
         
         # Create the shared Docker interpreter instance with storage handler

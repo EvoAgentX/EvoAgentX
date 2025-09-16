@@ -20,9 +20,8 @@ load_dotenv(override=True)
 sys.path.append(str(Path(__file__).parent.parent))
 
 from evoagentx.tools import (
-    OpenAIImageToolkitV2,
+    OpenAIImageToolkit,
     FluxImageGenerationToolkit,
-    GeminiImageToolkit,
     OpenRouterImageToolkit
 )
 
@@ -58,7 +57,7 @@ def run_image_analysis_example():
 
 
 def run_openai_image_toolkit_pipeline():
-    """Pipeline: generate → edit → analyze using OpenAIImageToolkitV2."""
+    """Pipeline: generate → edit → analyze using OpenAIImageToolkit."""
     print("\n===== OPENAI IMAGE TOOLKIT PIPELINE (GEN → EDIT → ANALYZE) =====\n")
 
     openai_api_key = os.getenv("OPENAI_API_KEY")
@@ -67,17 +66,17 @@ def run_openai_image_toolkit_pipeline():
         print("❌ OPENAI_API_KEY not found in environment variables")
         return
 
-    toolkit = OpenAIImageToolkitV2(
-        name="DemoOpenAIImageToolkitV2",
+    toolkit = OpenAIImageToolkit(
+        name="DemoOpenAIImageToolkit",
         api_key=openai_api_key,
         organization_id=openai_org_id,
         generation_model="gpt-image-1",
         save_path="./generated_images"
     )
 
-    gen = toolkit.get_tool("openai_image_generation_v2")
-    edit = toolkit.get_tool("openai_gpt_image1_edit_v2")
-    analyze = toolkit.get_tool("openai_image_analysis_v2")
+    gen = toolkit.get_tool("openai_image_generation")
+    edit = toolkit.get_tool("openai_image_edit")
+    analyze = toolkit.get_tool("openai_image_analysis")
 
     # 1) Generate
     gen_prompt = "A cute baby owl sitting on a tree branch at sunset, digital art"
@@ -117,15 +116,9 @@ def run_openai_image_toolkit_pipeline():
     # 3) Analyze (convert local file → data URL)
     print("Analyzing the edited image...")
     try:
-        import base64, mimetypes
-        with open(edited_path, 'rb') as f:
-            b64 = base64.b64encode(f.read()).decode('utf-8')
-        mime, _ = mimetypes.guess_type(edited_path)
-        mime = mime or 'image/png'
-        data_url = f"data:{mime};base64,{b64}"
         analysis = analyze(
             prompt="Summarize what's in this image in one sentence.",
-            image_url=data_url,
+            image_path=edited_path,
             model="gpt-4o-mini"
         )
         if 'error' in analysis:
@@ -159,8 +152,8 @@ def run_openai_image_toolkit_pipeline():
         print("✓ Image Generation Toolkit initialized")
         print(f"✓ Using BFL API key: {bfl_api_key[:8]}...")
         
-        # Get the generation tool - the actual tool name is "flux_image_generation"
-        generate_tool = toolkit.get_tool("flux_image_generation")
+        # Get the generation tool - the actual tool name is "flux_image_generation_edit"
+        generate_tool = toolkit.get_tool("flux_image_generation_edit")
         
         # Test image generation
         test_prompt = "A futuristic cyberpunk city with neon lights and flying cars, digital art style"
@@ -211,7 +204,7 @@ def run_flux_image_toolkit_pipeline():
         api_key=bfl_api_key,
         save_path="./flux_generated_images"
     )
-    gen = flux.get_tool("flux_image_generation")
+    gen = flux.get_tool("flux_image_generation_edit")
     analyze = flux.get_tool("image_analysis") if flux.get_tool("image_analysis") else None
 
     # 1) Generate base image
@@ -290,8 +283,6 @@ def run_openrouter_edit_pipeline():
         print("❌ OPENROUTER_API_KEY not found")
         return
 
-    from evoagentx.tools.image_tools.openrouter_image_tools.utils import path_to_image_part
-
     ortk = OpenRouterImageToolkit(name="DemoORImageToolkit", api_key=or_key)
     gen = ortk.get_tool("openrouter_image_generation_edit")
 
@@ -313,7 +304,7 @@ def run_openrouter_edit_pipeline():
     edit_prompt = "Add a bold 'GEMINI' text at the top"
     edit_res = gen(
         prompt=edit_prompt,
-        image_urls=[path_to_image_part(base_path)["image_url"]["url"]],
+        image_paths=[base_path],
         model="google/gemini-2.5-flash-image-preview",
         save_path="./openrouter_images",
         output_basename="edited"
@@ -329,14 +320,13 @@ def main():
     """Main function to run all image tool examples"""
     print("===== IMAGE TOOL EXAMPLES =====")
     
-    # run_image_analysis_example()
+    # run_image_analysis_example() 
     
     # run_openai_image_toolkit_pipeline()
-    
+   
     # run_flux_image_toolkit_pipeline()
-
+   
     # run_openrouter_edit_pipeline()
-    
     
     print("\n===== ALL IMAGE TOOL EXAMPLES COMPLETED =====")
 

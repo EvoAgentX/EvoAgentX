@@ -19,6 +19,7 @@ import os
 from dotenv import load_dotenv
 from evoagentx.models import OpenAILLMConfig
 from evoagentx.agents import CustomizeAgent
+from evoagentx.prompts.template import StringTemplate
 
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -38,11 +39,15 @@ You can directly initialize the agent with the `CustomizeAgent` class:
 ```python
 first_agent = CustomizeAgent(
     name="FirstAgent",
-    description="A simple agent that prints hello world",
-    prompt="Print 'hello world'", 
+    description="A agent that generates a blog post about the topic for the target audience",
+    prompt_template=StringTemplate(instruction="Generate a blog post about the topic {topic} for the target audience {target_audience}"), 
+    inputs=[{"name": "topic", "type": "string", "description": "The question to answer"}, {"name": "target_audience", "type": "string", "description": "The target audience of the topic"}],
+    outputs=[{"name": "blog_post", "type": "string", "description": "The blog post about the topic for the target audience"}, {"name": "outline", "type": "string", "description": "The outline of the blog post"}],
     llm_config=openai_config # specify the LLM configuration 
 )
 ```
+
+**Note:** Make sure to import `StringTemplate` as shown in the imports section above.
 
 ### Method 2: Creating from Dictionary
 
@@ -60,14 +65,28 @@ first_agent = CustomizeAgent.from_dict(agent_data) # use .from_dict() to create 
 
 ### Using the Agent
 
-Once created, you can use the agent to print hello world. 
+Once created, you can use the agent in different ways:
 
+#### Using the Simple Agent (Method 2)
 ```python
 # Execute the agent without input. The agent will return a Message object containing the results. 
 message = first_agent()
 
 print(f"Response from {first_agent.name}:")
 print(message.content.content) # the content of a Message object is a LLMOutputParser object, where the `content` attribute is the raw LLM output. 
+```
+
+#### Using the Blog Post Agent (Method 1)
+```python
+# Execute the agent with inputs for the blog post
+message = first_agent(inputs={
+    "topic": "Python programming", 
+    "target_audience": "beginners"
+})
+
+print(f"Response from {first_agent.name}:")
+print(f"Blog Post: {message.content.blog_post}")
+print(f"Outline: {message.content.outline}")
 ```
 
 For a complete example, please refer to the [CustomizeAgent example](https://github.com/EvoAgentX/EvoAgentX/blob/main/examples/customize_agent.py). 
@@ -79,10 +98,14 @@ CustomizeAgent also offers other features including structured inputs/outputs an
 In EvoAgentX, you can create an agent with multiple predefined actions. This allows you to build more complex agents that can perform multiple tasks. Here's an example showing how to create an agent with `TestCodeGeneration` and `TestCodeReview` actions:
 
 ### Defining Actions
-First, we need to define the actions, which are subclasses of `Action`: 
+First, we need to define the actions, which are subclasses of `Action`. Make sure to import all necessary dependencies:
+
 ```python
 from evoagentx.agents import Agent
 from evoagentx.actions import Action, ActionInput, ActionOutput
+from evoagentx.models.base_model import BaseLLM
+from pydantic import Field
+from typing import Optional
 
 # Define the CodeGeneration action inputs
 class TestCodeGenerationInput(ActionInput):
@@ -256,5 +279,5 @@ You can save an agent to a file and load it later:
 developer.save_module("examples/output/developer.json") # ignore the LLM config to avoid saving the API key 
 
 # Load the agent from a file
-developer = Agent.from_file("examples/output/developer.json", llm_config=openai_config)
+developer = Agent.load_module("examples/output/developer.json", llm_config=openai_config)
 ```

@@ -1,6 +1,6 @@
-from typing import Dict, List
+from typing import Dict, List, Optional
 from ...tool import Tool
-from ...storage_handler import FileStorageHandler
+from ...storage_handler import FileStorageHandler, LocalStorageHandler
 import requests
 import time
 
@@ -23,11 +23,20 @@ class FluxImageGenerationEditTool(Tool):
     }
     required: List[str] = ["prompt"]
 
-    def __init__(self, api_key: str, save_path: str = "./imgs", storage_handler: FileStorageHandler = None):
+    def __init__(self, api_key: str, storage_handler: Optional[FileStorageHandler] = None, 
+                 base_path: str = "./imgs", save_path: str = None):
         super().__init__()
         self.api_key = api_key
-        self.save_path = save_path
-        self.storage_handler = storage_handler
+        
+        # Handle backward compatibility: if save_path is provided, use it as base_path
+        if save_path is not None:
+            base_path = save_path
+            
+        # Initialize storage handler
+        if storage_handler is None:
+            self.storage_handler = LocalStorageHandler(base_path=base_path)
+        else:
+            self.storage_handler = storage_handler
 
     def __call__(
         self,
@@ -85,18 +94,36 @@ class FluxImageGenerationEditTool(Tool):
         image_response.raise_for_status()
         image_content = image_response.content
 
-        filename = f"flux_{seed}.{output_format}"
-        i = 1
-        while self.storage_handler.exists(filename):
-            filename = f"flux_{seed}_{i}.{output_format}"
-            i += 1
-
-        storage_relative_path = filename
-        result = self.storage_handler.save(storage_relative_path, image_content)
-        if result.get("success"):
-            public_path = f"{self.save_path}/{filename}" if self.save_path else filename
-            return {"file_path": public_path, "storage_handler": type(self.storage_handler).__name__}
+        # Generate unique filename using storage handler
+        filename = self._get_unique_filename(seed, output_format)
+        
+        # Save image using storage handler
+        result = self.storage_handler.save(filename, image_content)
+        
+        if result["success"]:
+            return {
+                "success": True,
+                "file_path": filename,
+                "full_path": result.get("full_path", filename),
+                "message": f"Image saved successfully as {filename}"
+            }
         else:
-            return {"error": f"Failed to save image: {result.get('error', 'Unknown error')}"}
+            return {
+                "success": False,
+                "error": f"Failed to save image: {result.get('error', 'Unknown error')}"
+            }
+    
+    def _get_unique_filename(self, seed: int, output_format: str) -> str:
+        """Generate a unique filename for the image"""
+        base_filename = f"flux_{seed}.{output_format}"
+        filename = base_filename
+        counter = 1
+        
+        # Check if file exists and generate unique name
+        while self.storage_handler.exists(filename):
+            filename = f"flux_{seed}_{counter}.{output_format}"
+            counter += 1
+            
+        return filename
 
 

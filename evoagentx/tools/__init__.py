@@ -20,7 +20,7 @@ from .storage_handler import FileStorageHandler, LocalStorageHandler, SupabaseSt
 from .storage_file import StorageToolkit
 from .image_tools.flux_image_tools.image_generation_edit import FluxImageGenerationEditTool
 from .image_tools.flux_image_tools.toolkit import FluxImageGenerationToolkit
-from .image_tools.openai_image_tools.toolkit import OpenAIImageToolkitV2
+from .image_tools.openai_image_tools.toolkit import OpenAIImageToolkit
 from .image_tools.openrouter_image_tools.image_analysis import ImageAnalysisTool as OpenRouterImageAnalysisTool
 from .image_tools.openrouter_image_tools.image_generation import OpenRouterImageGenerationEditTool
 from .image_tools.openrouter_image_tools.toolkit import OpenRouterImageToolkit
@@ -55,7 +55,7 @@ __all__ = [
     "StorageToolkit",
     "FluxImageGenerationEditTool",
     "FluxImageGenerationToolkit",
-    "OpenAIImageToolkitV2",
+    "OpenAIImageToolkit",
     "OpenRouterImageAnalysisTool",
     "OpenRouterImageGenerationEditTool",
     "OpenRouterImageToolkit",
@@ -65,4 +65,3 @@ __all__ = [
     "SerperAPIToolkit",
     "SerpAPIToolkit"
 ]
-

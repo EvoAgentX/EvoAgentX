@@ -1,10 +1,11 @@
 from typing import Dict, Optional, List
 from ...tool import Tool
-from .openai_utils import create_openai_client, ensure_image_edit_compatible
+from ...storage_handler import FileStorageHandler, LocalStorageHandler
+from .openai_utils import create_openai_client
 
 
-class OpenAIGPTImage1EditV2(Tool):
-    name: str = "openai_gpt_image1_edit_v2"
+class OpenAIImageEditTool(Tool):
+    name: str = "openai_image_edit"
     description: str = "Edit images using OpenAI gpt-image-1 (direct, minimal validation)."
 
     inputs: Dict[str, Dict[str, str]] = {
@@ -24,11 +25,13 @@ class OpenAIGPTImage1EditV2(Tool):
     }
     required: Optional[List[str]] = ["prompt", "images"]
 
-    def __init__(self, api_key: str, organization_id: str = None, save_path: str = "./edited_images"):
+    def __init__(self, api_key: str, organization_id: str = None, save_path: str = "./edited_images", 
+                 storage_handler: Optional[FileStorageHandler] = None):
         super().__init__()
         self.api_key = api_key
         self.organization_id = organization_id
         self.save_path = save_path
+        self.storage_handler = storage_handler or LocalStorageHandler(base_path=save_path)
 
     def __call__(
         self,
@@ -59,9 +62,9 @@ class OpenAIGPTImage1EditV2(Tool):
             temp_paths = []
             mask_fh = None
             try:
-                # ensure compatibility and open files
+            # ensure compatibility and open files using storage handler
                 for p in image_paths:
-                    use_path, tmp = ensure_image_edit_compatible(p)
+                    use_path, tmp = self._ensure_image_edit_compatible(p)
                     if tmp:
                         temp_paths.append(tmp)
                     opened_images.append(open(use_path, "rb"))
@@ -115,9 +118,9 @@ class OpenAIGPTImage1EditV2(Tool):
                     except Exception:
                         pass
 
-            # Save base64 images
-            import os, base64, time
-            os.makedirs(self.save_path, exist_ok=True)
+            # Save base64 images using storage handler
+            import base64
+            import time
             results = []
             for i, img in enumerate(response.data):
                 try:
@@ -126,16 +129,78 @@ class OpenAIGPTImage1EditV2(Tool):
                     if image_name:
                         filename = f"{image_name.rsplit('.', 1)[0]}_{i+1}.png"
                     else:
-                        filename = f"gpt_image1_edit_v2_{ts}_{i+1}.png"
-                    out_path = os.path.join(self.save_path, filename)
-                    with open(out_path, "wb") as f:
-                        f.write(img_bytes)
-                    results.append(out_path)
+                        filename = f"image_edit_{ts}_{i+1}.png"
+                    
+                    # Save using storage handler
+                    result = self.storage_handler.save(filename, img_bytes)
+                    
+                    if result["success"]:
+                        # Return the translated path that was actually used for saving
+                        translated_path = self.storage_handler.translate_in(filename)
+                        results.append(translated_path)
+                    else:
+                        results.append(f"Error saving image {i+1}: {result.get('error', 'Unknown error')}")
                 except Exception as e:
                     results.append(f"Error saving image {i+1}: {e}")
 
             return {"results": results, "count": len(results)}
         except Exception as e:
             return {"error": f"gpt-image-1 editing failed: {e}"}
+    
+    def _ensure_image_edit_compatible(self, image_path: str) -> tuple[str, str | None]:
+        """
+        Ensure the image matches OpenAI edit requirements using storage handler.
+        If not, convert to RGBA and save to a temporary path. Return (usable_path, temp_path).
+        Caller may delete temp_path after the request completes.
+        """
+        try:
+            from PIL import Image
+            from io import BytesIO
+            import os
+            
+            # Use storage handler to read the image
+            result = self.storage_handler.read(image_path)
+            if not result["success"]:
+                raise FileNotFoundError(f"Could not read image {image_path}: {result.get('error', 'Unknown error')}")
+            
+            # Get image content as bytes
+            if isinstance(result["content"], bytes):
+                content = result["content"]
+            else:
+                # If content is not bytes, convert to bytes
+                content = str(result["content"]).encode('utf-8')
+            
+            # Open image from bytes
+            with Image.open(BytesIO(content)) as img:
+                if img.mode in ("RGBA", "LA", "L"):
+                    # Image is already compatible, return the translated path
+                    translated_path = self.storage_handler.translate_in(image_path)
+                    return translated_path, None
+                
+                # Convert to RGBA
+                rgba_img = img.convert("RGBA")
+                
+                # Save to temporary file using storage handler
+                temp_filename = f"temp_rgba_{hash(image_path) % 10000}.png"
+                buffer = BytesIO()
+                rgba_img.save(buffer, format='PNG')
+                temp_content = buffer.getvalue()
+                
+                # Save using storage handler
+                result = self.storage_handler.save(temp_filename, temp_content)
+                if result["success"]:
+                    temp_path = self.storage_handler.translate_in(temp_filename)
+                    return temp_path, temp_path
+                else:
+                    # Fallback to direct file I/O if storage handler fails
+                    temp_path = os.path.join("workplace", "images", "temp_rgba_image.png")
+                    os.makedirs(os.path.dirname(temp_path), exist_ok=True)
+                    rgba_img.save(temp_path)
+                    return temp_path, temp_path
+                
+        except Exception:
+            # On error, return the translated path and let the caller decide
+            translated_path = self.storage_handler.translate_in(image_path)
+            return translated_path, None
 
 

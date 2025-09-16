@@ -134,7 +134,8 @@ Here’s how:
   - [📊 Results](#-results)
 - [Applications](#applications)
 - [Tutorial and Use Cases](#tutorial-and-use-cases)
-- [🎯 Roadmap](#-roadmap)
+- [🗣️ EvoAgentX TALK](#EvoAgentX-TALK) 
+- [🎯 Roadmap](#-roadmap)  
 - [🙋 Support](#-support)
   - [Join the Community](#join-the-community)
   - [Add the meeting to your calendar](#add-the-meeting-to-your-calendar)
@@ -517,12 +518,24 @@ Explore how to effectively use EvoAgentX with the following resources:
 
 🚀 We're actively working on expanding our library of use cases and optimization strategies. **More coming soon — stay tuned!**
 
+
+## 🗣️ EvoAgentX TALK
+
+EvoAgentX regularly invites leading researchers to give guest lectures on cutting-edge AI topics.  
+Below is a running log of scheduled and completed talks:
+
+| Speaker | Topic | Date | Meeting Video |
+|---|---|---|---|
+| [Hengzhe Zhang — Researcher](https://hengzhe-zhang.github.io/) | Genetic Programming: From Evolutionary Algorithms to the LLM Era | 2025-08-10 | [YouTube](https://www.youtube.com/watch?v=naja_kDYc_Y) |
+| [Guibin Zhang — Researcher](https://www.guibinz.top/) | G-Memory: Tracing Hierarchical Memory for Multi-Agent Systems | 2025-09-28 |  |
+| [Guanting Dong — Researcher](https://dongguanting.github.io/) | Agentic Reinforced Policy Optimization | 2025-11-02 |  |
+
+
 ## 🎯 Roadmap
 - [ ] **Modularize Evolution Algorithms**: Abstract optimization algorithms into plug-and-play modules that can be easily integrated into custom workflows. 
 - [ ] **Develop Task Templates and Agent Modules**: Build reusable templates for typical tasks and standardized agent components to streamline application development.
 - [ ] **Integrate Self-Evolving Agent Algorithms**: Incorporate more recent and advanced agent self-evolution across multiple dimensions, including prompt tuning, workflow structures, and memory modules. 
 - [ ] **Enable Visual Workflow Editing Interface**: Provide a visual interface for workflow structure display and editing to improve usability and debugging. 
-
 
 
 ## 🙋 Support

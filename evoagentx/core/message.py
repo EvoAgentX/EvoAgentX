@@ -47,6 +47,7 @@ class Message(BaseModule):
     wf_task_desc: Optional[str] = None
     message_id: Optional[str] = Field(default_factory=generate_id)
     timestamp: Optional[str] = Field(default_factory=get_timestamp)
+    conversation_id: Optional[str] = Field(default_factory=generate_id)
     
     def __str__(self) -> str:
         return self.to_str()

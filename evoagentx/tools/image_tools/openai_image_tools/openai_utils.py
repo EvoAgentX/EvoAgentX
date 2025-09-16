@@ -147,26 +147,3 @@ def create_openai_client(api_key: str, organization_id: str | None = None):
     from openai import OpenAI
     return OpenAI(api_key=api_key, organization=organization_id)
 
-
-def ensure_image_edit_compatible(image_path: str) -> tuple[str, str | None]:
-    """
-    Ensure the image matches OpenAI edit requirements: mode in ['RGBA','LA','L'].
-    If not, convert to RGBA and save to a temporary path. Return (usable_path, temp_path).
-    Caller may delete temp_path after the request completes.
-    """
-    try:
-        from PIL import Image
-        import os
-        with Image.open(image_path) as img:
-            if img.mode in ("RGBA", "LA", "L"):
-                return image_path, None
-            rgba_img = img.convert("RGBA")
-            temp_path = os.path.join("workplace", "images", "temp_rgba_image.png")
-            os.makedirs(os.path.dirname(temp_path), exist_ok=True)
-            rgba_img.save(temp_path)
-            return temp_path, temp_path
-    except Exception:
-        # On error, return the original path and let the caller decide
-        return image_path, None
-
-

@@ -17,7 +17,6 @@ from evoagentx.models.model_configs import OpenAILLMConfig
 # Load environment
 load_dotenv()
 
-
 def demonstrate_rag_to_generation_pipeline():
     """Simple demo: Index 20 docs, retrieve 5, generate answer."""
     print("🚀 EvoAgentX Multimodal RAG-to-Generation Pipeline")
@@ -27,6 +26,12 @@ def demonstrate_rag_to_generation_pipeline():
     openai_key = os.getenv("OPENAI_API_KEY")
     if not openai_key:
         print("❌ OPENAI_API_KEY not found. Please set it to run this demo.")
+        return
+
+    # Check if VOYAGE API key is available
+    voyage_key = os.getenv("VOYAGE_API_KEY")
+    if not voyage_key:
+        print("❌ VOYAGE_API_KEY not found. Please set it to run this demo.")
         return
     
     # Initialize dataset
@@ -45,7 +50,7 @@ def demonstrate_rag_to_generation_pipeline():
     rag_config = RAGConfig(
         modality="multimodal",
         reader=ReaderConfig(recursive=True, exclude_hidden=True, errors="ignore"),
-        embedding=EmbeddingConfig(provider="voyage", model_name="voyage-multimodal-3", device="cpu"),
+        embedding=EmbeddingConfig(provider="voyage", model_name="voyage-multimodal-3", device="cpu" ,api_key=voyage_key),
         index=IndexConfig(index_type="vector"),
         retrieval=RetrievalConfig(retrivel_type="vector", top_k=5, similarity_cutoff=0.3)
     )

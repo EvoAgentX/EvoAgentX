@@ -53,7 +53,7 @@ class PythonInterpreter(BaseInterpreter):
         
         # Initialize storage handler
         if storage_handler is None:
-            from .storage_file import LocalStorageHandler
+            from .storage_handler import LocalStorageHandler
             self.storage_handler = LocalStorageHandler(base_path="./workplace/interpreter")
         else:
             self.storage_handler = storage_handler
@@ -443,7 +443,7 @@ class PythonInterpreterToolkit(Toolkit):
     ):
         # Initialize storage handler if not provided
         if storage_handler is None:
-            from .storage_file import LocalStorageHandler
+            from .storage_handler import LocalStorageHandler
             storage_handler = LocalStorageHandler(base_path="./workplace/python")
         
         # Create the shared Python interpreter instance with storage handler
