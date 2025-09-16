@@ -4,6 +4,7 @@ from bs4 import BeautifulSoup
 from typing import Tuple, Optional
 from ..core.module import BaseModule
 from pydantic import Field
+from .crawler_base import AutoPageContentHandler, PageContentHandler
 
 class SearchBase(BaseModule):
     """
@@ -13,12 +14,14 @@ class SearchBase(BaseModule):
     
     num_search_pages: Optional[int] = Field(default=5, description="Number of search results to retrieve")
     max_content_words: Optional[int] = Field(default=None, description="Maximum number of words to include in content. Default None means no limit.")
+    page_content_handler: Optional[PageContentHandler] = Field(default=None, description="Page content handler for processing scraped content")
     
     def __init__(
         self, 
         name: str = "SearchBase",
         num_search_pages: Optional[int] = 5, 
-        max_content_words: Optional[int] = None, 
+        max_content_words: Optional[int] = None,
+        page_content_handler: Optional[PageContentHandler] = None,
         **kwargs
     ):
         """
@@ -27,18 +30,18 @@ class SearchBase(BaseModule):
         Args:
             name (str): Name of the tool
             num_search_pages (int): Number of search results to retrieve
-            max_content_words (int): Maximum number of words to include in content, default None means no limit. 
+            max_content_words (int): Maximum number of words to include in content, default None means no limit.
+            page_content_handler (PageContentHandler): Handler for processing scraped content. Defaults to AutoPageContentHandler.
             **kwargs: Additional keyword arguments for parent class initialization
         """ 
         # Pass to parent class initialization
-        super().__init__(name=name, num_search_pages=num_search_pages, max_content_words=max_content_words, **kwargs)
-        self.content_converter = html2text.HTML2Text()
-        # Configure html2text for better content extraction
-        self.content_converter.ignore_links = False
-        self.content_converter.ignore_images = True
-        self.content_converter.body_width = 0  # Don't wrap text
-        self.content_converter.unicode_snob = True
-        self.content_converter.escape_snob = True
+        super().__init__(name=name, num_search_pages=num_search_pages, max_content_words=max_content_words, page_content_handler=page_content_handler, **kwargs)
+        
+        # Initialize page content handler - use AutoPageContentHandler as default
+        if self.page_content_handler is None:
+            self.page_content_handler = AutoPageContentHandler(max_length=max_content_words)
+        else:
+            self.page_content_handler = page_content_handler
     
     def _truncate_content(self, content: str, max_words: Optional[int] = None) -> str:
         """
@@ -71,15 +74,16 @@ class SearchBase(BaseModule):
         # Add ellipsis only if truncated
         return truncated_content + (" ..." if is_truncated else "")
     
-    def _scrape_page(self, url: str) -> Tuple[Optional[str], Optional[str]]:
+    def _scrape_page(self, url: str, query: str = None) -> Tuple[Optional[str], Optional[str]]:
         """
-        Fetches the title and main text content from a web page.
+        Fetches the title and main text content from a web page using intelligent content processing.
 
         Args:
             url (str): The URL of the web page.
+            query (str): Optional search query for context-aware processing.
 
         Returns:
-            tuple: (Optional[title], Optional[main textual content])
+            tuple: (Optional[title], Optional[processed content])
         """
         headers = {"User-Agent": "Mozilla/5.0"}
         response = requests.get(url, headers=headers, timeout=10)
@@ -90,27 +94,16 @@ class SearchBase(BaseModule):
         soup = BeautifulSoup(response.text, "html.parser")
 
         # Extract title
-        title = soup.title.string if soup.title else "No Title"
+        title = soup.title.string if soup.title else "Unknown Title"
 
-        # Try to extract main content for specific sites
-        main_content = None
-        
-        # For Wikipedia, try to get the main content area
-        if 'wikipedia.org' in url:
-            main_content = soup.find('div', {'id': 'mw-content-text'})
-            if main_content:
-                # Remove navigation and other non-content elements
-                for element in main_content.find_all(['nav', 'script', 'style', 'table']):
-                    element.decompose()
-                text_content = self.content_converter.handle(str(main_content))
-            else:
-                text_content = self.content_converter.handle(response.text)
+        # Extract main content areas
+        main_content = soup.find('main') or soup.find('article') or soup.find('div', {'class': 'content'})
+        if main_content:
+            raw_content = str(main_content)
         else:
-            # For other sites, try to find main content areas
-            main_content = soup.find('main') or soup.find('article') or soup.find('div', {'class': 'content'})
-            if main_content:
-                text_content = self.content_converter.handle(str(main_content))
-            else:
-                text_content = self.content_converter.handle(response.text)
+            raw_content = response.text
 
-        return title, text_content
+        # Process content using PageContentHandler
+        processed_content = self.page_content_handler.handle(raw_content, query)
+
+        return title, processed_content

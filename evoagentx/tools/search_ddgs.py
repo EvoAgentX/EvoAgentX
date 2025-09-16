@@ -78,7 +78,7 @@ class SearchDDGS(SearchBase):
                     # Always try to scrape the actual page content
                     if url and url.startswith(('http://', 'https://')):
                         try:
-                            scraped_title, scraped_content = self._scrape_page(url)
+                            scraped_title, scraped_content = self._scrape_page(url, query)
                             if scraped_content:
                                 title = scraped_title or title
                                 content = scraped_content
@@ -93,8 +93,7 @@ class SearchDDGS(SearchBase):
                         content = result.get('body', '')
                     
                     if content:  # Ensure valid content exists
-                        # Use the base class's content truncation method
-                        display_content = self._truncate_content(content, max_content_words)
+                        display_content = content
                             
                         results.append({
                             "title": title,

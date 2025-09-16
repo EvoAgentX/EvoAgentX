@@ -11,11 +11,11 @@ from ..models.openai_model import OpenAILLM
 from ..models.model_utils import create_llm_instance
 from ..prompts.web_agent import SEARCH_RESULT_CONTENT_EXTRACTION_PROMPT
 
-class CrawlerResultOutput(LLMOutputParser):
-    title: str = Field(description="The title of the crawling result.")
-    description: str = Field(description="The description of the crawling result.")
-    content: str = Field(description="The content of the crawling result.")
-    links: List[str] = Field(description="The links of the crawling result.")
+# Configuration constants
+LLM_CONTENT_THRESHOLD = 50000
+
+class PageContentOutput(LLMOutputParser):
+    report: str = Field(description="The report of the page content.")
 
 
 class PageContentHandler(BaseModule):
@@ -169,21 +169,33 @@ class LLMPageContentHandler(PageContentHandler):
             Processed content with title, description, content, and links
         """
         try:
+            # Pre-process HTML content with html2text before sending to LLM
+            processed_content = content
+            if any(tag in content.lower() for tag in ['<html', '<body', '<div', '<p', '<h1']):
+                try:
+                    import html2text
+                    html_converter = html2text.HTML2Text()
+                    html_converter.ignore_links = False
+                    html_converter.ignore_images = True
+                    html_converter.body_width = 0
+                    html_converter.unicode_snob = True
+                    html_converter.escape_snob = True
+                    processed_content = html_converter.handle(content)
+                except Exception as e:
+                    print(f"HTML preprocessing failed: {str(e)}, using original content")
+            
             message = []
             message.append({"role": "system", "content": "You are a helpful assistant that can help with page content handling."})
-            message.append({"role": "user", "content": SEARCH_RESULT_CONTENT_EXTRACTION_PROMPT.format(crawling_result=content, query=query)})
+            message.append({"role": "user", "content": SEARCH_RESULT_CONTENT_EXTRACTION_PROMPT.format(crawling_result=processed_content, query=query)})
         
             # Try to get structured result first
             try:
-                result = self.llm.generate(messages=message, parse_mode="title", parser=CrawlerResultOutput)
+                result = self.llm.generate(messages=message, parse_mode="title", parser=PageContentOutput)
                 
                 # Format the result as a readable string
-                formatted_result = f"Title: {result.title}\n\nDescription: {result.description}\n\nContent: {result.content}"
+                final_report = result.report
                 
-                if result.links:
-                    formatted_result += f"\n\nLinks: {', '.join(result.links)}"
-                
-                return self._truncate_content(formatted_result)
+                return self._truncate_content(final_report)
                 
             except Exception as parse_error:
                 # If structured parsing fails, try to get raw text response
@@ -314,7 +326,7 @@ class AutoPageContentHandler(PageContentHandler):
         # Default order based on content analysis
         is_html = any(tag in content.lower() for tag in ['<html', '<body', '<div', '<p', '<h1'])
         has_query = bool(query and query.strip())
-        is_long = len(content) > 1000
+        is_long = len(content) > LLM_CONTENT_THRESHOLD  # Very long content: ~8,000+ words
         
         # Build order based on content type and available handlers
         order = []
@@ -345,11 +357,11 @@ class AutoPageContentHandler(PageContentHandler):
         if handler_name == "disabled":
             return True
         
-        # LLM handler: use for complex content with queries
+        # LLM handler: use for very long content with queries
         if handler_name == "llm":
             has_query = bool(query and query.strip())
-            is_complex = len(content) > 500 or any(tag in content.lower() for tag in ['<title', '<meta', '<h1', '<h2'])
-            return has_query and is_complex
+            is_long = len(content) > LLM_CONTENT_THRESHOLD
+            return has_query and is_long
         
         # HTML2Text handler: use for HTML content
         if handler_name == "html2text":

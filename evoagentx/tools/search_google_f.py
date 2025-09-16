@@ -56,14 +56,11 @@ class SearchGoogleFree(SearchBase):
             # Step 2: Fetch content from each page
             for url in search_results:
                 try:
-                    title, content = self._scrape_page(url)
+                    title, content = self._scrape_page(url, query)
                     if content:  # Ensure valid content exists
-                        # Use the base class's content truncation method
-                        display_content = self._truncate_content(content, max_content_words)
-                            
                         results.append({
                             "title": title,
-                            "content": display_content,
+                            "content": content,
                             "url": url,
                         })
                 except Exception as e:

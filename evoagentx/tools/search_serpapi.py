@@ -147,7 +147,7 @@ class SearchSerpAPI(SearchBase):
         except Exception as e:
             raise Exception(f"SerpAPI search failed: {str(e)}")
 
-    def _process_serpapi_results(self, serpapi_data: Dict[str, Any], max_content_words: int = None) -> Dict[str, Any]:
+    def _process_serpapi_results(self, serpapi_data: Dict[str, Any], max_content_words: int = None, query: str = None) -> Dict[str, Any]:
         """
         Process SerpAPI results into structured format with processed results + raw data.
         
@@ -208,13 +208,12 @@ class SearchSerpAPI(SearchBase):
             # Try to scrape full content if enabled and add as site_content
             if self.enable_content_scraping and url and url.startswith(('http://', 'https://')):
                 try:
-                    scraped_title, scraped_content = self._scrape_page(url)
+                    scraped_title, scraped_content = self._scrape_page(url, query)
                     if scraped_content and scraped_content.strip():
                         # Update title if scraped title is better
                         if scraped_title and scraped_title.strip():
                             result["title"] = scraped_title
-                        # Add scraped content as site_content
-                        result["site_content"] = self._truncate_content(scraped_content, max_content_words or 400)
+                        result["site_content"] = scraped_content
                     else:
                         result["site_content"] = None
                 except Exception as e:
@@ -340,7 +339,7 @@ class SearchSerpAPI(SearchBase):
             serpapi_data = self._execute_serpapi_search(params)
             
             # Process results
-            response_data = self._process_serpapi_results(serpapi_data, max_content_words)
+            response_data = self._process_serpapi_results(serpapi_data, max_content_words, query)
             
             logger.info(f"Successfully retrieved {len(response_data['results'])} processed results")
             return response_data

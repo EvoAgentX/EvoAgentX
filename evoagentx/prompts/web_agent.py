@@ -96,34 +96,38 @@ SEARCH_RESULT_CONTENT_EXTRACTION_PROMPT = """
 You are an expert if information extraction, your task is to extract all useful information from a raw crawling result based on a given query.
 
 ## Instructions:
-- You will be given a raw crawling result and a query.
-- You need to extract all useful information from the crawling result based on the query.
-- You should only extract information that is relevant to the query.
+- If a query is provided, you should extract the information that is relevant to the query.
+    - You will be given a raw crawling result and a query.
+    - You need to extract all useful information from the crawling result based on the query.
+    - You should only extract information that is relevant to the query.
 - You should never come up with any information that is not in the crawling result.
 - You should pay attention to following information:
     - Title
     - Description
     - Content
-    - Links (Optional, list)
+    - Links (Optional)
 
 
 # Output Format:
-- You should return a JSON object with the following fields:
-    - title: The title of the search result
-    - description: The description of the search result
-    - content: The content of the search result, that is related to the query
-    - links: The useful links in the search result, if there are no useful links, you should return an empty list
+- You should return a string object called "## report" with the following fields:
+    - title: The title of the search result, that is related to the query
+    - content: The content of the search result, that is related to the query; or summarized content of the page
+    - links: The useful links in the search result, that is related to the query, if there are no useful links, you should return nothing
 
 # Example Output:
-Here I extracted the following information from the crawling result:
-## title
+## report
+<short summary of the page content>
+### Title
 <title>
-## description
-<description>
-## content
+
+### Content
 <content>
-## links
-[ <links1>, <links2>, ... ]
+
+### Possible Useful Links
+<links 1>: <link 1 description>
+<links 2>: <link 2 description>
+...
+
 
 
 
