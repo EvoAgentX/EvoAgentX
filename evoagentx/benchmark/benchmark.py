@@ -33,6 +33,7 @@ class Benchmark(ABC):
         self.name = name
         self.path = path
         self.mode = mode
+        self.trace_back = False
         self.kwargs = kwargs
 
         # 用于存储不同数据集的内部变量
@@ -102,6 +103,18 @@ class Benchmark(ABC):
     
     def get_labels(self, examples: List[Any]) -> List[Any]:
         return [self._get_label(example=example) for example in examples]
+    
+    def get_label_test_case(self, example: List[Any]) -> Any:
+        """
+        Get the test case label for a given example. Currently defaults to get_label.
+        
+        Args:
+            example (List[Any]): The input example for which the test case label is needed.
+        
+        Returns:
+            Any: The test case label associated with the example.
+        """
+        return self._get_label(example=example)
     
     def get_id(self, example: List[Any]) -> Any:
         return self._get_id(example=example)
