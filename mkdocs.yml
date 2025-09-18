@@ -193,6 +193,7 @@ plugins:
               - SEW Optimizer: tutorial/sew_optimizer.md
               - TextGrad Optimizer: tutorial/textgrad_optimizer.md
               - Colab Notebooks: tutorial/colab_notebooks.md
+              - Multi Agent Debate: tutorial/multi_agent_debate.md
             - Key Modules:
               - LLM: modules/llm.md 
               - Agent: modules/agent.md

@@ -134,7 +134,7 @@ Here’s how:
   - [📊 Results](#-results)
 - [Applications](#applications)
 - [Tutorial and Use Cases](#tutorial-and-use-cases)
-- [🗣️ EvoAgentX TALK](#EvoAgentX-TALK) 
+- [🗣️ EvoAgentX TALK](#evoagentx-talk)
 - [🎯 Roadmap](#-roadmap)  
 - [🙋 Support](#-support)
   - [Join the Community](#join-the-community)
@@ -526,9 +526,9 @@ Below is a running log of scheduled and completed talks:
 
 | Speaker | Topic | Date | Meeting Video |
 |---|---|---|---|
-| [Hengzhe Zhang — Researcher](https://hengzhe-zhang.github.io/) | Genetic Programming: From Evolutionary Algorithms to the LLM Era | 2025-08-10 | [YouTube](https://www.youtube.com/watch?v=naja_kDYc_Y) |
-| [Guibin Zhang — Researcher](https://www.guibinz.top/) | G-Memory: Tracing Hierarchical Memory for Multi-Agent Systems | 2025-09-28 |  |
-| [Guanting Dong — Researcher](https://dongguanting.github.io/) | Agentic Reinforced Policy Optimization | 2025-11-02 |  |
+| [Hengzhe Zhang](https://hengzhe-zhang.github.io/) | Genetic Programming: From Evolutionary Algorithms to the LLM Era | 2025-08-10 | [YouTube](https://www.youtube.com/watch?v=naja_kDYc_Y) |
+| [Guibin Zhang](https://www.guibinz.top/) | G-Memory: Tracing Hierarchical Memory for Multi-Agent Systems | 2025-09-28 |  |
+| [Guanting Dong](https://dongguanting.github.io/) | Agentic Reinforced Policy Optimization | 2025-11-02 |  |
 
 
 ## 🎯 Roadmap
