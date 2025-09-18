@@ -67,10 +67,16 @@ class Tool(BaseModule):
                 raise ValueError(f"Input '{input_name}' must have a valid type, should be one of {ALLOWED_TYPES}")
             
             call_signature = inspect.signature(cls.__call__)
-            if input_name not in call_signature.parameters:
+            has_var_kw = any(param.kind == inspect.Parameter.VAR_KEYWORD for param in call_signature.parameters.values())
+            
+            # If the input isn't explicitly in the signature and there's no **kwargs, it's an error
+            if input_name not in call_signature.parameters and not has_var_kw:
                 raise ValueError(f"Input '{input_name}' is not found in __call__")
-            if call_signature.parameters[input_name].annotation != json_to_python[input_content["type"]]:
-                raise ValueError(f"Input '{input_name}' has a type mismatch in __call__")
+            
+            # Only enforce type match when the parameter is explicitly declared in the signature
+            if input_name in call_signature.parameters:
+                if call_signature.parameters[input_name].annotation != json_to_python[input_content["type"]]:
+                    raise ValueError(f"Input '{input_name}' has a type mismatch in __call__")
 
         if cls.required:
             for required_input in cls.required:

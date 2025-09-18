@@ -6,7 +6,7 @@ from ...storage_handler import FileStorageHandler, LocalStorageHandler
 
 
 class ImageAnalysisTool(Tool):
-    name: str = "image_analysis"
+    name: str = "openrouter_image_analysis"
     description: str = (
         "Analyze and understand images and PDF documents using a multimodal LLM (via OpenRouter). "
         "Supports image URLs, local image files, and local PDF files."

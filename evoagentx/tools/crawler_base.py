@@ -1,7 +1,5 @@
 from typing import Dict, Any, Optional, List
 
-from .tool import Tool, Toolkit
-from .request_base import RequestBase
 import os
 from ..core.module import BaseModule
 from pydantic import Field
@@ -31,7 +29,7 @@ class PageContentHandler(BaseModule):
     def __init__(self, max_length: Optional[int] = None, suffix: str = "...", **kwargs):
         super().__init__(max_length=max_length, suffix=suffix, **kwargs)
     
-    def handle(self, content: str, query: str = None) -> str:
+    def handle(self, content: str, query: Optional[str] = None) -> str:
         """
         Process page content. Subclasses should override this method.
         
@@ -42,7 +40,7 @@ class PageContentHandler(BaseModule):
         Returns:
             Processed content string
         """
-        pass
+        raise NotImplementedError("Subclasses must implement handle method")
     
     def _truncate_content(self, content: str) -> str:
         """
@@ -66,7 +64,7 @@ class DisabledPageContentHandler(PageContentHandler):
     Useful when you want to skip content processing and work with raw content.
     Supports optional truncation if max_length is specified.
     """
-    def handle(self, content: str, query: str = None) -> str:
+    def handle(self, content: str, query: Optional[str] = None) -> str:
         return self._truncate_content(content)
 
 
@@ -110,7 +108,7 @@ class HTML2TextPageContentHandler(PageContentHandler):
         self.html_converter.unicode_snob = self.unicode_snob
         self.html_converter.escape_snob = self.escape_snob
     
-    def handle(self, content: str, query: str = None) -> str:
+    def handle(self, content: str, query: Optional[str] = None) -> str:
         """
         Convert HTML content to clean text.
         
@@ -157,7 +155,7 @@ class LLMPageContentHandler(PageContentHandler):
             except Exception as e:
                 raise ValueError(f"Error initializing default LLM: {str(e)}")
     
-    def handle(self, content: str, query: str = None) -> str:
+    def handle(self, content: str, query: Optional[str] = None) -> str:
         """
         Process content using LLM and return structured result.
         
@@ -190,19 +188,28 @@ class LLMPageContentHandler(PageContentHandler):
         
             # Try to get structured result first
             try:
-                result = self.llm.generate(messages=message, parse_mode="title", parser=PageContentOutput)
-                
-                # Format the result as a readable string
-                final_report = result.report
-                
-                return self._truncate_content(final_report)
+                if self.llm is not None:
+                    result = self.llm.generate(messages=message, parse_mode="title", parser=PageContentOutput)
+                    
+                    # Format the result as a readable string
+                    if hasattr(result, 'report') and isinstance(result, PageContentOutput):
+                        final_report = result.report
+                    else:
+                        final_report = str(result)
+                    
+                    return self._truncate_content(final_report)
+                else:
+                    raise ValueError("LLM not available")
                 
             except Exception as parse_error:
                 # If structured parsing fails, try to get raw text response
                 print(f"Structured parsing failed: {str(parse_error)}, trying raw text response")
                 
                 # Get raw text response without parser
-                raw_result = self.llm.generate(messages=message)
+                if self.llm is not None:
+                    raw_result = self.llm.generate(messages=message)
+                else:
+                    raw_result = "LLM not available"
                 
                 # Extract basic information from raw response
                 title = "Extracted Content"
@@ -272,7 +279,7 @@ class AutoPageContentHandler(PageContentHandler):
     
     def __init__(
         self,
-        preferred_handler: str = None,
+        preferred_handler: Optional[str] = None,
         enable_llm: bool = True,
         enable_html2text: bool = True,
         **kwargs
@@ -317,7 +324,7 @@ class AutoPageContentHandler(PageContentHandler):
             except Exception as e:
                 print(f"Warning: Could not initialize LLM handler: {e}")
     
-    def _generate_handler_order(self, content: str, query: str = None) -> List[str]:
+    def _generate_handler_order(self, content: str, query: Optional[str] = None) -> List[str]:
         """Generate the default execution order based on content and query."""
         # If preferred handler is specified and available, use it first
         if self.preferred_handler and self.preferred_handler in self._handlers:
@@ -348,7 +355,7 @@ class AutoPageContentHandler(PageContentHandler):
         
         return order
     
-    def _should_handle(self, handler_name: str, content: str, query: str = None) -> bool:
+    def _should_handle(self, handler_name: str, content: str, query: Optional[str] = None) -> bool:
         """Determine if we should use this handler based on content and query."""
         if handler_name not in self._handlers:
             return False
@@ -370,7 +377,7 @@ class AutoPageContentHandler(PageContentHandler):
         # For any other handler, allow it
         return True
     
-    def handle(self, content, query: str = None):
+    def handle(self, content, query: Optional[str] = None):
         """
         Process content using the best available handler with automatic fallback.
         
@@ -437,7 +444,7 @@ class CrawlerBase(BaseModule):
         """
         super().__init__(page_content_handler=page_content_handler, **kwargs)
     
-    def crawl(self, url: str, query: str = None, page_content_handler: PageContentHandler = None) -> Dict[str, Any]:
+    def crawl(self, url: str, query: Optional[str] = None, page_content_handler: Optional[PageContentHandler] = None) -> Dict[str, Any]:
         """
         Crawl a URL and return processed content.
         
@@ -455,9 +462,9 @@ class CrawlerBase(BaseModule):
         Returns:
             Dictionary containing crawl results and metadata
         """
-        pass
+        raise NotImplementedError("Subclasses must implement crawl method")
     
-    def handle_page_content(self, content: str, query: str = None, page_content_handler: PageContentHandler = None) -> str:
+    def handle_page_content(self, content: str, query: Optional[str] = None, page_content_handler: Optional[PageContentHandler] = None) -> str:
         """
         Process page content using the specified or default handler.
         
@@ -473,286 +480,3 @@ class CrawlerBase(BaseModule):
             page_content_handler = self.page_content_handler
         
         return page_content_handler.handle(content, query)
-
-
-class RequestCrawler(CrawlerBase):
-    def __init__(self, page_content_handler: PageContentHandler, **kwargs):
-        super().__init__(page_content_handler=page_content_handler, **kwargs)
-        self.request_base = RequestBase()
-    
-    def crawl(self, url: str, query: str = None, page_content_handler: PageContentHandler = None) -> Dict[str, Any]:
-        if not page_content_handler:
-            page_content_handler = self.page_content_handler
-        
-        response = self.request_base.request_and_process(url=url)
-        return self.handle_page_content(response, query, page_content_handler)
-
-
-class Crawl4AICrawler(CrawlerBase):
-    """Crawler using Crawl4AI for advanced web crawling with browser automation."""
-    
-    def __init__(
-        self, 
-        page_content_handler: PageContentHandler = None,
-        browser_type: str = "chromium",
-        headless: bool = True,
-        verbose: bool = False,
-        user_agent: str = None,
-        proxy: str = None,
-        timeout: int = 30,
-        **kwargs
-    ):
-        super().__init__(page_content_handler=page_content_handler, **kwargs)
-        
-        # Handle optional crawl4ai import
-        try:
-            from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
-            self.crawl4ai_available = True
-        except ImportError:
-            self.crawl4ai_available = False
-            raise ImportError(
-                "crawl4ai is not installed. Please install it with: pip install crawl4ai"
-            )
-        
-        self.browser_type = browser_type
-        self.headless = headless
-        self.verbose = verbose
-        self.user_agent = user_agent
-        self.proxy = proxy
-        self.timeout = timeout
-    
-    def crawl(
-        self, 
-        url: str, 
-        query: str = None, 
-        page_content_handler: PageContentHandler = None,
-        output_format: str = "markdown",
-        css_selector: str = None,
-        word_count_threshold: int = 10,
-        include_images: bool = True,
-        include_links: bool = True,
-        take_screenshot: bool = False,
-        wait_for: str = None,
-        cache_mode: str = "enabled",
-        wait_until: str = "networkidle",
-        page_timeout: int = 3,
-        wait_for_images: bool = True,
-        scan_full_page: bool = True,
-        scroll_delay: float = 0.5
-    ) -> Dict[str, Any]:
-        """
-        Crawl a web page using Crawl4AI.
-        
-        Args:
-            url: The URL to crawl
-            query: Optional query for content filtering
-            page_content_handler: Handler for processing the content
-            output_format: Output format ('markdown', 'html', 'text')
-            css_selector: CSS selector to focus on specific content
-            word_count_threshold: Minimum word count for content extraction
-            include_images: Whether to include image information
-            include_links: Whether to include link information
-            take_screenshot: Whether to take a screenshot
-            wait_for: Wait condition for dynamic content (CSS selector, time in seconds, or 'load')
-            cache_mode: Cache strategy ('enabled', 'disabled', 'bypass')
-            wait_until: Wait condition for page load ('networkidle', 'load', 'domcontentloaded')
-            page_timeout: Maximum time to wait for page load in seconds
-            wait_for_images: Whether to wait for images to load
-            scan_full_page: Whether to scroll and scan the full page
-            scroll_delay: Delay between scroll actions in seconds
-            
-        Returns:
-            Dictionary containing crawled content and metadata
-        """
-        if not self.crawl4ai_available:
-            return self._error_result(url, "Crawl4AI is not available")
-        
-        try:
-            # Check if we're already in an async context
-            import asyncio
-            asyncio.get_running_loop()
-            # We're in an async context, run in a separate thread
-            return self._run_in_thread(
-                url, query, page_content_handler, output_format, css_selector,
-                word_count_threshold, include_images, include_links, take_screenshot,
-                wait_for, cache_mode, wait_until, page_timeout, wait_for_images,
-                scan_full_page, scroll_delay
-            )
-        except RuntimeError:
-            # No event loop running, safe to use asyncio.run()
-            return asyncio.run(self._async_crawl(
-                url, query, page_content_handler, output_format, css_selector,
-                word_count_threshold, include_images, include_links, take_screenshot,
-                wait_for, cache_mode, wait_until, page_timeout, wait_for_images,
-                scan_full_page, scroll_delay
-            ))
-    
-    def _run_in_thread(self, url, query, page_content_handler, output_format, css_selector,
-                      word_count_threshold, include_images, include_links, take_screenshot,
-                      wait_for, cache_mode, wait_until, page_timeout, wait_for_images,
-                      scan_full_page, scroll_delay):
-        """Run the async crawl in a separate thread to avoid event loop conflicts."""
-        import concurrent.futures
-        import asyncio
-        
-        def run_async():
-            return asyncio.run(self._async_crawl(
-                url, query, page_content_handler, output_format, css_selector,
-                word_count_threshold, include_images, include_links, take_screenshot,
-                wait_for, cache_mode, wait_until, page_timeout, wait_for_images,
-                scan_full_page, scroll_delay
-            ))
-        
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            future = executor.submit(run_async)
-            try:
-                return future.result(timeout=60)
-            except concurrent.futures.TimeoutError:
-                return self._error_result(url, "Crawling timed out after 60 seconds")
-            except Exception as e:
-                return self._error_result(url, f"Crawling failed: {str(e)}")
-    
-    async def _async_crawl(
-        self, 
-        url: str, 
-        query: str,
-        page_content_handler: PageContentHandler,
-        output_format: str,
-        css_selector: str,
-        word_count_threshold: int,
-        include_images: bool,
-        include_links: bool,
-        take_screenshot: bool,
-        wait_for: str,
-        cache_mode: str,
-        wait_until: str,
-        page_timeout: int,
-        wait_for_images: bool,
-        scan_full_page: bool,
-        scroll_delay: float
-    ) -> Dict[str, Any]:
-        """Async implementation of web crawling."""
-        try:
-            from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
-            
-            # Create browser config
-            config_dict = {
-                "browser_type": self.browser_type,
-                "headless": self.headless,
-                "verbose": self.verbose
-            }
-            
-            if self.user_agent:
-                config_dict["user_agent"] = self.user_agent
-            if self.proxy:
-                config_dict["proxy"] = self.proxy
-                
-            browser_config = BrowserConfig(**config_dict)
-            
-            # Create crawler run config
-            cache_mode_mapping = {
-                "enabled": "enabled",
-                "disabled": "disabled", 
-                "bypass": "bypass"
-            }
-            
-            cache_enum_value = getattr(CacheMode, cache_mode_mapping.get(cache_mode, "enabled").upper())
-            
-            run_config_dict = {
-                "cache_mode": cache_enum_value,
-                "word_count_threshold": word_count_threshold,
-                "screenshot": take_screenshot,
-                "process_iframes": True,
-                "remove_overlay_elements": True,
-                "wait_until": wait_until,
-                "page_timeout": page_timeout,  # Convert to milliseconds
-                "wait_for_images": wait_for_images,
-                "scan_full_page": scan_full_page,
-                "scroll_delay": scroll_delay
-            }
-            
-            if css_selector:
-                run_config_dict["css_selector"] = css_selector
-            if wait_for:
-                run_config_dict["wait_for"] = wait_for
-                
-            run_config = CrawlerRunConfig(**run_config_dict)
-            
-            # Create and use crawler
-            async with AsyncWebCrawler(config=browser_config) as crawler:
-                result = await crawler.arun(url=url, config=run_config)
-                processed_result = self._process_crawl4ai_result(result, output_format, include_images, include_links)
-                
-                # Return the processed result directly
-                return processed_result
-                
-        except Exception as e:
-            return self._error_result(url, f"Crawling failed: {str(e)}")
-    
-    def _process_crawl4ai_result(self, result, output_format: str, include_images: bool, include_links: bool) -> Dict[str, Any]:
-        """Process Crawl4AI result into standardized format."""
-        processed = {
-            "success": result.success,
-            "url": result.url,
-            "title": getattr(result, 'title', ''),
-            "status_code": getattr(result, 'status_code', None),
-            "content": "",
-            "raw_html": result.html or "",
-            "cleaned_html": result.cleaned_html or "",
-            "markdown": result.markdown or "",
-            "links": result.links or {} if include_links else {},
-            "media": result.media or {} if include_images else {},
-            "metadata": getattr(result, 'metadata', {}),
-            "error_message": result.error_message if not result.success else None
-        }
-        
-        # Set primary content based on format
-        if output_format == "markdown":
-            processed["content"] = result.markdown or ""
-        elif output_format == "html":
-            processed["content"] = result.cleaned_html or result.html or ""
-        elif output_format == "text":
-            # Extract text from markdown by removing markdown syntax
-            import re
-            text = result.markdown or ""
-            # Remove markdown syntax
-            text = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', text)  # Links
-            text = re.sub(r'[#*`_~]', '', text)  # Formatting
-            processed["content"] = text
-        else:
-            processed["content"] = result.markdown or ""
-        
-        # Add extracted content if available
-        if hasattr(result, 'extracted_content') and result.extracted_content:
-            try:
-                import json
-                processed["extracted_content"] = json.loads(result.extracted_content)
-            except (json.JSONDecodeError, TypeError):
-                processed["extracted_content"] = result.extracted_content
-        
-        # Add media files if available
-        if hasattr(result, 'screenshot') and result.screenshot:
-            processed["screenshot"] = result.screenshot
-        
-        if hasattr(result, 'pdf') and result.pdf:
-            processed["pdf"] = result.pdf
-            
-        # Add statistics
-        processed["stats"] = {
-            "content_length": len(processed["content"]),
-            "html_length": len(processed["raw_html"]),
-            "links_count": len(processed["links"].get('internal', [])) + len(processed["links"].get('external', [])),
-            "images_count": len(processed["media"].get('images', []))
-        }
-        
-        return processed
-    
-    def _error_result(self, url: str, error_message: str) -> Dict[str, Any]:
-        """Create a standardized error result."""
-        return {
-            "success": False,
-            "url": url,
-            "content": "",
-            "error_message": error_message,
-            "stats": {"content_length": 0, "html_length": 0, "links_count": 0, "images_count": 0}
-        }

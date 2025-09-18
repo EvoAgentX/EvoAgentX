@@ -11,7 +11,6 @@ from .browser_use_auto import BrowserUseAutoToolkit
 from .mcp import MCPToolkit
 from .request import RequestToolkit
 from .request_arxiv import ArxivToolkit
-from .request_crawl4ai import Crawl4AIToolkit
 from .browser_use import BrowserUseToolkit
 from .google_maps_tool import GoogleMapsToolkit
 from .database_mongodb import MongoDBToolkit
@@ -29,6 +28,10 @@ from .rss_feed import RSSToolkit
 from .file_tool import FileToolkit
 from .search_serperapi import SerperAPIToolkit
 from .search_serpapi import SerpAPIToolkit
+from .crawler_request import RequestCrawler, RequestCrawlToolkit
+from .crawler_crawl4ai import Crawl4AICrawler, Crawl4AICrawlToolkit
+from .collection_search import SearchCollectionToolkit
+from .collection_image import ImageCollectionToolkit
 
 __all__ = [
     "Tool", 
@@ -44,7 +47,7 @@ __all__ = [
     "MCPToolkit",
     "RequestToolkit",
     "ArxivToolkit",
-    "Crawl4AIToolkit",
+    "Crawl4AICrawlToolkit",
     "BrowserUseToolkit",
     "GoogleMapsToolkit",
     "MongoDBToolkit",
@@ -63,5 +66,11 @@ __all__ = [
     "RSSToolkit",
     "FileToolkit",
     "SerperAPIToolkit",
-    "SerpAPIToolkit"
+    "SerpAPIToolkit",
+    "RequestCrawler",
+    "RequestCrawlToolkit",
+    "Crawl4AICrawler",
+    "Crawl4AICrawlToolkit",
+    "SearchCollectionToolkit",
+    "ImageCollectionToolkit"
 ]
