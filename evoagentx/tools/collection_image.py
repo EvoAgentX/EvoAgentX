@@ -6,9 +6,9 @@ from .collection_base import ToolCollection
 from .storage_handler import FileStorageHandler, LocalStorageHandler
 
 # Import toolkit classes
-from .image_tools.openai_image_tools.toolkit import OpenAIImageToolkit
-from .image_tools.openrouter_image_tools.toolkit import OpenRouterImageToolkit
-from .image_tools.flux_image_tools.toolkit import FluxImageGenerationToolkit
+from .image_openai import OpenAIImageToolkit
+from .image_openrouter import OpenRouterImageToolkit
+from .image_flux import FluxImageToolkit
 load_dotenv()
 
 
@@ -72,7 +72,7 @@ class ImageGenerationCollection(ToolCollection):
             ))
             
         if flux_api_key:
-            toolkits.append(FluxImageGenerationToolkit(
+            toolkits.append(FluxImageToolkit(
                 api_key=flux_api_key,
                 storage_handler=storage_handler,
                 save_path=base_path
@@ -80,8 +80,8 @@ class ImageGenerationCollection(ToolCollection):
             
         # Set default execution order using actual tool names
         if execution_order is None:
-            execution_order = ["openai_image_generation", "openrouter_image_generation_edit", "flux_image_generation_edit"]
-            
+            execution_order = ["openai_image_generation", "openrouter_image_generation", "flux_image_generation"]
+        
         super().__init__(
             name=name,
             description="Generate images from text prompts with automatic provider fallback",
@@ -89,13 +89,13 @@ class ImageGenerationCollection(ToolCollection):
             execution_order=execution_order,
             argument_mapping_function={
                 "openai_image_generation": self._map_args_for_openai,
-                "openrouter_image_generation_edit": self._map_args_for_openrouter,
-                "flux_image_generation_edit": self._map_args_for_flux
+                "openrouter_image_generation": self._map_args_for_openrouter,
+                "flux_image_generation": self._map_args_for_flux
             },
             output_mapping_function={
                 "openai_image_generation": self._convert_output_from_openai,
-                "openrouter_image_generation_edit": self._convert_output_from_openrouter,
-                "flux_image_generation_edit": self._convert_output_from_flux
+                "openrouter_image_generation": self._convert_output_from_openrouter,
+                "flux_image_generation": self._convert_output_from_flux
             }
         )
         
@@ -252,14 +252,14 @@ class ImageGenerationCollection(ToolCollection):
         Convert Flux output to unified format.
         
         Flux Output Format:
-        - {"success": true, "file_path": "filename", "full_path": "...", "message": "..."}
-        - {"success": false, "error": "error message"}
+        - {"file_path": "/path/to/file.png"}
+        - {"error": "error message"}
         
         Unified Output Format:
-        - {"success": bool, "images": [filename1, ...], "count": int, "provider": "flux"}
+        - {"success": bool, "images": ["/path/to/file.png"], "count": 1, "provider": "flux"}
         - {"success": false, "error": "error message", "provider": "flux"}
         """
-        if not result.get("success", False):
+        if "error" in result:
             return {
                 "success": False,
                 "error": result.get("error", "Unknown error"),
@@ -278,6 +278,51 @@ class ImageGenerationCollection(ToolCollection):
         while b:
             a, b = b, a % b
         return a
+
+    def _get_next_execute(self, inputs: Dict[str, Any], outputs: Dict[str, Any]) -> Optional[str]:
+        """Determine next tool to execute; stop when a provider succeeded with images."""
+        for tool_name in self.execution_order:
+            if tool_name not in outputs:
+                return tool_name
+            tool_output = outputs.get(tool_name)
+            if (
+                isinstance(tool_output, dict)
+                and tool_output.get("success") is True
+                and len(tool_output.get("images", [])) > 0
+            ):
+                return None
+        return None
+
+    def __call__(
+        self,
+        prompt: str,
+        model: str = None,
+        size: str = None,
+        quality: str = None,
+        n: int = None,
+        seed: int = None,
+        style: str = None,
+        output_format: str = None,
+        image_name: str = None,
+        **kwargs
+    ) -> Dict[str, Any]:
+        if not prompt:
+            return {"success": False, "error": "Missing required parameter 'prompt'"}
+        inputs = {
+            "prompt": prompt,
+            "model": model,
+            "size": size,
+            "quality": quality,
+            "n": n,
+            "seed": seed,
+            "style": style,
+            "output_format": output_format,
+            "image_name": image_name,
+            **kwargs,
+        }
+        # Remove None values
+        inputs = {k: v for k, v in inputs.items() if v is not None}
+        return self._run_pipeline(inputs)
 
 
 class ImageEditingCollection(ToolCollection):
@@ -344,7 +389,7 @@ class ImageEditingCollection(ToolCollection):
             ))
             
         if flux_api_key:
-            toolkits.append(FluxImageGenerationToolkit(
+            toolkits.append(FluxImageToolkit(
                 api_key=flux_api_key,
                 storage_handler=storage_handler,
                 save_path=base_path
@@ -352,7 +397,7 @@ class ImageEditingCollection(ToolCollection):
             
         # Set default execution order using actual tool names
         if execution_order is None:
-            execution_order = ["openai_image_edit", "openrouter_image_generation_edit", "flux_image_generation_edit"]
+            execution_order = ["openai_image_edit", "openrouter_image_edit", "flux_image_edit"]
             
         super().__init__(
             name=name,
@@ -361,13 +406,13 @@ class ImageEditingCollection(ToolCollection):
             execution_order=execution_order,
             argument_mapping_function={
                 "openai_image_edit": self._map_args_for_openai,
-                "openrouter_image_generation_edit": self._map_args_for_openrouter,
-                "flux_image_generation_edit": self._map_args_for_flux
+                "openrouter_image_edit": self._map_args_for_openrouter,
+                "flux_image_edit": self._map_args_for_flux
             },
             output_mapping_function={
                 "openai_image_edit": self._convert_output_from_openai,
-                "openrouter_image_generation_edit": self._convert_output_from_openrouter,
-                "flux_image_generation_edit": self._convert_output_from_flux
+                "openrouter_image_edit": self._convert_output_from_openrouter,
+                "flux_image_edit": self._convert_output_from_flux
             }
         )
         
@@ -394,10 +439,10 @@ class ImageEditingCollection(ToolCollection):
                 images = [inputs["image_path"]]
             elif "image_url" in inputs:
                 # OpenAI edit doesn't support URLs directly, would need to download
-                return {"error": "OpenAI image editing requires local image files, not URLs"}
+                raise ValueError("OpenAI image editing requires local image files, not URLs")
         
         if not images:
-            return {"error": "No images provided for editing"}
+            raise ValueError("No images provided for editing")
             
         mapped = {
             "prompt": inputs.get("prompt"),
@@ -453,7 +498,7 @@ class ImageEditingCollection(ToolCollection):
         
         Flux Input Format:
         - prompt: str (required)
-        - input_image: str (base64 encoded image for editing)
+        - image_path: str (local path to image for editing)
         - seed: int (default: 42)
         - aspect_ratio: str (e.g., "1:1")
         - output_format: str (jpeg | png)
@@ -464,7 +509,7 @@ class ImageEditingCollection(ToolCollection):
             "output_format": inputs.get("output_format", "jpeg"),
         }
         
-        # Handle input image - Flux needs base64
+        # Handle input image - pass local path; provider will read and convert to base64
         images = inputs.get("images")
         image_path = inputs.get("image_path")
         
@@ -472,24 +517,8 @@ class ImageEditingCollection(ToolCollection):
             image_path = images[0]  # Use first image
         
         if image_path:
-            try:
-                # Read and encode image as base64
-                import base64
-                result = self.storage_handler.read(image_path)
-                if result["success"]:
-                    if isinstance(result["content"], bytes):
-                        image_content = result["content"]
-                    else:
-                        # If not bytes, try to get raw content
-                        system_path = self.storage_handler.translate_in(image_path)
-                        image_content = self.storage_handler._read_raw(system_path)
-                    
-                    mapped["input_image"] = base64.b64encode(image_content).decode("utf-8")
-                else:
-                    return {"error": f"Failed to read input image: {result.get('error', 'Unknown error')}"}
-            except Exception as e:
-                return {"error": f"Failed to process input image: {str(e)}"}
-        
+            mapped["image_path"] = image_path
+            
         return {k: v for k, v in mapped.items() if v is not None}
 
     def _convert_output_from_openai(self, result: Dict[str, Any]) -> Dict[str, Any]:
@@ -577,6 +606,75 @@ class ImageEditingCollection(ToolCollection):
             "count": 1,
             "provider": "flux"
         }
+
+    def _get_next_execute(self, inputs: Dict[str, Any], outputs: Dict[str, Any]) -> Optional[str]:
+        """Determine next tool to execute; stop when a provider succeeded with images."""
+        for tool_name in self.execution_order:
+            if tool_name not in outputs:
+                return tool_name
+            tool_output = outputs.get(tool_name)
+            if (
+                isinstance(tool_output, dict)
+                and tool_output.get("success") is True
+                and len(tool_output.get("images", [])) > 0
+            ):
+                return None
+        return None
+
+    def __call__(
+        self,
+        prompt: str,
+        images: list = None,
+        image_path: str = None,
+        image_url: str = None,
+        mask_path: str = None,
+        model: str = None,
+        size: str = None,
+        quality: str = None,
+        n: int = None,
+        seed: int = None,
+        output_format: str = None,
+        image_name: str = None,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Execute image editing with automatic provider fallback.
+        Requires a prompt and at least one image input (images, image_path, or image_url).
+        """
+        # Validate required prompt
+        if not prompt or not isinstance(prompt, str) or not prompt.strip():
+            return {"error": "prompt is required for image editing"}
+
+        # Consolidate image inputs
+        consolidated_images: List[str] = []
+        if images:
+            consolidated_images.extend(images)
+        if image_path:
+            consolidated_images.append(image_path)
+        # image_url is handled separately by providers that support URLs
+
+        if not consolidated_images and not image_url:
+            return {"error": "At least one of images, image_path, or image_url must be provided"}
+
+        inputs: Dict[str, Any] = {
+            "prompt": prompt,
+            "images": consolidated_images if consolidated_images else None,
+            "image_path": image_path,
+            "image_url": image_url,
+            "mask_path": mask_path,
+            "model": model,
+            "size": size,
+            "quality": quality,
+            "n": n,
+            "seed": seed,
+            "output_format": output_format,
+            "image_name": image_name,
+        }
+
+        # Remove None values
+        inputs = {k: v for k, v in inputs.items() if v is not None}
+
+        return self._run_pipeline(inputs)
 
 
 class ImageAnalysisCollection(ToolCollection):
@@ -751,13 +849,27 @@ class ImageAnalysisCollection(ToolCollection):
             "provider": "openrouter"
         }
 
-    def __call__(self, **kwargs) -> Dict[str, Any]:
+    def _get_next_execute(self, inputs: Dict[str, Any], outputs: Dict[str, Any]) -> Optional[str]:
+        """Determine next tool to execute; stop when analysis succeeded with content."""
+        for tool_name in self.execution_order:
+            if tool_name not in outputs:
+                return tool_name
+            tool_output = outputs.get(tool_name)
+            if isinstance(tool_output, dict):
+                content = tool_output.get("content")
+                # Stop if we have explicit success with non-empty content,
+                # or if no error is present and content exists
+                if (tool_output.get("success") is True and content) or (tool_output.get("error") is None and content):
+                    return None
+        return None
+
+    def __call__(self, prompt: str, image_url: str = None, image_path: str = None, pdf_path: str = None, model: str = None, **kwargs) -> Dict[str, Any]:
         """
         Execute image analysis with provider fallback.
         Validates that at least one image input is provided.
         """
         # Validate required prompt parameter
-        if "prompt" not in kwargs:
+        if not prompt:
             return {
                 "success": False,
                 "error": "Missing required parameter 'prompt'"
@@ -765,9 +877,9 @@ class ImageAnalysisCollection(ToolCollection):
         
         # Validate input - need at least one image source
         has_image = any([
-            kwargs.get("image_url"),
-            kwargs.get("image_path"),
-            kwargs.get("pdf_path")  # PDF is also valid for OpenRouter
+            image_url,
+            image_path,
+            pdf_path  # PDF is also valid for OpenRouter
         ])
         
         if not has_image:
@@ -776,20 +888,31 @@ class ImageAnalysisCollection(ToolCollection):
                 "error": "No image input provided. Please specify image_url, image_path, or pdf_path."
             }
         
+        # Build unified inputs
+        inputs = {
+            "prompt": prompt,
+            "image_url": image_url,
+            "image_path": image_path,
+            "pdf_path": pdf_path,
+            "model": model,
+            **kwargs,
+        }
+        inputs = {k: v for k, v in inputs.items() if v is not None}
+        
         # Check content type and provider compatibility
-        if kwargs.get("pdf_path") and self.execution_order:
+        if pdf_path and self.execution_order:
             # OpenAI doesn't support PDF, remove it from execution order for this call
             original_order = self.execution_order.copy()
             # Remove OpenAI analysis tool by its name
             filtered_order = [name for name in self.execution_order if name != "openai_image_analysis"]
             self.execution_order = filtered_order
             try:
-                result = super().__call__(**kwargs)
+                result = self._run_pipeline(inputs)
             finally:
                 self.execution_order = original_order
             return result
         
-        return super().__call__(**kwargs)
+        return self._run_pipeline(inputs)
 
 
 class ImageCollectionToolkit(Toolkit):

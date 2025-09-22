@@ -3,7 +3,7 @@ import asyncio
 import json
 
 from .tool import Tool, Toolkit
-from .crawler_base import CrawlerBase, PageContentHandler, DisabledPageContentHandler
+from .crawler_base import CrawlerBase, PageContentHandler, DisabledPageContentHandler, AutoPageContentHandler
 
 
 class Crawl4AICrawler(CrawlerBase):
@@ -20,6 +20,8 @@ class Crawl4AICrawler(CrawlerBase):
         timeout: int = 30,
         **kwargs
     ):
+        if not page_content_handler:
+            page_content_handler = AutoPageContentHandler()
         super().__init__(page_content_handler=page_content_handler, **kwargs)
         
         # Handle optional crawl4ai import
@@ -358,30 +360,31 @@ class Crawl4AICrawlTool(Tool):
             timeout=timeout
         )
     
-    def __call__(self, **kwargs) -> Dict[str, Any]:
+    def __call__(
+        self,
+        url: str,
+        output_format: str = 'markdown',
+        css_selector: str = None,
+        word_count_threshold: int = 10,
+        include_images: bool = True,
+        include_links: bool = True,
+        take_screenshot: bool = False,
+        wait_for: str = None,
+        cache_mode: str = 'enabled',
+        wait_until: str = 'networkidle',
+        page_timeout: int = 3,
+        wait_for_images: bool = True,
+        scan_full_page: bool = True,
+        scroll_delay: float = 0.5
+    ) -> Dict[str, Any]:
         """
         Crawl a web page using Crawl4AI and extract comprehensive content.
         
         Returns:
             Dictionary containing crawled content and metadata
         """
-        url = kwargs.get('url')
-        output_format = kwargs.get('output_format', 'markdown')
-        css_selector = kwargs.get('css_selector')
-        word_count_threshold = kwargs.get('word_count_threshold', 10)
-        include_images = kwargs.get('include_images', True)
-        include_links = kwargs.get('include_links', True)
-        take_screenshot = kwargs.get('take_screenshot', False)
-        wait_for = kwargs.get('wait_for')
-        cache_mode = kwargs.get('cache_mode', 'enabled')
-        wait_until = kwargs.get('wait_until', 'networkidle')
-        page_timeout = kwargs.get('page_timeout', 3)
-        wait_for_images = kwargs.get('wait_for_images', True)
-        scan_full_page = kwargs.get('scan_full_page', True)
-        scroll_delay = kwargs.get('scroll_delay', 0.5)
         
-        if not url:
-            raise ValueError("URL is required")
+
         return self.crawler.crawl(
             url=url,
             query=None,  # No query filtering for basic crawling
@@ -413,8 +416,7 @@ class Crawl4AICrawlToolkit(Toolkit):
         verbose: bool = False,
         user_agent: str = None,
         proxy: str = None,
-        timeout: int = 30,
-        **kwargs
+        timeout: int = 30
     ):
         """
         Initialize Crawl4AI crawling toolkit with shared configuration.

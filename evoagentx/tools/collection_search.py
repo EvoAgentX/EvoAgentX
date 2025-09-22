@@ -69,7 +69,7 @@ class SearchCollection(ToolCollection):
             language (str): Language for search results
             region (str): Region for search results
             page_content_handler (PageContentHandler): Optional shared handler for processing page content
-            **kwargs: Additional arguments
+            **kwargs: Additional arguments passed to ToolCollection base class
         """
         # Initialize shared page content handler if not provided
         if page_content_handler is None:
@@ -516,30 +516,28 @@ class SearchCollection(ToolCollection):
             "error": None
         }
 
-    def __call__(self, **kwargs) -> Dict[str, Any]:
+    def __call__(self, query: str, num_results: int = None, max_content_words: int = None, language: str = None, region: str = None, **kwargs) -> Dict[str, Any]:
         """
         Execute the search collection with unified parameters.
         
         Args:
-            **kwargs: Arguments including:
-                query: The search query to execute across multiple search engines
-                num_results: Number of search results to retrieve per engine (default: 5)
-                max_content_words: Maximum words per result content (default: 300)
-                language: Language preference (ISO 639-1 code, e.g., 'en', 'es', 'fr')
-                region: Geographic region for localized results (e.g., 'us', 'uk', 'de')
+            query: The search query to execute across multiple search engines
+            num_results: Number of search results to retrieve per engine (default: 5)
+            max_content_words: Maximum words per result content (default: 300)
+            language: Language preference (ISO 639-1 code, e.g., 'en', 'es', 'fr')
+            region: Geographic region for localized results (e.g., 'us', 'uk', 'de')
             
         Returns:
             Dict containing the unified results from executed search engines
         """
-        # Extract required query parameter
-        if "query" not in kwargs:
+        # Extract required query parameter (now provided explicitly)
+        if not query:
             raise ValueError("Missing required parameter 'query'")
             
-        query = kwargs["query"]
-        num_results = kwargs.get("num_results") or self.default_num_results
-        max_content_words = kwargs.get("max_content_words") or self.default_max_content_words
-        language = kwargs.get("language") or self.default_language
-        region = kwargs.get("region") or self.default_region
+        num_results = num_results or self.default_num_results
+        max_content_words = max_content_words or self.default_max_content_words
+        language = language or self.default_language
+        region = region or self.default_region
         
         inputs = {
             "query": query,

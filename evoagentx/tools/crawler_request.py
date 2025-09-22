@@ -127,7 +127,8 @@ class RequestCrawlTool(Tool):
             page_content_handler=self.page_content_handler
         )
     
-    def __call__(self, **kwargs) -> Dict[str, Any]:
+    def __call__(self, url: str, query: str = None, max_content_words: int = None,
+                 output_format: str = None, preferred_handler: str = None) -> Dict[str, Any]:
         """
         Crawl a web page using HTTP requests and return processed content.
         
@@ -141,14 +142,9 @@ class RequestCrawlTool(Tool):
         Returns:
             Dictionary containing crawled content and metadata
         """
-        url = kwargs.get('url')
-        query = kwargs.get('query')
-        max_content_words = kwargs.get('max_content_words')
-        output_format = kwargs.get('output_format')
-        preferred_handler = kwargs.get('preferred_handler')
-        
         if not url:
             raise ValueError("URL is required")
+        
         # Create handler override if needed
         page_content_handler = None
         if max_content_words or preferred_handler:

@@ -29,22 +29,23 @@ class ToolCollection(Tool):
     output_mapping_function: Optional[Dict[str, Callable]] = Field(default_factory=dict, description="Output mapping functions for each tool")
 
     def __init__(
-        self, 
-        name: str = "ToolCollection",
-        description: str = "A collection that orchestrates multiple tools",
-        kits: Optional[List[Union[Tool, Toolkit]]] = None, 
+        self,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+        kits: Optional[List[Union[Tool, Toolkit]]] = None,
         execution_order: Optional[List[str]] = None,
         argument_mapping_function: Optional[Dict[str, Callable]] = None,
-        output_mapping_function: Optional[Dict[str, Callable]] = None,
-        **kwargs
+        output_mapping_function: Optional[Dict[str, Callable]] = None
         ):
         
         # Call parent constructor first
-        super().__init__(**kwargs)
+        super().__init__()
         
         # Initialize Tool attributes
-        self.name = name
-        self.description = description
+        if name is not None:
+            self.name = name
+        if description is not None:
+            self.description = description
         
         # Process tools from kits
         tools = []
@@ -97,42 +98,37 @@ class ToolCollection(Tool):
             if tool_name not in outputs:
                 return tool_name
         return None
-    
-    def __call__(self, **kwargs) -> Dict[str, Any]:
-        """
-        Execute the tool collection with the given arguments.
-        
-        Args:
-            **kwargs: Arguments based on the collection's input schema
-            
-        Returns:
-            Dict containing the results from all executed tools
-        """
-        # Validate required parameters based on the collection's inputs schema
-        if self.required:
-            for required_param in self.required:
-                if required_param not in kwargs:
-                    raise ValueError(f"Missing required parameter '{required_param}'")
-            
-        inputs = kwargs.copy()
-        outputs = {}
-        
+
+    def _run_pipeline(self, inputs: Dict[str, Any], outputs: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Execute the collection pipeline using mapping functions and execution order."""
+        outputs = outputs or {}
         while True:
             next_tool_name = self._get_next_execute(inputs, outputs)
             if not next_tool_name:
                 break
-                
             tool = self.tool_mappings.get(next_tool_name)
             if not tool:
-                logger.error(f"Tool {next_tool_name} not found in tool mappings")
                 break
-                
             try:
-                mapped_args = self.argument_mapping_function[next_tool_name](inputs, outputs)
+                arg_map_fn = self.argument_mapping_function.get(next_tool_name, lambda i, o: i)
+                mapped_args = arg_map_fn(inputs, outputs)
                 result = tool(**mapped_args)
-                outputs[next_tool_name] = self.output_mapping_function[next_tool_name](result)
+                out_map_fn = self.output_mapping_function.get(next_tool_name, lambda r: r)
+                outputs[next_tool_name] = out_map_fn(result)
             except Exception as e:
-                logger.error(f"Error executing tool {next_tool_name}: {e}")
+                logger.exception(f"Error executing tool {next_tool_name}: {e}")
                 outputs[next_tool_name] = {"error": str(e)}
-                
         return outputs
+    
+    def __call__(self, query: str, **kwargs) -> Dict[str, Any]:
+        """
+        Execute the tool collection with the given query.
+        
+        Args:
+            query: The input query to process through the tool collection
+            
+        Returns:
+            Dict containing the results from all executed tools
+        """
+        inputs = {"query": query, **kwargs}
+        return self._run_pipeline(inputs)

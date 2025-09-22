@@ -57,11 +57,11 @@ def demo_image_generation():
     # Check for API keys
     openai_key = os.getenv("OPENAI_API_KEY")
     openrouter_key = os.getenv("OPENROUTER_API_KEY") 
-    flux_key = os.getenv("BFL_API_KEY")
+    flux_key = os.getenv("FLUX_API_KEY")
     
     if not any([openai_key, openrouter_key, flux_key]):
         print("No image generation API keys found")
-        return
+        return None
     
     try:
         image_gen = ImageGenerationCollection(
@@ -78,22 +78,42 @@ def demo_image_generation():
         print(f"\nRaw Generation Results:")
         print(result)
         
+        # Extract the first successful image path from the collection outputs
+        first_image = None
+        if isinstance(result, dict):
+            for tool_name, res in result.items():
+                if isinstance(res, dict) and res.get("success") and res.get("images"):
+                    first_image = res["images"][0]
+                    print(f"Provider '{tool_name}' produced image: {first_image}")
+                    break
+        
+        if first_image:
+            return first_image
+        else:
+            print("No image generated to edit")
+            return None
+        
     except Exception as e:
         print(f"Generation error: {str(e)}")
+        return None
 
 
-def demo_image_editing():
-    """Simple image editing demo"""
+def demo_image_editing(src_image_path: str = None):
+    """Simple image editing demo. Returns edited image path if success, else None"""
     print("\n=== IMAGE EDITING DEMO ===")
     
     # Check for API keys
     openai_key = os.getenv("OPENAI_API_KEY")
     openrouter_key = os.getenv("OPENROUTER_API_KEY")
-    flux_key = os.getenv("BFL_API_KEY")
+    flux_key = os.getenv("FLUX_API_KEY")
     
     if not any([openai_key, openrouter_key, flux_key]):
         print("No image editing API keys found")
-        return
+        return None
+    
+    if not src_image_path:
+        print("No source image path provided from generation step; skipping real edit.")
+        return None
     
     try:
         image_edit = ImageEditingCollection(
@@ -103,21 +123,43 @@ def demo_image_editing():
             base_path="./demo_images"
         )
         
-        # Use a sample image path (would need existing image)
         prompt = "Add a red hat to the subject"
         print(f"Editing with prompt: {prompt}")
-        print("Note: Would need existing image file for actual editing")
+        print(f"Editing source image: {src_image_path}")
         
-        # Simulate with dummy data for demo
-        print("\nRaw Editing Results: (simulated - need existing image)")
-        print("{'error': 'No images provided for editing'}")
+        # Perform real editing using the generated image
+        edit_result = image_edit(
+            prompt=prompt,
+            image_path=src_image_path,
+            size="1024x1024",
+            quality="high",
+            n=1,
+            image_name="demo_robot_edited"
+        )
+        
+        print("\nRaw Editing Results:")
+        print(edit_result)
+        
+        # Extract first successful edited image path
+        edited_image = None
+        if isinstance(edit_result, dict):
+            for tool_name, res in edit_result.items():
+                if isinstance(res, dict) and res.get("success") and res.get("images"):
+                    edited_image = res["images"][0]
+                    print(f"Provider '{tool_name}' produced edited image: {edited_image}")
+                    break
+        if not edited_image:
+            print("No edited image returned by any provider.")
+            return None
+        return edited_image
         
     except Exception as e:
         print(f"Editing error: {str(e)}")
+        return None
 
 
-def demo_image_analysis():
-    """Simple image analysis demo"""
+def demo_image_analysis(local_image_path: str = None):
+    """Simple image analysis demo. If local_image_path provided and exists, analyze it; otherwise, fall back to a demo URL."""
     print("\n=== IMAGE ANALYSIS DEMO ===")
     
     # Check for API keys
@@ -135,12 +177,16 @@ def demo_image_analysis():
             base_path="./demo_images"
         )
         
-        test_image_url = "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Gfp-wisconsin-madison-the-nature-boardwalk.jpg/2560px-Gfp-wisconsin-madison-the-nature-boardwalk.jpg"
         prompt = "What do you see in this image?"
         
-        print(f"Analyzing image with prompt: {prompt}")
+        if local_image_path:
+            print(f"Analyzing local edited image with prompt: {prompt}")
+            result = image_analysis(prompt=prompt, image_path=local_image_path)
+        else:
+            test_image_url = "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Gfp-wisconsin-madison-the-nature-boardwalk.jpg/2560px-Gfp-wisconsin-madison-the-nature-boardwalk.jpg"
+            print(f"Analyzing image with prompt: {prompt}")
+            result = image_analysis(prompt=prompt, image_url=test_image_url)
         
-        result = image_analysis(prompt=prompt, image_url=test_image_url)
         print(f"\nRaw Analysis Results:")
         print(result)
         
@@ -150,16 +196,63 @@ def demo_image_analysis():
 
 
 
+def demo_image_toolkit():
+    """Demo unified ImageCollectionToolkit"""
+    print("\n=== UNIFIED IMAGE TOOLKIT DEMO ===")
+    
+    # Check for API keys
+    openai_key = os.getenv("OPENAI_API_KEY")
+    openrouter_key = os.getenv("OPENROUTER_API_KEY")
+    flux_key = os.getenv("FLUX_API_KEY")
+    
+    if not any([openai_key, openrouter_key, flux_key]):
+        print("No image API keys found")
+        return
+    
+    try:
+        # Initialize unified toolkit
+        image_toolkit = ImageCollectionToolkit(
+            openai_api_key=openai_key,
+            openrouter_api_key=openrouter_key,
+            flux_api_key=flux_key,
+            base_path="./demo_images"
+        )
+        
+        # Check available providers
+        providers = image_toolkit.get_available_providers()
+        print(f"Available providers: {providers}")
+        
+        # Demo generation using the toolkit
+        prompt = "A serene mountain landscape at sunset"
+        print(f"\nGenerating with unified toolkit: {prompt}")
+        
+        # Use the generation collection through the toolkit
+        gen_result = image_toolkit.generate_image(prompt=prompt, image_name="mountain_sunset")
+        print(f"Generation result: {gen_result}")
+        
+        # Demo analysis with a web image
+        test_image_url = "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Gfp-wisconsin-madison-the-nature-boardwalk.jpg/2560px-Gfp-wisconsin-madison-the-nature-boardwalk.jpg"
+        analysis_prompt = "Describe this natural landscape"
+        
+        print(f"\nAnalyzing with unified toolkit: {analysis_prompt}")
+        analysis_result = image_toolkit.analyze_image(prompt=analysis_prompt, image_url=test_image_url)
+        print(f"Analysis result: {analysis_result}")
+        
+    except Exception as e:
+        print(f"Unified toolkit error: {str(e)}")
+
+
 def main():
     """Run simple Tool Collection demos."""
     print("=== TOOL COLLECTIONS SIMPLE DEMO ===")
-    print("Demonstrating search, image generation, editing, and analysis\n")
+    print("Demonstrating search, image generation, editing, analysis, and unified toolkit\n")
     
     # Core demos
-    demo_search()
-    demo_image_generation()
-    demo_image_editing()
-    demo_image_analysis()
+    # demo_search()
+    generated_image_path = demo_image_generation()
+    edited_image_path = demo_image_editing(generated_image_path)
+    demo_image_analysis(edited_image_path)
+    demo_image_toolkit()
     print("\n=== DEMO COMPLETED ===")
 
 

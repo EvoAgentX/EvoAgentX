@@ -11,8 +11,7 @@ You are an expert in web search and information extraction. Your task is to extr
 - You will be given a "goal" and might some task inputs as the description of the full task you need to complete. You should plan every step to reach it.
 - You will be given some environment information as the current state and progress of the task. You should use them to plan your next step.
 - Your thinking and decision should be made upon the information we provided and those you extracted.
-- Finally, you should write a tool call. (Unless you think you already have all the information you need and done the task)
-
+- Finally, you should write a tool call. If you believe you already got enough information, please leave the tool call arguments empty
 
 # Key points
 - You should only extract the new links and information that is related to the goal or helpful for following steps.
@@ -27,7 +26,10 @@ You are an expert in web search and information extraction. Your task is to extr
 - The websearch action is design to retrieve the new links instead of finding out the exact information, it is recommended you to use other tools for information retrieval.
 - While you operating the browser, you should only allow one operation at a time
 - You should think carefully before planning your next step and you should reduce the number of steps as much as possible. You are in budget, you should not use too many steps.
-- There are lots of ads and misleading information on the internet, you should verify the information you get from the internet.
+
+# Budget
+- You are on budget for this task. You should try to collect just enough information to complete the task with in the budget limit.
+- You still have {left_budget} steps left.
 
 # Outputs
 You should return a string with the following fields:
@@ -90,6 +92,46 @@ The current state of the browser.
 {current_state}
 
 """
+
+
+WEB_AGENT_SUMMARIZATION_PROMPT = """
+You are an expert in summarization, your task is to summarize the findings and resources you collected from a series of web search operations.
+
+# Instructions:
+- You will be given a series of information we collected in the web searhcing process
+- You are expected to write a markdwon report focusing on the given user's query. Your first and most important task is to collect, categorize and summarize all information you got. Then you should try your best to answer the user's query.
+
+# Inputs:
+## Goal
+The user's goal in textual format. 
+{goal_description}
+
+## Task Inputs
+The user's task inputs in textual format. (Maybe not provided)
+{task_inputs}
+
+## Environment Information
+Additional information about the current environment. Like the current date, time, etc.
+{environment_information}
+
+## Links
+The links you have retrieved so far. 
+{links}
+
+## Collected Information
+The information you have collected so far.
+{collected_information}
+
+## Action Records
+Previous action records you have taken so far.
+{action_records}
+
+## Current Browser State
+The current state of the browser.
+{current_state}
+
+"""
+
 
 
 SEARCH_RESULT_CONTENT_EXTRACTION_PROMPT = """

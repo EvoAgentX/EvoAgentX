@@ -4,7 +4,7 @@ from typing import Optional, Callable, List, Any
 from pydantic import create_model, Field
 from ..prompts.template import PromptTemplate
 from ..actions.action import ActionOutput
-from ..tools.tool import Toolkit
+from ..tools import Toolkit,BrowserUseToolkit, Crawl4AICrawlToolkit, SearchCollectionToolkit 
 from ..actions.action import Action, ActionInput
 from ..utils.utils import generate_dynamic_class_name
 
@@ -13,6 +13,14 @@ from ..utils.utils import generate_dynamic_class_name
 class WebSearchAgent(CustomizeAgent):
     
     def __init__(self, *args, **kwargs):
+        if "tools" not in kwargs:
+            kwargs["tools"] = [BrowserUseToolkit(headless = True), Crawl4AICrawlToolkit(), SearchCollectionToolkit()]
+        kwargs["inputs"] = [
+            {"name": "requirement", "type": "string", "description": "The goal you need to achieve"}
+        ]
+        kwargs["outputs"] = [
+            {"name": "output", "type": "string", "description": "The result of the web search, containing all information required in the inputs."}
+        ]
         super().__init__(*args, **kwargs)
     
     
@@ -68,7 +76,7 @@ class WebSearchAgent(CustomizeAgent):
 
         action_input_type = create_model(
             self._get_unique_class_name(
-                generate_dynamic_class_name(name+" action_input")
+                candidate_name=generate_dynamic_class_name(name+" action_input")
             ),
             **action_input_fields, 
             __base__=ActionInput

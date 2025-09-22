@@ -950,7 +950,7 @@ class BrowserUse(BaseModule):
                 text_content = str(dom_state)[:500]
             
             
-            
+            from pdb import set_trace; set_trace()
             return {
                 "elements": elements,
                 "text_content": text_content,
