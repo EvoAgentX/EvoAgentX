@@ -238,6 +238,7 @@ class SearchCollection(ToolCollection):
                 "title": result.get("title", ""),
                 "content": result.get("content", ""),
                 "url": result.get("url", ""),
+                "site_content": result.get("site_content"),
                 "source": "ddgs_search"
             })
         
@@ -280,6 +281,7 @@ class SearchCollection(ToolCollection):
                 "title": result.get("title", ""),
                 "content": result.get("content", ""),
                 "url": result.get("url", ""),
+                "site_content": result.get("site_content"),
                 "source": "wiki_search"
             })
         
@@ -322,6 +324,7 @@ class SearchCollection(ToolCollection):
                 "title": result.get("title", ""),
                 "content": result.get("content", ""),
                 "url": result.get("url", ""),
+                "site_content": result.get("site_content"),
                 "source": "serpapi_search"
             })
         
@@ -419,6 +422,7 @@ class SearchCollection(ToolCollection):
                 "title": result.get("title", ""),
                 "content": result.get("content", ""),
                 "url": result.get("url", ""),
+                "site_content": result.get("site_content"),
                 "source": "google_search"
             })
         
@@ -461,6 +465,7 @@ class SearchCollection(ToolCollection):
                 "title": result.get("title", ""),
                 "content": result.get("content", ""),
                 "url": result.get("url", ""),
+                "site_content": result.get("site_content"),
                 "source": "google_free_search"
             })
         
@@ -503,6 +508,7 @@ class SearchCollection(ToolCollection):
                 "title": result.get("title", ""),
                 "content": result.get("content", ""),
                 "url": result.get("url", ""),
+                "site_content": result.get("site_content"),
                 "source": "serperapi_search"
             })
         

@@ -22,6 +22,7 @@ class WebSearchAgent(CustomizeAgent):
             {"name": "output", "type": "string", "description": "The result of the web search, containing all information required in the inputs."}
         ]
         super().__init__(*args, **kwargs)
+        self.actions[0].search_budget = kwargs.get("search_budget", 7)
     
     
     def create_customize_action(
