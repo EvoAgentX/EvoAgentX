@@ -248,11 +248,11 @@ def main():
     print("Demonstrating search, image generation, editing, analysis, and unified toolkit\n")
     
     # Core demos
-    # demo_search()
-    generated_image_path = demo_image_generation()
-    edited_image_path = demo_image_editing(generated_image_path)
-    demo_image_analysis(edited_image_path)
-    demo_image_toolkit()
+    demo_search()
+    # generated_image_path = demo_image_generation()
+    # edited_image_path = demo_image_editing(generated_image_path)
+    # demo_image_analysis(edited_image_path)
+    # demo_image_toolkit()
     print("\n=== DEMO COMPLETED ===")
 
 

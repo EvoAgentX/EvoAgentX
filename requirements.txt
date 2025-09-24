@@ -81,7 +81,7 @@ PyPDF2>=3.0.0
 selenium>=4.0.0
 webdriver-manager>=3.8.0
 html2text>=2020.1.16
-browser-use; python_version >= "3.11"
+browser-use==0.7.1; python_version >= "3.11"
 browser-use-py310; python_version < "3.11"
 mcp>=0.1.0
 

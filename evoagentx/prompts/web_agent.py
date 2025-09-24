@@ -59,8 +59,30 @@ With these information and those you provided, ...
 ## decision
 <Decision_content>
 
+<ToolCalling>
 <Tool_calls_content>
+</ToolCalling>
 
+
+# Browser State
+Sometimes, Browser State will be given as:
+
+Current URL: URL of the page you are currently viewing.
+Open Tabs: Open tabs with their indexes.
+Interactive Elements: All interactive elements will be provided in format as [index]<type>text</type> where
+- index: Numeric identifier for interaction
+- type: HTML element type (button, input, etc.)
+- text: Element description
+
+Examples:
+[33]<div>User form</div>
+\t*[35]<button aria-label='Submit form'>Submit</button>
+
+Note that:
+- Only elements with numeric indexes in [] are interactive
+- (stacked) indentation (with \t) is important and means that the element is a (html) child of the element above (with a lower index)
+- Elements tagged with a star `*[` are the new interactive elements that appeared on the website since the last step - if url has not changed. Your previous actions caused that change. Think if you need to interact with them, e.g. after input_text you might need to select the right option from the list.
+- Pure text elements without [] are not interactive.
 
 # Inputs:
 You will be given the following inputs for your analysis:

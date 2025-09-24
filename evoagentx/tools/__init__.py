@@ -5,13 +5,12 @@ from .search_google import GoogleSearchToolkit
 from .search_google_f import GoogleFreeSearchToolkit
 from .search_ddgs import DDGSSearchToolkit
 from .search_wiki import WikipediaSearchToolkit
-from .browser_tool import BrowserToolkit
-from .browser_use import BrowserUseToolkit
-from .browser_use_auto import BrowserUseAutoToolkit
 from .mcp import MCPToolkit
 from .request import RequestToolkit
 from .request_arxiv import ArxivToolkit
-from .browser_use import BrowserUseToolkit
+from .browser_browseruse import BrowserUseToolkit
+from .browser_browseruse_auto import BrowserUseAutoToolkit
+from .browser_tool import BrowserToolkit
 from .google_maps_tool import GoogleMapsToolkit
 from .database_mongodb import MongoDBToolkit
 from .database_postgresql import PostgreSQLToolkit

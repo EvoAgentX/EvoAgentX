@@ -57,7 +57,10 @@ class BrowserBase(BaseModule):
             **kwargs: Additional keyword arguments for parent class initialization
         """
         # Pass to parent class initialization
-        super().__init__(name=name, timeout=timeout, browser_type=browser_type, headless=headless, **kwargs)
+        super().__init__(name=name)
+        self.timeout = timeout
+        self.browser_type = browser_type
+        self.headless=headless
         self.driver = None
         
         # Storage for element references from snapshots
@@ -234,8 +237,8 @@ class BrowserBase(BaseModule):
                 from selenium.webdriver.chrome.service import Service
                 from webdriver_manager.chrome import ChromeDriverManager
                 options = Options()
-                if self.headless:
-                    options.add_argument("--headless")
+                # if self.headless:
+                #     options.add_argument("--headless")
                 options.add_argument("--no-sandbox")
                 options.add_argument("--disable-dev-shm-usage")
                 

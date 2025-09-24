@@ -55,6 +55,7 @@ class BrowserUse(BaseModule):
         name: str = 'BrowserUse',
         browser_session: Optional[BrowserSession] = None,
         auto_update_state: bool = True,
+        return_llm_repre: bool = False,
         **kwargs
     ):
         """
@@ -69,6 +70,7 @@ class BrowserUse(BaseModule):
         super().__init__(name=name, **kwargs)
         self.browser_session = browser_session
         self.auto_update_state = auto_update_state
+        self.return_llm_repre = return_llm_repre
         self._current_state = None
         self._last_error = None
         self._operation_history = []
@@ -82,7 +84,75 @@ class BrowserUse(BaseModule):
         
         # Start the dedicated browser thread
         self._start_browser_thread()
-    
+        
+    def _format_state_for_output(self, state: Optional[Dict[str, Any]]) -> Any:
+        """
+        Decide what to return as the operation 'state' based on the return_llm_repre flag.
+        If return_llm_repre is True and the state has an 'llm_representation', return that;
+        otherwise, return a sanitized, JSON-safe version of the state to prevent leaking raw objects.
+        """
+        if state is None:
+            return None
+        try:
+            if self.return_llm_repre and isinstance(state, dict):
+                llm_rep = state.get("llm_representation")
+                if llm_rep is not None:
+                    return llm_rep
+            if isinstance(state, dict):
+                # Shallow copy and sanitize non-serializable parts
+                safe_state = dict(state)
+                # Remove raw BrowserState object from nested 'state' to avoid non-serializable payloads
+                if "state" in safe_state:
+                    raw = safe_state.pop("state")
+                    try:
+                        safe_state["_state_descriptor"] = {
+                            "type": type(raw).__name__,
+                            "repr": str(raw)[:200]
+                        }
+                    except Exception:
+                        safe_state["_state_descriptor"] = {"type": type(raw).__name__}
+                return self._json_safe(safe_state)
+        except Exception:
+            # Be permissive if state is not dict-like
+            pass
+        return state
+
+    def _json_safe(self, value: Any) -> Any:
+        """
+        Recursively convert a Python object into a JSON-serializable structure.
+        Non-serializable objects are converted to strings or descriptors.
+        """
+        try:
+            import json
+            json.dumps(value)
+            return value
+        except Exception:
+            pass
+
+        # Dict
+        if isinstance(value, dict):
+            return {str(k): self._json_safe(v) for k, v in value.items()}
+        # Sequences
+        if isinstance(value, (list, tuple, set)):
+            return [self._json_safe(v) for v in value]
+        # Primitives
+        if isinstance(value, (str, int, float, bool)) or value is None:
+            return value
+
+        # Datetime-like
+        try:
+            import datetime
+            if isinstance(value, (datetime.datetime, datetime.date)):
+                return value.isoformat()
+        except Exception:
+            pass
+
+        # Fallback to string
+        try:
+            return str(value)
+        except Exception:
+            return repr(value)
+        
     def _start_browser_thread(self):
         """Start the dedicated browser thread with its own event loop."""
         import threading
@@ -241,7 +311,7 @@ class BrowserUse(BaseModule):
                 "new_tab": new_tab,
                 "success": True,
                 "timestamp": asyncio.get_event_loop().time(),
-                "state": page_state,  # Include complete page state
+                "state": self._format_state_for_output(page_state),  # Include complete page state
                 "agent_context": agent_context,  # Include rich agent context
                 "context": {
                     "page_title": getattr(result, 'title', None) if result else page_state.get("title", "Unknown"),
@@ -261,7 +331,7 @@ class BrowserUse(BaseModule):
             self._operation_history.append(("navigate", operation_result))
             
             if self.auto_update_state:
-                await self._update_state()
+                await self._update_state(page_state)
             
             return operation_result
             
@@ -308,7 +378,7 @@ class BrowserUse(BaseModule):
                 "while_holding_ctrl": while_holding_ctrl,
                 "success": True,
                 "timestamp": asyncio.get_event_loop().time(),
-                "state": updated_state,  # Include updated page state
+                "state": self._format_state_for_output(updated_state),  # Include updated page state
                 "agent_context": agent_context,  # Include rich agent context
                 "context": {
                     "clicked_element_index": index,
@@ -326,7 +396,7 @@ class BrowserUse(BaseModule):
             self._operation_history.append(("click", operation_result))
             
             if self.auto_update_state:
-                await self._update_state()
+                await self._update_state(updated_state)
             
             return operation_result
             
@@ -375,7 +445,7 @@ class BrowserUse(BaseModule):
                 "text": text,
                 "success": True,
                 "timestamp": asyncio.get_event_loop().time(),
-                "state": updated_state,  # Include updated page state
+                "state": self._format_state_for_output(updated_state),  # Include updated page state
                 "agent_context": agent_context,  # Include rich agent context
                 "context": {
                     "typed_text": text,
@@ -394,7 +464,7 @@ class BrowserUse(BaseModule):
             self._operation_history.append(("type", operation_result))
             
             if self.auto_update_state:
-                await self._update_state()
+                await self._update_state(updated_state)
             
             return operation_result
 
@@ -575,7 +645,7 @@ class BrowserUse(BaseModule):
                 "tab_id": tab_id or "current",
                 "success": operation_successful,
                 "timestamp": asyncio.get_event_loop().time(),
-                "state": updated_state,  # Include updated page state
+                "state": self._format_state_for_output(updated_state),  # Include updated page state
                 "agent_context": agent_context,  # Include rich agent context
                 "context": {
                     "closed_tab": tab_id or "current",
@@ -597,7 +667,7 @@ class BrowserUse(BaseModule):
             self._operation_history.append(("close_tab", operation_result))
             
             if self.auto_update_state:
-                await self._update_state()
+                await self._update_state(updated_state)
             
             return operation_result
             
@@ -640,7 +710,7 @@ class BrowserUse(BaseModule):
                 "amount": amount,
                 "success": True,
                 "timestamp": asyncio.get_event_loop().time(),
-                "state": updated_state,  # Include updated page state
+                "state": self._format_state_for_output(updated_state),  # Include updated page state
                 "agent_context": agent_context,  # Include rich agent context
                 "context": {
                     "scroll_direction": direction,
@@ -659,7 +729,7 @@ class BrowserUse(BaseModule):
             self._operation_history.append(("scroll", operation_result))
             
             if self.auto_update_state:
-                await self._update_state()
+                await self._update_state(updated_state)
             
             return operation_result
             
@@ -767,10 +837,13 @@ class BrowserUse(BaseModule):
             self._last_error = str(e)
             return {"state": None, "success": False, "error": str(e)}
     
-    async def _update_state(self) -> None:
-        """Update current state"""
+    async def _update_state(self, state: Optional[Dict[str, Any]] = None) -> None:
+        """Update current state. If 'state' is provided, use it directly; otherwise fetch from browser."""
         try:
-            self._current_state = await self._get_page_state()
+            if state is not None:
+                self._current_state = state
+            else:
+                self._current_state = await self._get_page_state()
         except Exception as e:
             self._last_error = str(e)
     
@@ -877,6 +950,34 @@ class BrowserUse(BaseModule):
         )
         await event
         result = await event.event_result(raise_if_any=True, raise_if_none=False)
+
+        import json
+        llm_result = None
+
+        if result:
+            try:
+                llm_result = result.dom_state.llm_representation()
+                with open("llm_result.txt", "w") as f:
+                    f.write(json.dumps(llm_result))
+            except Exception:
+                pass
+
+        try:
+            with open("normal_result.txt", "w") as f:
+                f.write(json.dumps({
+                    "url": getattr(result, 'url', 'Unknown'),
+                    "title": getattr(result, 'title', 'Unknown'),
+                    "tabs": self._extract_tabs_info(getattr(result, 'tabs', [])),
+                    "dom_state": self._extract_dom_state(getattr(result, 'dom_state', None)),
+                    "screenshot": getattr(result, 'screenshot', None) is not None,
+                    "timestamp": asyncio.get_event_loop().time(),
+                    "state": result,
+                    "llm_representation": llm_result,
+                }))
+        except Exception:
+            pass
+
+        
         
         if not result:
             return {
@@ -885,7 +986,9 @@ class BrowserUse(BaseModule):
                 "tabs": [],
                 "dom_state": {"elements": [], "text_content": "", "element_count": 0},
                 "screenshot": False,
-                "timestamp": asyncio.get_event_loop().time()
+                "timestamp": asyncio.get_event_loop().time(),
+                "state": result,
+                "llm_representation": llm_result if 'llm_result' in locals() else None,
             }
         
         return {
@@ -894,7 +997,9 @@ class BrowserUse(BaseModule):
             "tabs": self._extract_tabs_info(getattr(result, 'tabs', [])),
             "dom_state": self._extract_dom_state(getattr(result, 'dom_state', None)),
             "screenshot": getattr(result, 'screenshot', None) is not None,
-            "timestamp": asyncio.get_event_loop().time()
+            "timestamp": asyncio.get_event_loop().time(),
+            "state": result,
+            "llm_representation": llm_result if 'llm_result' in locals() else None,
         }
     
     def _extract_tabs_info(self, tabs) -> List[Dict[str, Any]]:
@@ -904,8 +1009,8 @@ class BrowserUse(BaseModule):
             tabs_info.append({
                 "url": tab.url,
                 "title": tab.title,
-                "target_id": str(tab.target_id),  # Keep full target_id for browser-use operations
-                "target_id_short": str(tab.target_id)[-4:],  # Keep short version for display
+                "target_id": str(tab.target_id),
+                "target_id_short": str(tab.target_id)[-4:],
                 "parent_target_id": str(tab.parent_target_id) if tab.parent_target_id else None
             })
         return tabs_info
@@ -921,7 +1026,6 @@ class BrowserUse(BaseModule):
         
         try:
             
-            # Extract elements from various possible attributes
             elements = []
             element_count = 0
             
@@ -971,11 +1075,9 @@ class BrowserUse(BaseModule):
             return elements
             
         try:
-            # Handle different types of selector_map structures
             if hasattr(selector_map, 'items'):
                 # Dictionary-like structure
                 for i, (selector, element) in enumerate(selector_map.items(), 1):
-                    # Extract element properties more carefully
                     element_tag = ''
                     element_text = ''
                     element_attrs = {}
@@ -1129,13 +1231,13 @@ class BrowserUse(BaseModule):
             
             operation_result = {
                 "action": "go_back", "success": True, "timestamp": asyncio.get_event_loop().time(),
-                "state": updated_state, "agent_context": agent_context,
+                "state": self._format_state_for_output(updated_state), "agent_context": agent_context,
                 "context": {"message": "Successfully went back in browser history"}
             }
             
             self._operation_history.append(("go_back", operation_result))
             if self.auto_update_state:
-                await self._update_state()
+                await self._update_state(updated_state)
             
             return operation_result
         except Exception as e:
@@ -1155,13 +1257,13 @@ class BrowserUse(BaseModule):
             
             operation_result = {
                 "action": "refresh", "success": True, "timestamp": asyncio.get_event_loop().time(),
-                "state": updated_state, "agent_context": agent_context,
+                "state": self._format_state_for_output(updated_state), "agent_context": agent_context,
                 "context": {"message": "Successfully refreshed the page"}
             }
             
             self._operation_history.append(("refresh", operation_result))
             if self.auto_update_state:
-                await self._update_state()
+                await self._update_state(updated_state)
             
             return operation_result
         except Exception as e:
@@ -1182,13 +1284,13 @@ class BrowserUse(BaseModule):
             
             operation_result = {
                 "action": "send_keys", "keys": keys, "success": True, "timestamp": asyncio.get_event_loop().time(),
-                "state": updated_state, "agent_context": agent_context,
+                "state": self._format_state_for_output(updated_state), "agent_context": agent_context,
                 "context": {"message": f"Successfully sent keys: '{keys}'"}
             }
             
             self._operation_history.append(("send_keys", operation_result))
             if self.auto_update_state:
-                await self._update_state()
+                await self._update_state(updated_state)
             
             return operation_result
         except Exception as e:
@@ -1232,13 +1334,13 @@ class BrowserUse(BaseModule):
             
             operation_result = {
                 "action": "select_dropdown_option", "index": index, "option": option_text, "success": True, "timestamp": asyncio.get_event_loop().time(),
-                "state": updated_state, "agent_context": agent_context,
+                "state": self._format_state_for_output(updated_state), "agent_context": agent_context,
                 "context": {"message": f"Successfully selected '{option_text}' from dropdown {index}"}
             }
             
             self._operation_history.append(("select_dropdown_option", operation_result))
             if self.auto_update_state:
-                await self._update_state()
+                await self._update_state(updated_state)
             
             return operation_result
         except Exception as e:
@@ -1262,7 +1364,7 @@ class BrowserUse(BaseModule):
             
             operation_result = {
                 "action": "switch_tab", "tab_id": tab_id, "success": operation_successful, "timestamp": asyncio.get_event_loop().time(),
-                "state": updated_state, "agent_context": agent_context,
+                "state": self._format_state_for_output(updated_state), "agent_context": agent_context,
                 "context": {
                     "message": f"Successfully switched to tab {tab_id}" if operation_successful else f"Failed to switch to tab {tab_id}",
                     "browser_result": str(result) if result else "No result"
@@ -1271,7 +1373,7 @@ class BrowserUse(BaseModule):
             
             self._operation_history.append(("switch_tab", operation_result))
             if self.auto_update_state:
-                await self._update_state()
+                await self._update_state(updated_state)
             
             return operation_result
         except Exception as e:
@@ -1620,6 +1722,8 @@ class BrowserUseToolkit(Toolkit):
         name: str = "BrowserUseToolkit",
         browser_session: Optional[BrowserSession] = None,
         auto_update_state: bool = True,
+        headless: bool = True,
+        return_llm_repre: bool = True,
         **kwargs
     ):
         # Create browser session if not provided
@@ -1627,7 +1731,7 @@ class BrowserUseToolkit(Toolkit):
             from browser_use import BrowserSession, BrowserProfile
             # Create optimized browser profile for performance
             browser_profile = BrowserProfile(
-                headless=True,
+                headless=headless,
                 minimum_wait_page_load_time=2,  # Increased from 1 to 3 seconds
                 wait_for_network_idle_page_load_time=3,  # Increased from 2 to 5 seconds
                 wait_between_actions=2,  # Increased from 1 to 2 seconds
@@ -1642,6 +1746,7 @@ class BrowserUseToolkit(Toolkit):
             name="BrowserUse",
             browser_session=browser_session,
             auto_update_state=auto_update_state,
+            return_llm_repre = return_llm_repre,
             **kwargs
         )
         

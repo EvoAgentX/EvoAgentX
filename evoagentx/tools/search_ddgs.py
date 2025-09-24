@@ -75,29 +75,29 @@ class SearchDDGS(SearchBase):
                     title = result.get('title', 'No Title')
                     url = result.get('href', '') or result.get('link', '') or result.get('url', '')
                     
-                    # Always try to scrape the actual page content
+                    # Extract snippet from the search result when available
+                    snippet = result.get('body', '')
+                    site_title = None
+                    site_content = None
+                    
+                    # Attempt to scrape the actual page content
                     if url and url.startswith(('http://', 'https://')):
                         try:
                             scraped_title, scraped_content = self._scrape_page(url, query)
+                            if scraped_title:
+                                site_title = scraped_title
                             if scraped_content:
-                                title = scraped_title or title
-                                content = scraped_content
-                            else:
-                                # Fall back to snippet if scraping fails
-                                content = result.get('body', '')
+                                site_content = scraped_content
                         except Exception:
-                            # Fall back to snippet if scraping fails
-                            content = result.get('body', '')
-                    else:
-                        # No valid URL, use snippet
-                        content = result.get('body', '')
+                            pass
                     
-                    if content:  # Ensure valid content exists
-                        display_content = content
-                            
+                    # Only add result if we have useful content: snippet or site content
+                    content_snippet = self._truncate_content(snippet, max_content_words or 400) if snippet else None
+                    if content_snippet or site_content:
                         results.append({
-                            "title": title,
-                            "content": display_content,
+                            "title": site_title or title,
+                            "content": content_snippet,
+                            "site_content": site_content,
                             "url": url,
                         })
                         

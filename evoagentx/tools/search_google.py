@@ -82,18 +82,28 @@ class SearchGoogle(SearchBase):
             # Step 2: Fetch content from each valid search result
             for item in search_results:
                 url = item["link"]
-                title = item["title"]
+                base_title = item["title"]
+                snippet = item.get("snippet", "")
+                site_title = None
+                site_content = None
                 try:
-                    title, content = self._scrape_page(url, query)
-                    if content:  # Ensure valid content exists
-                        results.append({
-                            "title": title,
-                            "content": content,
-                            "url": url,
-                        })
+                    scraped_title, scraped_content = self._scrape_page(url, query)
+                    if scraped_title:
+                        site_title = scraped_title
+                    if scraped_content:
+                        site_content = scraped_content
                 except Exception as e:
                     logger.warning(f"Error processing URL {url}: {str(e)}")
-                    continue  # Skip pages that cannot be processed
+                
+                # Build result only if we have snippet or site content
+                content_snippet = self._truncate_content(snippet, max_content_words or 400) if snippet else None
+                if content_snippet or site_content:
+                    results.append({
+                        "title": site_title or base_title,
+                        "content": content_snippet,
+                        "site_content": site_content,
+                        "url": url,
+                    })
 
             return {"results": results, "error": None}
 

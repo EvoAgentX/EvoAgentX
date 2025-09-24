@@ -237,8 +237,8 @@ class SearchCollection(ToolCollection):
             standardized_results.append({
                 "title": result.get("title", ""),
                 "content": result.get("content", ""),
-                "url": result.get("url", ""),
                 "site_content": result.get("site_content"),
+                "url": result.get("url", ""),
                 "source": "ddgs_search"
             })
         
@@ -280,8 +280,8 @@ class SearchCollection(ToolCollection):
             standardized_results.append({
                 "title": result.get("title", ""),
                 "content": result.get("content", ""),
-                "url": result.get("url", ""),
                 "site_content": result.get("site_content"),
+                "url": result.get("url", ""),
                 "source": "wiki_search"
             })
         
@@ -323,8 +323,8 @@ class SearchCollection(ToolCollection):
             standardized_results.append({
                 "title": result.get("title", ""),
                 "content": result.get("content", ""),
-                "url": result.get("url", ""),
                 "site_content": result.get("site_content"),
+                "url": result.get("url", ""),
                 "source": "serpapi_search"
             })
         
@@ -421,8 +421,8 @@ class SearchCollection(ToolCollection):
             standardized_results.append({
                 "title": result.get("title", ""),
                 "content": result.get("content", ""),
-                "url": result.get("url", ""),
                 "site_content": result.get("site_content"),
+                "url": result.get("url", ""),
                 "source": "google_search"
             })
         
@@ -464,8 +464,8 @@ class SearchCollection(ToolCollection):
             standardized_results.append({
                 "title": result.get("title", ""),
                 "content": result.get("content", ""),
-                "url": result.get("url", ""),
                 "site_content": result.get("site_content"),
+                "url": result.get("url", ""),
                 "source": "google_free_search"
             })
         
@@ -507,8 +507,8 @@ class SearchCollection(ToolCollection):
             standardized_results.append({
                 "title": result.get("title", ""),
                 "content": result.get("content", ""),
-                "url": result.get("url", ""),
                 "site_content": result.get("site_content"),
+                "url": result.get("url", ""),
                 "source": "serperapi_search"
             })
         
