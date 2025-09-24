@@ -31,13 +31,16 @@ class ChunkerConfig(BaseModule):
 
 class EmbeddingConfig(BaseModule):
     """Configuration for embedding stage."""
-    provider: str = Field(default=EmbeddingProvider.OPENAI, description="Embedding provider (OPENAI, HUGGINGFACE).")
+    provider: str = Field(default=EmbeddingProvider.OPENAI, description="Embedding provider (OPENAI, HUGGINGFACE, AZURE_OPENAI).")
     model_name: str = Field(default="text-embedding-ada-002", description="Name of the embedding model.")
     api_key: Optional[str] = Field(default=None, description="API key for the embedding provider (if required).")
     api_url: str = Field(default="https://api.openai.com/v1", description="api url for embedding model.")
     dimensions: Optional[int] = Field(default=None, description="Dimensions of the embedding model.")
     normalize: Optional[bool] = Field(default=True, description="Whether to normalize the embedding model(huggingface).")
     device: Optional[str] = Field(default=None, description="The device was used for embedding model.")
+    deployment_name: Optional[str] = Field(default=None, description="Deployment name for Azure OpenAI embeddings.")
+    azure_endpoint: Optional[str] = Field(default=None, description="Azure OpenAI endpoint.")
+    api_version: Optional[str] = Field(default=None, description="Azure OpenAI API version.")
 
 class IndexConfig(BaseModule):
     """Configuration for indexing stage."""

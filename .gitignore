@@ -6,6 +6,7 @@ __pycache__/
 # C extensions
 *.so
 
+browser_data
 # Distribution / packaging
 .Python
 env/

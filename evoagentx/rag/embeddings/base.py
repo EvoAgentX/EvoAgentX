@@ -12,6 +12,10 @@ SUPPORTED_MODELS: Dict[str, List[str]] = {
         "text-embedding-3-small",
         "text-embedding-3-large"
     ],
+    "azure_openai": [
+        "text-embedding-3-small",
+        "text-embedding-3-large"
+    ],
     "huggingface": [
         "sentence-transformers/all-MiniLM-L6-v2",
         "sentence-transformers/all-mpnet-base-v2",
@@ -31,6 +35,7 @@ SUPPORTED_MODELS: Dict[str, List[str]] = {
 
 class EmbeddingProvider(str, Enum):
     OPENAI = "openai"
+    AZURE_OPENAI = "azure_openai"
     HUGGINGFACE = "huggingface"
     OLLAMA = "ollama"
     VOYAGE = "voyage"

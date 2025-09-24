@@ -64,6 +64,7 @@ ollama
 llama-index
 llama-index-vector-stores-faiss
 llama-index-graph-stores-neo4j
+llama-index-embeddings-azure-openai
 sentence-transformers
 docx2txt
 python-pptx 
