@@ -11,6 +11,7 @@ from .request import RequestToolkit
 from .request_arxiv import ArxivToolkit
 from .browser_use import BrowserUseToolkit
 from .google_maps_tool import GoogleMapsToolkit
+from .telegram_tools import TelegramToolkit
 from .database_mongodb import MongoDBToolkit
 from .database_postgresql import PostgreSQLToolkit
 from .storage_handler import FileStorageHandler, LocalStorageHandler, SupabaseStorageHandler
@@ -42,6 +43,7 @@ __all__ = [
     "ArxivToolkit",
     "BrowserUseToolkit",
     "GoogleMapsToolkit",
+    "TelegramToolkit",
     "MongoDBToolkit",
     "PostgreSQLToolkit",
     "FileStorageHandler",

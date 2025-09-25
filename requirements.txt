@@ -84,6 +84,7 @@ html2text>=2020.1.16
 browser-use; python_version >= "3.11"
 browser-use-py310; python_version < "3.11"
 mcp>=0.1.0
+telethon>=1.35.0
 
 # Multimodal dependencies
 colpali-engine==0.3.9

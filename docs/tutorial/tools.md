@@ -14,6 +14,8 @@ We'll cover:
 - `examples/tools/tools_images.py` - Image handling examples (Section 6)
 - `examples/tools/tools_browser.py` - Browser automation examples (Section 7)
 - `examples/tools/tools_integration.py` - MCP and integration examples (Section 8)
+- `examples/tools/google_maps_example.py` - Google Maps integration examples (Section 3.10)
+- `examples/tools/telegram_example.py` - Telegram integration examples (Section 3.11)
 
 1. **Understanding the Tool Architecture**: Learn about the base Tool class and Toolkit system
 2. **Code Interpreters**: Execute Python code safely using Python and Docker interpreters
@@ -23,6 +25,7 @@ We'll cover:
 6. **Image Handling Tools**: Comprehensive capabilities for image analysis, generation, and manipulation using various AI services and APIs
 7. **Browser Tools**: Control web browsers using both traditional Selenium-based automation and AI-driven natural language automation
 8. **MCP Tools**: Connect to external services using the Model Context Protocol
+9. **Telegram Tools**: Comprehensive Telegram integration with messaging, file operations, and contact management
 
 By the end of this tutorial, you'll understand how to leverage these tools in your own agents and workflows.
 
@@ -56,6 +59,7 @@ By the end of this tutorial, you'll understand how to leverage these tools in yo
 | [ArxivToolkit](#38-arxivtoolkit) | Search arXiv for research papers (title, authors, abstract, links/categories). | [evoagentx/tools/request_arxiv.py](../../evoagentx/tools/request_arxiv.py) | [examples/tools/tools_search.py](../../examples/tools/tools_search.py) |
 | [RSSToolkit](#39-rsstoolkit) | Fetch RSS feeds (with optional webpage content extraction) and validate feeds. | [evoagentx/tools/rss_feed.py](../../evoagentx/tools/rss_feed.py) | [examples/tools/tools_search.py](../../examples/tools/tools_search.py) |
 | [GoogleMapsToolkit](#310-googlemapstoolkit) | Geoinformation retrieval and path planning via Google API service. | [evoagentx/tools/google_maps_tool.py](../../evoagentx/tools/google_maps_tool.py) | [examples/tools/google_maps_example.py](../../examples/tools/google_maps_example.py) |
+| [TelegramToolkit](#311-telegramtoolkit) | Comprehensive Telegram integration with messaging, file operations, and contact management. | [evoagentx/tools/telegram_tools.py](../../evoagentx/tools/telegram_tools.py) | [examples/tools/telegram_example.py](../../examples/tools/telegram_example.py) |
 | **🧰 FileSystem Tools** |  |  |  |
 | [StorageToolkit](#41-storagetoolkit) | File I/O utilities: save/read/append/delete, check existence, list files, list supported formats (pluggable storage backends). | [evoagentx/tools/storage_file.py](../../evoagentx/tools/storage_file.py) | [examples/tools/tools_files.py](../../examples/tools/tools_files.py) |
 | [CMDToolkit](#42-cmdtoolkit) | Execute shell/CLI commands with working directory and timeout control; returns stdout/stderr/return code. | [evoagentx/tools/cmd_toolkit.py](../../evoagentx/tools/cmd_toolkit.py) | [examples/tools/tools_files.py](../../examples/tools/tools_files.py) |
@@ -85,6 +89,7 @@ By the end of this tutorial, you'll understand how to leverage these tools in yo
 - [Image Handling Tools](#5-database-tools) - Image analysis and generation
 - [Browser Tools](#6-image-handling-tools) - Web automation
 - [MCP Tools](#8-mcp-tools) - External service integration
+- [Telegram Tools](#311-telegramtoolkit) - Messaging and file operations
 
 ---
 
@@ -107,6 +112,7 @@ python -m examples.tools.tools_images             # Image handling tools
 python -m examples.tools.tools_browser            # Browser automation tools
 python -m examples.tools.tools_integration        # MCP and integration tools
 python -m examples.tools.google_maps_example.py   # Google maps tool
+python -m examples.tools.telegram_example         # Telegram tools
 ```
 
 **Note**: The original `tools.py` file contains all examples in one place, while the separated files focus on specific tool categories for easier learning and testing.
@@ -1732,6 +1738,326 @@ The search and request tools in EvoAgentX provide comprehensive access to inform
 | **GoogleMapsToolkit** | Geoinformation | ✅ | Geoinformation retrieval, path planning |
 
 Choose the appropriate toolkit based on your specific needs, API key availability, and the type of information you need to retrieve.
+
+### 3.11 TelegramToolkit
+
+**The TelegramToolkit provides comprehensive Telegram integration capabilities, enabling AI agents to interact with Telegram through messaging, file operations, and contact management. It supports contact name-based operations, file downloading, content reading, and intelligent message processing.**
+
+#### 3.11.1 Setup
+
+```python
+from evoagentx.tools import TelegramToolkit
+
+# Initialize the toolkit - credentials will be automatically retrieved from environment
+toolkit = TelegramToolkit()
+
+# Or initialize with explicit credentials
+toolkit = TelegramToolkit(
+    api_id="your_api_id",
+    api_hash="your_api_hash", 
+    phone="your_phone_number"
+)
+```
+
+**Environment Variables Required:**
+```bash
+TELEGRAM_API_ID=your_api_id
+TELEGRAM_API_HASH=your_api_hash
+TELEGRAM_PHONE=your_phone_number
+```
+
+#### 3.11.2 Available Methods
+
+The `TelegramToolkit` provides **8 callable tools**:
+
+##### Tool 1: fetch_latest_messages
+
+**Description**: Retrieve recent messages from any Telegram contact for quick overview.
+
+**Usage Example**:
+```python
+# Get the fetch messages tool
+fetch_tool = toolkit.get_tool("fetch_latest_messages")
+
+# Get recent messages from a contact
+result = fetch_tool(
+    contact_name="John Smith",
+    limit=10
+)
+
+if result["success"]:
+    for message in result["recent_messages"]:
+        print(f"[{message['date']}] {message['text']}")
+else:
+    print(f"Error: {result['error']}")
+```
+
+**Parameters**:
+- `contact_name` (str, required): Name of the contact (e.g., "John Smith", "My Team")
+- `limit` (int, optional): Number of messages to fetch (default: 10)
+
+**Return Type**: `Dict[str, Any]`
+
+##### Tool 2: search_messages_by_keyword
+
+**Description**: Find specific information by searching for keywords within chat history.
+
+**Usage Example**:
+```python
+# Get the search tool
+search_tool = toolkit.get_tool("search_messages_by_keyword")
+
+# Search for specific content
+result = search_tool(
+    contact_name="Project Team",
+    keyword="meeting",
+    limit=5
+)
+
+if result["success"]:
+    for message in result["messages"]:
+        print(f"Found: {message['text']}")
+```
+
+**Parameters**:
+- `contact_name` (str, required): Name of the contact to search in
+- `keyword` (str, required): Search term to look for
+- `limit` (int, optional): Maximum results to return (default: 10)
+
+##### Tool 3: send_message_by_name
+
+**Description**: Send text messages to any Telegram contact using their name.
+
+**Usage Example**:
+```python
+# Get the send message tool
+send_tool = toolkit.get_tool("send_message_by_name")
+
+# Send a message
+result = send_tool(
+    contact_name="John Smith",
+    message_text="Hello! This is a test message from EvoAgentX."
+)
+
+if result["success"]:
+    print(f"Message sent successfully! ID: {result['message_id']}")
+```
+
+**Parameters**:
+- `contact_name` (str, required): Name of the recipient
+- `message_text` (str, required): Message content to send
+
+##### Tool 4: list_recent_chats
+
+**Description**: Get a list of recent conversations for context and clarification.
+
+**Usage Example**:
+```python
+# Get the list chats tool
+list_tool = toolkit.get_tool("list_recent_chats")
+
+# List recent conversations
+result = list_tool(limit=10)
+
+if result["success"]:
+    for chat in result["chats"]:
+        print(f"- {chat['name']} ({chat['type']}) - ID: {chat['id']}")
+```
+
+**Parameters**:
+- `limit` (int, optional): Number of chats to list (default: 10)
+
+##### Tool 5: find_and_retrieve_file
+
+**Description**: Locate and access files within Telegram chats with comprehensive metadata.
+
+**Usage Example**:
+```python
+# Get the find file tool
+find_tool = toolkit.get_tool("find_and_retrieve_file")
+
+# Find a specific file
+result = find_tool(
+    contact_name="John Smith",
+    filename_query="report.pdf"
+)
+
+if result["success"]:
+    for file_info in result["files"]:
+        print(f"File: {file_info['filename']}")
+        print(f"Size: {file_info['file_size']} bytes")
+        print(f"Type: {file_info['mime_type']}")
+```
+
+**Parameters**:
+- `contact_name` (str, required): Name of the contact to search in
+- `filename_query` (str, required): Filename or search term to find
+
+##### Tool 6: summarize_contact_messages
+
+**Description**: Generate intelligent summaries of conversation history with any contact.
+
+**Usage Example**:
+```python
+# Get the summarize tool
+summarize_tool = toolkit.get_tool("summarize_contact_messages")
+
+# Summarize conversation
+result = summarize_tool(
+    contact_name="Project Manager",
+    limit=50
+)
+
+if result["success"]:
+    print(f"Summary: {result['summary']}")
+    print(f"Messages analyzed: {result['message_count']}")
+```
+
+**Parameters**:
+- `contact_name` (str, required): Name of the contact to summarize
+- `limit` (int, optional): Number of messages to analyze (default: 20)
+
+##### Tool 7: download_file
+
+**Description**: Download files from Telegram contacts to local storage.
+
+**Usage Example**:
+```python
+# Get the download tool
+download_tool = toolkit.get_tool("download_file")
+
+# Download a file
+result = download_tool(
+    contact_name="John Smith",
+    filename_query="presentation.pdf",
+    download_dir="downloads"
+)
+
+if result["success"]:
+    print(f"File downloaded: {result['file_path']}")
+    print(f"Size: {result['file_size']} bytes")
+```
+
+**Parameters**:
+- `contact_name` (str, required): Name of the contact
+- `filename_query` (str, required): Filename or search term to find
+- `download_dir` (str, optional): Local directory (default: "downloads")
+
+##### Tool 8: read_file_content
+
+**Description**: Extract and read file content with multiple reading options.
+
+**Usage Example**:
+```python
+# Get the read content tool
+read_tool = toolkit.get_tool("read_file_content")
+
+# Read file content
+result = read_tool(
+    contact_name="John Smith",
+    filename_query="notes.pdf",
+    content_type="summary"
+)
+
+if result["success"]:
+    print(f"Content: {result['content']}")
+    print(f"File info: {result['file_info']}")
+```
+
+**Parameters**:
+- `contact_name` (str, required): Name of the contact
+- `filename_query` (str, required): Filename or search term to find
+- `content_type` (str, optional): Reading mode ("full", "first_lines", "last_lines", "summary")
+- `lines_count` (int, optional): Number of lines for first/last reading (default: 3)
+
+#### 3.11.3 Key Features
+
+**Contact Name Resolution**:
+- **Smart Finding**: Automatically finds contacts across users, groups, and channels
+- **Disambiguation**: Handles multiple matches by asking for clarification
+- **Universal Access**: Works with personal chats, group chats, and channels
+
+**File Operations**:
+- **Download**: Download files to local directories
+- **Access**: Get file metadata and information
+- **Read**: Extract and read file content (PDF, text files)
+- **PDF Processing**: Full text extraction, page counting, content analysis
+
+**Message Processing**:
+- **Search**: Find specific information by keywords
+- **Summarization**: Generate intelligent conversation summaries
+- **Analysis**: Message count, date ranges, activity patterns
+
+#### 3.11.4 Advanced Capabilities
+
+**PDF Content Extraction**:
+```python
+# Read full PDF content
+result = read_tool(
+    contact_name="Documents",
+    filename_query="manual.pdf",
+    content_type="full"
+)
+
+# Get document summary
+result = read_tool(
+    contact_name="Documents", 
+    filename_query="manual.pdf",
+    content_type="summary"
+)
+```
+
+**File Management**:
+```python
+# Download and organize files
+result = download_tool(
+    contact_name="Project Files",
+    filename_query="report",
+    download_dir="project_downloads"
+)
+```
+
+**Intelligent Search**:
+```python
+# Search across message history
+result = search_tool(
+    contact_name="Team Chat",
+    keyword="deadline",
+    limit=20
+)
+```
+
+#### 3.11.5 Error Handling
+
+The toolkit provides robust error handling for common scenarios:
+
+- **Contact Not Found**: Clear error messages with suggestions
+- **Ambiguous Names**: Lists available contacts for clarification
+- **File Not Found**: Specific error messages for missing files
+- **Network Issues**: Automatic retry and connection management
+- **Permission Errors**: Graceful handling of access restrictions
+
+#### 3.11.6 Integration with AI Agents
+
+The TelegramToolkit is designed for seamless integration with AI agents:
+
+- **LLM-Friendly**: Clear docstrings and consistent return formats
+- **Contact Names**: No IDs required, user-friendly interface
+- **Error Recovery**: Robust error management and cleanup
+- **Modular Design**: Individual tools can be used independently
+
+**Sample Return**:
+```python
+{
+    "success": True,
+    "message": "File downloaded successfully",
+    "filename": "report.pdf",
+    "file_path": "downloads/report.pdf",
+    "file_size": 101634,
+    "download_dir": "downloads",
+    "contact_name": "John Smith"
+}
+```
 
 ## 4. FileSystem Tools
 
