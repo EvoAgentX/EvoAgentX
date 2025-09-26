@@ -3,6 +3,7 @@ from pydantic import Field
 
 from .tool import Tool, Toolkit
 from ..core.logging import logger
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 
 
 class ToolCollection(Tool):
@@ -35,7 +36,8 @@ class ToolCollection(Tool):
         kits: Optional[List[Union[Tool, Toolkit]]] = None,
         execution_order: Optional[List[str]] = None,
         argument_mapping_function: Optional[Dict[str, Callable]] = None,
-        output_mapping_function: Optional[Dict[str, Callable]] = None
+        output_mapping_function: Optional[Dict[str, Callable]] = None,
+        per_tool_timeout: Optional[float] = None,
         ):
         
         # Call parent constructor first
@@ -66,6 +68,7 @@ class ToolCollection(Tool):
         self.tools = tools
         self.argument_mapping_function = argument_mapping_function or {}
         self.output_mapping_function = output_mapping_function or {}
+        self.per_tool_timeout = per_tool_timeout
         self._init_module(execution_order)
     
     def _init_module(self, preferred_order: Optional[List[str]] = None) -> None:
@@ -99,6 +102,7 @@ class ToolCollection(Tool):
                 return tool_name
         return None
 
+
     def _run_pipeline(self, inputs: Dict[str, Any], outputs: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Execute the collection pipeline using mapping functions and execution order."""
         outputs = outputs or {}
@@ -112,12 +116,53 @@ class ToolCollection(Tool):
             try:
                 arg_map_fn = self.argument_mapping_function.get(next_tool_name, lambda i, o: i)
                 mapped_args = arg_map_fn(inputs, outputs)
-                result = tool(**mapped_args)
-                out_map_fn = self.output_mapping_function.get(next_tool_name, lambda r: r)
-                outputs[next_tool_name] = out_map_fn(result)
+
+                # Enforce timeout via ThreadPoolExecutor if configured
+                resolved_timeout = self.per_tool_timeout
+                if resolved_timeout is not None and resolved_timeout > 0:
+                    executor = ThreadPoolExecutor(max_workers=1)
+                    future = executor.submit(tool, **mapped_args)
+                    try:
+                        result = future.result(timeout=resolved_timeout)
+                    except FuturesTimeoutError:
+                        out_map_fn = self.output_mapping_function.get(next_tool_name)
+                        err = {"error": f"timeout after {resolved_timeout}s"}
+                        try:
+                            outputs[next_tool_name] = out_map_fn(err) if out_map_fn else err
+                        except Exception:
+                            outputs[next_tool_name] = err
+                        # Ensure we don't block on shutdown; proceed to next tool immediately
+                        executor.shutdown(wait=False, cancel_futures=True)
+                        continue
+                    except Exception as inner_e:
+                        # Handle tool execution exceptions and normalize
+                        out_map_fn = self.output_mapping_function.get(next_tool_name)
+                        error_obj = {"error": str(inner_e)}
+                        try:
+                            outputs[next_tool_name] = out_map_fn(error_obj) if out_map_fn else error_obj
+                        except Exception:
+                            outputs[next_tool_name] = error_obj
+                        executor.shutdown(wait=False, cancel_futures=True)
+                        continue
+                    else:
+                        # Successful result, convert and shutdown executor
+                        out_map_fn = self.output_mapping_function.get(next_tool_name, lambda r: r)
+                        outputs[next_tool_name] = out_map_fn(result)
+                        executor.shutdown(wait=False, cancel_futures=True)
+                else:
+                    result = tool(**mapped_args)
+
+                    out_map_fn = self.output_mapping_function.get(next_tool_name, lambda r: r)
+                    outputs[next_tool_name] = out_map_fn(result)
             except Exception as e:
                 logger.exception(f"Error executing tool {next_tool_name}: {e}")
-                outputs[next_tool_name] = {"error": str(e)}
+                # Normalize errors through output mapping if possible
+                out_map_fn = self.output_mapping_function.get(next_tool_name)
+                error_obj = {"error": str(e)}
+                try:
+                    outputs[next_tool_name] = out_map_fn(error_obj) if out_map_fn else error_obj
+                except Exception:
+                    outputs[next_tool_name] = error_obj
         return outputs
     
     def __call__(self, query: str, **kwargs) -> Dict[str, Any]:

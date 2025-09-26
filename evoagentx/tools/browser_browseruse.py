@@ -923,18 +923,17 @@ class BrowserUse(BaseModule):
                 "element_count": state.get('dom_state', {}).get('element_count', 0),
                 "tab_count": len(state.get('tabs', []))
             },
-            "interactive_elements": {
-                "total_clickable": len(clickable_elements),
-                "all_elements": clickable_elements,  # ALL clickable elements with indices
-                "links": links,  # ALL links
-                "buttons": buttons,  # ALL buttons
-                "inputs": inputs,  # ALL inputs
-                "selects": select_elements,  # ALL selects
-                "forms": forms  # ALL forms
-            },
+            # "interactive_elements": {
+            #     "total_clickable": len(clickable_elements),
+            #     # "all_elements": clickable_elements,  # ALL clickable elements with indices
+            #     "links": links,  # ALL links
+            #     "buttons": buttons,  # ALL buttons
+            #     "inputs": inputs,  # ALL inputs
+            #     "selects": select_elements,  # ALL selects
+            #     "forms": forms  # ALL forms
+            # },
             "suggested_actions": suggested_actions,
             "page_analysis": page_analysis,
-            "recent_elements": clickable_elements[:15],  # Top 15 clickable elements
             "message": f"Page loaded with {len(clickable_elements)} interactive elements. {len(links)} links, {len(buttons)} buttons, {len(inputs)} inputs available."
         }
 

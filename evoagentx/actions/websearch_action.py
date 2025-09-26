@@ -19,7 +19,7 @@ class WebOperationOutput(ActionOutput):
     
 class WebSearchAction(CustomizeAction):
     
-    def __init__(self, search_budget = 7, *args, **kwargs):
+    def __init__(self, search_budget = 10, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.search_budget = search_budget
         self.searching_memory = {

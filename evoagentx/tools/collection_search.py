@@ -52,11 +52,12 @@ class SearchCollection(ToolCollection):
     def __init__(
         self,
         name: str = "search_collection",
-        max_content_words: Optional[int] = 300,
+        max_content_words: Optional[int] = 7500,
         num_results: Optional[int] = 5,
         language: Optional[str] = "en",
         region: Optional[str] = "us",
         page_content_handler: Optional[PageContentHandler] = None,
+        per_tool_timeout: Optional[float] = None,
         **kwargs
     ):
         """
@@ -69,6 +70,7 @@ class SearchCollection(ToolCollection):
             language (str): Language for search results
             region (str): Region for search results
             page_content_handler (PageContentHandler): Optional shared handler for processing page content
+            per_tool_timeout (float): Timeout in seconds applied to every tool in this collection
             **kwargs: Additional arguments passed to ToolCollection base class
         """
         # Initialize shared page content handler if not provided
@@ -137,6 +139,7 @@ class SearchCollection(ToolCollection):
                 "serpapi_search": self.serpapi_output_convert_func,
                 "serperapi_search": self.serperapi_output_convert_func
             },
+            per_tool_timeout=per_tool_timeout,
             **kwargs
         )
         

@@ -42,6 +42,7 @@ class ImageGenerationCollection(ToolCollection):
         storage_handler: Optional[FileStorageHandler] = None,
         base_path: str = "./images/generated",
         execution_order: Optional[List[str]] = None,
+        per_tool_timeout: Optional[float] = None,
     ):
         # Load environment variables if no keys provided
         if not openai_api_key:
@@ -96,7 +97,8 @@ class ImageGenerationCollection(ToolCollection):
                 "openai_image_generation": self._convert_output_from_openai,
                 "openrouter_image_generation": self._convert_output_from_openrouter,
                 "flux_image_generation": self._convert_output_from_flux
-            }
+            },
+            per_tool_timeout=per_tool_timeout,
         )
         
         self.storage_handler = storage_handler
@@ -359,6 +361,7 @@ class ImageEditingCollection(ToolCollection):
         storage_handler: Optional[FileStorageHandler] = None,
         base_path: str = "./images/edited",
         execution_order: Optional[List[str]] = None,
+        per_tool_timeout: Optional[float] = None,
     ):
         # Get API keys from environment if not provided
         if not openai_api_key:
@@ -413,7 +416,8 @@ class ImageEditingCollection(ToolCollection):
                 "openai_image_edit": self._convert_output_from_openai,
                 "openrouter_image_edit": self._convert_output_from_openrouter,
                 "flux_image_edit": self._convert_output_from_flux
-            }
+            },
+            per_tool_timeout=per_tool_timeout,
         )
         
         self.storage_handler = storage_handler
@@ -703,6 +707,7 @@ class ImageAnalysisCollection(ToolCollection):
         storage_handler: Optional[FileStorageHandler] = None,
         base_path: str = "./images/analysis_cache",
         execution_order: Optional[List[str]] = None,
+        per_tool_timeout: Optional[float] = None,
     ):
         # Get API keys from environment if not provided
         if not openai_api_key:
@@ -746,7 +751,8 @@ class ImageAnalysisCollection(ToolCollection):
             output_mapping_function={
                 "openai_image_analysis": self._convert_output_from_openai,
                 "openrouter_image_analysis": self._convert_output_from_openrouter
-            }
+            },
+            per_tool_timeout=per_tool_timeout,
         )
         
         self.storage_handler = storage_handler
