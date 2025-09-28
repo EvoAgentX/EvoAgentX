@@ -247,17 +247,15 @@ class BrowserUse(BaseModule):
         """Async method to close the browser session."""
         try:
             if self.browser_session:
-                # First stop the event bus to close WebSocket connections
-                if hasattr(self.browser_session, 'event_bus') and hasattr(self.browser_session.event_bus, 'stop'):
-                    await self.browser_session.event_bus.stop()
-                    logger.info("Event bus stopped in thread")
-                
-                # Then stop the browser session
+                # Stop the browser session first; it will handle EventBus shutdown internally
                 if hasattr(self.browser_session, 'stop'):
                     await self.browser_session.stop()
                     logger.info("Browser session stopped in thread")
+                elif hasattr(self.browser_session, 'kill'):
+                    await self.browser_session.kill()
+                    logger.info("Browser session killed in thread")
                 else:
-                    logger.warning("Browser session stop method not available")
+                    logger.warning("Browser session stop/kill method not available")
                 
                 self._browser_started = False
         except Exception as e:
@@ -1383,23 +1381,20 @@ class BrowserUse(BaseModule):
         """Close the browser session completely."""
         try:
             if self.browser_session and self._browser_started:
-                # Try different methods to close the browser session
                 try:
-                    if hasattr(self.browser_session, 'close'):
-                        await self.browser_session.close()
-                    elif hasattr(self.browser_session, 'stop'):
-                        await self.browser_session.stop()
-                    elif hasattr(self.browser_session, 'quit'):
-                        await self.browser_session.quit()
+                    # Always perform shutdown in the dedicated browser thread for loop-safety
+                    if self._browser_loop and not self._browser_loop.is_closed():
+                        self._run_in_browser_thread(self._close_browser_session())
                     else:
-                        # Gracefully mark as closed without error
-                        logger.info("Browser session cleanup completed")
+                        # Fallback: close in current loop if thread loop is unavailable
+                        await self._close_browser_session()
+
+                    logger.info("Browser session closed successfully")
+                    return {"success": True, "message": "Browser session closed"}
                 except Exception as close_error:
-                    logger.warning(f"Browser close method failed: {close_error}")
-                
-                self._browser_started = False
-                logger.info("Browser session closed successfully")
-                return {"success": True, "message": "Browser session closed"}
+                    logger.warning(f"Browser close operation failed: {close_error}")
+                    self._last_error = str(close_error)
+                    return {"success": False, "error": str(close_error)}
             else:
                 return {"success": True, "message": "Browser was not started"}
         except Exception as e:
