@@ -1,4 +1,4 @@
-from .tool import Tool,Toolkit
+from .tool import Tool,Toolkit, tool
 from .interpreter_docker import DockerInterpreterToolkit
 from .interpreter_python import PythonInterpreterToolkit
 from .search_google import GoogleSearchToolkit

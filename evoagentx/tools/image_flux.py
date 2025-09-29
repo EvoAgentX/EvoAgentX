@@ -63,7 +63,8 @@ class FluxImageBase:
                 return {
                     "success": True,
                     "filename": filename,
-                    "full_path": result.get("full_path", filename)
+                    "full_path": result.get("full_path", filename),
+                    **({"url": result.get("url")} if isinstance(result.get("url"), str) else {})
                 }
             else:
                 return {"success": False, "error": result.get("error", "Unknown storage error")}
@@ -266,6 +267,7 @@ class FluxImageProvider(FluxImageBase):
                     "success": True,
                     "file_path": save_result["filename"],
                     "full_path": save_result.get("full_path"),
+                    **({"url": save_result.get("url")} if isinstance(save_result.get("url"), str) else {}),
                     "message": f"Image saved successfully as {save_result['filename']}"
                 }
             else:
@@ -330,6 +332,7 @@ class FluxImageProvider(FluxImageBase):
                     "success": True,
                     "file_path": save_result["filename"],
                     "full_path": save_result.get("full_path"),
+                    **({"url": save_result.get("url")} if isinstance(save_result.get("url"), str) else {}),
                     "message": f"Edited image saved successfully as {save_result['filename']}"
                 }
             else:

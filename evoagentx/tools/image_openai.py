@@ -78,6 +78,7 @@ class OpenAIImageGenerationTool(Tool):
 
             # Save results using storage handler
             results = []
+            urls: List[str] = []
             for i, image_data in enumerate(response.data):
                 try:
                     if hasattr(image_data, "b64_json") and image_data.b64_json:
@@ -95,14 +96,19 @@ class OpenAIImageGenerationTool(Tool):
                     # Save using storage handler
                     result = self.storage_handler.save(filename, image_bytes)
                     
-                    if result["success"]:
+                    if result.get("success"):
                         results.append(filename)
+                        if isinstance(result.get("url"), str):
+                            urls.append(result["url"])
                     else:
                         results.append(f"Error saving image {i+1}: {result.get('error', 'Unknown error')}")
                 except Exception as e:
                     results.append(f"Error saving image {i+1}: {e}")
 
-            return {"results": results, "count": len(results)}
+            response = {"results": results, "count": len(results)}
+            if urls:
+                response["urls"] = urls
+            return response
         except Exception as e:
             return {"error": f"Image generation failed: {e}"}
     
@@ -228,6 +234,7 @@ class OpenAIImageEditTool(Tool):
 
                 # Save results
                 results = []
+                urls: List[str] = []
                 for i, img in enumerate(response.data):
                     try:
                         if hasattr(img, "b64_json") and img.b64_json:
@@ -248,14 +255,18 @@ class OpenAIImageEditTool(Tool):
                         # Save using storage handler
                         result = self.storage_handler.save(filename, img_bytes)
                         
-                        if result["success"]:
+                        if result.get("success"):
                             results.append(filename)
+                            if isinstance(result.get("url"), str):
+                                urls.append(result["url"])
                         else:
                             results.append(f"Error saving image {i+1}: {result.get('error', 'Unknown error')}")
                     except Exception as e:
                         results.append(f"Error saving image {i+1}: {e}")
-
-                return {"results": results, "count": len(results)}
+                response = {"results": results, "count": len(results)}
+                if urls:
+                    response["urls"] = urls
+                return response
             finally:
                 # Ensure file handles are closed
                 try:

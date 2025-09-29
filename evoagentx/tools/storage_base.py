@@ -47,6 +47,7 @@ class StorageBase(BaseModule, ABC):
         """
         super().__init__(**kwargs)
         self.base_path = base_path
+        self.return_file_url = kwargs.get("return_file_url", True)
         
         # File types that support append operations
         self.appendable_formats = {
@@ -204,13 +205,19 @@ class StorageBase(BaseModule, ABC):
                 return {"success": False, "error": f"File {file_path} does not exist"}
             
             # For now, return basic info - subclasses can override for more details
-            return {
+            res = {
                 "success": True,
                 "file_path": target_path,
                 "file_name": Path(target_path).name,
                 "file_extension": Path(target_path).suffix.lower(),
                 "exists": True
             }
+            if self.return_file_url:
+                try:
+                    res["url"] = self._get_file_url(target_path)
+                except Exception:
+                    pass
+            return res
         except Exception as e:
             logger.error(f"Error getting file info for {file_path}: {str(e)}")
             return {"success": False, "error": str(e), "file_path": file_path}
@@ -221,7 +228,13 @@ class StorageBase(BaseModule, ABC):
             target_path = self.translate_in(path)
             success = self._create_directory_raw(target_path)
             if success:
-                return {"success": True, "path": target_path, "message": "Directory created successfully"}
+                res = {"success": True, "path": target_path, "message": "Directory created successfully"}
+                if self.return_file_url:
+                    try:
+                        res["url"] = self._get_file_url(target_path)
+                    except Exception:
+                        pass
+                return res
             else:
                 return {"success": False, "error": "Failed to create directory", "path": target_path}
         except Exception as e:
@@ -241,7 +254,13 @@ class StorageBase(BaseModule, ABC):
             target_path = self.translate_in(path)
             success = self._delete_raw(target_path)
             if success:
-                return {"success": True, "path": target_path, "message": "Deleted successfully"}
+                res = {"success": True, "path": target_path, "message": "Deleted successfully"}
+                if self.return_file_url:
+                    try:
+                        res["url"] = self._get_file_url(target_path)
+                    except Exception:
+                        pass
+                return res
             else:
                 return {"success": False, "error": "Failed to delete", "path": target_path}
         except Exception as e:
@@ -262,7 +281,14 @@ class StorageBase(BaseModule, ABC):
             if success:
                 # Delete source
                 self._delete_raw(resolved_source)
-                return {"success": True, "source": resolved_source, "destination": resolved_destination, "message": "Moved successfully"}
+                # Return only destination info, using usual keys
+                res = {"success": True, "file_path": resolved_destination, "message": "Moved successfully"}
+                if self.return_file_url:
+                    try:
+                        res["url"] = self._get_file_url(resolved_destination)
+                    except Exception:
+                        pass
+                return res
             else:
                 return {"success": False, "error": "Failed to write to destination", "source": resolved_source, "destination": resolved_destination}
         except Exception as e:
@@ -281,7 +307,14 @@ class StorageBase(BaseModule, ABC):
             # Write to destination
             success = self._write_raw(resolved_destination, content)
             if success:
-                return {"success": True, "source": resolved_source, "destination": resolved_destination, "message": "Copied successfully"}
+                # Return only destination info, using usual keys
+                res = {"success": True, "file_path": resolved_destination, "message": "Copied successfully"}
+                if self.return_file_url:
+                    try:
+                        res["url"] = self._get_file_url(resolved_destination)
+                    except Exception:
+                        pass
+                return res
             else:
                 return {"success": False, "error": "Failed to write to destination", "source": resolved_source, "destination": resolved_destination}
         except Exception as e:
@@ -293,6 +326,14 @@ class StorageBase(BaseModule, ABC):
         try:
             target_path = self.translate_in(path) if path else str(self.base_path)
             items = self._list_raw(target_path, max_depth=max_depth, include_hidden=include_hidden)
+            if self.return_file_url:
+                for item in items:
+                    try:
+                        item_path = item.get("path")
+                        if item_path:
+                            item["url"] = self._get_file_url(item_path)
+                    except Exception:
+                        continue
             
             return {
                 "success": True,
@@ -355,13 +396,16 @@ class StorageBase(BaseModule, ABC):
                 success = self._write_raw(target_file_path, content_bytes, **kwargs)
             
                 if success:
-                    return {
+                    res = {
                         "success": True,
                         "message": f"File '{file_path}' saved successfully",
                         "file_path": file_path,
                         "full_path": target_file_path,
                         "size": len(content_bytes)
                     }
+                    if self.return_file_url:
+                        res["url"] = self._get_file_url(target_file_path)
+                    return res
                 else:
                     return {
                         "success": False,
@@ -437,12 +481,15 @@ class StorageBase(BaseModule, ABC):
             success = self._write_raw(file_path, content_bytes, **kwargs)
             
             if success:
-                return {
+                res = {
                     "success": True,
                     "message": f"File saved to {file_path}",
                     "file_path": file_path,
                     "content_length": len(content_bytes)
                 }
+                if self.return_file_url:
+                    res["url"] = self._get_file_url(file_path)
+                return res
             else:
                 return {"success": False, "error": "Failed to write file", "file_path": file_path}
         except Exception as e:
@@ -456,12 +503,15 @@ class StorageBase(BaseModule, ABC):
             content_bytes = self._read_raw(file_path, **kwargs)
             content = content_bytes.decode(encoding)
             
-            return {
+            base = {
                 "success": True,
                 "content": content,
                 "file_path": file_path,
                 "content_length": len(content)
             }
+            if self.return_file_url:
+                base["url"] = self._get_file_url(file_path)
+            return base
         except Exception as e:
             logger.error(f"Error reading text file {file_path}: {str(e)}")
             return {"success": False, "error": str(e), "file_path": file_path}
@@ -484,11 +534,14 @@ class StorageBase(BaseModule, ABC):
             success = self._write_raw(file_path, combined_bytes, **kwargs)
             
             if success:
-                return {
+                res = {
                     "success": True,
                     "message": f"Content appended to file {file_path}",
                     "file_path": file_path
                 }
+                if self.return_file_url:
+                    res["url"] = self._get_file_url(file_path)
+                return res
             else:
                 return {"success": False, "error": "Failed to append to file", "file_path": file_path}
         except Exception as e:
@@ -514,11 +567,14 @@ class StorageBase(BaseModule, ABC):
             success = self._write_raw(file_path, content_bytes, **kwargs)
             
             if success:
-                return {
+                res = {
                     "success": True,
                     "message": f"JSON file saved to {file_path}",
                     "file_path": file_path
                 }
+                if self.return_file_url:
+                    res["url"] = self._get_file_url(file_path)
+                return res
             else:
                 return {"success": False, "error": "Failed to write file", "file_path": file_path}
         except Exception as e:
@@ -535,11 +591,14 @@ class StorageBase(BaseModule, ABC):
             # Parse JSON
             content = json.loads(content_str)
             
-            return {
+            base = {
                 "success": True,
                 "content": content,
                 "file_path": file_path
             }
+            if self.return_file_url:
+                base["url"] = self._get_file_url(file_path)
+            return base
         except Exception as e:
             logger.error(f"Error reading JSON file {file_path}: {str(e)}")
             return {"success": False, "error": str(e), "file_path": file_path}
@@ -580,11 +639,14 @@ class StorageBase(BaseModule, ABC):
             success = self._write_raw(file_path, content_bytes, **kwargs)
             
             if success:
-                return {
+                res = {
                     "success": True,
                     "message": f"Content appended to JSON file {file_path}",
                     "file_path": file_path
                 }
+                if self.return_file_url:
+                    res["url"] = self._get_file_url(file_path)
+                return res
             else:
                 return {"success": False, "error": "Failed to append to file", "file_path": file_path}
         except Exception as e:
@@ -629,12 +691,15 @@ class StorageBase(BaseModule, ABC):
             success = self._write_raw(file_path, content_bytes, **kwargs)
             
             if success:
-                return {
+                res = {
                     "success": True,
                     "message": f"CSV file saved to {file_path}",
                     "file_path": file_path,
                     "rows": rows
                 }
+                if self.return_file_url:
+                    res["url"] = self._get_file_url(file_path)
+                return res
             else:
                 return {"success": False, "error": "Failed to write file", "file_path": file_path}
             
@@ -654,12 +719,15 @@ class StorageBase(BaseModule, ABC):
             reader = csv.DictReader(StringIO(content_str))
             content = list(reader)
             
-            return {
+            base = {
                 "success": True,
                 "content": content,
                 "file_path": file_path,
                 "rows": len(content)
             }
+            if self.return_file_url:
+                base["url"] = self._get_file_url(file_path)
+            return base
         except Exception as e:
             logger.error(f"Error reading CSV file {file_path}: {str(e)}")
             return {"success": False, "error": str(e), "file_path": file_path}
@@ -696,12 +764,15 @@ class StorageBase(BaseModule, ABC):
             success = self._write_raw(file_path, content_bytes, **kwargs)
             
             if success:
-                return {
+                res = {
                     "success": True,
                     "message": f"Content appended to CSV file {file_path}",
                     "file_path": file_path,
                     "appended_rows": len(content)
                 }
+                if self.return_file_url:
+                    res["url"] = self._get_file_url(file_path)
+                return res
             else:
                 return {"success": False, "error": "Failed to append to file", "file_path": file_path}
         except Exception as e:
@@ -720,11 +791,14 @@ class StorageBase(BaseModule, ABC):
             success = self._write_raw(file_path, content_bytes, **kwargs)
             
             if success:
-                return {
+                res = {
                     "success": True,
                     "message": f"YAML file saved to {file_path}",
                     "file_path": file_path
                 }
+                if self.return_file_url:
+                    res["url"] = self._get_file_url(file_path)
+                return res
             else:
                 return {"success": False, "error": "Failed to write file", "file_path": file_path}
         except Exception as e:
@@ -741,11 +815,14 @@ class StorageBase(BaseModule, ABC):
             # Parse YAML
             content = yaml.safe_load(content_str)
             
-            return {
+            base = {
                 "success": True,
                 "content": content,
                 "file_path": file_path
             }
+            if self.return_file_url:
+                base["url"] = self._get_file_url(file_path)
+            return base
         except Exception as e:
             logger.error(f"Error reading YAML file {file_path}: {str(e)}")
             return {"success": False, "error": str(e), "file_path": file_path}
@@ -786,11 +863,14 @@ class StorageBase(BaseModule, ABC):
             success = self._write_raw(file_path, content_bytes, **kwargs)
             
             if success:
-                return {
+                res = {
                     "success": True,
                     "message": f"Content appended to YAML file {file_path}",
                     "file_path": file_path
                 }
+                if self.return_file_url:
+                    res["url"] = self._get_file_url(file_path)
+                return res
             else:
                 return {"success": False, "error": "Failed to append to file", "file_path": file_path}
         except Exception as e:
@@ -836,11 +916,14 @@ class StorageBase(BaseModule, ABC):
             success = self._write_raw(file_path, content_bytes, **kwargs)
             
             if success:
-                return {
+                res = {
                     "success": True,
                     "message": f"XML file saved to {file_path}",
                     "file_path": file_path
                 }
+                if self.return_file_url:
+                    res["url"] = self._get_file_url(file_path)
+                return res
             else:
                 return {"success": False, "error": "Failed to write file", "file_path": file_path}
         except Exception as e:
@@ -868,11 +951,14 @@ class StorageBase(BaseModule, ABC):
             
             content = xml_to_dict(root)
             
-            return {
+            base = {
                 "success": True,
                 "content": content,
                 "file_path": file_path
             }
+            if self.return_file_url:
+                base["url"] = self._get_file_url(file_path)
+            return base
         except Exception as e:
             logger.error(f"Error reading XML file {file_path}: {str(e)}")
             return {"success": False, "error": str(e), "file_path": file_path}
@@ -903,12 +989,15 @@ class StorageBase(BaseModule, ABC):
             success = self._write_raw(file_path, content_bytes, **kwargs)
             
             if success:
-                return {
+                res = {
                     "success": True,
                     "message": f"Excel file saved to {file_path}",
                     "file_path": file_path,
                     "rows": len(content)
                 }
+                if self.return_file_url:
+                    res["url"] = self._get_file_url(file_path)
+                return res
             else:
                 return {"success": False, "error": "Failed to write file", "file_path": file_path}
         except Exception as e:
@@ -943,13 +1032,16 @@ class StorageBase(BaseModule, ABC):
                 if any(cell is not None for cell in row):
                     content.append(list(row))
             
-            return {
+            base = {
                 "success": True,
                 "content": content,
                 "file_path": file_path,
                 "sheet_name": sheet_name,
                 "rows": len(content)
             }
+            if self.return_file_url:
+                base["url"] = self._get_file_url(file_path)
+            return base
         except Exception as e:
             logger.error(f"Error reading Excel file {file_path}: {str(e)}")
             return {"success": False, "error": str(e), "file_path": file_path}
@@ -990,12 +1082,15 @@ class StorageBase(BaseModule, ABC):
             success = self._write_raw(file_path, updated_bytes, **kwargs)
             
             if success:
-                return {
+                res = {
                     "success": True,
                     "message": f"Content appended to Excel file {file_path}",
                     "file_path": file_path,
                     "appended_rows": len(content)
                 }
+                if self.return_file_url:
+                    res["url"] = self._get_file_url(file_path)
+                return res
             else:
                 return {"success": False, "error": "Failed to append to file", "file_path": file_path}
         except Exception as e:
@@ -1013,11 +1108,14 @@ class StorageBase(BaseModule, ABC):
             success = self._write_raw(file_path, content_bytes, **kwargs)
             
             if success:
-                return {
+                res = {
                     "success": True,
                     "message": f"Pickle file saved to {file_path}",
                     "file_path": file_path
                 }
+                if self.return_file_url:
+                    res["url"] = self._get_file_url(file_path)
+                return res
             else:
                 return {"success": False, "error": "Failed to write file", "file_path": file_path}
         except Exception as e:
@@ -1033,11 +1131,14 @@ class StorageBase(BaseModule, ABC):
             # Parse pickle content
             content = pickle.loads(content_bytes)
             
-            return {
+            base = {
                 "success": True,
                 "content": content,
                 "file_path": file_path
             }
+            if self.return_file_url:
+                base["url"] = self._get_file_url(file_path)
+            return base
         except Exception as e:
             logger.error(f"Error reading pickle file {file_path}: {str(e)}")
             return {"success": False, "error": str(e), "file_path": file_path}
@@ -1076,11 +1177,14 @@ class StorageBase(BaseModule, ABC):
             success = self._write_raw(file_path, content_bytes, **kwargs)
             
             if success:
-                return {
+                res = {
                     "success": True,
                     "message": f"Content appended to pickle file {file_path}",
                     "file_path": file_path
                 }
+                if self.return_file_url:
+                    res["url"] = self._get_file_url(file_path)
+                return res
             else:
                 return {"success": False, "error": "Failed to append to file", "file_path": file_path}
         except Exception as e:
@@ -1115,11 +1219,14 @@ class StorageBase(BaseModule, ABC):
             # Build the PDF
             doc.build(story)
             
-            return {
+            res = {
                 "success": True,
                 "message": f"PDF file saved to {file_path}",
                 "file_path": file_path
             }
+            if self.return_file_url:
+                res["url"] = self._get_file_url(file_path)
+            return res
                 
         except ImportError:
             return {"success": False, "error": "reportlab library not available for PDF creation"}
@@ -1138,11 +1245,14 @@ class StorageBase(BaseModule, ABC):
                 text = page.get_text()
                 all_text.append(text)
             text = "\n\n".join(all_text)
-            return {
+            base = {
                 "success": True,
                 "content": text,
                 "file_path": file_path
             }
+            if self.return_file_url:
+                base["url"] = self._get_file_url(file_path)
+            return base
                 
         except Exception as e:
             logger.error(f"Error reading PDF file {file_path}: {str(e)}")
@@ -1168,13 +1278,16 @@ class StorageBase(BaseModule, ABC):
                 success = self._write_raw(file_path, content_bytes, **kwargs)
                 
                 if success:
-                    return {
+                    res = {
                         "success": True,
                         "message": f"Image saved to {file_path}",
                         "file_path": file_path,
                         "format": content.format,
                         "size": content.size
                     }
+                    if self.return_file_url:
+                        res["url"] = self._get_file_url(file_path)
+                    return res
                 else:
                     return {"success": False, "error": "Failed to write file", "file_path": file_path}
             elif isinstance(content, bytes):
@@ -1182,11 +1295,14 @@ class StorageBase(BaseModule, ABC):
                 success = self._write_raw(file_path, content, **kwargs)
                 
                 if success:
-                    return {
+                    res = {
                         "success": True,
                         "message": f"Image saved to {file_path}",
                         "file_path": file_path
                     }
+                    if self.return_file_url:
+                        res["url"] = self._get_file_url(file_path)
+                    return res
                 else:
                     return {"success": False, "error": "Failed to write file", "file_path": file_path}
             elif isinstance(content, str) and Path(content).exists():
@@ -1197,11 +1313,14 @@ class StorageBase(BaseModule, ABC):
                 success = self._write_raw(file_path, content_bytes, **kwargs)
                 
                 if success:
-                    return {
+                    res = {
                         "success": True,
                         "message": f"Image copied from {content} to {file_path}",
                         "file_path": file_path
                     }
+                    if self.return_file_url:
+                        res["url"] = self._get_file_url(file_path)
+                    return res
                 else:
                     return {"success": False, "error": "Failed to write file", "file_path": file_path}
             else:
@@ -1236,12 +1355,15 @@ class StorageBase(BaseModule, ABC):
                     "height": img.height
                 }
                 
-                return {
+                base = {
                     "success": True,
                     "content": img,  # Return the PIL Image object
                     "metadata": metadata,
                     "file_path": file_path
                 }
+                if self.return_file_url:
+                    base["url"] = self._get_file_url(file_path)
+                return base
                 
         except Exception as e:
             logger.error(f"Error reading image file {file_path}: {str(e)}")
@@ -1252,3 +1374,7 @@ class StorageBase(BaseModule, ABC):
         """Placeholder for future database integration"""
         # This will be implemented when adding database support
         raise NotImplementedError("Database integration not yet implemented") 
+    
+    def _get_file_url(self, file_path: str) -> str:
+        """Create URL for others access"""
+        raise NotImplementedError("URL convertion methods not implemented")

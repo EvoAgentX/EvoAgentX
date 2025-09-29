@@ -208,12 +208,16 @@ class ImageGenerationCollection(ToolCollection):
                 "provider": "openai"
             }
         
-        return {
+        resp = {
             "success": True,
             "images": result.get("results", []),
             "count": result.get("count", 0),
             "provider": "openai"
         }
+        urls = result.get("urls")
+        if isinstance(urls, list) and urls:
+            resp["urls"] = urls
+        return resp
 
     def _convert_output_from_openrouter(self, result: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -236,12 +240,16 @@ class ImageGenerationCollection(ToolCollection):
             }
         
         if "saved_paths" in result:
-            return {
+            resp = {
                 "success": True,
                 "images": result["saved_paths"],
                 "count": len(result["saved_paths"]),
                 "provider": "openrouter"
             }
+            urls = result.get("urls")
+            if isinstance(urls, list) and urls:
+                resp["urls"] = urls
+            return resp
         
         return {
             "success": False,
@@ -268,12 +276,15 @@ class ImageGenerationCollection(ToolCollection):
                 "provider": "flux"
             }
         
-        return {
+        resp = {
             "success": True,
             "images": [result["file_path"]],
             "count": 1,
             "provider": "flux"
         }
+        if isinstance(result.get("url"), str):
+            resp["urls"] = [result["url"]]
+        return resp
 
     def _gcd(self, a: int, b: int) -> int:
         """Calculate greatest common divisor."""
@@ -544,12 +555,16 @@ class ImageEditingCollection(ToolCollection):
                 "provider": "openai"
             }
         
-        return {
+        resp = {
             "success": True,
             "images": result.get("results", []),
             "count": result.get("count", 0),
             "provider": "openai"
         }
+        urls = result.get("urls")
+        if isinstance(urls, list) and urls:
+            resp["urls"] = urls
+        return resp
 
     def _convert_output_from_openrouter(self, result: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -572,12 +587,16 @@ class ImageEditingCollection(ToolCollection):
             }
         
         if "saved_paths" in result:
-            return {
+            resp = {
                 "success": True,
                 "images": result["saved_paths"],
                 "count": len(result["saved_paths"]),
                 "provider": "openrouter"
             }
+            urls = result.get("urls")
+            if isinstance(urls, list) and urls:
+                resp["urls"] = urls
+            return resp
         
         return {
             "success": False,
@@ -604,12 +623,15 @@ class ImageEditingCollection(ToolCollection):
                 "provider": "flux"
             }
         
-        return {
+        resp = {
             "success": True,
             "images": [result["file_path"]],
             "count": 1,
             "provider": "flux"
         }
+        if isinstance(result.get("url"), str):
+            resp["urls"] = [result["url"]]
+        return resp
 
     def _get_next_execute(self, inputs: Dict[str, Any], outputs: Dict[str, Any]) -> Optional[str]:
         """Determine next tool to execute; stop when a provider succeeded with images."""

@@ -61,11 +61,12 @@ class OpenRouterImageGenerationEditBase(BaseModule):
     def _urls_to_image_parts(self, urls: list) -> List[Dict]:
         return [self._url_to_image_part(u) for u in (urls or [])]
 
-    def _save_images_from_choices(self, data: Dict, output_basename: str) -> List[str]:
+    def _save_images_from_choices(self, data: Dict, output_basename: str) -> Dict[str, List[str]]:
         import base64
         saved_paths: List[str] = []
+        urls: List[str] = []
         if not data or not data.get("choices"):
-            return saved_paths
+            return {"saved_paths": saved_paths, "urls": urls}
         msg = data["choices"][0].get("message", {})
         images = msg.get("images") or []
         for im in images:
@@ -86,10 +87,12 @@ class OpenRouterImageGenerationEditBase(BaseModule):
                 result = self.storage_handler.save(filename, image_content)
                 if result.get("success"):
                     saved_paths.append(filename)
+                    if isinstance(result.get("url"), str):
+                        urls.append(result["url"])
                 else:
                     # stop early on save error to surface issue
-                    return []
-        return saved_paths
+                    return {"saved_paths": [], "urls": []}
+        return {"saved_paths": saved_paths, "urls": urls}
 
 
 # Deprecated combined tool retained for reference only (not registered in toolkit)
@@ -160,9 +163,14 @@ class OpenRouterImageGenerationEditTool(OpenRouterImageGenerationEditBase, Tool)
         except Exception as e:
             return {"error": f"Request failed: {e}"}
 
-        saved_paths = self._save_images_from_choices(data, output_basename)
+        saved = self._save_images_from_choices(data, output_basename)
+        saved_paths = saved.get("saved_paths", []) if isinstance(saved, dict) else (saved or [])
+        urls = saved.get("urls", []) if isinstance(saved, dict) else []
         if saved_paths:
-            return {"saved_paths": saved_paths}
+            resp = {"saved_paths": saved_paths}
+            if urls:
+                resp["urls"] = urls
+            return resp
         return {"warning": "No image returned or saved.", "raw": data}
 
 
@@ -219,9 +227,14 @@ class OpenRouterImageGenerationTool(OpenRouterImageGenerationEditBase, Tool):
         except Exception as e:
             return {"error": f"Request failed: {e}"}
 
-        saved_paths = self._save_images_from_choices(data, output_basename)
+        saved = self._save_images_from_choices(data, output_basename)
+        saved_paths = saved.get("saved_paths", []) if isinstance(saved, dict) else (saved or [])
+        urls = saved.get("urls", []) if isinstance(saved, dict) else []
         if saved_paths:
-            return {"saved_paths": saved_paths}
+            resp = {"saved_paths": saved_paths}
+            if urls:
+                resp["urls"] = urls
+            return resp
         return {"warning": "No image returned or saved.", "raw": data}
 
 
@@ -290,10 +303,15 @@ class OpenRouterImageEditTool(OpenRouterImageGenerationEditBase, Tool):
                 return {"error": f"OpenRouter API error: {e}", "status_code": resp.status_code}
         except Exception as e:
             return {"error": f"Request failed: {e}"}
-
-        saved_paths = self._save_images_from_choices(data, output_basename)
+        # Save returned images and propagate URLs if the storage handler provides them
+        saved = self._save_images_from_choices(data, output_basename)
+        saved_paths = saved.get("saved_paths", []) if isinstance(saved, dict) else (saved or [])
+        urls = saved.get("urls", []) if isinstance(saved, dict) else []
         if saved_paths:
-            return {"saved_paths": saved_paths}
+            resp = {"saved_paths": saved_paths}
+            if urls:
+                resp["urls"] = urls
+            return resp
         return {"warning": "No image returned or saved.", "raw": data}
 
 
