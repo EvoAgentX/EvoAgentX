@@ -25,11 +25,7 @@ class ImageEditingCollection(ToolCollection):
         "images": {"type": "array", "description": "Optional. List of image paths or URLs (normalized to provider-specific parts)."},
         "image_path": {"type": "string", "description": "Optional. Single local image path."},
         "image_url": {"type": "string", "description": "Optional. Single HTTP(S) image URL."},
-        "mask_path": {"type": "string", "description": "Optional. PNG mask path (same size as the image)."},
-        "size": {"type": "string", "description": "Optional. Output size (e.g., '1024x1024') or ratio for Flux."},
-        "quality": {"type": "string", "description": "Optional. Output quality (provider-specific)."},
-        "n": {"type": "integer", "description": "Optional. Number of variations (provider-specific constraints)."},
-        "seed": {"type": "integer", "description": "Optional. Random seed for reproducibility (Flux)."},
+        "size": {"type": "string", "description": "Optional. Output size in 'WxH' format (e.g., '1024x1024')."},
         "output_format": {"type": "string", "description": "Optional. Output format (e.g., 'png'|'jpeg'|'webp')."},
         "image_name": {"type": "string", "description": "Optional. Base filename for saved outputs."},
     }
@@ -102,8 +98,6 @@ class ImageEditingCollection(ToolCollection):
         mapped = {
             "prompt": inputs.get("prompt"),
             "size": inputs.get("size"),
-            "n": inputs.get("n"),
-            "quality": inputs.get("quality"),
             "output_format": inputs.get("output_format"),
             "partial_images": inputs.get("partial_images"),
             "stream": inputs.get("stream"),
@@ -119,9 +113,6 @@ class ImageEditingCollection(ToolCollection):
             mapped["images"] = [single_path]
         elif single_url:
             mapped["images"] = [single_url]
-        # Optional mask
-        if inputs.get("mask_path"):
-            mapped["mask_path"] = inputs["mask_path"]
         return {k: v for k, v in mapped.items() if v is not None}
 
     def _map_args_for_openrouter(self, inputs: Dict[str, Any], outputs: Dict[str, Any]) -> Dict[str, Any]:
@@ -146,8 +137,8 @@ class ImageEditingCollection(ToolCollection):
     def _map_args_for_flux(self, inputs: Dict[str, Any], outputs: Dict[str, Any]) -> Dict[str, Any]:
         mapped = {
             "prompt": inputs.get("prompt"),
-            "seed": inputs.get("seed"),
             "output_format": inputs.get("output_format"),
+            "image_name": inputs.get("image_name"),
         }
         # Flux accepts either base64 in input_image or a file path
         input_image = inputs.get("input_image")
@@ -219,11 +210,7 @@ class ImageEditingCollection(ToolCollection):
         images: list = None,
         image_path: str = None,
         image_url: str = None,
-        mask_path: str = None,
         size: str = None,
-        quality: str = None,
-        n: int = None,
-        seed: int = None,
         output_format: str = None,
         image_name: str = None,
         **kwargs,
@@ -233,11 +220,7 @@ class ImageEditingCollection(ToolCollection):
             "images": images,
             "image_path": image_path,
             "image_url": image_url,
-            "mask_path": mask_path,
             "size": size,
-            "quality": quality,
-            "n": n,
-            "seed": seed,
             "output_format": output_format,
             "image_name": image_name,
             **kwargs,

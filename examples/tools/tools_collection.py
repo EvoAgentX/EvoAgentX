@@ -81,7 +81,7 @@ def demo_image_generation():
         prompt = "A cute robot in a garden"
         print(f"Generating: {prompt}")
 
-        result = gen_tool(prompt=prompt, image_name="demo_robot")
+        result = gen_tool(prompt=prompt, size="1024x1024", image_name="demo_robot")
         print(f"\nRaw Generation Result:")
         print(result)
         
@@ -143,9 +143,7 @@ def demo_image_editing(src_image_path: str = None):
             prompt=prompt,
             image_path=src_image_path,
             size="1024x1024",
-            quality="high",
-            n=1,
-            image_name="demo_robot_edited"
+            image_name="demo_robot_edited",
         )
         
         print("\nRaw Editing Result:")
@@ -241,7 +239,7 @@ def demo_image_toolkit():
         # Demo generation using the toolkit via get_tool
         prompt = "A serene mountain landscape at sunset"
         print(f"\nGenerating with unified toolkit: {prompt}")
-        gen_result = gen_tool(prompt=prompt, image_name="mountain_sunset")
+        gen_result = gen_tool(prompt=prompt, size="1024x1024", image_name="mountain_sunset")
         print(f"Generation result: {gen_result}")
 
         # Demo analysis with a web image via get_tool

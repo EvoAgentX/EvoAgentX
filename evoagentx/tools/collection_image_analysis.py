@@ -23,7 +23,6 @@ class ImageAnalysisCollection(ToolCollection):
         "prompt": {"type": "string", "description": "Required. Question or instruction for analysis."},
         "image_url": {"type": "string", "description": "Optional. HTTP(S) image URL."},
         "image_path": {"type": "string", "description": "Optional. Local image file path (converted internally)."},
-        "pdf_path": {"type": "string", "description": "Optional. Local PDF path (converted when supported)."},
     }
     required: Optional[List[str]] = ["prompt"]
 
@@ -92,7 +91,6 @@ class ImageAnalysisCollection(ToolCollection):
             "prompt": inputs.get("prompt"),
             "image_url": inputs.get("image_url"),
             "image_path": inputs.get("image_path"),
-            "pdf_path": inputs.get("pdf_path"),
         }
         return {k: v for k, v in mapped.items() if v is not None}
 
@@ -124,14 +122,12 @@ class ImageAnalysisCollection(ToolCollection):
         prompt: str,
         image_url: str = None,
         image_path: str = None,
-        pdf_path: str = None,
         **kwargs,
     ) -> Dict[str, Any]:
         inputs = {
             "prompt": prompt,
             "image_url": image_url,
             "image_path": image_path,
-            "pdf_path": pdf_path,
             **kwargs,
         }
         return self._run_pipeline(inputs)

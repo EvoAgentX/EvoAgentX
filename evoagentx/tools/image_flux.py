@@ -237,9 +237,10 @@ class FluxImageBase:
 class FluxImageProvider(FluxImageBase):
     """Flux-specific image provider implementation."""
     
-    def generate_image(self, prompt: str, seed: Optional[int] = None, 
+    def generate_image(self, prompt: str,
                       aspect_ratio: Optional[str] = None, output_format: Optional[str] = None,
-                      prompt_upsampling: Optional[bool] = None, safety_tolerance: Optional[int] = None) -> Dict[str, Any]:
+                      prompt_upsampling: Optional[bool] = None, safety_tolerance: Optional[int] = None,
+                      image_name: Optional[str] = None, seed: Optional[int] = None) -> Dict[str, Any]:
         """Generate image using Flux AI."""
         try:
             # Make request with individual parameters
@@ -255,10 +256,9 @@ class FluxImageProvider(FluxImageBase):
                 return result
 
             # Download and save image
-            # Use seed from parameters or default for filename
-            seed_for_filename = seed if seed is not None else "default"
             output_format_for_filename = output_format if output_format is not None else "jpeg"
-            base_name = f"flux_{seed_for_filename}"
+            # Use provided image_name as base name if given; else default
+            base_name = (image_name or "flux").strip() or "flux"
             filename = self.get_unique_filename(base_name, f".{output_format_for_filename}")
             save_result = self.save_image_from_url(result["image_url"], filename)
             
@@ -276,9 +276,10 @@ class FluxImageProvider(FluxImageBase):
         except Exception as e:
             return {"success": False, "error": f"Flux image generation failed: {e}"}
 
-    def edit_image(self, prompt: str, image_input: str, seed: Optional[int] = None,
+    def edit_image(self, prompt: str, image_input: str,
                   aspect_ratio: Optional[str] = None, output_format: Optional[str] = None,
-                  prompt_upsampling: Optional[bool] = None, safety_tolerance: Optional[int] = None) -> Dict[str, Any]:
+                  prompt_upsampling: Optional[bool] = None, safety_tolerance: Optional[int] = None,
+                  image_name: Optional[str] = None, seed: Optional[int] = None) -> Dict[str, Any]:
         """Edit image using Flux AI."""
         try:
             # Handle input image (accept base64/data URLs or local file paths)
@@ -320,10 +321,9 @@ class FluxImageProvider(FluxImageBase):
                 return result
             
             # Download and save image
-            # Use seed from parameters or default for filename
-            seed_for_filename = seed if seed is not None else "default"
             output_format_for_filename = output_format if output_format is not None else "jpeg"
-            base_name = f"flux_edited_{seed_for_filename}"
+            # Use provided image_name as base name if given; else default
+            base_name = (image_name or "flux_edited").strip() or "flux_edited"
             filename = self.get_unique_filename(base_name, f".{output_format_for_filename}")
             save_result = self.save_image_from_url(result["image_url"], filename)
             
@@ -347,11 +347,12 @@ class FluxImageGenerationTool(Tool):
 
     inputs: Dict[str, Dict[str, str]] = {
         "prompt": {"type": "string", "description": "Text prompt for image generation"},
-        "seed": {"type": "integer", "description": "Random seed for generation"},
         "aspect_ratio": {"type": "string", "description": "Aspect ratio (e.g., '1:1', '16:9')"},
         "output_format": {"type": "string", "description": "Output format (jpeg, png)"},
         "prompt_upsampling": {"type": "boolean", "description": "Enable prompt upsampling"},
         "safety_tolerance": {"type": "integer", "description": "Safety tolerance level"},
+        "image_name": {"type": "string", "description": "Base filename for saved output"},
+        "seed": {"type": "integer", "description": "Random seed for reproducibility"},
     }
     required: Optional[List[str]] = ["prompt"]
 
@@ -359,20 +360,21 @@ class FluxImageGenerationTool(Tool):
         super().__init__()
         self.provider = provider
 
-    def __call__(self, prompt: str, seed: int = None, aspect_ratio: str = None, 
+    def __call__(self, prompt: str, aspect_ratio: str = None, 
                  output_format: str = None, prompt_upsampling: bool = None, 
-                 safety_tolerance: int = None) -> Dict[str, Any]:
+                 safety_tolerance: int = None, image_name: str = None, seed: int = None) -> Dict[str, Any]:
         if not prompt:
             return {"error": "Missing required parameter 'prompt'"}
         
         # Call provider directly with explicit parameters
         result = self.provider.generate_image(
             prompt=prompt,
-            seed=seed,
             aspect_ratio=aspect_ratio,
             output_format=output_format,
             prompt_upsampling=prompt_upsampling,
-            safety_tolerance=safety_tolerance
+            safety_tolerance=safety_tolerance,
+            image_name=image_name,
+            seed=seed,
         )
         
         # Convert provider response to tool response format
@@ -395,11 +397,12 @@ class FluxImageEditTool(Tool):
         "prompt": {"type": "string", "description": "Edit instruction"},
         "input_image": {"type": "string", "description": "Base64 encoded input image"},
         "image_path": {"type": "string", "description": "Local path to input image"},
-        "seed": {"type": "integer", "description": "Random seed for editing"},
         "aspect_ratio": {"type": "string", "description": "Aspect ratio (e.g., '1:1', '16:9')"},
         "output_format": {"type": "string", "description": "Output format (jpeg, png)"},
         "prompt_upsampling": {"type": "boolean", "description": "Enable prompt upsampling"},
         "safety_tolerance": {"type": "integer", "description": "Safety tolerance level"},
+        "image_name": {"type": "string", "description": "Base filename for saved output"},
+        "seed": {"type": "integer", "description": "Random seed for reproducibility"},
     }
     required: Optional[List[str]] = ["prompt"]
 
@@ -408,9 +411,9 @@ class FluxImageEditTool(Tool):
         self.provider = provider
 
     def __call__(self, prompt: str, input_image: str = None, image_path: str = None,
-                 seed: int = None, aspect_ratio: str = None, 
+                 aspect_ratio: str = None, 
                  output_format: str = None, prompt_upsampling: bool = None, 
-                 safety_tolerance: int = None) -> Dict[str, Any]:
+                 safety_tolerance: int = None, image_name: str = None, seed: int = None) -> Dict[str, Any]:
         if not prompt:
             return {"error": "Missing required parameter 'prompt'"}
         
@@ -423,11 +426,12 @@ class FluxImageEditTool(Tool):
         result = self.provider.edit_image(
             prompt=prompt,
             image_input=image_input,
-            seed=seed,
             aspect_ratio=aspect_ratio,
             output_format=output_format,
             prompt_upsampling=prompt_upsampling,
-            safety_tolerance=safety_tolerance
+            safety_tolerance=safety_tolerance,
+            image_name=image_name,
+            seed=seed,
         )
         
         # Convert provider response to tool response format

@@ -23,11 +23,7 @@ class ImageGenerationCollection(ToolCollection):
 
     inputs: Dict[str, Dict[str, str]] = {
         "prompt": {"type": "string", "description": "Required. Text prompt for image generation."},
-        "size": {"type": "string", "description": "Optional. Output size (e.g., '1024x1024') or provider ratio (e.g., '1:1')."},
-        "quality": {"type": "string", "description": "Optional. Image quality (provider-specific, e.g., 'standard'|'hd')."},
-        "n": {"type": "integer", "description": "Optional. Number of images, 1–10 (DALL·E 3 supports 1)."},
-        "seed": {"type": "integer", "description": "Optional. Random seed for reproducibility (Flux)."},
-        "style": {"type": "string", "description": "Optional. Artistic style (e.g., 'vivid'|'natural' for DALL·E 3)."},
+        "size": {"type": "string", "description": "Optional. Output size in 'WxH' format (e.g., '1024x1024')."},
         "output_format": {"type": "string", "description": "Optional. Output format (e.g., 'png'|'jpeg'|'webp')."},
         "image_name": {"type": "string", "description": "Optional. Base filename (without extension) for saved images."},
     }
@@ -105,9 +101,6 @@ class ImageGenerationCollection(ToolCollection):
         Map arguments for OpenAI image generation.
         - prompt: str (required)
         - size: str (provider-supported size)
-        - quality: str (e.g., 'standard'|'hd')
-        - n: int (1–10)
-        - style: str (e.g., 'vivid'|'natural')
         - response_format: str ('url'|'b64_json') — mapped to 'b64_json'
         - image_name: str
         """
@@ -117,12 +110,6 @@ class ImageGenerationCollection(ToolCollection):
         }
         if "size" in inputs:
             mapped["size"] = inputs["size"]
-        if "quality" in inputs:
-            mapped["quality"] = inputs["quality"]
-        if "n" in inputs:
-            mapped["n"] = inputs["n"]
-        if "style" in inputs:
-            mapped["style"] = inputs["style"]
         if "output_format" in inputs:
             mapped["response_format"] = "b64_json"
         return {k: v for k, v in mapped.items() if v is not None}
@@ -143,7 +130,6 @@ class ImageGenerationCollection(ToolCollection):
         """
         Map arguments for Flux image generation.
         - prompt: str (required)
-        - seed: int (default: 42)
         - aspect_ratio: str (e.g., '1:1')
         - output_format: str ('jpeg'|'png')
         - prompt_upsampling: bool
@@ -151,8 +137,8 @@ class ImageGenerationCollection(ToolCollection):
         """
         mapped = {
             "prompt": inputs.get("prompt"),
-            "seed": inputs.get("seed", 42),
             "output_format": inputs.get("output_format", "jpeg"),
+            "image_name": inputs.get("image_name"),
         }
         if "size" in inputs:
             size = inputs["size"]
@@ -224,10 +210,6 @@ class ImageGenerationCollection(ToolCollection):
         self,
         prompt: str,
         size: str = None,
-        quality: str = None,
-        n: int = None,
-        seed: int = None,
-        style: str = None,
         output_format: str = None,
         image_name: str = None,
         **kwargs,
@@ -235,10 +217,6 @@ class ImageGenerationCollection(ToolCollection):
         inputs = {
             "prompt": prompt,
             "size": size,
-            "quality": quality,
-            "n": n,
-            "seed": seed,
-            "style": style,
             "output_format": output_format,
             "image_name": image_name,
             **kwargs,
