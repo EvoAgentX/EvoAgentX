@@ -103,19 +103,19 @@ class ToolCollection(Tool):
         return None
 
 
-    def _run_pipeline(self, inputs: Dict[str, Any], outputs: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """Execute the collection pipeline using mapping functions and execution order."""
-        outputs = outputs or {}
-        while True:
-            next_tool_name = self._get_next_execute(inputs, outputs)
-            if not next_tool_name:
-                break
+    def _run_pipeline(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute tools in order and return immediately on first non-error result."""
+        last_error: Optional[Dict[str, Any]] = None
+
+        for next_tool_name in self.execution_order:
             tool = self.tool_mappings.get(next_tool_name)
             if not tool:
-                break
+                continue
+
             try:
                 arg_map_fn = self.argument_mapping_function.get(next_tool_name, lambda i, o: i)
-                mapped_args = arg_map_fn(inputs, outputs)
+                # Do not maintain outputs; pass empty dict to keep mapping signatures intact
+                mapped_args = arg_map_fn(inputs, {})
 
                 # Enforce timeout via ThreadPoolExecutor if configured
                 resolved_timeout = self.per_tool_timeout
@@ -128,42 +128,49 @@ class ToolCollection(Tool):
                         out_map_fn = self.output_mapping_function.get(next_tool_name)
                         err = {"error": f"timeout after {resolved_timeout}s"}
                         try:
-                            outputs[next_tool_name] = out_map_fn(err) if out_map_fn else err
+                            mapped = out_map_fn(err) if out_map_fn else err
                         except Exception:
-                            outputs[next_tool_name] = err
-                        # Ensure we don't block on shutdown; proceed to next tool immediately
+                            mapped = err
+                        last_error = mapped
                         executor.shutdown(wait=False, cancel_futures=True)
                         continue
                     except Exception as inner_e:
-                        # Handle tool execution exceptions and normalize
                         out_map_fn = self.output_mapping_function.get(next_tool_name)
                         error_obj = {"error": str(inner_e)}
                         try:
-                            outputs[next_tool_name] = out_map_fn(error_obj) if out_map_fn else error_obj
+                            mapped = out_map_fn(error_obj) if out_map_fn else error_obj
                         except Exception:
-                            outputs[next_tool_name] = error_obj
+                            mapped = error_obj
+                        last_error = mapped
                         executor.shutdown(wait=False, cancel_futures=True)
                         continue
                     else:
-                        # Successful result, convert and shutdown executor
                         out_map_fn = self.output_mapping_function.get(next_tool_name, lambda r: r)
-                        outputs[next_tool_name] = out_map_fn(result)
+                        mapped = out_map_fn(result)
                         executor.shutdown(wait=False, cancel_futures=True)
                 else:
                     result = tool(**mapped_args)
-
                     out_map_fn = self.output_mapping_function.get(next_tool_name, lambda r: r)
-                    outputs[next_tool_name] = out_map_fn(result)
+                    mapped = out_map_fn(result)
+
+                # Return immediately if no error (error key missing or falsy)
+                if not (isinstance(mapped, dict) and bool(mapped.get("error"))):
+                    return mapped
+                # Otherwise remember error and proceed
+                last_error = mapped
+
             except Exception as e:
                 logger.exception(f"Error executing tool {next_tool_name}: {e}")
-                # Normalize errors through output mapping if possible
                 out_map_fn = self.output_mapping_function.get(next_tool_name)
                 error_obj = {"error": str(e)}
                 try:
-                    outputs[next_tool_name] = out_map_fn(error_obj) if out_map_fn else error_obj
+                    mapped = out_map_fn(error_obj) if out_map_fn else error_obj
                 except Exception:
-                    outputs[next_tool_name] = error_obj
-        return outputs
+                    mapped = error_obj
+                last_error = mapped
+
+        # If all tools failed or none executed, return last error or a default one
+        return last_error or {"error": "No tools executed or all attempts failed"}
     
     def __call__(self, query: str, **kwargs) -> Dict[str, Any]:
         """

@@ -556,33 +556,8 @@ class SearchCollection(ToolCollection):
             "region": region,
             **{k: v for k, v in kwargs.items() if k not in ["query", "num_results", "max_content_words", "language", "region"]}
         }
-        outputs = {}
-        
-        while True:
-            next_tool_name = self._get_next_execute(inputs, outputs)
-            if not next_tool_name:
-                break
-                
-            tool = self.tool_mappings.get(next_tool_name)
-            if not tool:
-                break
-                
-            try:
-                mapped_args = self.argument_mapping_function[next_tool_name](inputs, outputs)
-                result = tool(**mapped_args)
-                outputs[next_tool_name] = self.output_mapping_function[next_tool_name](result)
-            except Exception as e:
-                outputs[next_tool_name] = {
-                    "results": [],
-                    "metadata": {
-                        "source": next_tool_name,
-                        "success": False,
-                        "total_results": 0
-                    },
-                    "error": str(e)
-                }
-                
-        return outputs
+        # Delegate to base pipeline: returns first successful mapped result or last error
+        return self._run_pipeline(inputs)
 
     def _get_next_execute(self, inputs: Dict[str, Any], outputs: Dict[str, Any]) -> Optional[str]:
         """

@@ -7,22 +7,7 @@ One base class and one toolkit managing all tools
 
 import asyncio
 import threading
-from typing import Dict, Any, Optional, List
-from browser_use import BrowserSession
-from browser_use.browser.events import (
-    NavigateToUrlEvent,
-    ClickElementEvent,
-    ScrollEvent,
-    CloseTabEvent,
-    BrowserStateRequestEvent,
-    TypeTextEvent,
-    GoBackEvent,
-    RefreshEvent,
-    SendKeysEvent,
-    GetDropdownOptionsEvent,
-    SelectDropdownOptionEvent,
-    SwitchTabEvent
-)
+from typing import Dict, Any, Optional, List, TYPE_CHECKING
 
 from .tool import Tool, Toolkit
 from ..core.module import BaseModule
@@ -42,6 +27,43 @@ def _run_async_in_sync(browser_use_instance, async_func, *args, **kwargs):
     return browser_use_instance._run_in_browser_thread(async_func(*args, **kwargs))
 
 
+# Lazy import support for browser_use events to avoid hard dependency at import time
+def _ensure_events_loaded():
+    """Lazy-load browser_use event classes only when needed.
+
+    This avoids importing the heavy browser_use dependency during module import,
+    making the toolkit usable in environments where browser_use isn't available
+    until the browser features are actually used.
+    """
+    try:
+        # If already loaded, do nothing
+        if 'NavigateToUrlEvent' in globals():
+            return
+
+        import importlib
+        events = importlib.import_module("browser_use.browser.events")
+
+        globals().update({
+            'NavigateToUrlEvent': getattr(events, 'NavigateToUrlEvent'),
+            'ClickElementEvent': getattr(events, 'ClickElementEvent'),
+            'ScrollEvent': getattr(events, 'ScrollEvent'),
+            'CloseTabEvent': getattr(events, 'CloseTabEvent'),
+            'BrowserStateRequestEvent': getattr(events, 'BrowserStateRequestEvent'),
+            'TypeTextEvent': getattr(events, 'TypeTextEvent'),
+            'GoBackEvent': getattr(events, 'GoBackEvent'),
+            'RefreshEvent': getattr(events, 'RefreshEvent'),
+            'SendKeysEvent': getattr(events, 'SendKeysEvent'),
+            'GetDropdownOptionsEvent': getattr(events, 'GetDropdownOptionsEvent'),
+            'SelectDropdownOptionEvent': getattr(events, 'SelectDropdownOptionEvent'),
+            'SwitchTabEvent': getattr(events, 'SwitchTabEvent'),
+        })
+    except Exception as e:
+        raise RuntimeError(
+            "The 'browser_use' package (and its events) is required to use BrowserUse tools. "
+            "Please install it and ensure your Python/environment meet its requirements."
+        ) from e
+
+
 
 
 class BrowserUse(BaseModule):
@@ -53,7 +75,7 @@ class BrowserUse(BaseModule):
     def __init__(
         self, 
         name: str = 'BrowserUse',
-        browser_session: Optional[BrowserSession] = None,
+        browser_session: Optional[Any] = None,
         auto_update_state: bool = True,
         return_llm_repre: bool = False,
         **kwargs
@@ -276,6 +298,8 @@ class BrowserUse(BaseModule):
         """Ensure the browser session is started."""
         if not self.browser_session:
             raise RuntimeError("Browser session not initialized")
+        # Lazy-load event classes when we first need the browser
+        _ensure_events_loaded()
         
         if not self._browser_started:
             try:
@@ -1714,7 +1738,7 @@ class BrowserUseToolkit(Toolkit):
     def __init__(
         self,
         name: str = "BrowserUseToolkit",
-        browser_session: Optional[BrowserSession] = None,
+        browser_session: Optional[Any] = None,
         auto_update_state: bool = True,
         headless: bool = True,
         return_llm_repre: bool = True,
@@ -1722,18 +1746,28 @@ class BrowserUseToolkit(Toolkit):
     ):
         # Create browser session if not provided
         if browser_session is None:
-            from browser_use import BrowserSession, BrowserProfile
-            # Create optimized browser profile for performance
-            browser_profile = BrowserProfile(
-                headless=headless,
-                minimum_wait_page_load_time=2,  # Increased from 1 to 3 seconds
-                wait_for_network_idle_page_load_time=3,  # Increased from 2 to 5 seconds
-                wait_between_actions=2,  # Increased from 1 to 2 seconds
-                highlight_elements=False,  # Disable highlighting for performance
-                cross_origin_iframes=False,  # Disable for performance
-                enable_default_extensions=False,  # Disable extensions for performance
-            )
-            browser_session = BrowserSession(browser_profile=browser_profile)
+            try:
+                import importlib
+                browser_use_mod = importlib.import_module("browser_use")
+                BrowserSession = getattr(browser_use_mod, "BrowserSession")
+                BrowserProfile = getattr(browser_use_mod, "BrowserProfile")
+
+                # Create optimized browser profile for performance
+                browser_profile = BrowserProfile(
+                    headless=headless,
+                    minimum_wait_page_load_time=2,  # Increased from 1 to 3 seconds
+                    wait_for_network_idle_page_load_time=3,  # Increased from 2 to 5 seconds
+                    wait_between_actions=2,  # Increased from 1 to 2 seconds
+                    highlight_elements=False,  # Disable highlighting for performance
+                    cross_origin_iframes=False,  # Disable for performance
+                    enable_default_extensions=False,  # Disable extensions for performance
+                )
+                browser_session = BrowserSession(browser_profile=browser_profile)
+            except Exception as e:
+                raise RuntimeError(
+                    "The 'browser_use' package is required to initialize BrowserUseToolkit. "
+                    "Please install it and ensure your environment meets its requirements."
+                ) from e
         
         # Create the shared BrowserUse instance
         browser_use = BrowserUse(

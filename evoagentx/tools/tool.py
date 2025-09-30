@@ -5,6 +5,16 @@ from typing import Dict, List, Optional, Any, Callable, get_origin
 
 from ..core.module import BaseModule
 
+
+json_to_python_type = {
+    "string": str,
+    "integer": int,
+    "number": float,
+    "boolean": bool,
+    "object": dict,
+    "array": list,
+}
+
 ALLOWED_TYPES = ["string", "number", "integer", "boolean", "object", "array"]
 
 
@@ -43,15 +53,6 @@ class Tool(BaseModule):
             "description": str,
             "inputs": dict
         }
-
-        json_to_python = {
-            "string": str,
-            "integer": int,
-            "number": float,
-            "boolean": bool,
-            "object": dict,
-            "array": list,
-        }
         
         for attr, attr_type in required_attributes.items():
             if not hasattr(cls, attr):
@@ -70,7 +71,7 @@ class Tool(BaseModule):
             call_signature = inspect.signature(cls.__call__)
             if input_name not in call_signature.parameters:
                 raise ValueError(f"Input '{input_name}' is not found in __call__")
-            if call_signature.parameters[input_name].annotation != json_to_python[input_content["type"]]:
+            if call_signature.parameters[input_name].annotation != json_to_python_type[input_content["type"]]:
                 raise ValueError(f"Input '{input_name}' has a type mismatch in __call__")
 
         if cls.required:
@@ -80,6 +81,71 @@ class Tool(BaseModule):
     
     def __call__(self, **kwargs):
         raise NotImplementedError("All tools must implement __call__")
+
+    def to_dict(self, exclude_none: bool = True, ignore: List[str] = [], **kwargs) -> dict:
+        """
+        Convert the Tool to a dictionary with shallow unpacking (only one layer).
+        This prevents extremely long output when there are errors by not recursively 
+        unpacking nested BaseModule objects.
+        
+        Args:
+            exclude_none: Whether to exclude fields with None values
+            ignore: List of field names to ignore
+            **kwargs: Additional keyword arguments
+        
+        Returns:
+            dict: Dictionary containing the object data with shallow unpacking
+        """
+        data = {}
+        for field_name, _ in type(self).model_fields.items():
+            if field_name in ignore:
+                continue
+            field_value = getattr(self, field_name, None)
+            if exclude_none and field_value is None:
+                continue
+            
+            # Only unpack one layer - don't recursively unpack nested BaseModule objects
+            if hasattr(field_value, 'to_dict') and hasattr(field_value, '__class__'):
+                # For BaseModule objects, just include their class name and basic info
+                data[field_name] = {
+                    'class_name': field_value.__class__.__name__,
+                    'type': str(type(field_value))
+                }
+            elif isinstance(field_value, list):
+                # For lists, handle each item but don't go deeper
+                list_data = []
+                for item in field_value:
+                    if hasattr(item, 'to_dict') and hasattr(item, '__class__'):
+                        list_data.append({
+                            'class_name': item.__class__.__name__,
+                            'type': str(type(item))
+                        })
+                    else:
+                        list_data.append(item)
+                data[field_name] = list_data
+            elif isinstance(field_value, dict):
+                # For dicts, handle values but don't go deeper
+                dict_data = {}
+                for key, value in field_value.items():
+                    if hasattr(value, 'to_dict') and hasattr(value, '__class__'):
+                        dict_data[key] = {
+                            'class_name': value.__class__.__name__,
+                            'type': str(type(value))
+                        }
+                    elif callable(value):
+                        # Handle functions/methods with full name representation
+                        dict_data[key] = f"<function: {getattr(value, '__name__', str(value))}>"
+                    else:
+                        dict_data[key] = value
+                data[field_name] = dict_data
+            elif callable(field_value):
+                # Handle functions/methods with full name
+                data[field_name] = f"<function: {getattr(field_value, '__name__', str(field_value))}>"
+            else:
+                # For primitive types, include as-is
+                data[field_name] = field_value
+        
+        return data
 
 class Toolkit(BaseModule):
     name: str
@@ -105,6 +171,71 @@ class Toolkit(BaseModule):
             if tool.name == tool_name:
                 return tool
         raise ValueError(f"Tool '{tool_name}' not found")
+    
+    def to_dict(self, exclude_none: bool = True, ignore: List[str] = [], **kwargs) -> dict:
+        """
+        Convert the Toolkit to a dictionary with shallow unpacking (only one layer).
+        This prevents extremely long output when there are errors by not recursively 
+        unpacking nested BaseModule objects.
+        
+        Args:
+            exclude_none: Whether to exclude fields with None values
+            ignore: List of field names to ignore
+            **kwargs: Additional keyword arguments
+        
+        Returns:
+            dict: Dictionary containing the object data with shallow unpacking
+        """
+        data = {}
+        for field_name, _ in type(self).model_fields.items():
+            if field_name in ignore:
+                continue
+            field_value = getattr(self, field_name, None)
+            if exclude_none and field_value is None:
+                continue
+            
+            # Only unpack one layer - don't recursively unpack nested BaseModule objects
+            if hasattr(field_value, 'to_dict') and hasattr(field_value, '__class__'):
+                # For BaseModule objects, just include their class name and basic info
+                data[field_name] = {
+                    'class_name': field_value.__class__.__name__,
+                    'type': str(type(field_value))
+                }
+            elif isinstance(field_value, list):
+                # For lists, handle each item but don't go deeper
+                list_data = []
+                for item in field_value:
+                    if hasattr(item, 'to_dict') and hasattr(item, '__class__'):
+                        list_data.append({
+                            'class_name': item.__class__.__name__,
+                            'type': str(type(item))
+                        })
+                    else:
+                        list_data.append(item)
+                data[field_name] = list_data
+            elif isinstance(field_value, dict):
+                # For dicts, handle values but don't go deeper
+                dict_data = {}
+                for key, value in field_value.items():
+                    if hasattr(value, 'to_dict') and hasattr(value, '__class__'):
+                        dict_data[key] = {
+                            'class_name': value.__class__.__name__,
+                            'type': str(type(value))
+                        }
+                    elif callable(value):
+                        # Handle functions/methods with full name representation
+                        dict_data[key] = f"<function: {getattr(value, '__name__', str(value))}>"
+                    else:
+                        dict_data[key] = value
+                data[field_name] = dict_data
+            elif callable(field_value):
+                # Handle functions/methods with full name
+                data[field_name] = f"<function: {getattr(field_value, '__name__', str(field_value))}>"
+            else:
+                # For primitive types, include as-is
+                data[field_name] = field_value
+        
+        return data
     
     def get_tools(self) -> List[Tool]:
         return self.tools

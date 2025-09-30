@@ -354,18 +354,73 @@ class OpenAIImageAnalysisTool(Tool):
                 ],
             )
 
-            # Prefer unified output_text when present
-            text = getattr(response, "output_text", None)
-            if text is None:
-                # Fallback: try to assemble from content if SDK shape differs
+            # Extract text robustly across SDK shapes
+            def _extract_text(resp):
+                # 1) Preferred: Responses API unified text
+                text = getattr(resp, "output_text", None)
+                if text:
+                    return text
+
+                # 2) Responses API structured output → output[*].content[*].text
                 try:
-                    choices = getattr(response, "output", None) or getattr(response, "choices", None)
+                    output = getattr(resp, "output", None)
+                    if output and isinstance(output, list):
+                        parts = []
+                        for block in output:
+                            content_items = getattr(block, "content", None)
+                            if content_items and isinstance(content_items, list):
+                                for item in content_items:
+                                    val = getattr(item, "text", None)
+                                    if val:
+                                        parts.append(val)
+                        if parts:
+                            return "\n".join(parts)
+                except Exception:
+                    pass
+
+                # 3) Try dict-like serialization and parse similarly
+                try:
+                    as_dict = resp if isinstance(resp, dict) else None
+                    if not as_dict and hasattr(resp, "model_dump"):
+                        as_dict = resp.model_dump()
+                    if not as_dict and hasattr(resp, "to_dict"):
+                        as_dict = resp.to_dict()
+                    if as_dict:
+                        parts = []
+                        for block in as_dict.get("output", []) or []:
+                            for item in block.get("content", []) or []:
+                                t = item.get("text")
+                                if t:
+                                    parts.append(t)
+                        if parts:
+                            return "\n".join(parts)
+                        # Chat-style fallback if present
+                        choices = as_dict.get("choices") or []
+                        if choices:
+                            msg = choices[0].get("message") or {}
+                            c = msg.get("content")
+                            if isinstance(c, str):
+                                return c
+                except Exception:
+                    pass
+
+                # 4) Chat Completions typed fallback
+                try:
+                    choices = getattr(resp, "choices", None)
                     if choices and isinstance(choices, list):
                         first = choices[0]
-                        text = getattr(first, "message", {}).get("content", "") if isinstance(first, dict) else ""
+                        if isinstance(first, dict):
+                            return first.get("message", {}).get("content", "")
+                        message = getattr(first, "message", None)
+                        content = getattr(message, "content", None)
+                        if isinstance(content, str):
+                            return content
                 except Exception:
-                    text = ""
+                    pass
 
+                return ""
+
+            text = _extract_text(response)
             return {"content": text or ""}
         except Exception as e:
             return {"error": f"OpenAI image analysis failed: {e}"}

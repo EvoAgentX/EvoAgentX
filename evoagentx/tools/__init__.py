@@ -27,7 +27,9 @@ from .search_serpapi import SerpAPIToolkit
 from .crawler_request import RequestCrawlToolkit
 from .crawler_crawl4ai import Crawl4AICrawlToolkit
 from .collection_search import SearchCollectionToolkit
-from .collection_image import ImageCollectionToolkit
+from .collection_image_generation import ImageGenerationCollectionToolkit
+from .collection_image_edit import ImageEditingCollectionToolkit
+from .collection_image_analysis import ImageAnalysisCollectionToolkit
 
 __all__ = [
     "Tool", 
@@ -63,5 +65,7 @@ __all__ = [
     "RequestCrawlToolkit",
     "Crawl4AICrawlToolkit",
     "SearchCollectionToolkit",
-    "ImageCollectionToolkit"
+    "ImageGenerationCollectionToolkit",
+    "ImageEditingCollectionToolkit",
+    "ImageAnalysisCollectionToolkit",
 ]
