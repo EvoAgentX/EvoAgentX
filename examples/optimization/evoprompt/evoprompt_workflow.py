@@ -55,7 +55,7 @@ class SarcasmClassifierProgram:
         """
         answers = []
         prompts = [self.prompt_direct, self.prompt_expert, self.prompt_cot]
-        pattern = r"the answer is\s*(.*)"
+        pattern = r"FINAL_ANSWER\((.*?)\)"
 
         # Query each prompt voter independently
         for prompt in prompts:

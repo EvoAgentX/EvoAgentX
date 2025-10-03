@@ -101,7 +101,7 @@ class SarcasmClassifierProgram:
     def __call__(self, input: str) -> tuple[str, dict]:
         answers = []
         prompts = [self.prompt_direct, self.prompt_expert, self.prompt_cot]
-        pattern = r"the answer is\s*(.*)"
+        pattern = r"FINAL_ANSWER\((.*?)\)"
 
         for prompt in prompts:
             full_prompt = f"{prompt}\n\n{self.task_instruction}\n\nText:\n{input}"
@@ -272,6 +272,7 @@ node_evolution_logs_{ALGO}_{MODEL}_{TASK}_{TIMESTAMP}/
 ├── combo_generation_XX_log.csv          # 每代组合评估日志
 ├── evaluation_testset_test_*.csv         # 测试集评估结果
 ├── optimization_summary_{algo}.csv       # 优化摘要
+├── best_config.json                      # 机器可读的最优配置（自动保存）
 ├── performance_summary_OVERALL.png      # 训练过程可视化
 └── individual_plots/                     # 单个节点性能图表
     └── performance_plot_*.png
@@ -358,7 +359,33 @@ if __name__ == "__main__":
 
 完整的工作示例请参考 [evoprompt_workflow.py](https://github.com/EvoAgentX/EvoAgentX/blob/main/examples/optimization/evoprompt/evoprompt_workflow.py)。
 
-## 9. 最佳实践
+## 9. 对象使用与 JSON 持久化
+
+- 直接使用优化后的对象
+  - `optimize()` 完成后，优化器会自动将最优提示写回已注册的节点。传入的 `program` 实例即为“可直接使用”的最终工作流对象。
+
+- 自动保存 JSON
+  - 日志目录内会同时保存 `best_config.json`，其内容为 `{ 节点名: 最优提示 }` 的映射，便于后续复用或审计。
+
+- 在新实例中复用（两种方式）
+  - 方式一（助手方法）：`optimizer.load_and_apply_config("/path/to/best_config.json")`
+  - 方式二（注册表）：读取 JSON 后，逐项 `registry.set(name, value)` 应用到新建的 program
+
+最小示例：
+
+```python
+# 将 best_config.json 应用到新 program（基于 ParamRegistry）
+with open(json_path, "r", encoding="utf-8") as f:
+    best_cfg = json.load(f)
+for k, v in best_cfg.items():
+    registry.set(k, v)
+```
+
+参考示例：
+- examples/optimization/evoprompt/evoprompt_bestconfig_json.py
+- examples/optimization/evoprompt/evoprompt_save_load_json_min.py
+
+## 10. 最佳实践
 
 1. **合理设置种群大小**：建议4-8个个体，平衡探索和计算开销
 2. **使用早停机制**：避免过度训练，节省计算资源
@@ -366,7 +393,7 @@ if __name__ == "__main__":
 4. **监控日志**：关注收敛趋势，及时调整参数
 5. **多任务测试**：在多个任务上验证优化器的通用性
 
-## 10. 故障排除
+## 11. 故障排除
 
 ### 常见问题
 
