@@ -1,6 +1,9 @@
 
 from evoagentx.tools.browser_browseruse_auto import BrowserUseAutoToolkit
-from evoagentx.tools.collection_image import ImageCollectionToolkit
+# from evoagentx.tools.collection_image import ImageCollectionToolkit
+from evoagentx.tools.collection_image_analysis import ImageAnalysisCollectionToolkit 
+from evoagentx.tools.collection_image_generation import ImageGenerationCollectionToolkit
+from evoagentx.tools.collection_image_edit import ImageEditingCollectionToolkit
 from evoagentx.tools.collection_search import SearchCollectionToolkit
 from evoagentx.tools.crawler_crawl4ai import Crawl4AICrawlToolkit
 from evoagentx.tools.crawler_request import RequestCrawlToolkit
@@ -25,6 +28,8 @@ default_tools = [
     StorageToolkit(),
     ArxivToolkit(),
     CMDToolkit(),
-    ImageCollectionToolkit(),
-    
+    # ImageCollectionToolkit(),
+    ImageAnalysisCollectionToolkit(),
+    ImageGenerationCollectionToolkit(),
+    ImageEditingCollectionToolkit(),
 ]

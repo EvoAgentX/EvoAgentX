@@ -47,7 +47,7 @@ class StorageBase(BaseModule, ABC):
         """
         super().__init__(**kwargs)
         self.base_path = base_path
-        self.return_file_url = kwargs.get("return_file_url", True)
+        self.return_file_url = kwargs.get("return_file_url", False)
         
         # File types that support append operations
         self.appendable_formats = {

@@ -5,7 +5,9 @@ import requests
 import time
 from dotenv import load_dotenv
 from .tool import Tool, Toolkit
+from .image_openai import download_image
 from .storage_handler import FileStorageHandler, LocalStorageHandler
+from ..core.logging import logger 
 
 load_dotenv()
 
@@ -13,9 +15,15 @@ load_dotenv()
 class FluxImageBase:
     """Base class for Flux image provider with shared functionality."""
     
-    def __init__(self, api_key: Optional[str] = None, storage_handler: Optional[FileStorageHandler] = None,
-                 base_path: str = "./flux_images"):
+    def __init__(
+        self, 
+        api_key: Optional[str] = None, 
+        storage_handler: Optional[FileStorageHandler] = None,
+        model: str = "flux-kontext-pro", # "flux-kontext-pro", "flux-kontext-max"
+        base_path: str = "./flux_images"
+    ):
         self.api_key = api_key or os.getenv("FLUX_API_KEY")
+        self.model = model 
         self.storage_handler = storage_handler or LocalStorageHandler(base_path=base_path)
         self.base_path = base_path
 
@@ -162,10 +170,17 @@ class FluxImageBase:
         except Exception as e:
             return {"success": False, "error": f"Failed to process image: {e}"}
 
-    def _make_flux_request(self, prompt: str, input_image: Optional[str] = None, 
-                          seed: Optional[int] = None, aspect_ratio: Optional[str] = None,
-                          output_format: Optional[str] = None, prompt_upsampling: Optional[bool] = None,
-                          safety_tolerance: Optional[int] = None) -> Dict[str, Any]:
+    def _make_flux_request(
+        self, prompt: str, 
+        # input_image: Optional[str] = None, 
+        input_images: Optional[List[str]] = None, 
+        seed: Optional[int] = None, 
+        aspect_ratio: Optional[str] = None,
+        output_format: Optional[str] = None, 
+        prompt_upsampling: Optional[bool] = None,
+        safety_tolerance: Optional[int] = None,
+    ) -> Dict[str, Any]:
+
         """Make request to Flux API and handle polling."""
         if not self.api_key:
             return {"success": False, "error": "Flux API key not provided"}
@@ -178,8 +193,15 @@ class FluxImageBase:
         
         # Build payload with only provided parameters
         payload = {"prompt": prompt}
-        if input_image is not None:
-            payload["input_image"] = input_image
+        # if input_image is not None:
+        #     payload["input_image"] = input_image
+        if input_images and len(input_images) > 4:
+            logger.warning(f"Flux API supports up to 4 input images, but {len(input_images)} were provided. Only the first 4 will be used.")
+        if input_images:
+            payload["input_image"] = input_images[0]
+            if len(input_images) > 1:
+                for i, image in zip([2, 3, 4], input_images[1:]):
+                    payload[f"input_image_{i}"] = image
         if seed is not None:
             payload["seed"] = seed
         if aspect_ratio is not None:
@@ -193,8 +215,10 @@ class FluxImageBase:
         
         try:
             # Submit request
-            response = requests.post("https://api.bfl.ai/v1/flux-kontext-max", 
-                                   json=payload, headers=headers, timeout=30)
+            response = requests.post(
+                f"https://api.bfl.ai/v1/{self.model}", 
+                json=payload, headers=headers, timeout=30
+            )
             response.raise_for_status()
             request_data = response.json()
             
@@ -256,7 +280,7 @@ class FluxImageProvider(FluxImageBase):
                 return result
 
             # Download and save image
-            output_format_for_filename = output_format if output_format is not None else "jpeg"
+            output_format_for_filename = output_format if output_format is not None else "png"
             # Use provided image_name as base name if given; else default
             base_name = (image_name or "flux").strip() or "flux"
             filename = self.get_unique_filename(base_name, f".{output_format_for_filename}")
@@ -276,41 +300,74 @@ class FluxImageProvider(FluxImageBase):
         except Exception as e:
             return {"success": False, "error": f"Flux image generation failed: {e}"}
 
-    def edit_image(self, prompt: str, image_input: str,
-                  aspect_ratio: Optional[str] = None, output_format: Optional[str] = None,
-                  prompt_upsampling: Optional[bool] = None, safety_tolerance: Optional[int] = None,
-                  image_name: Optional[str] = None, seed: Optional[int] = None) -> Dict[str, Any]:
+    def edit_image(
+        self, 
+        prompt: str, 
+        image_urls: list = None, 
+        image_paths: list = None,
+        aspect_ratio: Optional[str] = None, 
+        output_format: Optional[str] = None,
+        prompt_upsampling: Optional[bool] = None, 
+        safety_tolerance: Optional[int] = None,
+        image_name: Optional[str] = None, 
+        seed: Optional[int] = None
+    ) -> Dict[str, Any]:
         """Edit image using Flux AI."""
         try:
-            # Handle input image (accept base64/data URLs or local file paths)
-            if not isinstance(image_input, str) or not image_input:
-                return {"success": False, "error": "Invalid image input format"}
+            # Build unified input_images supporting both URLs and base64
+            input_images: List[str] = []
+            # 1) URL 输入：下载到本地临时文件 -> 读取为 base64 -> 删除临时文件
+            tmp_dir_rel: Optional[str] = None
+            downloaded_rel_paths: List[str] = []
+            if image_urls is not None:
+                if not isinstance(image_urls, list):
+                    return {"success": False, "error": "image_urls must be a list of strings"}
+                if image_urls:
+                    ts = int(time.time())
+                    tmp_dir_rel = f"_tmp_flux_edit/{ts}"
+                    try:
+                        self.storage_handler.create_directory(tmp_dir_rel)
+                    except Exception:
+                        # 尝试继续，后续保存可能失败
+                        pass
+                for idx, u in enumerate(image_urls):
+                    if not isinstance(u, str) or not u.strip():
+                        continue
+                    try:
+                        content, ext = download_image(u.strip())
+                        filename = f"url_{idx+1}{ext}"
+                        rel_path = f"{tmp_dir_rel}/{filename}" if tmp_dir_rel else filename
+                        save_res = self.storage_handler.save(rel_path, content)
+                        if not save_res.get("success"):
+                            continue
+                        downloaded_rel_paths.append(rel_path)
+                        # 读取成 base64
+                        b64_res = self.read_image_as_base64(rel_path)
+                        if b64_res.get("success"):
+                            input_images.append(b64_res["base64"])
+                    except Exception:
+                        # 跳过下载失败的 URL
+                        continue
+            
+            # 2) local paths -> read as base64 and append
+            if image_paths is not None:
+                if not isinstance(image_paths, list):
+                    return {"success": False, "error": "image_paths must be a list of strings"}
+                for p in image_paths:
+                    if not isinstance(p, str) or not p.strip():
+                        continue
+                    b64_result = self.read_image_as_base64(p.strip())
+                    if not b64_result.get("success"):
+                        return {"success": False, "error": b64_result.get("error", "Failed to read image as base64")}
+                    input_images.append(b64_result["base64"])
 
-            input_image_b64: Optional[str] = None
-            s = image_input.strip()
-
-            # data URL prefix case
-            if s.startswith("data:"):
-                comma = s.find(",")
-                if comma != -1:
-                    s = s[comma + 1 :]
-                input_image_b64 = s
-            else:
-                # Try to validate as base64; if fails, treat as path and read
-                try:
-                    import base64 as _b64
-                    _b64.b64decode(s, validate=True)
-                    input_image_b64 = s
-                except Exception:
-                    b64_result = self.read_image_as_base64(s)
-                    if not b64_result["success"]:
-                        return {"success": False, "error": b64_result["error"]}
-                    input_image_b64 = b64_result["base64"]
+            if not input_images:
+                return {"success": False, "error": "No valid input images provided"}
             
             # Make request with individual parameters
             result = self._make_flux_request(
                 prompt=prompt,
-                input_image=input_image_b64,
+                input_images=input_images,
                 seed=seed,
                 aspect_ratio=aspect_ratio,
                 output_format=output_format,
@@ -321,11 +378,27 @@ class FluxImageProvider(FluxImageBase):
                 return result
             
             # Download and save image
-            output_format_for_filename = output_format if output_format is not None else "jpeg"
+            output_format_for_filename = output_format if output_format is not None else "png"
             # Use provided image_name as base name if given; else default
             base_name = (image_name or "flux_edited").strip() or "flux_edited"
             filename = self.get_unique_filename(base_name, f".{output_format_for_filename}")
             save_result = self.save_image_from_url(result["image_url"], filename)
+            
+            # 清理下载的临时文件/目录
+            try:
+                if downloaded_rel_paths:
+                    for rel in downloaded_rel_paths:
+                        try:
+                            self.storage_handler.delete(rel)
+                        except Exception:
+                            pass
+                if 'tmp_dir_rel' in locals() and tmp_dir_rel:
+                    try:
+                        self.storage_handler.delete(tmp_dir_rel)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
             
             if save_result["success"]:
                 return {
@@ -356,13 +429,22 @@ class FluxImageGenerationTool(Tool):
     }
     required: Optional[List[str]] = ["prompt"]
 
-    def __init__(self, provider: FluxImageProvider):
+    def __init__(self, provider: FluxImageProvider, name: str = None):
         super().__init__()
         self.provider = provider
+        self.name = name or self.name
 
-    def __call__(self, prompt: str, aspect_ratio: str = None, 
-                 output_format: str = None, prompt_upsampling: bool = None, 
-                 safety_tolerance: int = None, image_name: str = None, seed: int = None) -> Dict[str, Any]:
+    def __call__(
+        self, 
+        prompt: str, 
+        aspect_ratio: str = None, 
+        output_format: str = None, 
+        prompt_upsampling: bool = None, 
+        safety_tolerance: int = None, 
+        image_name: str = "default_flux_image_generation", 
+        seed: int = None
+    ) -> Dict[str, Any]:
+
         if not prompt:
             return {"error": "Missing required parameter 'prompt'"}
         
@@ -383,7 +465,8 @@ class FluxImageGenerationTool(Tool):
                 "success": True,
                 "file_path": result["file_path"],
                 "full_path": result.get("full_path"),
-                "message": result["message"]
+                "message": result["message"], 
+                "url": result.get("url", None), 
             }
         else:
             return {"success": False, "error": result["error"]}
@@ -395,8 +478,10 @@ class FluxImageEditTool(Tool):
 
     inputs: Dict[str, Dict[str, str]] = {
         "prompt": {"type": "string", "description": "Edit instruction"},
-        "input_image": {"type": "string", "description": "Base64 encoded input image"},
-        "image_path": {"type": "string", "description": "Local path to input image"},
+        # "input_image": {"type": "string", "description": "Base64 encoded input image"},
+        # "image_path": {"type": "string", "description": "Local path to input image"},
+        "image_urls": {"type": "array", "items": {"type": "string", "description": "HTTP(S) image URL"}, "description": "HTTP(S) image URL"},
+        "image_paths": {"type": "array", "items": {"type": "string", "description": "Local path to input image"}, "description": "Local path to input image"},
         "aspect_ratio": {"type": "string", "description": "Aspect ratio (e.g., '1:1', '16:9')"},
         "output_format": {"type": "string", "description": "Output format (jpeg, png)"},
         "prompt_upsampling": {"type": "boolean", "description": "Enable prompt upsampling"},
@@ -406,26 +491,36 @@ class FluxImageEditTool(Tool):
     }
     required: Optional[List[str]] = ["prompt"]
 
-    def __init__(self, provider: FluxImageProvider):
+    def __init__(self, provider: FluxImageProvider, name: str = None):
         super().__init__()
         self.provider = provider
+        self.name = name or self.name
 
-    def __call__(self, prompt: str, input_image: str = None, image_path: str = None,
-                 aspect_ratio: str = None, 
-                 output_format: str = None, prompt_upsampling: bool = None, 
-                 safety_tolerance: int = None, image_name: str = None, seed: int = None) -> Dict[str, Any]:
+    def __call__(
+        self, 
+        prompt: str, 
+        image_urls: list = None, 
+        image_paths: list = None,
+        aspect_ratio: str = None, 
+        output_format: str = None, 
+        prompt_upsampling: bool = None, 
+        safety_tolerance: int = None, 
+        image_name: str = "default_flux_image_edit", 
+        seed: int = None
+    ) -> Dict[str, Any]:
+
         if not prompt:
             return {"error": "Missing required parameter 'prompt'"}
         
         # Determine image input
-        image_input = input_image or image_path
-        if not image_input:
-            return {"error": "No input image provided. Please specify input_image or image_path."}
+        if not image_urls and not image_paths:
+            return {"error": "No input image provided. Please specify `image_urls` or `image_paths`."}
         
         # Call provider directly with explicit parameters
         result = self.provider.edit_image(
             prompt=prompt,
-            image_input=image_input,
+            image_urls=image_urls,
+            image_paths=image_paths,
             aspect_ratio=aspect_ratio,
             output_format=output_format,
             prompt_upsampling=prompt_upsampling,
@@ -440,7 +535,8 @@ class FluxImageEditTool(Tool):
                 "success": True,
                 "file_path": result["file_path"],
                 "full_path": result.get("full_path"),
-                "message": result["message"]
+                "message": result["message"],
+                "url": result.get("url", None), 
             }
         else:
             return {"success": False, "error": result["error"]}

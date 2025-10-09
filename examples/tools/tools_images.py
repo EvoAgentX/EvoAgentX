@@ -1,12 +1,9 @@
 #!/usr/bin/env python3
 
 """
-Example demonstrating how to use image handling toolkits from EvoAgentX.
-This script provides comprehensive examples for:
-- ImageAnalysisToolkit for analyzing images using AI
-- OpenAI Image Generation for creating images from text prompts
-- OpenAI Image Editing for editing existing images
-- Flux Image Generation for creating images using Flux Kontext Max
+Minimal, raw-input/output demos for individual image toolkits.
+Focus: OpenAIImageToolkit, OpenRouterImageToolkit, FluxImageToolkit.
+Each demo prints full input dicts and raw outputs.
 """
 
 import os
@@ -16,200 +13,174 @@ from dotenv import load_dotenv
 
 load_dotenv(override=True)
 
-# Add the parent directory to sys.path to import from evoagentx
-sys.path.append(str(Path(__file__).parent.parent))
+# Ensure project root is on sys.path to import evoagentx
+sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
 
 from evoagentx.tools import (
     OpenAIImageToolkit,
     OpenRouterImageToolkit,
-    FluxImageToolkit
-)
-from evoagentx.tools.storage_handler import LocalStorageHandler
-
-# Import the new unified image collections
-from evoagentx.tools.collection_image import (
-    ImageGenerationCollection,
-    ImageEditingCollection, 
-    ImageAnalysisCollection,
-    ImageCollectionToolkit
+    FluxImageToolkit,
 )
 
 
-def run_image_analysis_example():
-    """Simple example using OpenRouter image analysis to analyze images."""
-    print("\n===== IMAGE ANALYSIS TOOL EXAMPLE =====\n")
-
-    openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
-    if not openrouter_api_key:
-        print("❌ OPENROUTER_API_KEY not found in environment variables")
-        return
-
-    try:
-        ortk = OpenRouterImageToolkit(name="DemoORImageToolkit", api_key=openrouter_api_key)
-        # Use the correct tool name from OpenRouterImageAnalysisTool
-        analyze_tool = ortk.get_tool("openrouter_image_analysis")
-        test_image_url = "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Gfp-wisconsin-madison-the-nature-boardwalk.jpg/2560px-Gfp-wisconsin-madison-the-nature-boardwalk.jpg"
-        print(f"Analyzing image: {test_image_url}")
-        result = analyze_tool(prompt="Describe this image in detail.", image_url=test_image_url)
-        print("Raw analysis response:")
-        print(result)
-        if 'error' in result:
-            print(f"❌ Image analysis failed: {result['error']}")
-        else:
-            print("✓ Analysis:")
-            print(result.get('content', ''))
-    except Exception as e:
-        print(f"Error: {str(e)}")
-
-
-## (Removed) standalone OpenAI image generation example
-
-
-## (Removed) standalone OpenAI image editing example
-
-
-def run_openai_image_toolkit_pipeline():
-    """Single-call demo using OpenAIImageToolkit: generation only."""
-    print("\n===== OPENAI IMAGE TOOLKIT (SINGLE CALL: GENERATION) =====\n")
+def run_openai_toolkit_examples():
+    """Demonstrate OpenAIImageToolkit: generation, edit, analysis (raw IO)."""
+    print("\n===== OPENAI IMAGE TOOLKIT (GEN/EDIT/ANALYSIS) =====\n")
 
     openai_api_key = os.getenv("OPENAI_API_KEY")
     openai_org_id = os.getenv("OPENAI_ORGANIZATION_ID")
     if not openai_api_key:
-        print("❌ OPENAI_API_KEY not found in environment variables")
+        print("❌ OPENAI_API_KEY not found; skipping OpenAI toolkit demos")
         return
 
-    # Handle optional organization_id parameter
-    if openai_org_id:
-        toolkit = OpenAIImageToolkit(
-            name="DemoOpenAIImageToolkit",
-            api_key=openai_api_key,
-            organization_id=openai_org_id,
-            generation_model="gpt-image-1",
-            save_path="./generated_images"
-        )
-    else:
-        toolkit = OpenAIImageToolkit(
-            name="DemoOpenAIImageToolkit",
-            api_key=openai_api_key,
-            generation_model="gpt-image-1",
-            save_path="./generated_images"
-        )
+    try:
+        tk = OpenAIImageToolkit(api_key=openai_api_key, organization_id=openai_org_id, save_path="./generated_images")
 
-    # Single tool call: generation only
-    gen = toolkit.get_tool("openai_image_generation")
+        # Generation
+        gen = tk.get_tool("openai_image_generation")
+        gen_input = {
+            "prompt": "A watercolor painting of a mountain lake at dawn",
+            "image_name": "openai_gen_demo",
+            "size": "1024x1024",
+        }
+        print("OpenAI generation input:")
+        print(gen_input)
+        gen_out = gen(**gen_input)
+        print("Raw generation output:")
+        print(gen_out)
 
-    gen_prompt = "A cute baby owl sitting on a tree branch at sunset, digital art"
-    print(f"Generating: {gen_prompt}")
-    gen_result = gen(prompt=gen_prompt, model="gpt-image-1", size="1024x1024")
-    print("Raw generation response:")
-    print(gen_result)
-    if 'error' in gen_result:
-        print(f"❌ Generation failed: {gen_result['error']}")
+        # Editing
+        edit = tk.get_tool("openai_image_edit")
+        demo_url = "https://upload.wikimedia.org/wikipedia/commons/4/47/PNG_transparency_demonstration_1.png"
+        edit_input = {
+            "prompt": "Add a small red hat to the central subject",
+            "image_urls": [demo_url],
+            "image_name": "openai_edit_demo",
+        }
+        print("OpenAI edit input:")
+        print(edit_input)
+        edit_out = edit(**edit_input)
+        print("Raw edit output:")
+        print(edit_out)
+
+        # Analysis
+        analysis = tk.get_tool("openai_image_analysis")
+        analysis_input = {
+            "prompt": "Describe notable visual elements in this image.",
+            "image_urls": [demo_url],
+        }
+        print("OpenAI analysis input:")
+        print(analysis_input)
+        analysis_out = analysis(**analysis_input)
+        print("Raw analysis output:")
+        print(analysis_out)
+    except Exception as e:
+        print(f"Error running OpenAI toolkit demos: {str(e)}")
+
+
+def run_openrouter_toolkit_examples():
+    """Demonstrate OpenRouterImageToolkit: generation, edit, analysis (raw IO)."""
+    print("\n===== OPENROUTER IMAGE TOOLKIT (GEN/EDIT/ANALYSIS) =====\n")
+
+    openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
+    if not openrouter_api_key:
+        print("❌ OPENROUTER_API_KEY not found; skipping OpenRouter toolkit demos")
         return
-    gen_paths = gen_result.get('results', [])
-    if not gen_paths:
-        print("❌ No generated images returned")
-        return
-    src_path = gen_paths[0]
-    print(f"Generated image: {src_path}")
+
+    try:
+        tk = OpenRouterImageToolkit(api_key=openrouter_api_key)
+
+        demo_url = "https://upload.wikimedia.org/wikipedia/commons/4/47/PNG_transparency_demonstration_1.png"
+
+        # Generation
+        gen = tk.get_tool("openrouter_image_generation")
+        gen_input = {
+            "prompt": "An isometric city at night with glowing windows",
+            "output_basename": "openrouter_gen_demo",
+        }
+        print("OpenRouter generation input:")
+        print(gen_input)
+        gen_out = gen(**gen_input)
+        print("Raw generation output:")
+        print(gen_out)
+
+        # Editing
+        edit = tk.get_tool("openrouter_image_edit")
+        edit_input = {
+            "prompt": "Overlay a translucent geometric pattern",
+            "image_urls": [demo_url],
+            "output_basename": "openrouter_edit_demo",
+        }
+        print("OpenRouter edit input:")
+        print(edit_input)
+        edit_out = edit(**edit_input)
+        print("Raw edit output:")
+        print(edit_out)
+
+        # Analysis
+        analysis = tk.get_tool("openrouter_image_analysis")
+        analysis_input = {
+            "prompt": "Summarize the visual composition",
+            "image_urls": [demo_url],
+        }
+        print("OpenRouter analysis input:")
+        print(analysis_input)
+        analysis_out = analysis(**analysis_input)
+        print("Raw analysis output:")
+        print(analysis_out)
+    except Exception as e:
+        print(f"Error running OpenRouter toolkit demos: {str(e)}")
 
 
-def run_flux_image_toolkit_pipeline():
-    """Single-call demo using Flux backend: generation only."""
-    print("\n===== FLUX IMAGE TOOLKIT (SINGLE CALL: GENERATION) =====\n")
+def run_flux_toolkit_examples():
+    """Demonstrate FluxImageToolkit: generation and edit (raw IO)."""
+    print("\n===== FLUX IMAGE TOOLKIT (GEN/EDIT) =====\n")
 
     flux_api_key = os.getenv("FLUX_API_KEY")
     if not flux_api_key:
-        print("❌ FLUX_API_KEY not found in environment variables")
+        print("❌ FLUX_API_KEY not found; skipping Flux toolkit demos")
         return
 
-    # Initialize toolkit
-    flux = FluxImageToolkit(
-        name="DemoFluxImageToolkitPipeline",
-        api_key=flux_api_key,
-        save_path="./flux_generated_images"
-    )
-    gen_tool = flux.get_tool("flux_image_generation")
+    try:
+        tk = FluxImageToolkit(api_key=flux_api_key, save_path="./flux_generated_images")
 
-    # Single tool call: generation only
-    gen_prompt = "A neon-lit cyberpunk alley with rain reflections, cinematic"
-    print(f"Generating: {gen_prompt}")
-    gen_res = gen_tool(
-        prompt=gen_prompt,
-        seed=42,
-        output_format="jpeg",
-        prompt_upsampling=False,
-        safety_tolerance=2
-    )
-    print("Raw Flux generation response:")
-    print(gen_res)
-    if not gen_res.get('success'):
-        print(f"❌ Generation failed: {gen_res.get('error')}")
-        return
+        # Generation
+        gen = tk.get_tool("flux_image_generation")
+        gen_input = {
+            "prompt": "A neon-lit cyberpunk alley with rain reflections, cinematic",
+            "image_name": "flux_gen_demo",
+        }
+        print("Flux generation input:")
+        print(gen_input)
+        gen_out = gen(**gen_input)
+        print("Raw Flux generation output:")
+        print(gen_out)
 
-    base_path = gen_res.get('file_path')
-    if not base_path or not os.path.exists(base_path):
-        print("❌ Generation did not return a valid file path")
-        return
-    print(f"Generated: {base_path}")
-
-
-def run_openrouter_edit_pipeline():
-    """Single-call demo using OpenRouter: edit only (uses existing base image)."""
-    print("\n===== OPENROUTER EDIT (SINGLE CALL: EDIT ONLY) =====\n")
-
-    or_key = os.getenv("OPENROUTER_API_KEY")
-    if not or_key:
-        print("❌ OPENROUTER_API_KEY not found")
-        return
-
-    # Use a single storage handler across OR tools so that saved_paths (filenames)
-    # are resolved relative to the same base directory when read back.
-    or_base_dir = "./openrouter_images"
-    or_storage = LocalStorageHandler(base_path=or_base_dir)
-    ortk = OpenRouterImageToolkit(name="DemoORImageToolkit", api_key=or_key, storage_handler=or_storage)
-
-    # Single tool call: edit only, using an existing base image in repo
-    edit_tool = ortk.get_tool("openrouter_image_edit")
-
-    base_image_path = os.path.join(or_base_dir, "base.png")
-    if not os.path.exists(base_image_path):
-        print(f"❌ Base image not found at {base_image_path}. Please add one to proceed.")
-        return
-
-    edit_prompt = "Add a bold 'GEMINI' text at the top"
-    print(f"Editing image: {base_image_path}")
-    edit_res = edit_tool(
-        prompt=edit_prompt,
-        image_paths=[base_image_path],
-        model="google/gemini-2.5-flash-image-preview",
-        save_path=or_base_dir,
-        output_basename="edited"
-    )
-    print("Raw OpenRouter edit response:")
-    print(edit_res)
-    edited = edit_res.get('saved_paths', [])
-    if not edited:
-        print("❌ No edited image saved")
-        return
-    edited_path = edited[0]
-    print(f"Edited image: {edited_path}")
-
+        # Editing
+        edit = tk.get_tool("flux_image_edit")
+        demo_url = "https://upload.wikimedia.org/wikipedia/commons/4/47/PNG_transparency_demonstration_1.png"
+        edit_input = {
+            "prompt": "Apply a subtle vignette and cool tone",
+            "image_urls": [demo_url],
+            "image_name": "flux_edit_demo",
+        }
+        print("Flux edit input:")
+        print(edit_input)
+        edit_out = edit(**edit_input)
+        print("Raw Flux edit output:")
+        print(edit_out)
+    except Exception as e:
+        print(f"Error running Flux toolkit demos: {str(e)}")
 
 
 def main():
-    """Main function to run all image tool examples"""
-    print("===== IMAGE TOOL EXAMPLES =====")
-    
-    # Uncomment the examples you want to run:
-    
-    # Individual toolkit examples
-    run_image_analysis_example() 
-    run_openai_image_toolkit_pipeline()
-    run_flux_image_toolkit_pipeline()
-    run_openrouter_edit_pipeline()
-    
-    print("\n===== ALL IMAGE TOOL EXAMPLES COMPLETED =====")
+    """Run individual image toolkit demos (OpenAI, OpenRouter, Flux)."""
+    print("===== INDIVIDUAL IMAGE TOOLKIT DEMOS =====")
+    run_openai_toolkit_examples()
+    # run_openrouter_toolkit_examples()
+    run_flux_toolkit_examples()
+    print("\n===== ALL INDIVIDUAL TOOLKIT DEMOS COMPLETED =====")
+
 
 
 if __name__ == "__main__":

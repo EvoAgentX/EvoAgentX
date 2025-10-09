@@ -604,4 +604,3 @@ class SearchCollectionToolkit(Toolkit):
             tools=[search_collection],
             **kwargs
         )
-

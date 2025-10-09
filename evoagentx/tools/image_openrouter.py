@@ -1,3 +1,4 @@
+from re import S
 from typing import Dict, List, Optional
 import os
 import requests
@@ -183,28 +184,32 @@ class OpenRouterImageGenerationTool(OpenRouterImageGenerationEditBase, Tool):
 
     inputs: Dict[str, Dict] = {
         "prompt": {"type": "string", "description": "Text prompt."},
-        "model": {"type": "string", "description": "OpenRouter model id.", "default": "google/gemini-2.5-flash-image-preview"},
-        "api_key": {"type": "string", "description": "OpenRouter API key (fallback to env OPENROUTER_API_KEY)."},
-        "save_path": {"type": "string", "description": "Directory to save images (when data URLs).", "default": "./openrouter_images"},
         "output_basename": {"type": "string", "description": "Base filename for outputs.", "default": "or_gen"}
     }
     required: List[str] = ["prompt"]
 
-    def __init__(self, api_key: str = None, storage_handler: Optional[FileStorageHandler] = None, 
-                 base_path: str = "./openrouter_images"):
+    def __init__(
+        self, 
+        name: str = None, 
+        api_key: str = None, 
+        model: str = "google/gemini-2.5-flash-image-preview", 
+        storage_handler: Optional[FileStorageHandler] = None, 
+        save_path: str = "./openrouter_images"
+    ):
         super().__init__()
         self.api_key = api_key or os.getenv("OPENROUTER_API_KEY")
-        self.storage_handler = storage_handler or LocalStorageHandler(base_path=base_path)
+        self.model = model
+        self.storage_handler = storage_handler or LocalStorageHandler(base_path=save_path)
+        self.name = name or self.name 
 
     def __call__(
         self,
         prompt: str,
-        model: str = "google/gemini-2.5-flash-image-preview",
-        api_key: str = None,
-        save_path: str = "./openrouter_images",
-        output_basename: str = "or_gen",
+        output_basename: str = "default_or_generated_image",
     ):
-        key = api_key or self.api_key
+        key = self.api_key
+        model = self.model 
+
         if not key:
             return {"error": "OPENROUTER_API_KEY not provided."}
 
@@ -247,32 +252,35 @@ class OpenRouterImageEditTool(OpenRouterImageGenerationEditBase, Tool):
 
     inputs: Dict[str, Dict] = {
         "prompt": {"type": "string", "description": "Text prompt describing the edit."},
-        "image_urls": {"type": "array", "description": "Remote image URLs (optional)."},
-        "image_paths": {"type": "array", "description": "Local image paths (optional)."},
-        "model": {"type": "string", "description": "OpenRouter model id.", "default": "google/gemini-2.5-flash-image-preview"},
-        "api_key": {"type": "string", "description": "OpenRouter API key (fallback to env OPENROUTER_API_KEY)."},
-        "save_path": {"type": "string", "description": "Directory to save images (when data URLs).", "default": "./openrouter_images"},
+        "image_urls": {"type": "array", "items": {"type": "string", "description": "HTTP(S) image URL"}, "description": "Remote image URLs (optional)."},
+        "image_paths": {"type": "array", "items": {"type": "string", "description": "Local image file path"}, "description": "Local image paths (optional)."},
         "output_basename": {"type": "string", "description": "Base filename for outputs.", "default": "or_gen"}
     }
     required: List[str] = ["prompt"]
 
-    def __init__(self, api_key: str = None, storage_handler: Optional[FileStorageHandler] = None, 
-                 base_path: str = "./openrouter_images"):
+    def __init__(
+        self, 
+        name: str = None, 
+        api_key: str = None, 
+        model: str = "google/gemini-2.5-flash-image-preview", 
+        storage_handler: Optional[FileStorageHandler] = None, 
+        save_path: str = "./openrouter_images"
+    ):
         super().__init__()
         self.api_key = api_key or os.getenv("OPENROUTER_API_KEY")
-        self.storage_handler = storage_handler or LocalStorageHandler(base_path=base_path)
+        self.model = model
+        self.storage_handler = storage_handler or LocalStorageHandler(base_path=save_path)
+        self.name = name or self.name  
 
     def __call__(
         self,
         prompt: str,
         image_urls: list = None,
         image_paths: list = None,
-        model: str = "google/gemini-2.5-flash-image-preview",
-        api_key: str = None,
-        save_path: str = "./openrouter_images",
-        output_basename: str = "or_gen",
+        output_basename: str = "default_or_edited_image",
     ):
-        key = api_key or self.api_key
+        key = self.api_key
+        model = self.model 
         if not key:
             return {"error": "OPENROUTER_API_KEY not provided."}
 
@@ -282,7 +290,7 @@ class OpenRouterImageEditTool(OpenRouterImageGenerationEditBase, Tool):
         # Build content parts from URLs and/or local paths
         content_parts = [{"type": "text", "text": prompt}]
         if image_urls:
-            content_parts.extend(self._urls_to_image_parts(image_urls))
+            content_parts.extend(self._urls_to_image_parts(image_urls)) 
         if image_paths:
             content_parts.extend(self._paths_to_image_parts(image_paths))
 
@@ -321,54 +329,64 @@ class OpenRouterImageAnalysisTool(Tool):
 
     inputs: Dict[str, Dict[str, str]] = {
         "prompt": {"type": "string", "description": "Analysis question or instruction"},
-        "image_url": {"type": "string", "description": "HTTP(S) image URL"},
-        "image_path": {"type": "string", "description": "Local image file path"},
-        "pdf_path": {"type": "string", "description": "Local PDF file path"},
-        "model": {"type": "string", "description": "Model to use for analysis"},
+        "image_urls": {"type": "array", "items": {"type": "string", "description": "HTTP(S) image URL"}, "description": "HTTP(S) image URL"},
+        "image_paths": {"type": "array", "items": {"type": "string", "description": "Local image file path"}, "description": "Local image file path"},
     }
     required: Optional[List[str]] = ["prompt"]
 
-    def __init__(self, api_key: str = None, model: str = "openai/gpt-4o", 
-                 storage_handler: Optional[FileStorageHandler] = None):
+    def __init__(
+        self, 
+        name: str = None, 
+        api_key: str = None, 
+        model: str = "openai/gpt-4o", 
+        storage_handler: Optional[FileStorageHandler] = None
+    ):
         super().__init__()
         self.api_key = api_key or os.getenv("OPENROUTER_API_KEY")
         self.model = model
+        self.name = name or self.name 
         self.storage_handler = storage_handler or LocalStorageHandler()
 
-    def __call__(self, prompt: str = None, image_url: str = None, image_path: str = None, 
-                 pdf_path: str = None, model: str = None):
+    def __call__(
+        self, 
+        prompt: str = None, 
+        image_urls: list = None, 
+        image_paths: list = None,
+    ):
         key = self.api_key
         if not key:
             return {"error": "OPENROUTER_API_KEY not provided."}
 
-        actual_model = model or self.model
+        actual_model = self.model
 
         # Determine image input
-        image_input = image_url or image_path or pdf_path
-        if not image_input:
-            return {"error": "No image input provided. Please specify image_url, image_path, or pdf_path."}
+        if not image_urls and not image_paths:
+            return {"error": "No image input provided. Please provide one of the following: 1) image_urls - a list of one or more HTTP/HTTPS URL(s) to image files, 2) image_paths - a list of one or more local file path(s) to image files. The image will be analyzed according to your prompt."}
 
         content_parts = [{"type": "text", "text": prompt or ""}]
         
-        if image_url:
-            content_parts.append({"type": "image_url", "image_url": {"url": image_url}})
-        elif image_path or pdf_path:
-            try:
-                data_url = self._path_to_data_url(image_path or pdf_path)
-                content_parts.append({"type": "image_url", "image_url": {"url": data_url}})
-            except Exception as e:
-                return {"error": f"Failed to read file: {e}"}
+        if image_urls:
+            for url in image_urls:
+                content_parts.append({"type": "image_url", "image_url": {"url": url}})
+        
+        if image_paths:
+            for image_path in image_paths:
+                try:
+                    data_url = self._path_to_data_url(image_path)
+                    content_parts.append({"type": "image_url", "image_url": {"url": data_url}})
+                except Exception as e:
+                    return {"error": f"Failed to read local image file '{image_path}': {e}. Please check that the file exists and is a valid image file."}
 
         payload = {
             "model": actual_model,
             "messages": [{"role": "user", "content": content_parts}],
+            "modalities": ["image", "text"]
         }
 
         headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
         
         try:
-            resp = requests.post("https://openrouter.ai/api/v1/chat/completions", 
-                               headers=headers, json=payload)
+            resp = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload)
             resp.raise_for_status()
             data = resp.json()
         except Exception as e:
