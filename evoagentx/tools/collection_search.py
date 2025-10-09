@@ -33,15 +33,7 @@ class SearchCollection(ToolCollection):
         },
         "max_content_words": {
             "type": "integer",
-            "description": "Maximum words per result content (default: 300)"
-        },
-        "language": {
-            "type": "string",
-            "description": "Language preference (ISO 639-1 code, e.g., 'en', 'es', 'fr')"
-        },
-        "region": {
-            "type": "string", 
-            "description": "Geographic region for localized results (e.g., 'us', 'uk', 'de')"
+            "description": "Maximum words per result content (default: 7500)"
         }
     }
     required: Optional[List[str]] = ["query"]
@@ -82,6 +74,8 @@ class SearchCollection(ToolCollection):
             SerperAPIToolkit(
                 num_search_pages=num_results,
                 max_content_words=max_content_words,
+                default_language=language,
+                default_country=region,
                 page_content_handler=page_content_handler
             ),
             WikipediaSearchToolkit(
@@ -154,62 +148,48 @@ class SearchCollection(ToolCollection):
         """
         Map unified inputs to DDGS search tool format.
         
-        Maps from unified schema to DDGSSearchTool inputs:
-        - query (string, required): The search query to execute
-        - num_search_pages (integer, optional): Number of search results to retrieve. Default: 5
-        - max_content_words (integer, optional): Maximum number of words to include in content per result. None means no limit. Default: None
-        - backend (string, optional): Search backend to use. Options: 'auto', 'duckduckgo', 'google', 'bing', 'brave', 'yahoo'. Default: 'auto'
-        - region (string, optional): Search region (e.g., 'us-en', 'uk-en', 'ru-ru'). Default: 'us-en'
+        Simplified mapping to DDGSSearchTool:
+        - query
+        - num_search_pages
+        - max_content_words
+        Backend and region are configured during toolkit initialization.
         """
-        mapped_args = {
+        return {
             "query": inputs.get("query", ""),
             "num_search_pages": inputs.get("num_results", 5),
             "max_content_words": inputs.get("max_content_words", 300)
         }
-        
-        # Map region to DDGS format (e.g., 'us' -> 'us-en')
-        if "region" in inputs and inputs["region"]:
-            region = inputs["region"]
-            language = inputs.get("language", "en")
-            mapped_args["region"] = f"{region}-{language}"
-            
-        return mapped_args
     
     def wiki_argument_mapping_func(self, inputs: Dict[str, Any], outputs: Dict[str, Any]) -> Dict[str, Any]:
         """
         Map unified inputs to Wikipedia search tool format.
         
-        Maps from unified schema to WikipediaSearchTool inputs:
-        - query (string, required): The search query to execute
-        - num_search_pages (integer, optional): Number of search results to retrieve. Default: 5
-        - max_content_words (integer, optional): Maximum number of words to include in content per result. None means no limit. Default: None
-        - language (string, optional): Wikipedia language code (e.g., 'en', 'es', 'fr', 'de'). Default: 'en'
+        Simplified mapping to WikipediaSearchTool:
+        - query
+        - num_search_pages
+        - max_content_words
+        Language is handled by the underlying tool or defaults.
         """
         return {
             "query": inputs.get("query", ""),
             "num_search_pages": inputs.get("num_results", 5),
-            "max_content_words": inputs.get("max_content_words", 300),
-            "language": inputs.get("language", "en")
+            "max_content_words": inputs.get("max_content_words", 30000)
         }
     
     def serpapi_argument_mapping_func(self, inputs: Dict[str, Any], outputs: Dict[str, Any]) -> Dict[str, Any]:
         """
         Map unified inputs to SerpAPI search tool format.
         
-        Maps from unified schema to SerpAPITool inputs:
-        - query (string, required): The search query to execute
-        - num_search_pages (integer, optional): Number of search results to retrieve. Default: 10
-        - max_content_words (integer, optional): Maximum number of words to include in content per result. None means no limit. Default: None
-        - location (string, optional): Geographic location for localized results (e.g., 'New York, NY', 'London, UK')
-        - language (string, optional): Interface language code (e.g., 'en', 'es', 'fr', 'de'). Default: en
-        - country (string, optional): Country code for country-specific results (e.g., 'us', 'uk', 'ca'). Default: us
+        Simplified mapping to SerpAPITool:
+        - query
+        - num_search_pages
+        - max_content_words
+        Location/language/country/search_type are configured via toolkit defaults.
         """
         return {
             "query": inputs.get("query", ""),
             "num_search_pages": inputs.get("num_results", 5),
-            "max_content_words": inputs.get("max_content_words", 300),
-            "language": inputs.get("language", "en"),
-            "country": inputs.get("region", "us")
+            "max_content_words": inputs.get("max_content_words", 30000)
         }
     
     def ddgs_output_convert_func(self, outputs: Any) -> Dict[str, Any]:
@@ -345,20 +325,16 @@ class SearchCollection(ToolCollection):
         """
         Map unified inputs to Google search tool format.
         
-        Maps from unified schema to GoogleSearchTool inputs:
-        - query (string, required): The search query to execute
-        - num_search_pages (integer, optional): Number of search results to retrieve. Default: 10
-        - max_content_words (integer, optional): Maximum number of words to include in content per result. None means no limit. Default: None
-        - language (string, optional): Interface language code (e.g., 'en', 'es', 'fr', 'de'). Default: en
-        - country (string, optional): Country code for country-specific results (e.g., 'us', 'uk', 'ca'). Default: us
-        - location (string, optional): Geographic location for localized results
+        Simplified mapping to GoogleSearchTool:
+        - query
+        - num_search_pages
+        - max_content_words
+        Locale parameters are not passed per call.
         """
         return {
             "query": inputs.get("query", ""),
             "num_search_pages": inputs.get("num_results", 5),
-            "max_content_words": inputs.get("max_content_words", 300),
-            "language": inputs.get("language", "en"),
-            "country": inputs.get("region", "us")
+            "max_content_words": inputs.get("max_content_words", 30000),
         }
     
     def google_free_argument_mapping_func(self, inputs: Dict[str, Any], outputs: Dict[str, Any]) -> Dict[str, Any]:
@@ -373,27 +349,23 @@ class SearchCollection(ToolCollection):
         return {
             "query": inputs.get("query", ""),
             "num_search_pages": inputs.get("num_results", 5),
-            "max_content_words": inputs.get("max_content_words", 300)
+            "max_content_words": inputs.get("max_content_words", 30000)
         }
     
     def serperapi_argument_mapping_func(self, inputs: Dict[str, Any], outputs: Dict[str, Any]) -> Dict[str, Any]:
         """
         Map unified inputs to SerperAPI search tool format.
         
-        Maps from unified schema to SerperAPITool inputs:
-        - query (string, required): The search query to execute
-        - num_search_pages (integer, optional): Number of search results to retrieve. Default: 10
-        - max_content_words (integer, optional): Maximum number of words to include in content per result. None means no limit. Default: None
-        - location (string, optional): Geographic location for localized results (e.g., 'New York, NY', 'London, UK')
-        - language (string, optional): Interface language code (e.g., 'en', 'es', 'fr', 'de'). Default: en
-        - country (string, optional): Country code for country-specific results (e.g., 'us', 'uk', 'ca'). Default: us
+        Simplified mapping to SerperAPITool:
+        - query
+        - num_search_pages
+        - max_content_words
+        Location/language/country are configured via toolkit defaults.
         """
         return {
             "query": inputs.get("query", ""),
             "num_search_pages": inputs.get("num_results", 5),
-            "max_content_words": inputs.get("max_content_words", 300),
-            "language": inputs.get("language", "en"),
-            "country": inputs.get("region", "us")
+            "max_content_words": inputs.get("max_content_words", 30000)
         }
     
     def google_output_convert_func(self, outputs: Any) -> Dict[str, Any]:
@@ -525,16 +497,15 @@ class SearchCollection(ToolCollection):
             "error": None
         }
 
-    def __call__(self, query: str, num_results: int = None, max_content_words: int = None, language: str = None, region: str = None, **kwargs) -> Dict[str, Any]:
+    def __call__(self, query: str, num_results: int = None, max_content_words: int = None, **kwargs) -> Dict[str, Any]:
         """
         Execute the search collection with unified parameters.
         
         Args:
             query: The search query to execute across multiple search engines
             num_results: Number of search results to retrieve per engine (default: 5)
-            max_content_words: Maximum words per result content (default: 300)
-            language: Language preference (ISO 639-1 code, e.g., 'en', 'es', 'fr')
-            region: Geographic region for localized results (e.g., 'us', 'uk', 'de')
+            max_content_words: Maximum words per result content (default: 30000)
+            Note: Language/region are configured at initialization and not passed per-call.
             
         Returns:
             Dict containing the unified results from executed search engines
@@ -545,16 +516,11 @@ class SearchCollection(ToolCollection):
             
         num_results = num_results or self.default_num_results
         max_content_words = max_content_words or self.default_max_content_words
-        language = language or self.default_language
-        region = region or self.default_region
-        
         inputs = {
             "query": query,
             "num_results": num_results,
             "max_content_words": max_content_words,
-            "language": language,
-            "region": region,
-            **{k: v for k, v in kwargs.items() if k not in ["query", "num_results", "max_content_words", "language", "region"]}
+            **{k: v for k, v in kwargs.items() if k not in ["query", "num_results", "max_content_words"]}
         }
         # Delegate to base pipeline: returns first successful mapped result or last error
         return self._run_pipeline(inputs)
