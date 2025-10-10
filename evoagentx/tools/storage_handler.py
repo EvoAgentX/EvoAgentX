@@ -246,17 +246,14 @@ class LocalStorageHandler(FileStorageHandler):
     def _get_file_url(self, file_path: str) -> str:
         """Create URL for others access"""
         try:
-            # If already absolute, use it directly
-            if os.path.isabs(file_path):
-                path_for_url = file_path
-            else:
-                # Join with absolute base_path to avoid duplicating base_path
-                abs_base = os.path.abspath(self.base_path)
-                path_for_url = os.path.normpath(os.path.join(abs_base, file_path))
-            return f"file://{path_for_url}"
+            # file_path provided to this method is already the resolved system path
+            # (callers pass translate_in(file_path)). To avoid duplicating base_path,
+            # simply convert to an absolute path and build the file URL.
+            abs_path = os.path.abspath(file_path)
+            return f"file://{abs_path}"
         except Exception:
-            # Fallback to original behavior
-            return f"file://{os.path.join(self.base_path, file_path)}"
+            # Fallback: return a best-effort URL without altering the path
+            return f"file://{file_path}"
     
 
 
