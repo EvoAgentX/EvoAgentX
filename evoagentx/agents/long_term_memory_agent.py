@@ -1,7 +1,8 @@
+from email import message
 import json
 import asyncio
 from uuid import uuid4
-from pydantic import Field
+from pydantic import Field, BaseModel
 from datetime import datetime
 from typing import Optional, List, Tuple, Dict, Union
 
@@ -14,6 +15,7 @@ from evoagentx.storages.base import StorageHandler
 from evoagentx.core.message import Message, MessageType
 from evoagentx.memory.memory_manager import MemoryManager
 from evoagentx.memory.long_term_memory import LongTermMemory
+from evoagentx.memory.memory import ShortTermMemory
 from evoagentx.actions.action import Action, ActionInput, ActionOutput
 from evoagentx.rag.rag_config import RAGConfig
 
@@ -21,6 +23,7 @@ from evoagentx.rag.rag_config import RAGConfig
 class MemoryActionInput(ActionInput):
     user_prompt: str = Field(description="The user's input prompt")
     conversation_id: Optional[str] = Field(default=None, description="ID for tracking conversation")
+    corpus_id: Optional[str] = Field(default=None, description="Specific corpus ID to query / write")
     top_k: Optional[int] = Field(default=5, description="Number of memory results to retrieve")
     metadata_filters: Optional[Dict] = Field(default=None, description="Filters for memory retrieval")
 
@@ -34,7 +37,11 @@ class MemoryAction(Action):
         self,
         name: str = "MemoryAction",
         description: str = "Action that processes user input with long-term memory context",
-        prompt: str = "Based on the following context and user prompt, provide a relevant response:\n\nContext: {context}\n\nUser Prompt: {user_prompt}\n\n",
+        prompt: str = (
+            "Based on the following context and user prompt, provide a relevant response:\n\n"
+            "Context: {context}\n\n"
+            "User Prompt: {user_prompt}\n\n"
+        ),
         inputs_format: ActionInput = None,
         outputs_format: ActionOutput = None,
         **kwargs
@@ -50,14 +57,18 @@ class MemoryAction(Action):
             **kwargs
         )
 
-    def execute(self, llm: BaseLLM | None = None, 
-                inputs: Dict | None = None, 
-                sys_msg: str | None = None, 
-                return_prompt: bool = False, 
-                memory_manager: Optional[MemoryManager] = None,
-                **kwargs
+    def execute(
+        self,
+        llm: BaseLLM | None = None,
+        inputs: Dict | None = None,
+        sys_msg: str | None = None,
+        return_prompt: bool = False,
+        memory_manager: Optional[MemoryManager] = None,
+        **kwargs
     ) -> Parser | Tuple[Parser | str] | None:
-        return asyncio.run(self.async_execute(llm, inputs, sys_msg, return_prompt, memory_manager, **kwargs))
+        return asyncio.run(
+            self.async_execute(llm, inputs, sys_msg, return_prompt, memory_manager, **kwargs)
+        )
 
     async def async_execute(
         self,
@@ -69,30 +80,51 @@ class MemoryAction(Action):
         **kwargs
     ) -> Union[MemoryActionOutput, tuple]:
         if not memory_manager:
-            logger.error("MemoryManager is required for MemoryAction execution")
-            raise ValueError("MemoryManager is required for MemoryAction")
+            raise ValueError("MemoryManager is required for MemoryAction execution")
+
+        # safety: ensure inputs is a dict
+        inputs = inputs or {}
 
         action_input = self.inputs_format(**inputs)
         user_prompt = action_input.user_prompt
-        conversation_id = action_input.conversation_id
-        if not conversation_id:
-            conversation_id = str(uuid4())
-            logger.warning("No conversation_id provided; generated a new UUID4 for this session")
-        top_k = action_input.top_k
-        metadata_filters = action_input.metadata_filters
 
+        # conversation_id: prefer explicit -> fallback to memory default corpus id -> fallback to new uuid
+        conversation_id = action_input.conversation_id or getattr(getattr(memory_manager, 'memory', None), 'default_corpus_id', None) or str(uuid4())
+        if not action_input.conversation_id:
+            logger.warning("No conversation_id provided; using default_corpus_id or generated UUID4 for this session: %s", conversation_id)
+
+        top_k = action_input.top_k
+        corpus_id = action_input.corpus_id
+        metadata_filters = action_input.metadata_filters or {}
+
+        # if caller provided an explicit corpus_id, ensure it's present in metadata_filters
+        if corpus_id:
+            metadata_filters.setdefault('corpus_id', corpus_id)
+        else:
+            # if not provided, but memory_manager has a default corpus id, use that
+            default_corpus = getattr(getattr(memory_manager, 'memory', None), 'default_corpus_id', None)
+            if default_corpus and 'corpus_id' not in metadata_filters:
+                metadata_filters.setdefault('corpus_id', default_corpus)
+
+        # Obtain short-term memory from action_input_data
+        short_term_context = inputs.get("short_term_context", "")
+
+        # Create a unified conversation message
         message = await memory_manager.create_conversation_message(
             user_prompt=user_prompt,
             conversation_id=conversation_id,
+            short_term_context=short_term_context,
             top_k=top_k,
-            metadata_filters=metadata_filters
+            metadata_filters=metadata_filters,
+            corpus_id=corpus_id
         )
 
-        action_input_attrs = self.inputs_format.get_attrs()
-        action_input_data = {attr: getattr(action_input, attr, "undefined") for attr in action_input_attrs}
-        action_input_data["context"] = message.content
-        prompt = self.prompt.format(**action_input_data)
-        logger.info(f"The New Created Message by LongTermMemory:\n\n{prompt}")
+        print("\n========== Memory Context ==========\n"
+            f"{message.content}\n"
+            "====================================\n")
+
+        # Construct LLM prompt
+        prompt = self.prompt.format(context=message.content, user_prompt=user_prompt)
 
         output = await llm.async_generate(
             prompt=prompt,
@@ -100,7 +132,8 @@ class MemoryAction(Action):
             parser=self.outputs_format,
             parse_mode='str'
         )
-        
+
+        # Construct response message and write to long-term memory
         response_message = Message(
             content=output.content,
             msg_type=MessageType.RESPONSE,
@@ -108,12 +141,9 @@ class MemoryAction(Action):
             conversation_id=conversation_id,
             memory_ids=message.memory_ids
         )
-        memory_ids = await memory_manager.handle_memory(
-            action="add",
-            data=response_message,
-        )
+        # ensure that write includes corpus_id in metadata where possible (MemoryManager/LongTermMemory should honor it)
+        memory_ids = await memory_manager.handle_memory(action="add", data=response_message)
 
-        # Prepare the final output
         final_output = self.outputs_format(
             response=output.content,
             memory_ids=memory_ids
@@ -122,6 +152,7 @@ class MemoryAction(Action):
         if return_prompt:
             return final_output, prompt
         return final_output
+
 
 
 class MemoryAgent(Agent):
@@ -135,6 +166,7 @@ class MemoryAgent(Agent):
         description: str = "An agent that uses long-term memory to provide context-aware responses",
         inputs: Optional[List[Dict]] = None,
         outputs: Optional[List[Dict]] = None,
+        llm: Optional[BaseLLM] = None,
         llm_config: Optional[OpenAILLMConfig] = None,
         storage_handler: Optional[StorageHandler] = None,
         rag_config: Optional[RAGConfig] = None,
@@ -159,6 +191,7 @@ class MemoryAgent(Agent):
             **kwargs
         )
 
+        # Note: the 'conversation_id' arg here is used to initialize the default corpus id in LongTermMemory
         self.long_term_memory = LongTermMemory(
             storage_handler=storage_handler,
             rag_config=rag_config,
@@ -166,7 +199,7 @@ class MemoryAgent(Agent):
         )
         self.memory_manager = MemoryManager(
             memory=self.long_term_memory,
-            llm=llm_config.get_llm() if llm_config else None,
+            llm=llm if llm else None,
             use_llm_management=True
         )
 
@@ -185,6 +218,49 @@ class MemoryAgent(Agent):
             outputs_format=MemoryActionOutput
         )
         self.add_action(memory_action)
+
+    def _build_short_term_context(self, n: int = 5) -> str:
+        recent_msgs = self.short_term_memory.get(n=n)
+        context_lines = []
+        for m in recent_msgs:
+            role = "User" if m.msg_type in [MessageType.REQUEST, MessageType.INPUT] else "Agent"
+            content = m.content
+            if isinstance(content, str):
+                text = content
+            elif isinstance(content, BaseModel):
+                text = json.dumps(content.model_dump(), ensure_ascii=False)
+            elif hasattr(content, "dict"):
+                text = json.dumps(content.dict(), ensure_ascii=False)
+            else:
+                text = str(content)
+            context_lines.append(f"{role}: {text}")
+        return "\n".join(context_lines)
+    
+    def _prepare_execution(
+        self,
+        action_name: str,
+        msgs: Optional[list] = None,
+        action_input_data: Optional[dict] = None,
+        **kwargs
+    ):
+        # Update short-term memory
+        action, action_input_data = super()._prepare_execution(
+            action_name=action_name,
+            msgs=msgs,
+            action_input_data=action_input_data,
+            **kwargs
+        )
+
+        # Automatically inject short-term context
+        if action_input_data is None:
+            action_input_data = {}
+        if "short_term_context" not in action_input_data:
+            action_input_data["short_term_context"] = self._build_short_term_context(
+                n=self.n or 5
+            )
+
+        return action, action_input_data
+        
 
     def _create_output_message(
         self,
@@ -304,7 +380,6 @@ class MemoryAgent(Agent):
             **kwargs
         )
 
-        # Execute action with memory_manager
         execution_results = action.execute(
             llm=self.llm,
             inputs=action_input_data,
@@ -337,11 +412,14 @@ class MemoryAgent(Agent):
         return_message: bool = True,
         **kwargs
     ):
+        # prefer explicit corpus id default from long_term_memory if available
+        corpus_default = getattr(getattr(self, 'long_term_memory', None), 'default_corpus_id', None)
         action_input_data = {
             "user_prompt": user_prompt,
             "conversation_id": conversation_id or self._default_conversation_id(),
+            "corpus_id": corpus_default,
             "top_k": top_k if top_k is not None else 3,
-            "metadata_filters": metadata_filters or {},
+            "metadata_filters": metadata_filters or ({'corpus_id': corpus_default} if corpus_default else {}),
         }
         msg = self.execute(
             action_name="MemoryAction",
@@ -362,11 +440,13 @@ class MemoryAgent(Agent):
         return_message: bool = True,
         **kwargs
     ):
+        corpus_default = getattr(getattr(self, 'long_term_memory', None), 'default_corpus_id', None)
         action_input_data = {
             "user_prompt": user_prompt,
             "conversation_id": conversation_id or self._default_conversation_id(),
+            "corpus_id": corpus_default,
             "top_k": top_k if top_k is not None else 3,
-            "metadata_filters": metadata_filters or {},
+            "metadata_filters": metadata_filters or ({'corpus_id': corpus_default} if corpus_default else {}),
         }
         msg = await self.async_execute(
             action_name="MemoryAction",
@@ -403,6 +483,11 @@ class MemoryAgent(Agent):
         conversation_id = conversation_id or self._default_conversation_id()
         metadata_filters = metadata_filters or {}
 
+        # ensure corpus_id filter uses the agent's default corpus id when not specified
+        corpus_default = getattr(getattr(self, 'long_term_memory', None), 'default_corpus_id', None)
+        if corpus_default and 'corpus_id' not in metadata_filters:
+            metadata_filters['corpus_id'] = corpus_default
+
         print("💬 MemoryAgent has been started (type 'exit' to quit)\n")
 
         while True:
@@ -424,9 +509,6 @@ class MemoryAgent(Agent):
                 if hasattr(msg, "content") and msg.content:
                     context_texts.append(msg.content)
             context_str = "\n".join(context_texts)
-
-            # if context_str:
-            #     print(f"📖 Retrieved context from memory:\n{context_str}\n")
 
             # Concatenate the historical context into the user input and invoke async_chat
             full_prompt = f"Context:\n{context_str}\n\nUser: {user_prompt}" if context_str else user_prompt

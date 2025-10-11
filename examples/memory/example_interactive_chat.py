@@ -42,7 +42,8 @@ async def main():
 
     # Initialize MemoryAgent
     agent = MemoryAgent(
-        llm=llm,
+        llm=llm, 
+        llm_config=llm_config,
         rag_config=rag_config,
         storage_handler=storage_handler,
         name="MemoryAgent",

@@ -1,12 +1,11 @@
-import asyncio  
+import asyncio
 import os
-import pytest
 from evoagentx.core.message import Message, MessageType
 from evoagentx.agents.agent import Agent
 from evoagentx.models import OpenAILLMConfig, OpenAILLM
 from evoagentx.actions.action import Action
 
-# Define a DummyAction for testing
+# ---------------- Action ----------------
 class DummyAction(Action):
     def __init__(self, **kwargs):
         super().__init__(
@@ -23,13 +22,14 @@ class DummyAction(Action):
             return output, prompt
         return output
 
+# ---------------- Agent ----------------
 class ShortTermMemoryTestAgent(Agent):
-    """Inherit Agent for short-term memory testing"""
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.short_term_memory.max_size = 5
         self.add_action(DummyAction())
 
+# ---------------- Test ----------------
 async def test_short_term_memory_via_agent():
     config = OpenAILLMConfig(
         model="gpt-4o-mini",
@@ -38,7 +38,6 @@ async def test_short_term_memory_via_agent():
     )
     llm = OpenAILLM(config=config)
 
-    # Initialize agent
     agent = ShortTermMemoryTestAgent(
         llm=llm,
         rag_config=None,
@@ -50,23 +49,23 @@ async def test_short_term_memory_via_agent():
     print("=== Add a single message ===")
     await agent.async_execute("DummyAction", action_input_data={"text": "Hello 1"})
     for m in agent.short_term_memory.get():
-        print(f"- {m.content}")
+        if isinstance(m.content, str) and m.content.startswith("[Echo]"):
+            print(f"- {m.content}")
 
     print("\n=== Add multiple messages, exceeding max_size to test circular queue ===")
     for i in range(2, 8):
         await agent.async_execute("DummyAction", action_input_data={"text": f"Msg {i}"})
 
     buffer_msgs = agent.short_term_memory.get()
-    print("Short-term memory content (should be at most 5 messages):")
-    for i, m in enumerate(buffer_msgs, 1):
-        print(f"{i}: {m.content}")
+    print("Short-term memory (RESULT only):")
+    results = [m for m in buffer_msgs
+               if isinstance(m.content, str) and m.content.startswith("[Echo]")]
+    for idx, m in enumerate(results, 1):
+        print(f"{idx}: {m.content}")
 
-    # Check FIFO behavior (only look at response messages)
-    responses = [m for m in buffer_msgs if isinstance(m.content, str) and m.content.startswith("[Echo]")]
-    assert len(responses) <= agent.short_term_memory.max_size, "Short-term memory exceeded max_size"
-    assert responses[0].content == "[Echo] Msg 5", "Oldest response message should be overwritten"
-    assert responses[-1].content == "[Echo] Msg 7", "Latest response message should be at the end"
-
+    assert len(results) <= agent.short_term_memory.max_size
+    assert results[0].content == "[Echo] Msg 5" 
+    assert results[-1].content == "[Echo] Msg 7"
     print("\n✅ Short-term memory test passed!")
 
 if __name__ == "__main__":

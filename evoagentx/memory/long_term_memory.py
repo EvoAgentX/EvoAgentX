@@ -153,7 +153,7 @@ class LongTermMemory(BaseMemory):
             logger.error(f"Failed to get memories: {str(e)}")
             return []
 
-    def delete(self, memory_ids: Union[str, List[str]]) -> List[bool]:
+    async def delete(self, memory_ids: Union[str, List[str]]) -> List[bool]:
         """Delete memories by memory_ids, returning success status for each."""
         if not isinstance(memory_ids, list):
             memory_ids = [memory_ids]
@@ -165,7 +165,8 @@ class LongTermMemory(BaseMemory):
         successes = [False] * len(memory_ids)
         valid_memory_ids = []
 
-        existing_chunks = asyncio.run(self.get(memory_ids, return_chunk=True))
+        existing_chunks = await self.get(memory_ids, return_chunk=True)
+
         for idx, (chunk, mid) in enumerate(existing_chunks):
             if chunk:
                 valid_memory_ids.append(mid)
@@ -176,16 +177,25 @@ class LongTermMemory(BaseMemory):
             logger.info("No memories found for deletion")
             return successes
 
-        # Remove from RAG index
-        self.rag_engine.delete(
-            corpus_id=self.default_corpus_id,
-            index_type=self.rag_config.index.index_type,
-            node_ids=valid_memory_ids
-        )
+        if hasattr(self.rag_engine, "delete") and callable(self.rag_engine.delete):
+            result = self.rag_engine.delete(
+                corpus_id=self.default_corpus_id,
+                index_type=self.rag_config.index.index_type,
+                node_ids=valid_memory_ids
+            )
+            if asyncio.iscoroutine(result):
+                await result
+        else:
+            self.rag_engine.delete(
+                corpus_id=self.default_corpus_id,
+                index_type=self.rag_config.index.index_type,
+                node_ids=valid_memory_ids
+            )
 
         return successes
 
-    def update(self, updates: Union[Tuple[str, Union[Message, str]], List[Tuple[str, Union[Message, str]]]]) -> List[bool]:
+
+    async def update(self, updates: Union[Tuple[str, Union[Message, str]], List[Tuple[str, Union[Message, str]]]]) -> List[bool]:
         """Update memories with new content, returning success status for each."""
         if not isinstance(updates, list):
             updates = [updates]
@@ -197,7 +207,7 @@ class LongTermMemory(BaseMemory):
             return []
 
         memory_ids = list(updates_dict.keys())
-        existing_memories = asyncio.run(self.get(memory_ids, return_chunk=False))
+        existing_memories = await self.get(memory_ids, return_chunk=False)
         existing_dict = {mid: msg for msg, mid in existing_memories}
 
         successes = [False] * len(updates)
@@ -250,7 +260,7 @@ class LongTermMemory(BaseMemory):
                 return [(chunk, chunk.metadata.memory_id) for chunk in result.corpus.chunks]
             else:
                 messages = [(self._chunk_to_message(chunk), chunk.metadata.memory_id) for chunk in result.corpus.chunks]
-            logger.info(f"Retrieved {len(messages)} memories for query: {query_obj.query_str}")
+            logger.info(f"Retrieved {len(messages)} memories for query.")
             return messages[:n] if n else messages
         except Exception as e:
             logger.error(f"Failed to search memories: {str(e)}")

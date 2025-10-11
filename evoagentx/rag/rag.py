@@ -686,6 +686,10 @@ class RAGEngine:
                     if all(chunk.metadata.model_dump().get(k) == v for k, v in query.metadata_filters.items())
                 ]
                 final_result.scores = [chunk.metadata.similarity_score for chunk in final_result.corpus.chunks]
+
+                # for c in final_result.corpus.chunks:
+                #     logger.debug(f"[FilterCheck] chunk_id={c.chunk_id}, metadata={c.metadata}")
+
                 logger.info(f"Applied metadata filters, retained {len(final_result.corpus.chunks)} chunks")
 
             logger.info(f"Query returned {len(final_result.corpus.chunks)} chunks after post-processing")
