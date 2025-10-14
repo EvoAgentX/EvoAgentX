@@ -50,6 +50,9 @@ class SearchCollection(ToolCollection):
         region: Optional[str] = "us",
         page_content_handler: Optional[PageContentHandler] = None,
         per_tool_timeout: Optional[float] = None,
+        # Optional API keys forwarded to underlying toolkits (env fallback handled there)
+        serper_api_key: Optional[str] = None,
+        serp_api_key: Optional[str] = None,
         **kwargs
     ):
         """
@@ -72,6 +75,7 @@ class SearchCollection(ToolCollection):
         # Initialize all search toolkits with their specific parameters and shared handler
         toolkits = [
             SerperAPIToolkit(
+                api_key=serper_api_key,
                 num_search_pages=num_results,
                 max_content_words=max_content_words,
                 default_language=language,
@@ -100,6 +104,7 @@ class SearchCollection(ToolCollection):
                 page_content_handler=page_content_handler
             ),
             SerpAPIToolkit(
+                api_key=serp_api_key,
                 num_search_pages=num_results,
                 max_content_words=max_content_words,
                 default_language=language,

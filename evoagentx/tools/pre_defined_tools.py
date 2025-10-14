@@ -12,6 +12,7 @@ from evoagentx.tools.rss_feed import RSSToolkit
 from evoagentx.tools.storage_file import StorageToolkit
 from evoagentx.tools.request_arxiv import ArxivToolkit
 from evoagentx.tools.cmd_toolkit import CMDToolkit
+from evoagentx.tools.google_maps_tool import GoogleMapsToolkit
 
 
 
@@ -23,11 +24,11 @@ default_tools = [
     RSSToolkit(),
     RequestToolkit(),
     BrowserUseAutoToolkit(),
+    GoogleMapsToolkit(),
     
     ## Storage Toolkits
     StorageToolkit(),
     ArxivToolkit(),
-    CMDToolkit(),
     # ImageCollectionToolkit(),
     ImageAnalysisCollectionToolkit(),
     ImageGenerationCollectionToolkit(),
