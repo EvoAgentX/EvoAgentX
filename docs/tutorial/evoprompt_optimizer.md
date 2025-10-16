@@ -101,7 +101,7 @@ class SarcasmClassifierProgram:
     def __call__(self, input: str) -> tuple[str, dict]:
         answers = []
         prompts = [self.prompt_direct, self.prompt_expert, self.prompt_cot]
-        pattern = r"the answer is\s*(.*)"
+        pattern = r"FINAL_ANSWER\((.*?)\)"
 
         for prompt in prompts:
             full_prompt = f"{prompt}\n\n{self.task_instruction}\n\nText:\n{input}"
@@ -272,6 +272,7 @@ node_evolution_logs_{ALGO}_{MODEL}_{TASK}_{TIMESTAMP}/
 ├── combo_generation_XX_log.csv          # Combination evaluation logs per generation
 ├── evaluation_testset_test_*.csv         # Test set evaluation results
 ├── optimization_summary_{algo}.csv       # Optimization summary
+├── best_config.json                      # Machine-readable best config (auto-saved)
 ├── performance_summary_OVERALL.png      # Training process visualization
 └── individual_plots/                     # Individual node performance charts
     └── performance_plot_*.png
@@ -358,7 +359,33 @@ if __name__ == "__main__":
 
 For a complete working example, please refer to [evoprompt_workflow.py](https://github.com/EvoAgentX/EvoAgentX/blob/main/examples/optimization/evoprompt/evoprompt_workflow.py).
 
-## 9. Best Practices
+## 9. Using the Optimized Program and Persisting JSON
+
+- Optimized Program Object
+  - After `optimize()` finishes, the optimizer automatically applies the best prompts back into your registered nodes. The `program` instance you passed in is already ready to use for downstream inference without extra steps.
+
+- Auto-Saved JSON
+  - Alongside CSV logs, the optimizer also saves `best_config.json` in the log directory. This contains a simple mapping of `{ node_name: optimized_prompt }`.
+
+- Reload In A New Process/Instance
+  - Option 1 (helper): `optimizer.load_and_apply_config("/path/to/best_config.json")`
+  - Option 2 (registry): load JSON and call `registry.set(name, value)` for each entry.
+
+Minimal examples:
+
+```python
+# Apply best_config.json to a fresh program via ParamRegistry
+with open(json_path, "r", encoding="utf-8") as f:
+    best_cfg = json.load(f)
+for k, v in best_cfg.items():
+    registry.set(k, v)
+```
+
+See examples:
+- examples/optimization/evoprompt/evoprompt_bestconfig_json.py
+- examples/optimization/evoprompt/evoprompt_save_load_json_min.py
+
+## 10. Best Practices
 
 1. **Set reasonable population size**: Recommend 4-8 individuals, balancing exploration and computational overhead
 2. **Use early stopping**: Avoid overfitting and save computational resources
@@ -366,7 +393,7 @@ For a complete working example, please refer to [evoprompt_workflow.py](https://
 4. **Monitor logs**: Pay attention to convergence trends and adjust parameters timely
 5. **Multi-task testing**: Validate optimizer generality across multiple tasks
 
-## 10. Troubleshooting
+## 11. Troubleshooting
 
 ### Common Issues
 

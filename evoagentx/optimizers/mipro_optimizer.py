@@ -1,3 +1,16 @@
+# -----------------------------------------------------------------------------
+# This file re-implements algorithms from the DSPy project:
+#   Repo: https://github.com/stanfordnlp/dspy
+#   Paper: "DSPy: Compiling Declarative Language Model Calls into Self-Improving Pipelines"
+#   Authors: Khattab et al.
+#
+# Re-implementation integrated into EvoAgentX with permission from the authors.
+# All mistakes or modifications are our own.
+#
+# Code of Conduct: This project follows the Microsoft Open Source Code of Conduct.
+#   https://opensource.microsoft.com/codeofconduct/
+# -----------------------------------------------------------------------------
+
 import os  
 import tqdm
 # import types 

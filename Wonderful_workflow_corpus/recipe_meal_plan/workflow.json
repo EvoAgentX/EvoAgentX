@@ -1,0 +1,419 @@
+{
+    "class_name": "WorkFlowGraph",
+    "goal": "\nYou are a highly specialized nutrition and meal planning assistant, capable of generating comprehensive and personalized weekly meal plans.\n\nThe user provides a single input called `goal`, written in free text. From this goal, you must meticulously extract their meal planning preferences and generate a highly structured, detailed weekly meal plan that adheres to all specified criteria.\n\n### Input expectations (inside the `goal` text)\nThe user may include details such as:\n- **Diet preference** (e.g., vegetarian, vegan, keto, Mediterranean, no restriction)\n- **Meals per day** (e.g., 3 for breakfast/lunch/dinner, including snacks)\n- **Duration** (number of days, default = 7)\n- **Allergies or restrictions** (e.g., gluten-free, nut-free, lactose-free, specific ingredients to avoid)\n- **Cooking time preference** (e.g., quick meals under 30 minutes, meals suitable for meal prepping)\n- **Nutritional focus** (e.g., high protein, low carb, balanced macros, calorie-controlled)\n- **Cuisine preference** (e.g., Italian, Asian, Mexican, American comfort food)\n- **Meal variety**: (e.g., ensure minimal repetition of recipes throughout the week)\n\nIf any of these details are missing, assume sensible and healthy defaults.\n\n### Tasks\n1. **Initial Meal Schedule Generation**: Create a foundational meal schedule based on duration and meals per day, leaving placeholders for recipes.\n2. **Recipe Selection with Constraints**: Select diverse recipes for each meal slot, strictly adhering to diet preferences, allergies, cooking time, nutritional focus, and cuisine preferences. Ensure minimal recipe repetition.\n3. **Detailed Recipe Compilation**: For each selected recipe, gather comprehensive information including:\n   - Full ingredients list with quantities.\n   - Step-by-step cooking instructions.\n   - Detailed nutrition facts (calories, protein, carbohydrates, fat, fiber).\n   - Estimated preparation and cooking time.\n4. **Consolidated Shopping List Generation**: Compile a complete shopping list of all unique ingredients required for the entire meal plan, categorized by typical grocery store sections (e.g., Produce, Dairy, Pantry, Meat/Seafood).\n5. **Final Meal Plan Assembly**: Assemble all compiled information into a coherent, easy-to-follow weekly meal plan.\n6. **Markdown Digest Compilation**: Compile the final meal plan and shopping list into a well-formatted Markdown digest.\n\n### Output\n- **meal_plan_digest**: A well-formatted Markdown digest of the weekly meal plan, including daily breakdown, meal types, selected recipes with detailed ingredients, instructions, nutrition facts, estimated times, and the categorized shopping list.\n",
+    "nodes": [
+        {
+            "class_name": "WorkFlowNode",
+            "name": "parse_user_goal",
+            "description": "Extract meal planning preferences from the user's goal.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "goal",
+                    "type": "string",
+                    "description": "The user's goal in textual format.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "user_preferences",
+                    "type": "object",
+                    "description": "An object containing parsed dietary preferences, meal numbers, duration, allergies, cooking preferences, nutritional focus, cuisine, and variety.",
+                    "required": true
+                }
+            ],
+            "reason": "Understanding the user's preferences and constraints is essential to create a personalized meal plan.",
+            "agents": [
+                {
+                    "name": "user_goal_parser",
+                    "description": "This agent extracts detailed meal planning preferences such as dietary preferences, number of meals, duration, allergies, cooking time, nutritional focus, cuisine, and meal variety from the user's goal.",
+                    "inputs": [
+                        {
+                            "name": "goal",
+                            "type": "string",
+                            "description": "The user's goal in textual format.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "user_preferences",
+                            "type": "object",
+                            "description": "An object containing parsed dietary preferences, meal numbers, duration, allergies, cooking preferences, nutritional focus, cuisine, and variety.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Objective\nExtract detailed meal planning preferences from the user's goal.\n\n### Instructions\n1. Read and comprehend the user's goal provided as free text input: <input>{goal}</input>.\n2. Identify and extract the following details from the goal:\n   - **Dietary Preference**: Look for keywords indicating dietary styles like vegetarian, vegan, keto, etc.\n   - **Meals Per Day**: Recognize numerical values or phrases indicating the number of meals/day.\n   - **Duration**: Extract the intended duration for the meal plan; default to 7 days if not specified.\n   - **Allergies or Restrictions**: Identify any food allergies or specific ingredients the user wishes to avoid.\n   - **Cooking Time Preference**: Determine preferences for meal preparation time, such as 'quick meals'.\n   - **Nutritional Focus**: Find any specific nutritional goals, like high protein or low carbs.\n   - **Cuisine Preference**: Note any preference for particular cuisine types.\n   - **Meal Variety**: Determine if the user desires variety or minimal repetition.\n3. Structure the extracted details into an object format that includes fields for dietary preferences, number of meals, duration, allergies, cooking preferences, nutritional focus, cuisine, and variety.\n4. Output the structured object as the user preferences.\n\n### Output Format\nYour final output should ALWAYS in the following format:\n\n## Thought\nBriefly explain the reasoning process for extracting preferences from the goal.\n\n## user_preferences\nAn object containing parsed dietary preferences, meal numbers, duration, allergies, cooking preferences, nutritional focus, cuisine, and variety."
+                }
+            ],
+            "status": "pending"
+        },
+        {
+            "class_name": "WorkFlowNode",
+            "name": "initial_meal_schedule_generation",
+            "description": "Create a foundational meal schedule based on the user's duration and meal preferences.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "user_preferences",
+                    "type": "object",
+                    "description": "Parsed user preferences from the goal.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "meal_schedule",
+                    "type": "list",
+                    "description": "A list representing the initial meal schedule with placeholders for recipes.",
+                    "required": true
+                }
+            ],
+            "reason": "Provides a structured framework to organize meals, ensuring coverage across the user's specified timeframe.",
+            "agents": [
+                {
+                    "name": "meal_schedule_creator",
+                    "description": "This agent creates a foundational meal schedule using the user's duration and meal preferences as a guideline.",
+                    "inputs": [
+                        {
+                            "name": "user_preferences",
+                            "type": "object",
+                            "description": "Parsed user preferences from the goal, including meal numbers and duration.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "meal_schedule",
+                            "type": "list",
+                            "description": "A list representing the initial meal schedule with placeholders for recipes.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Objective\nCreate a foundational meal schedule based on the user's duration and meal preferences.\n\n### Instructions\n1. Review the parsed user preferences: <input>{user_preferences}</input>.\n2. Determine the total number of days from the duration in the user preferences.\n3. For each day, create meal slots based on the number of meals per day specified in the preferences.\n4. Use placeholders for each meal slot to indicate where recipes will be added later.\n5. Assemble the meal slots into a structured list representing the meal schedule for the entire duration.\n\n### Output Format\nYour final output should ALWAYS in the following format:\n\n## Thought\nBriefly explain the reasoning process for constructing the meal schedule.\n\n## meal_schedule\nA list representing the initial meal schedule with placeholders for recipes."
+                }
+            ],
+            "status": "pending"
+        },
+        {
+            "class_name": "WorkFlowNode",
+            "name": "recipe_selection_with_constraints",
+            "description": "Select diverse recipes for each meal slot, adhering to the user's preferences and constraints.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "meal_schedule",
+                    "type": "list",
+                    "description": "The initial meal schedule with placeholders.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "user_preferences",
+                    "type": "object",
+                    "description": "Parsed user preferences from the goal.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "completed_meal_schedule",
+                    "type": "list",
+                    "description": "A list representing the meal schedule with selected recipes filled in.",
+                    "required": true
+                }
+            ],
+            "reason": "Ensures meal plan diversity while respecting dietary restrictions and preferences.",
+            "agents": [
+                {
+                    "name": "recipe_selector_agent",
+                    "description": "This agent selects diverse recipes for each meal slot based on user preferences and constraints.",
+                    "inputs": [
+                        {
+                            "name": "meal_schedule",
+                            "type": "list",
+                            "description": "The initial meal schedule with placeholders.",
+                            "required": true
+                        },
+                        {
+                            "name": "user_preferences",
+                            "type": "object",
+                            "description": "Parsed user preferences from the goal.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "completed_meal_schedule",
+                            "type": "list",
+                            "description": "A list representing the meal schedule with selected recipes filled in.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Objective\nSelect diverse recipes for each meal slot in the schedule, ensuring adherence to the user's dietary preferences and constraints while minimizing repetition.\n\n### Instructions\n1. Review the user's dietary preferences and constraints from <input>{user_preferences}</input>.\n2. Analyze the initial meal schedule: <input>{meal_schedule}</input>.\n3. For each meal slot in the schedule, select a recipe that aligns with the dietary restrictions (e.g., vegetarian, gluten-free) and nutritional focus (e.g., high protein, low carb).\n4. Ensure that the chosen recipes reflect the user's cuisine preferences (e.g., Mediterranean, Asian) and cooking time preferences (e.g., quick meals under 30 minutes).\n5. Strive to minimize recipe repetition throughout the week's meal schedule.\n6. Compile these selections into the meal schedule, resulting in a completed meal schedule with recipes filled in.\n\n### Output Format\nYour final output should ALWAYS be in the following format:\n\n## Thought\nBriefly explain the reasoning process for achieving the objective.\n\n## completed_meal_schedule\nProvide the completed meal schedule with each slot filled with a selected recipe."
+                }
+            ],
+            "status": "pending"
+        },
+        {
+            "class_name": "WorkFlowNode",
+            "name": "detailed_recipe_compilation",
+            "description": "Gather comprehensive information for each selected recipe.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "completed_meal_schedule",
+                    "type": "list",
+                    "description": "The meal schedule with selected recipes filled in.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "detailed_meal_info",
+                    "type": "list",
+                    "description": "A list containing detailed recipe information including ingredients, instructions, nutrition, and times.",
+                    "required": true
+                }
+            ],
+            "reason": "Provides detailed cooking instructions and nutritional information needed for execution and dietary tracking.",
+            "agents": [
+                {
+                    "name": "recipe_details_compiler",
+                    "description": "This agent compiles comprehensive information about each recipe, including ingredients, cooking instructions, nutritional facts, and estimated cooking times.",
+                    "inputs": [
+                        {
+                            "name": "completed_meal_schedule",
+                            "type": "list",
+                            "description": "The meal schedule with selected recipes filled in.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "detailed_meal_info",
+                            "type": "list",
+                            "description": "A list containing detailed recipe information including ingredients, instructions, nutrition, and times.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Objective\nCompile comprehensive information about each recipe in the completed meal schedule, including ingredients, cooking instructions, nutrition, and estimated cooking times.\n\n### Instructions\n1. Examine the list of recipes in the completed meal schedule: <input>{completed_meal_schedule}</input>\n2. For each recipe, gather the complete list of ingredients with their quantities.\n3. Compile detailed step-by-step cooking instructions.\n4. Calculate or find detailed nutritional facts such as calories, protein, carbohydrates, fat, and fiber content.\n5. Estimate the preparation and cooking times.\n6. Organize all information into a structured format, ensuring each recipe is fully detailed.\n\n### Output Format\nYour final output should ALWAYS in the following format:\n\n## Thought\nBriefly explain the reasoning process for compiling comprehensive recipe information.\n\n## detailed_meal_info\nA structured list of recipes containing ingredients, instructions, nutritional facts, and cooking times."
+                }
+            ],
+            "status": "pending"
+        },
+        {
+            "class_name": "WorkFlowNode",
+            "name": "consolidated_shopping_list_generation",
+            "description": "Compile a comprehensive shopping list of ingredients for the entire meal plan.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "detailed_meal_info",
+                    "type": "list",
+                    "description": "Detailed information of selected recipes.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "shopping_list",
+                    "type": "string",
+                    "description": "A complete, categorized shopping list for the meal plan.",
+                    "required": true
+                }
+            ],
+            "reason": "Streamlines grocery shopping by consolidating all necessary ingredients into a categorized list.",
+            "agents": [
+                {
+                    "name": "shopping_list_generator",
+                    "description": "This agent compiles a comprehensive shopping list of all unique ingredients required for the entire meal plan, categorized by typical grocery store sections.",
+                    "inputs": [
+                        {
+                            "name": "detailed_meal_info",
+                            "type": "list",
+                            "description": "Detailed information of selected recipes.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "shopping_list",
+                            "type": "string",
+                            "description": "A complete, categorized shopping list for the meal plan.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Objective\nCompile a comprehensive and categorized shopping list based on the detailed meal information provided.\n\n### Instructions\n1. Analyze the detailed meal information: <input>{detailed_meal_info}</input>\n2. Extract all unique ingredients from the detailed meal info.\n3. Organize the ingredients by typical grocery store categories such as Produce, Dairy, Pantry, and Meat/Seafood.\n4. Ensure no duplicate entries exist in the list, and each item is listed with the required quantity if available.\n5. Compile and format the shopping list clearly and logically.\n\n### Output Format\nYour final output should ALWAYS in the following format:\n\n## Thought\nBriefly explain the reasoning process for compiling the shopping list.\n\n## shopping_list\nA complete and categorized shopping list for the meal plan."
+                }
+            ],
+            "status": "pending"
+        },
+        {
+            "class_name": "WorkFlowNode",
+            "name": "final_meal_plan_assembly",
+            "description": "Assemble the meal plan with all compiled information into a coherent, user-friendly format.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "detailed_meal_info",
+                    "type": "list",
+                    "description": "Detailed information of selected recipes.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "shopping_list",
+                    "type": "string",
+                    "description": "The categorized shopping list.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "assembled_meal_plan",
+                    "type": "string",
+                    "description": "The assembled meal plan document ready for output.",
+                    "required": true
+                }
+            ],
+            "reason": "Provides a clear overview of the weekly meal plan, making it easy to follow and implement.",
+            "agents": [
+                {
+                    "name": "meal_plan_assembler",
+                    "description": "This agent assembles detailed meal information and a categorized shopping list into a coherent meal plan document.",
+                    "inputs": [
+                        {
+                            "name": "detailed_meal_info",
+                            "type": "list",
+                            "description": "Detailed information of selected recipes.",
+                            "required": true
+                        },
+                        {
+                            "name": "shopping_list",
+                            "type": "string",
+                            "description": "The categorized shopping list.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "assembled_meal_plan",
+                            "type": "string",
+                            "description": "The assembled meal plan document ready for output.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Objective\nAssemble detailed meal information and a categorized shopping list into a coherent and user-friendly meal plan document.\n\n### Instructions\n1. Review the detailed meal information provided: <input>{detailed_meal_info}</input>.\n2. Consider the structure and elements necessary for a user-friendly meal plan.\n3. Integrate each meal's details, ensuring clarity and completeness in presenting recipes, ingredients, and instructions.\n4. Include the categorized shopping list: <input>{shopping_list}</input> towards the end, featuring all necessary groceries grouped by category.\n5. Ensure the document flows logically, with daily meal arrangements clearly separated and easily readable.\n6. Finalize the meal plan document ensuring coherence and user-friendliness.\n\n### Output Format\nYour final output should ALWAYS in the following format:\n\n## Thought\nBriefly explain the reasoning process for assembling the meal plan document.\n\n## assembled_meal_plan\nProvide the final assembled meal plan document, ready for output."
+                }
+            ],
+            "status": "pending"
+        },
+        {
+            "class_name": "WorkFlowNode",
+            "name": "markdown_digest_compilation",
+            "description": "Compile the final meal plan and shopping list into a Markdown format.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "assembled_meal_plan",
+                    "type": "string",
+                    "description": "The assembled meal plan document.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "meal_plan_digest",
+                    "type": "string",
+                    "description": "A Markdown formatted digest of the weekly meal plan and shopping list.",
+                    "required": true
+                }
+            ],
+            "reason": "Delivers the meal plan in a well-structured, easy-to-read format that can be accessed and shared conveniently.",
+            "agents": [
+                {
+                    "name": "markdown_compilation_agent",
+                    "description": "This agent compiles the assembled meal plan and shopping list into a Markdown-formatted digest for easy access and sharing.",
+                    "inputs": [
+                        {
+                            "name": "assembled_meal_plan",
+                            "type": "string",
+                            "description": "The assembled meal plan document.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "meal_plan_digest",
+                            "type": "string",
+                            "description": "A Markdown formatted digest of the weekly meal plan and shopping list.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Objective\nCompile the provided meal plan and shopping list into a structured Markdown format.\n\n### Instructions\n1. Take the assembled meal plan document: <input>{assembled_meal_plan}</input>\n2. Convert the meal plan and shopping list sections into a readable Markdown format.\n3. Ensure headers, sub-headers, bullet points, and tables are used appropriately to enhance readability.\n4. Include a title and any necessary section headers to organize the information.\n5. Double-check the Markdown syntax for correctness to ensure the document is well-formatted.\n6. Output the final Markdown document as 'meal_plan_digest'.\n\n### Output Format\nYour final output should ALWAYS in the following format:\n\n## Thought\nBriefly explain the reasoning process for compiling the provided document into Markdown format.\n\n## meal_plan_digest\nA Markdown formatted digest of the weekly meal plan and shopping list."
+                }
+            ],
+            "status": "pending"
+        }
+    ],
+    "edges": [
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "parse_user_goal",
+            "target": "initial_meal_schedule_generation",
+            "priority": 0
+        },
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "parse_user_goal",
+            "target": "recipe_selection_with_constraints",
+            "priority": 0
+        },
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "initial_meal_schedule_generation",
+            "target": "recipe_selection_with_constraints",
+            "priority": 0
+        },
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "recipe_selection_with_constraints",
+            "target": "detailed_recipe_compilation",
+            "priority": 0
+        },
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "detailed_recipe_compilation",
+            "target": "consolidated_shopping_list_generation",
+            "priority": 0
+        },
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "detailed_recipe_compilation",
+            "target": "final_meal_plan_assembly",
+            "priority": 0
+        },
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "consolidated_shopping_list_generation",
+            "target": "final_meal_plan_assembly",
+            "priority": 0
+        },
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "final_meal_plan_assembly",
+            "target": "markdown_digest_compilation",
+            "priority": 0
+        }
+    ],
+    "graph": null
+}

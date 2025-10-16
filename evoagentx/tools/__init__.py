@@ -12,6 +12,7 @@ from .browser_browseruse import BrowserUseToolkit
 from .browser_browseruse_auto import BrowserUseAutoToolkit
 from .browser_tool import BrowserToolkit
 from .google_maps_tool import GoogleMapsToolkit
+from .telegram_tools import TelegramToolkit
 from .database_mongodb import MongoDBToolkit
 from .database_postgresql import PostgreSQLToolkit
 from .storage_handler import FileStorageHandler, LocalStorageHandler, SupabaseStorageHandler
@@ -48,6 +49,7 @@ __all__ = [
     "Crawl4AICrawlToolkit",
     "BrowserUseToolkit",
     "GoogleMapsToolkit",
+    "TelegramToolkit",
     "MongoDBToolkit",
     "PostgreSQLToolkit",
     "FileStorageHandler",

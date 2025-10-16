@@ -1,0 +1,388 @@
+{
+    "class_name": "WorkFlowGraph",
+    "goal": "Generate html code for the Tetris game that can be played in the browser.",
+    "nodes": [
+        {
+            "class_name": "WorkFlowNode",
+            "name": "requirements_analysis",
+            "description": "Analyze the core requirements for developing a browser-based Tetris game.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "goal",
+                    "type": "string",
+                    "description": "The user's goal in textual format.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "game_requirements",
+                    "type": "string",
+                    "description": "A detailed analysis of the requirements for the Tetris game, including game mechanics and user controls.",
+                    "required": true
+                }
+            ],
+            "reason": "Understanding the game mechanics, controls, and features is essential to ensure the development meets expectations.",
+            "agents": [
+                {
+                    "name": "requirements_analysis_agent",
+                    "description": "This agent analyzes the user's goal and formulates a detailed requirements document outlining the game mechanics and controls for the Tetris game.",
+                    "inputs": [
+                        {
+                            "name": "goal",
+                            "type": "string",
+                            "description": "The user's goal in textual format.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "game_requirements",
+                            "type": "string",
+                            "description": "A detailed analysis of the requirements for the Tetris game, including game mechanics and user controls.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Objective\nAnalyze the given user goal to extract and define the core requirements for developing a browser-based Tetris game.\n\n### Instructions\n1. Read and understand the user's goal: <input>{goal}</input>.\n2. Identify key mechanics of the Tetris game, including how blocks will fall, rotate, and stack.\n3. Describe the user controls expected (e.g., moving, rotating blocks, starting the game).\n4. Consider any additional features that are common in Tetris games (e.g., scoring, level progression).\n5. Compile these insights into a cohesive requirements document.\n\n### Output Format\nYour final output should ALWAYS in the following format:\n\n## Thought\nBriefly explain the reasoning process for analyzing the user's goal.\n\n## game_requirements\nA detailed analysis of the requirements for the Tetris game, including game mechanics and user controls."
+                }
+            ],
+            "status": "pending"
+        },
+        {
+            "class_name": "WorkFlowNode",
+            "name": "html_structure_setup",
+            "description": "Create the basic HTML structure for the Tetris game layout.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "goal",
+                    "type": "string",
+                    "description": "The user's goal in textual format.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "game_requirements",
+                    "type": "string",
+                    "description": "A detailed analysis of the requirements for the Tetris game.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "html_code",
+                    "type": "string",
+                    "description": "The HTML code that provides the structure for the Tetris game.",
+                    "required": true
+                }
+            ],
+            "reason": "Setting up the HTML will provide the foundational structure of the game interface, including the canvas and controls.",
+            "agents": [
+                {
+                    "name": "html_structure_agent",
+                    "description": "This agent creates the basic HTML structure needed for the Tetris game layout based on the user's goal and the game requirements.",
+                    "inputs": [
+                        {
+                            "name": "goal",
+                            "type": "string",
+                            "description": "The user's goal in textual format.",
+                            "required": true
+                        },
+                        {
+                            "name": "game_requirements",
+                            "type": "string",
+                            "description": "A detailed analysis of the requirements for the Tetris game.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "html_code",
+                            "type": "string",
+                            "description": "The HTML code that provides the structure for the Tetris game.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Objective\nCreate the basic HTML structure for the Tetris game layout.\n\n### Instructions\n1. Read the user's goal: <input>{goal}</input> to understand what the game should achieve.\n2. Analyze the game requirements: <input>{game_requirements}</input> to determine what elements and features need to be included in the HTML structure.\n3. Structure the HTML document with essential elements such as the canvas for graphics and controls for user interaction based on the analyzed requirements.\n4. Ensure that the layout is organized for ease of use and clarity.\n5. Accurately produce the complete HTML code as your output.\n\n### Output Format\nYour final output should ALWAYS in the following format:\n\n## Thought\nBriefly explain the reasoning process for creating the HTML structure for the Tetris game.\n\n## html_code\nThe complete HTML code that serves as the foundational structure for the Tetris game."
+                }
+            ],
+            "status": "pending"
+        },
+        {
+            "class_name": "WorkFlowNode",
+            "name": "css_styling",
+            "description": "Generate CSS code to style the Tetris game interface.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "goal",
+                    "type": "string",
+                    "description": "The user's goal in textual format.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "html_code",
+                    "type": "string",
+                    "description": "The HTML code that provides the structure for the Tetris game.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "css_code",
+                    "type": "string",
+                    "description": "The generated CSS code that styles the Tetris game.",
+                    "required": true
+                }
+            ],
+            "reason": "Styling is necessary to enhance the visual appeal of the game and make it visually engaging.",
+            "agents": [
+                {
+                    "name": "css_generation_agent",
+                    "description": "This agent generates CSS code specifically tailored to style the Tetris game interface based on the provided user's goal and HTML structure.",
+                    "inputs": [
+                        {
+                            "name": "goal",
+                            "type": "string",
+                            "description": "The user's goal in textual format.",
+                            "required": true
+                        },
+                        {
+                            "name": "html_code",
+                            "type": "string",
+                            "description": "The HTML code that provides the structure for the Tetris game.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "css_code",
+                            "type": "string",
+                            "description": "The generated CSS code that styles the Tetris game.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Objective\nGenerate the CSS code needed to style the Tetris game interface based on the provided goal and HTML structure.\n\n### Instructions\n1. Read the user's goal: <input>{goal}</input>\n2. Analyze the provided HTML structure of the game: <input>{html_code}</input>\n3. Identify key elements and requirements from the goal and HTML structure to determine suitable styles (colors, fonts, layouts).\n4. Write CSS rules to apply styles to the main components of the Tetris game, ensuring that it is visually appealing and functional.\n5. Output the final CSS code reflecting these styles.\n\n### Output Format\nYour final output should ALWAYS in the following format:\n\n## Thought\nBriefly explain the reasoning process for generating the CSS code.\n\n## css_code\nThe generated CSS code that styles the Tetris game."
+                }
+            ],
+            "status": "pending"
+        },
+        {
+            "class_name": "WorkFlowNode",
+            "name": "javascript_game_logic",
+            "description": "Develop the JavaScript code to implement the Tetris game logic and functionality.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "goal",
+                    "type": "string",
+                    "description": "The user's goal in textual format.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "html_code",
+                    "type": "string",
+                    "description": "The HTML code that provides the structure for the Tetris game.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "css_code",
+                    "type": "string",
+                    "description": "The generated CSS code that styles the Tetris game.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "game_requirements",
+                    "type": "string",
+                    "description": "A detailed analysis of the requirements for the Tetris game.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "javascript_code",
+                    "type": "string",
+                    "description": "The generated JavaScript code that implements the Tetris game logic.",
+                    "required": true
+                }
+            ],
+            "reason": "Game logic is critical for handling the gameplay mechanics such as piece movement, collision detection, and scoring.",
+            "agents": [
+                {
+                    "name": "tetris_game_logic_agent",
+                    "description": "This agent develops the JavaScript code needed to implement the game logic for Tetris, including piece movement, collision detection, and scoring functionality.",
+                    "inputs": [
+                        {
+                            "name": "goal",
+                            "type": "string",
+                            "description": "The user's goal in textual format.",
+                            "required": true
+                        },
+                        {
+                            "name": "html_code",
+                            "type": "string",
+                            "description": "The HTML code that provides the structure for the Tetris game.",
+                            "required": true
+                        },
+                        {
+                            "name": "css_code",
+                            "type": "string",
+                            "description": "The generated CSS code that styles the Tetris game.",
+                            "required": true
+                        },
+                        {
+                            "name": "game_requirements",
+                            "type": "string",
+                            "description": "A detailed analysis of the requirements for the Tetris game.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "javascript_code",
+                            "type": "string",
+                            "description": "The generated JavaScript code that implements the Tetris game logic.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Objective\nDevelop the JavaScript code necessary to implement the logic and functionality of the Tetris game based on the provided inputs.\n\n### Instructions\n1. Read and understand the user's goal: <input>{goal}</input>.\n2. Analyze the HTML code structure: <input>{html_code}</input>.\n3. Review the CSS code that styles the game: <input>{css_code}</input>.\n4. Take into account the detailed game requirements: <input>{game_requirements}</input>.\n5. Develop the JavaScript code to handle game mechanics such as piece movement, collision detection, and scoring based on the provided requirements and structures.\n6. Ensure the code is optimized for performance and ease of understanding.\n7. Provide the generated JavaScript code as the output.\n\n### Output Format\nYour final output should ALWAYS in the following format:\n\n## Thought\nBriefly explain the reasoning process for developing the JavaScript logic for the Tetris game.\n\n## javascript_code\nThe generated JavaScript code that implements the Tetris game logic."
+                }
+            ],
+            "status": "pending"
+        },
+        {
+            "class_name": "WorkFlowNode",
+            "name": "final_code_integration",
+            "description": "Combine the HTML, CSS, and JavaScript into a single document ready for testing.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "html_code",
+                    "type": "string",
+                    "description": "The HTML code that provides the structure for the Tetris game.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "css_code",
+                    "type": "string",
+                    "description": "The generated CSS code that styles the Tetris game.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "javascript_code",
+                    "type": "string",
+                    "description": "The generated JavaScript code that implements the Tetris game logic.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "final_code",
+                    "type": "string",
+                    "description": "The final integrated code ready to be played in the browser.",
+                    "required": true
+                }
+            ],
+            "reason": "This final integration step ensures that all parts of the game are assembled correctly to function together in the browser.",
+            "agents": [
+                {
+                    "name": "final_code_integration_agent",
+                    "description": "This agent combines HTML, CSS, and JavaScript code into a single document ready for testing the Tetris game.",
+                    "inputs": [
+                        {
+                            "name": "html_code",
+                            "type": "string",
+                            "description": "The HTML code that provides the structure for the Tetris game.",
+                            "required": true
+                        },
+                        {
+                            "name": "css_code",
+                            "type": "string",
+                            "description": "The generated CSS code that styles the Tetris game.",
+                            "required": true
+                        },
+                        {
+                            "name": "javascript_code",
+                            "type": "string",
+                            "description": "The generated JavaScript code that implements the Tetris game logic.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "final_code",
+                            "type": "string",
+                            "description": "The final integrated code ready to be played in the browser.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Objective\nCombine the provided HTML, CSS, and JavaScript code into a single document suitable for testing the Tetris game.\n\n### Instructions\n1. Read the HTML code structure: <input>{html_code}</input>.\n2. Read the CSS code for styling: <input>{css_code}</input>.\n3. Read the JavaScript code implementing game logic: <input>{javascript_code}</input>.\n4. Integrate these three code sections into a single HTML document:\n   - Ensure the CSS is included within a <style> tag in the <head> section.\n   - Ensure the JavaScript is included within a <script> tag before the closing </body> tag.\n5. Generate the complete HTML document as the output.\n\n### Output Format\nYour final output should ALWAYS in the following format:\n\n## Thought\nBriefly explain the reasoning process for integrating the provided code components.\n\n## final_code\nThe final integrated code ready to be played in the browser."
+                }
+            ],
+            "status": "pending"
+        }
+    ],
+    "edges": [
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "requirements_analysis",
+            "target": "html_structure_setup",
+            "priority": 0
+        },
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "requirements_analysis",
+            "target": "javascript_game_logic",
+            "priority": 0
+        },
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "html_structure_setup",
+            "target": "css_styling",
+            "priority": 0
+        },
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "html_structure_setup",
+            "target": "javascript_game_logic",
+            "priority": 0
+        },
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "html_structure_setup",
+            "target": "final_code_integration",
+            "priority": 0
+        },
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "css_styling",
+            "target": "javascript_game_logic",
+            "priority": 0
+        },
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "css_styling",
+            "target": "final_code_integration",
+            "priority": 0
+        },
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "javascript_game_logic",
+            "target": "final_code_integration",
+            "priority": 0
+        }
+    ],
+    "graph": null
+}

@@ -1,11 +1,19 @@
-"""
-EvoPrompt Optimizer Module
-
-This module implements evolutionary algorithms for optimizing prompts in multi-agent workflows.
-It provides base functionality for prompt evolution using genetic algorithms and differential evolution.
-"""
+# -----------------------------------------------------------------------------
+# This file re-implements algorithms from the EvoPrompt project:
+#   Repo: GitHub - beeevita/EvoPrompt: Official implementation of the paper Connecting Large Language Models w
+#   Paper: "Connecting Large Language Models with Evolutionary Algorithms
+#           Yields Powerful Prompt Optimizers"
+#   Authors: Qingyan et al.
+#
+# Re-implementation integrated into EvoAgentX with permission from the authors.
+# All mistakes or modifications are our own.
+#
+# Code of Conduct: This project follows the Microsoft Open Source Code of Conduct.
+#   https://opensource.microsoft.com/codeofconduct/
+# -----------------------------------------------------------------------------
 
 import asyncio
+import json
 import random
 import re
 import os
@@ -338,6 +346,45 @@ Please provide the paraphrased version in the following format:
                         writer.writerow([f'{gen_name}_{metric_name}_Avg', f"{avg_score:.6f}", timestamp])
 
         self._plot_and_save_performance_graph(algorithm_name)
+        
+        # Also dump a machine-readable best config for easy reuse
+        try:
+            self._save_best_config_json(best_config)
+        except Exception as e:
+            logger.error(f"Failed to save best_config.json: {e}")
+
+    def _save_best_config_json(self, best_config: Dict[str, str], filename: str = "best_config.json") -> None:
+        """
+        Save the best configuration to a JSON file in the log directory.
+
+        This is a convenience artifact for downstream automation to reload and
+        apply the optimized prompt set without parsing CSVs.
+
+        Note: optimize() already applies the best config to the in-memory
+        program. This JSON is intended for persistence and later reuse.
+        """
+        if not self.enable_logging:
+            return
+        if not self.log_dir:
+            # If logging is disabled or not yet set up, skip silently
+            return
+        filepath = os.path.join(self.log_dir, filename)
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(best_config, f, ensure_ascii=False, indent=2)
+        logger.info(f"Best config JSON saved to: {filepath}")
+
+    def load_and_apply_config(self, path: str) -> Dict[str, str]:
+        """
+        Load a JSON best_config from disk and apply it to the registered program.
+
+        Returns the loaded configuration dictionary.
+        """
+        with open(path, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
+        # Apply directly to current registry/program
+        self.apply_cfg(cfg)
+        logger.info(f"Applied configuration from JSON: {path}")
+        return cfg
     
     async def _log_evaluation_details(self, benchmark: BIGBenchHard, dataset: List[Dict], 
                                         predictions: List[str], scores: List[float], eval_mode: str,

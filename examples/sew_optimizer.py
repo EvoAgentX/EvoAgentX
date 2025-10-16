@@ -35,7 +35,7 @@ def main():
     # obtain SEW workflow 
     sew_graph = SEWWorkFlowGraph(llm_config=llm_config)
     agent_manager = AgentManager()
-    agent_manager.add_agents_from_workflow(sew_graph)
+    agent_manager.add_agents_from_workflow(sew_graph, llm_config=llm_config)
 
     # obtain HumanEval benchmark
     humaneval = HumanEvalSplits()

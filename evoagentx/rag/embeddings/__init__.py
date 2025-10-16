@@ -3,12 +3,14 @@ from typing import Dict, Any
 from evoagentx.core.logging import logger
 from .base import EmbeddingProvider, BaseEmbeddingWrapper
 from .openai_embedding import OpenAIEmbeddingWrapper
+from .azure_openai_embedding import AzureOpenAIEmbeddingWrapper
 from .huggingface_embedding import HuggingFaceEmbeddingWrapper
 from .ollama_embedding import OllamaEmbeddingWrapper
 from .voyage import VoyageEmbeddingWrapper
 
 __all__ = [
     'OpenAIEmbeddingWrapper',
+    'AzureOpenAIEmbeddingWrapper',
     'HuggingFaceEmbeddingWrapper',
     'OllamaEmbeddingWrapper',
     'VoyageEmbeddingWrapper',
@@ -42,6 +44,8 @@ class EmbeddingFactory:
 
         if provider == EmbeddingProvider.OPENAI:
             wrapper = OpenAIEmbeddingWrapper(**model_config)
+        elif provider == EmbeddingProvider.AZURE_OPENAI:
+            wrapper = AzureOpenAIEmbeddingWrapper(**model_config)
         elif provider == EmbeddingProvider.HUGGINGFACE:
             wrapper = HuggingFaceEmbeddingWrapper(**model_config)
         elif provider == EmbeddingProvider.OLLAMA:

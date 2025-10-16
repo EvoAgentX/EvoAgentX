@@ -1,4 +1,5 @@
 import os 
+import re
 import yaml
 import json
 import regex
@@ -6,7 +7,7 @@ from uuid import uuid4
 from datetime import datetime, date 
 from pydantic import BaseModel
 from pydantic_core import PydanticUndefined, ValidationError
-from typing import Union, Type, Any, List, Dict, get_origin, get_args
+from typing import Union, Type, Any, List, Dict, Tuple, get_origin, get_args
 
 from .logging import logger 
 
@@ -81,6 +82,28 @@ def save_json(data, path: str, type: str="json", use_indent: bool=True) -> str:
 
     return path
 
+
+def _extract_fenced_blocks(text: str) -> Tuple[List[str], List[str]]:
+    """
+    Extract fenced code blocks from the given text.
+
+    Returns:
+        preferred (List[str]): Code blocks explicitly labeled as json/yaml/yml.
+        others (List[str]): Code blocks with other or missing language labels.
+    """
+    _FENCE_RE = re.compile(r"```(\w+)?\r?\n(.*?)```", re.DOTALL)
+
+    preferred, others = [], []
+    for m in _FENCE_RE.finditer(text):
+        lang = (m.group(1) or "").lower().strip()
+        code = m.group(2)
+        if lang in ("json", "yaml", "yml"):
+            preferred.append(code)
+        else:
+            others.append(code)
+    return preferred, others
+
+
 def escape_json_values(string: str) -> str:
 
     def escape_value(match):
@@ -152,10 +175,26 @@ def parse_json_from_text(text: str) -> List[str]:
     Returns:
         List[str]: a list of parsed JSON data
     """
+    preferred, others = _extract_fenced_blocks(text)
+
+    # Candidate search order: JSON/YAML fenced > other fenced > full original text
+    blocks = preferred or others or [text]
+    
     json_pattern = r"""(?:\{(?:[^{}]*|(?R))*\}|\[(?:[^\[\]]*|(?R))*\])"""
     pattern = regex.compile(json_pattern, regex.VERBOSE)
-    matches = pattern.findall(text)
-    matches = [fix_json(match) for match in matches]
+    matches: List[str] = []
+    for block in blocks:
+        found = pattern.findall(block)
+        if found:
+            matches.extend(found)
+
+    # If no match within fenced blocks, fall back to full content (only if we didn't already scan it)
+    if not matches:
+        found = pattern.findall(text)
+        matches.extend(found)
+
+    # Normalize/repair using your existing function.
+    matches = [fix_json(m) for m in matches]
     return matches
 
 

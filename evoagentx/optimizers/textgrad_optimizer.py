@@ -1,3 +1,16 @@
+# -----------------------------------------------------------------------------
+# This file re-implements algorithms from the TextGrad project:
+#   Repo: https://github.com/zou-group/textgrad
+#   Paper: "TextGrad: Automatic 'Differentiation' via Text -- using large language models to backpropagate textual gradients."
+#   Authors: Zou et al.
+#
+# Re-implementation integrated into EvoAgentX with permission from the authors.
+# All mistakes or modifications are our own.
+#
+# Code of Conduct: This project follows the Microsoft Open Source Code of Conduct.
+#   https://opensource.microsoft.com/codeofconduct/
+# -----------------------------------------------------------------------------
+
 # ruff: noqa: E402
 import os
 import shutil
@@ -658,4 +671,6 @@ class TextGradOptimizer(BaseModule):
                         # CustomizeAgent does not have actions in its dict
                         if "prompt_template" not in agent:
                             raise ValueError(f"Please provide a PromptTemplate for {agent['name']}.")
+                    
+
                     

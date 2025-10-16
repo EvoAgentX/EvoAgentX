@@ -1,0 +1,6 @@
+{
+  "tools": [
+    { "module": "evoagentx.tools.google_maps_tool", "class": "GoogleMapsToolkit" },
+    { "module": "evoagentx.tools.search_serpapi", "class": "SerpAPIToolkit" }
+  ]
+}

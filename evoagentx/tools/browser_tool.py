@@ -36,7 +36,7 @@ class BrowserBase(BaseModule):
     timeout: int = Field(default=10, description="Default timeout in seconds for browser operations")
     browser_type: str = Field(default="chrome", description="Type of browser to use ('chrome', 'firefox', 'safari', 'edge')")
     headless: bool = Field(default=False, description="Whether to run the browser in headless mode")
-    timeout: int = Field(default=10, description="Default timeout in seconds for browser operations")
+    user_data_dir: Optional[str] = Field(default=None, description="User data directory for persistent browser sessions")
     
     def __init__(
         self,
@@ -237,10 +237,18 @@ class BrowserBase(BaseModule):
                 from selenium.webdriver.chrome.service import Service
                 from webdriver_manager.chrome import ChromeDriverManager
                 options = Options()
-                # if self.headless:
-                #     options.add_argument("--headless")
+                if self.headless:
+                    options.add_argument("--headless")
+                # Add GPU-related stability options
+                options.add_argument("--disable-gpu")
+                options.add_argument("--disable-gpu-sandbox")
                 options.add_argument("--no-sandbox")
                 options.add_argument("--disable-dev-shm-usage")
+                
+                # Add user data directory for persistent sessions
+                if self.user_data_dir:
+                    options.add_argument(f"--user-data-dir={self.user_data_dir}")
+                    logger.info(f"Using user data directory: {self.user_data_dir}")
                 
                 # Create service with Chrome executable path
                 service = Service(ChromeDriverManager().install())
@@ -258,6 +266,17 @@ class BrowserBase(BaseModule):
                 options = Options()
                 if self.headless:
                     options.add_argument("--headless")
+                # Add GPU-related stability options
+                options.add_argument("--disable-gpu")
+                options.add_argument("--disable-gpu-sandbox")
+                options.add_argument("--no-sandbox")
+                options.add_argument("--disable-dev-shm-usage")
+                
+                # Add user data directory for persistent sessions
+                if self.user_data_dir:
+                    options.add_argument(f"--user-data-dir={self.user_data_dir}")
+                    logger.info(f"Using user data directory: {self.user_data_dir}")
+                
                 self.driver = webdriver.Edge(options=options)
             else:
                 return {"status": "error", "message": f"Unsupported browser type: {self.browser_type}"}
@@ -1769,7 +1788,6 @@ class BrowserToolkit(Toolkit):
         headless: bool = True,
         timeout: int = 10,
         **kwargs
-
     ):
         # Create the shared browser tool instance
         browser_tool = BrowserBase(

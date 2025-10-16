@@ -1,0 +1,3 @@
+Stock code: 300750, Available funds: 100000 RMB, Current position: 500 shares at 280 RMB average cost, Date: 2024-07-30, Type of position: call, Data folder: d:\EvoAgentX\Wonderful_workflow_corpus\invest\300750\20240730\data, Past report folder: d:\EvoAgentX\Wonderful_workflow_corpus\invest\300750\reports\text_report_300750_20240730_previous.md
+
+Please read ALL files in the data folder and generate a comprehensive trading decision report in Chinese based on real data. Return the complete content.

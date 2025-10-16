@@ -1,0 +1,450 @@
+{
+    "class_name": "WorkFlowGraph",
+    "goal": "Goal: Write a complete, practical travel plan in clear sections (natural language, no JSON or code). \nUse any available context about:\n- travel_preferences (destination, start_date, end_date, budget & currency, traveler_count/ages, accommodation/transport/dining/activity preferences)\n- departure_location (city, country, optional airport_code)\n\nIf something is missing, make conservative assumptions and state them briefly in an \u201cAssumptions\u201d note. Keep dates in YYYY-MM-DD, use one currency consistently, ensure arithmetic is sensible (e.g., nights \u00d7 price_per_night \u2248 total).\n\nProduce the plan with these sections and bullets under each:\n1) Trip Summary \u2014 destination, dates, duration_days (inclusive), travelers (count, ages if known), top 3\u20136 highlights, total estimated cost & currency.\n2) Transportation \u2014 outbound and return (method, indicative duration, rough cost, carrier if relevant, booking tips), plus local transport options with quick pros/cons.\n3) Accommodation \u2014 1\u20133 suitable options with area, check-in/out, nights, price per night, total, key amenities, and (optional) booking hints/links.\n4) Dining \u2014 3\u20136 restaurant suggestions (cuisine, meal type, typical spend per person, area, whether reservation needed).\n5) Daily Itinerary \u2014 one entry per trip day: theme (optional), 3\u20136 activities with time window or sequence, locations, intra-day travel notes, and per-day budget.\n6) Booking Timeline \u2014 what to book when (e.g., flights, hotels, tours), money-saving tips, essential preparations.\n7) Assumptions \u2014 list any important assumptions you made due to missing info.\n\nStyle: clear headings, concise bullets, realistic and location-appropriate suggestions.\n",
+    "nodes": [
+        {
+            "class_name": "WorkFlowNode",
+            "name": "trip_summary_generation",
+            "description": "Create a trip summary detailing destination, dates, duration, travelers, highlights, and estimated costs.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "goal",
+                    "type": "string",
+                    "description": "The user's goal in textual format.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "trip_summary",
+                    "type": "string",
+                    "description": "An overview of the trip including key highlights and total estimated costs.",
+                    "required": true
+                }
+            ],
+            "reason": "This section provides an overview of the entire travel plan, making it easier to understand the overall framework and set expectations.",
+            "agents": [
+                {
+                    "name": "trip_summary_agent",
+                    "description": "This agent generates a trip summary by extracting and synthesizing information from the user's goal, detailing destination, dates, duration, travelers, highlights, and estimated costs.",
+                    "inputs": [
+                        {
+                            "name": "goal",
+                            "type": "string",
+                            "description": "The user's goal in textual format.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "trip_summary",
+                            "type": "string",
+                            "description": "An overview of the trip including key highlights and total estimated costs.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Objective\nGenerate a comprehensive trip summary outlining the destination, travel dates, duration, traveler details, key highlights, and estimated costs based on the user's goal.\n\n### Instructions\n1. Begin by analyzing the user's travel goal provided: <input>{goal}</input>.\n2. Extract details about the destination, intended travel dates, and duration from the goal.\n3. Identify and list the number of travelers and their ages (if available) from the provided goal.\n4. Based on the information, determine and list the top 3 to 6 trip highlights worth mentioning.\n5. Calculate an estimated total cost of the trip, considering aspects such as transportation, accommodation, dining, and activities. Use consistent currency as stated in the goal.\n6. Synthesize all the extracted information into a coherent and succinct trip summary.\n\n### Output Format\nYour final output should ALWAYS be in the following format:\n\n## Thought\nBriefly explain the reasoning process for achieving the objective.\n\n## trip_summary\nAn overview of the trip including destination, travel dates, duration, highlights, and estimated costs."
+                }
+            ],
+            "status": "pending"
+        },
+        {
+            "class_name": "WorkFlowNode",
+            "name": "transportation_details",
+            "description": "Provide details about outbound and return transportation, including local transport options.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "goal",
+                    "type": "string",
+                    "description": "The user's goal in textual format.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "trip_summary",
+                    "type": "string",
+                    "description": "The trip summary with key information about the travel plan.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "transportation_plan",
+                    "type": "string",
+                    "description": "Details of transportation, including options for outbound, return, and local journeys.",
+                    "required": true
+                }
+            ],
+            "reason": "Transportation planning is essential for ensuring smooth travel arrangements, covering both long-distance travel and local mobility.",
+            "agents": [
+                {
+                    "name": "transportation_details_agent",
+                    "description": "This agent provides comprehensive transportation details for the trip, covering both outbound/return journeys and local transport options based on the user's goal and trip summary.",
+                    "inputs": [
+                        {
+                            "name": "goal",
+                            "type": "string",
+                            "description": "The user's goal in textual format.",
+                            "required": true
+                        },
+                        {
+                            "name": "trip_summary",
+                            "type": "string",
+                            "description": "The trip summary with key information about the travel plan.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "transportation_plan",
+                            "type": "string",
+                            "description": "Details of transportation, including options for outbound, return, and local journeys.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Objective\nGenerate a comprehensive transportation plan for the trip, incorporating details for outbound and return travels as well as local transportation options using the user's goals and the trip summary.\n\n### Instructions\n1. Analyze the user's goal: <input>{goal}</input> to understand their travel preferences, budget, and specific requirements.\n2. Review the trip summary: <input>{trip_summary}</input> to extract key information such as destination, duration, and dates.\n3. Draft options for outbound transportation considering methods like flights, trains, or buses. Include indicative duration, rough costs, carrier options, and any applicable booking tips.\n4. Draft options for return transportation, mirroring the approach used for outbound travel.\n5. Identify the most suitable local transportation methods, outlining their pros and cons for getting around the destination.\n6. Compile all gathered information into a clear and cohesive transportation plan that aligns with the user's goal and trip summary.\n\n### Output Format\nYour final output should ALWAYS be in the following format:\n\n## Thought\nBriefly explain the reasoning process for achieving the objective.\n\n## transportation_plan\nProvide a detailed account of the transportation options for outbound, return, and local journeys.",
+                    "tool_names": [
+                        "SerpAPIToolkit",
+                        "GoogleMapsToolkit"
+                    ]
+                }
+            ],
+            "status": "pending"
+        },
+        {
+            "class_name": "WorkFlowNode",
+            "name": "accommodation_suggestions",
+            "description": "Identify suitable accommodation options with pricing and amenities details.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "goal",
+                    "type": "string",
+                    "description": "The user's goal in textual format.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "trip_summary",
+                    "type": "string",
+                    "description": "The trip summary with key information about the travel plan.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "accommodation_plan",
+                    "type": "string",
+                    "description": "Details of recommended accommodations, including costs and amenities.",
+                    "required": true
+                }
+            ],
+            "reason": "Accommodation is a critical part of travel planning, requiring careful consideration of budget, location, and amenities.",
+            "agents": [
+                {
+                    "name": "accommodation_recommender",
+                    "description": "This agent identifies and recommends suitable accommodation options with details on pricing and amenities, using the user's goal and trip summary.",
+                    "inputs": [
+                        {
+                            "name": "goal",
+                            "type": "string",
+                            "description": "The user's goal in textual format.",
+                            "required": true
+                        },
+                        {
+                            "name": "trip_summary",
+                            "type": "string",
+                            "description": "The trip summary with key information about the travel plan.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "accommodation_plan",
+                            "type": "string",
+                            "description": "Details of recommended accommodations, including costs and amenities.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Objective\nIdentify and recommend suitable accommodation options based on the user's travel goal and the provided trip summary, ensuring each option meets budget, location, and amenity preferences.\n\n### Instructions\n1. Analyze the user's travel goal: <input>{goal}</input> to understand specific requirements or preferences for accommodations such as budget constraints, preferred locations, and necessary amenities.\n2. Review the trip summary: <input>{trip_summary}</input> to gather key trip details like duration, traveler count, and destination specifics.\n3. Search for accommodation options that align with these preferences and requirements.\n4. Evaluate each option, considering price, location proximity to activities or destinations, and offered amenities.\n5. Compile a list of 1-3 recommended accommodation options, detailing location, check-in/out dates, price per night, total cost, and available amenities.\n6. Ensure recommendations include any booking hints or links where applicable.\n\n### Output Format\nYour final output should ALWAYS be in the following format:\n\n## Thought\nBriefly explain the reasoning process for identifying and recommending these accommodations.\n\n## accommodation_plan\nProvide a detailed list of recommended accommodation options, including costs and amenities.",
+                    "tool_names": [
+                        "SerpAPIToolkit"
+                    ]
+                }
+            ],
+            "status": "pending"
+        },
+        {
+            "class_name": "WorkFlowNode",
+            "name": "dining_recommendations",
+            "description": "Suggest restaurants with details about cuisine, meal types, and typical spending.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "goal",
+                    "type": "string",
+                    "description": "The user's goal in textual format.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "trip_summary",
+                    "type": "string",
+                    "description": "The trip summary with key information about the travel plan.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "dining_plan",
+                    "type": "string",
+                    "description": "Recommended dining options with details and costs.",
+                    "required": true
+                }
+            ],
+            "reason": "Dining options enhance the travel experience and should be varied and aligned with traveler preferences.",
+            "agents": [
+                {
+                    "name": "dining_recommendation_agent",
+                    "description": "This agent is responsible for providing dining recommendations matching the traveler's preferences based on the trip summary.",
+                    "inputs": [
+                        {
+                            "name": "goal",
+                            "type": "string",
+                            "description": "The user's goal in textual format.",
+                            "required": true
+                        },
+                        {
+                            "name": "trip_summary",
+                            "type": "string",
+                            "description": "The trip summary with key information about the travel plan.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "dining_plan",
+                            "type": "string",
+                            "description": "Recommended dining options with details and costs.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Objective\nProvide dining recommendations that match the traveler's preferences based on the information in the trip summary.\n\n### Instructions\n1. Review the user's goal to understand any specific dining preferences or restrictions: <input>{goal}</input>.\n2. Analyze the trip summary to identify the location, duration, and context of the travel: <input>{trip_summary}</input>.\n3. Research potential dining options that fit within the context of the trip, including the location and likely schedule.\n4. Curate a variety of dining experiences, ensuring a mix of cuisines and meal types (e.g., breakfast, lunch, dinner).\n5. For each recommendation, provide details such as cuisine type, meal type, typical spending per person, and any other relevant notes (e.g., need for reservations).\n6. Compile these recommendations into a cohesive 'dining_plan' to present to the user.\n\n### Output Format\nYour final output should ALWAYS be in the following format:\n\n## Thought\nBriefly explain the reasoning process for achieving the objective.\n\n## dining_plan\nProvide a comprehensive list of recommended dining options, each with detailed descriptions including cuisine, meal type, typical spending, and any other relevant information.",
+                    "tool_names": [
+                        "SerpAPIToolkit"
+                    ]
+                }
+            ],
+            "status": "pending"
+        },
+        {
+            "class_name": "WorkFlowNode",
+            "name": "daily_itinerary_creation",
+            "description": "Develop a detailed daily itinerary with activities and budget considerations.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "goal",
+                    "type": "string",
+                    "description": "The user's goal in textual format.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "trip_summary",
+                    "type": "string",
+                    "description": "The trip summary with key information about the travel plan.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "daily_itinerary",
+                    "type": "string",
+                    "description": "Detailed plan of daily activities with budgets.",
+                    "required": true
+                }
+            ],
+            "reason": "A well-structured daily itinerary helps maximize time and enjoyment during the trip.",
+            "agents": [
+                {
+                    "name": "itinerary_planner",
+                    "description": "This agent creates a daily itinerary based on the user's travel goals and the trip summary, detailing activities and budgets for each day.",
+                    "inputs": [
+                        {
+                            "name": "goal",
+                            "type": "string",
+                            "description": "The user's goal in textual format.",
+                            "required": true
+                        },
+                        {
+                            "name": "trip_summary",
+                            "type": "string",
+                            "description": "The trip summary with key information about the travel plan.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "daily_itinerary",
+                            "type": "string",
+                            "description": "Detailed plan of daily activities with budgets.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Objective\nDevelop a detailed, practical daily itinerary that aligns with the user's travel preferences and trip overview, incorporating activities and budgets for each day of the trip.\n\n### Instructions\n1. Analyze the detailed goal of the user: <input>{goal}</input>.\n2. Review the trip summary for key details such as destination, dates, duration, travelers, and highlights: <input>{trip_summary}</input>.\n3. Create a day-by-day itinerary that includes 3-6 activities each day, aiming to incorporate the user's interests and destination highlights.\n4. Assign time windows or sequences for each activity to ensure a balanced daily schedule.\n5. Include intra-day travel notes to suggest how to navigate between activities effectively.\n6. Estimate and allocate a per-day budget reflecting activities and any additional relevant expenses, ensuring it aligns with the overall trip budget.\n7. Ensure the itinerary maximizes enjoyment and practicality, making adjustments as necessary based on the user's preferences.\n8. Present the itinerary in a clear, structured format suitable for easy understanding and use during the trip.\n\n### Output Format\nYour final output should ALWAYS be in the following format:\n\n## Thought\nBriefly explain the reasoning process for achieving the objective.\n\n## daily_itinerary\nProvide the detailed plan of daily activities with budgets."
+                }
+            ],
+            "status": "pending"
+        },
+        {
+            "class_name": "WorkFlowNode",
+            "name": "booking_timeline_and_tips",
+            "description": "Outline the booking timeline and provide essential tips for savings and preparations.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "goal",
+                    "type": "string",
+                    "description": "The user's goal in textual format.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "trip_summary",
+                    "type": "string",
+                    "description": "The trip summary with key information about the travel plan.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "booking_timeline",
+                    "type": "string",
+                    "description": "A timeline for bookings and tips for preparations and savings.",
+                    "required": true
+                }
+            ],
+            "reason": "Timely bookings and preparations can prevent last-minute issues and reduce costs.",
+            "agents": [
+                {
+                    "name": "booking_timeline_and_tips_agent",
+                    "description": "This agent creates a booking timeline with essential tips for savings and preparations based on the provided trip summary and user goal.",
+                    "inputs": [
+                        {
+                            "name": "goal",
+                            "type": "string",
+                            "description": "The user's goal in textual format.",
+                            "required": true
+                        },
+                        {
+                            "name": "trip_summary",
+                            "type": "string",
+                            "description": "The trip summary with key information about the travel plan.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "booking_timeline",
+                            "type": "string",
+                            "description": "A timeline for bookings and tips for preparations and savings.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Objective\nCreate a booking timeline with essential tips for cost-saving and preparations, using the trip summary and user's goal.\n\n### Instructions\n1. Analyze the trip summary: <input>{trip_summary}</input>\n2. Understand the key timeline milestones for booking essentials such as flights, accommodations, and activities from the user's goal: <input>{goal}</input>\n3. Identify early booking opportunities and suggest potential cost-saving actions for various components of the trip (e.g., flight and accommodation deals, bundled bookings).\n4. Develop a booking timeline covering all major bookings and preparation actions prior to the trip.\n5. Provide practical tips for preparations and possible savings, considering the specifics of the trip summary and user preferences.\n6. Output the booking timeline and tips in a clear, organized format suitable for direct application.\n\n### Output Format\nYour final output should ALWAYS in the following format:\n\n## Thought\nBriefly explain the reasoning process for creating the booking timeline and tips\n\n## booking_timeline\nA timeline for bookings and tips for preparations and savings."
+                }
+            ],
+            "status": "pending"
+        },
+        {
+            "class_name": "WorkFlowNode",
+            "name": "assumptions_note",
+            "description": "List any assumptions made due to missing information.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "goal",
+                    "type": "string",
+                    "description": "The user's goal in textual format.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "assumptions",
+                    "type": "string",
+                    "description": "Detailed list of assumptions made during the planning process.",
+                    "required": true
+                }
+            ],
+            "reason": "Understanding the assumptions used in planning helps calibrate expectations and makes it easier to fill any informational gaps.",
+            "agents": [
+                {
+                    "name": "assumption_analysis_agent",
+                    "description": "This agent analyzes the provided goal to deduce necessary assumptions due to missing information in order to support the travel planning process.",
+                    "inputs": [
+                        {
+                            "name": "goal",
+                            "type": "string",
+                            "description": "The user's goal in textual format.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "assumptions",
+                            "type": "string",
+                            "description": "Detailed list of assumptions made during the planning process.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Objective\nIdentify and list assumptions based on the user's goal, addressing any missing information in the travel planning process.\n\n### Instructions\n1. Analyze the user's goal text: <input>{goal}</input>.\n2. Identify key elements required to fulfill the travel planning goals such as destination, travel dates, budget, traveler preferences, and transport/accommodation options.\n3. Assess any areas where information might be missing or incomplete.\n4. Infer logical and conservative assumptions to bridge these informational gaps.\n5. Clearly list each assumption, specifying the aspect of the travel plan it relates to.\n\n### Output Format\nYour final output should ALWAYS in the following format:\n\n## Thought\nBriefly explain the reasoning process for identifying assumptions and addressing any gaps in information.\n\n## assumptions\nProvide a detailed list of assumptions made during the planning process."
+                }
+            ],
+            "status": "pending"
+        }
+    ],
+    "edges": [
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "trip_summary_generation",
+            "target": "transportation_details",
+            "priority": 0
+        },
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "trip_summary_generation",
+            "target": "accommodation_suggestions",
+            "priority": 0
+        },
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "trip_summary_generation",
+            "target": "dining_recommendations",
+            "priority": 0
+        },
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "trip_summary_generation",
+            "target": "daily_itinerary_creation",
+            "priority": 0
+        },
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "trip_summary_generation",
+            "target": "booking_timeline_and_tips",
+            "priority": 0
+        }
+    ],
+    "graph": null
+}

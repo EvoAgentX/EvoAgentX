@@ -1,0 +1,194 @@
+{
+    "class_name": "WorkFlowGraph",
+    "goal": "Create a daily research paper recommendation assistant.\n\n    The assistant should:\n    1. Use the ArxivToolkit to search for the latest papers with user-provided constraints.\n    2. Summarize the search results.\n    3. Compile the summaries into a well-formatted Markdown digest.\n\n    ### Output\n    daily_paper_digest\n    ",
+    "nodes": [
+        {
+            "class_name": "WorkFlowNode",
+            "name": "search_papers_using_arxiv_toolkit",
+            "description": "Use the ArxivToolkit to search for the latest papers based on user-provided constraints.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "goal",
+                    "type": "string",
+                    "description": "The user's goal in textual format, including any constraints for paper searching.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "search_results",
+                    "type": "list",
+                    "description": "A list of research papers retrieved from Arxiv based on the constraints.",
+                    "required": true
+                }
+            ],
+            "reason": "This allows the assistant to retrieve the most relevant research papers according to the user's interests.",
+            "agents": [
+                {
+                    "name": "arxiv_paper_search_agent",
+                    "description": "This agent uses the ArxivToolkit to search for the latest research papers on arXiv based on the user's provided constraints, producing a list of relevant research papers.",
+                    "inputs": [
+                        {
+                            "name": "goal",
+                            "type": "string",
+                            "description": "The user's goal in textual format, including any constraints for paper searching.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "search_results",
+                            "type": "list",
+                            "description": "A list of research papers retrieved from Arxiv based on the constraints.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Objective\nUse the ArxivToolkit to search and retrieve the latest research papers that match the user-provided constraints and interests.\n\n### Instructions\n1. Understand the user's goal and constraints specified in the input: <input>{goal}</input>.\n2. Formulate an appropriate search query based on the provided constraints.\n3. Utilize the ArxivToolkit to search for papers using the formulated query.\n4. Retrieve and compile a list of papers that meet the specified criteria.\n5. Ensure the search results are relevant and up-to-date.\n\n### Output Format\nYour final output should ALWAYS be in the following format:\n\n## Thought\nBriefly explain the reasoning process for achieving the objective.\n\n## search_results\nA compiled list of research papers retrieved from arXiv satisfying the user constraints.",
+                    "tool_names": [
+                        "ArxivToolkit"
+                    ]
+                }
+            ],
+            "status": "pending"
+        },
+        {
+            "class_name": "WorkFlowNode",
+            "name": "summarize_search_results",
+            "description": "Summarize the search results to provide concise overviews of each paper.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "goal",
+                    "type": "string",
+                    "description": "The user's goal in textual format, ensuring context is maintained.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "search_results",
+                    "type": "list",
+                    "description": "A list of research papers retrieved from Arxiv based on the constraints.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "summarized_results",
+                    "type": "list",
+                    "description": "A list of summaries corresponding to each of the retrieved research papers.",
+                    "required": true
+                }
+            ],
+            "reason": "This step condenses the papers into brief, easy-to-digest summaries for better user understanding.",
+            "agents": [
+                {
+                    "name": "paper_summarizer_agent",
+                    "description": "This agent summarizes a list of research papers retrieved from Arxiv, providing concise overviews while ensuring alignment with the user's research goal.",
+                    "inputs": [
+                        {
+                            "name": "goal",
+                            "type": "string",
+                            "description": "The user's goal in textual format, ensuring context is maintained.",
+                            "required": true
+                        },
+                        {
+                            "name": "search_results",
+                            "type": "list",
+                            "description": "A list of research papers retrieved from Arxiv based on the constraints.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "summarized_results",
+                            "type": "list",
+                            "description": "A list of summaries corresponding to each of the retrieved research papers.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Objective\nSummarize the provided list of research papers to produce concise overviews that align with the user's research goal.\n\n### Instructions\n1. Understand the user's research goal: <input>{goal}</input> to maintain context during summarization.\n2. For each paper in <input>{search_results}</input>:\n   a. Extract key information, including the title, authors, abstract or introduction, and any distinctive aspects.\n   b. Create a brief and informative summary, highlighting the main contributions and findings.\n   c. Ensure each summary is relevant to the user's goal.\n3. Compile all summaries into a list to serve as the summarized results.\n\n### Output Format\nYour final output should ALWAYS be in the following format:\n\n## Thought\nBriefly explain the reasoning process for achieving the objective.\n\n## summarized_results\nA list of summaries corresponding to each of the retrieved research papers."
+                }
+            ],
+            "status": "pending"
+        },
+        {
+            "class_name": "WorkFlowNode",
+            "name": "compile_summaries_into_markdown",
+            "description": "Compile the summarized search results into a well-formatted Markdown digest.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "goal",
+                    "type": "string",
+                    "description": "The user's goal in textual format, ensuring context is maintained.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "summarized_results",
+                    "type": "list",
+                    "description": "A list of summaries corresponding to each of the retrieved research papers.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "daily_paper_digest",
+                    "type": "string",
+                    "description": "The final Markdown digest of the summarized research papers.",
+                    "required": true
+                }
+            ],
+            "reason": "Compiling into Markdown provides a user-friendly format that is easy to read and distribute.",
+            "agents": [
+                {
+                    "name": "markdown_compilation_agent",
+                    "description": "This agent compiles the summarized research papers into a well-formatted Markdown digest.",
+                    "inputs": [
+                        {
+                            "name": "goal",
+                            "type": "string",
+                            "description": "The user's goal in textual format, ensuring context is maintained.",
+                            "required": true
+                        },
+                        {
+                            "name": "summarized_results",
+                            "type": "list",
+                            "description": "A list of summaries corresponding to each of the retrieved research papers.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "daily_paper_digest",
+                            "type": "string",
+                            "description": "The final Markdown digest of the summarized research papers.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Objective\nCompile the summarized search results into a well-formatted Markdown digest, ensuring clarity and coherence aligned with the user's goal.\n\n### Instructions\n1. Read and understand the user's goal: <input>{goal}</input> to maintain the context in the formatting.\n2. Review the list of summarized results: <input>{summarized_results}</input>.\n3. Begin creating a Markdown document that starts with an introduction reflecting the user's goal and any overarching themes.\n4. For each summary in the list of summarized results, format it as a distinct section or bullet point in the Markdown document.\n5. Ensure each section includes appropriate headings, indentation, and bullet points where suitable.\n6. Compile all formatted sections into a single coherent Markdown document titled 'Daily Paper Digest'.\n7. Double-check for clarity, consistent formatting, and adherence to Markdown standards.\n\n### Output Format\nYour final output should ALWAYS in the following format:\n\n## Thought\nBriefly explain the reasoning process for compiling into Markdown\n\n## daily_paper_digest\nThe final Markdown digest of the summarized research papers."
+                }
+            ],
+            "status": "pending"
+        }
+    ],
+    "edges": [
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "search_papers_using_arxiv_toolkit",
+            "target": "summarize_search_results",
+            "priority": 0
+        },
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "summarize_search_results",
+            "target": "compile_summaries_into_markdown",
+            "priority": 0
+        }
+    ],
+    "graph": null
+}
