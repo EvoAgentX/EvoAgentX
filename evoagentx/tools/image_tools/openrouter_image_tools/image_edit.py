@@ -2,25 +2,29 @@ from typing import Dict, List, Optional
 import os
 import requests
 import base64
+import mimetypes
 from ...tool import Tool
 from ...storage_handler import FileStorageHandler, LocalStorageHandler
 from .image_postprocessor import ImagePostProcessor
 
 
-class OpenRouterImageGenerationTool(Tool):
-    name: str = "openrouter_image_generation"
+class OpenRouterImageEditTool(Tool):
+    name: str = "openrouter_image_edit"
     description: str = (
-        "Generate images from text prompts using OpenRouter models (e.g., google/gemini-2.5-flash-image). "
+        "Edit or compose images using OpenRouter models (e.g., google/gemini-2.5-flash-image). "
+        "Provide image URLs or local paths along with a text prompt to modify or enhance the image. "
         "Supports custom output sizes and formats with automatic postprocessing."
     )
 
     inputs: Dict[str, Dict] = {
-        "prompt": {"type": "string", "description": "Text prompt for image generation."},
+        "prompt": {"type": "string", "description": "Text prompt for image editing/composition."},
+        "image_urls": {"type": "array", "description": "Remote image URLs (optional)."},
+        "image_paths": {"type": "array", "description": "Local image paths (optional)."},
         "model": {"type": "string", "description": "OpenRouter model id.", "default": "google/gemini-2.5-flash-image"},
         "api_key": {"type": "string", "description": "OpenRouter API key (fallback to env OPENROUTER_API_KEY)."},
-        "save_path": {"type": "string", "description": "Directory to save generated images.", "default": "./openrouter_images"},
-        "output_basename": {"type": "string", "description": "Base filename for outputs.", "default": "or_gen"},
-        "output_size": {"type": "string", "description": "Output image size as 'WIDTHxHEIGHT' (e.g., '512x512', '1024x768'). If not specified, uses model's default size."},
+        "save_path": {"type": "string", "description": "Directory to save edited images.", "default": "./openrouter_images"},
+        "output_basename": {"type": "string", "description": "Base filename for outputs.", "default": "or_edit"},
+        "output_size": {"type": "string", "description": "Output image size as 'WIDTHxHEIGHT' (e.g., '512x512', '1024x768'). If not specified, keeps original size."},
         "output_format": {"type": "string", "description": "Output format: 'png', 'jpeg', 'webp' etc. If not specified, uses PNG.", "default": "png"},
         "output_quality": {"type": "integer", "description": "JPEG/WEBP quality (1-100). Only used for jpeg/webp formats.", "default": 95}
     }
@@ -37,10 +41,12 @@ class OpenRouterImageGenerationTool(Tool):
     def __call__(
         self,
         prompt: str,
+        image_urls: list = None,
+        image_paths: list = None,
         model: str = "google/gemini-2.5-flash-image",
         api_key: str = None,
         save_path: str = "./openrouter_images",
-        output_basename: str = "or_gen",
+        output_basename: str = "or_edit",
         output_size: str = None,
         output_format: str = "png",
         output_quality: int = 95,
@@ -48,6 +54,10 @@ class OpenRouterImageGenerationTool(Tool):
         key = api_key or self.api_key
         if not key:
             return {"error": "OPENROUTER_API_KEY not provided."}
+
+        # Validate that at least one image source is provided
+        if not image_urls and not image_paths:
+            return {"error": "At least one of image_urls or image_paths must be provided for editing."}
 
         # Check if postprocessing is needed
         needs_pp = self.postprocessor.needs_postprocessing(model, output_size, output_format)
@@ -66,12 +76,21 @@ class OpenRouterImageGenerationTool(Tool):
             
             print(f"📝 API will generate with format: {api_format}")
             print(f"🎯 Postprocessing target: size={target_size or 'original'}, format={target_format}")
+
+        # Build content parts from URLs and/or local paths
+        content_parts = [{"type": "text", "text": prompt}]
+        
+        if image_urls:
+            content_parts.extend(self._urls_to_image_parts(image_urls))
+        
+        if image_paths:
+            content_parts.extend(self._paths_to_image_parts(image_paths))
         
         # Build API request
-        messages = [{"role": "user", "content": prompt}]
+        messages = [{"role": "user", "content": content_parts}]
         payload = {
-            "model": model, 
-            "messages": messages, 
+            "model": model,
+            "messages": messages,
             "modalities": ["image", "text"]
         }
 
@@ -143,7 +162,7 @@ class OpenRouterImageGenerationTool(Tool):
                         ext = ".heif"
                     
                     # Generate unique filename
-                    filename = self._get_unique_filename(output_basename or "or_gen", ext)
+                    filename = self._get_unique_filename(output_basename or "or_edit", ext)
                     
                     # Decode image data
                     image_content = base64.b64decode(b64data)
@@ -168,7 +187,9 @@ class OpenRouterImageGenerationTool(Tool):
                     result = self.storage_handler.save(filename, image_content)
                     
                     if result["success"]:
-                        saved_paths.append(filename)
+                        # Return the translated path that was actually used for saving
+                        translated_path = self.storage_handler.translate_in(filename)
+                        saved_paths.append(translated_path)
                     else:
                         return {"error": f"Failed to save image: {result.get('error', 'Unknown error')}"}
 
@@ -176,6 +197,32 @@ class OpenRouterImageGenerationTool(Tool):
             return {"results": saved_paths, "count": len(saved_paths)}
         return {"warning": "No image returned or saved.", "raw": data}
 
+    # --- Helper methods ---
+    
+    def _url_to_image_part(self, url: str) -> Dict:
+        """Convert URL to image_url content part"""
+        return {"type": "image_url", "image_url": {"url": url}}
+
+    def _guess_mime_from_name(self, name: str, default: str = "image/png") -> str:
+        """Guess MIME type from filename"""
+        guess, _ = mimetypes.guess_type(name)
+        return guess or default
+
+    def _path_to_data_url(self, path: str) -> str:
+        """Convert local image path to data URL"""
+        mime = self._guess_mime_from_name(path)
+        
+        # Use storage handler to read raw bytes directly
+        try:
+            # Translate user path to system path first
+            system_path = self.storage_handler.translate_in(path)
+            content = self.storage_handler._read_raw(system_path)
+        except Exception as e:
+            raise FileNotFoundError(f"Could not read file {path}: {str(e)}")
+        
+        b64 = base64.b64encode(content).decode("utf-8")
+        return f"data:{mime};base64,{b64}"
+    
     def _get_unique_filename(self, base_name: str, extension: str) -> str:
         """Generate a unique filename for the image"""
         filename = f"{base_name}{extension}"
@@ -196,3 +243,20 @@ class OpenRouterImageGenerationTool(Tool):
         
         base = filename.rsplit('.', 1)[0] if '.' in filename else filename
         return f"{base}.{new_ext}"
+
+    def _paths_to_image_parts(self, paths: list) -> List[Dict]:
+        """Convert list of local paths to image_url content parts"""
+        parts: List[Dict] = []
+        for p in paths:
+            try:
+                parts.append(self._url_to_image_part(self._path_to_data_url(p)))
+            except Exception as e:
+                print(f"⚠️ Failed to read image path {p}: {e}")
+                # Skip unreadable path
+                continue
+        return parts
+
+    def _urls_to_image_parts(self, urls: list) -> List[Dict]:
+        """Convert list of URLs to image_url content parts"""
+        return [self._url_to_image_part(u) for u in urls]
+

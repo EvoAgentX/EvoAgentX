@@ -2,6 +2,7 @@ from typing import Dict, Optional, List
 from ...tool import Tool
 from ...storage_handler import FileStorageHandler, LocalStorageHandler
 from .openai_utils import create_openai_client
+from .image_postprocessor import ImagePostProcessor
 
 
 class OpenAIImageEditTool(Tool):
@@ -12,26 +13,28 @@ class OpenAIImageEditTool(Tool):
         "prompt": {"type": "string", "description": "Edit instruction. Required."},
         "images": {"type": "array", "description": "Image path(s) png/webp/jpg <50MB. Required. Single string accepted and normalized to array."},
         "mask_path": {"type": "string", "description": "Optional PNG mask path (same size as first image)."},
-        "size": {"type": "string", "description": "1024x1024 | 1536x1024 | 1024x1536 | auto"},
-        "n": {"type": "integer", "description": "1-10"},
-        "background": {"type": "string", "description": "transparent | opaque | auto"},
-        "input_fidelity": {"type": "string", "description": "high | low"},
-        "output_compression": {"type": "integer", "description": "0-100 for jpeg/webp"},
-        "output_format": {"type": "string", "description": "png | jpeg | webp (default png)"},
-        "partial_images": {"type": "integer", "description": "0-3 partial streaming"},
-        "quality": {"type": "string", "description": "auto | high | medium | low"},
-        "stream": {"type": "boolean", "description": "streaming mode"},
+        "size": {"type": "string", "description": "Output image size: 1024x1024|1536x1024|1024x1536|auto"},
+        "n": {"type": "integer", "description": "Number of images to generate: 1-10"},
+        "background": {"type": "string", "description": "Background mode: transparent|opaque|auto"},
+        "input_fidelity": {"type": "string", "description": "Input fidelity level: high|low"},
+        "output_compression": {"type": "integer", "description": "Compression quality 0-100 (jpeg/webp only)"},
+        "output_format": {"type": "string", "description": "Output format (gpt-image-1 only): png|jpeg|webp"},
+        "partial_images": {"type": "integer", "description": "Streaming partial images 0-3 (gpt-image-1 only)"},
+        "quality": {"type": "string", "description": "Output quality: auto|high|medium|low"},
+        "stream": {"type": "boolean", "description": "Enable streaming (gpt-image-1 only)"},
         "image_name": {"type": "string", "description": "Optional output base name"},
     }
     required: Optional[List[str]] = ["prompt", "images"]
 
-    def __init__(self, api_key: str, organization_id: str = None, save_path: str = "./edited_images", 
-                 storage_handler: Optional[FileStorageHandler] = None):
+    def __init__(self, api_key: str, organization_id: str = None, save_path: str = "./openai_edited_images", 
+                 storage_handler: Optional[FileStorageHandler] = None, auto_postprocess: bool = False):
         super().__init__()
         self.api_key = api_key
         self.organization_id = organization_id
         self.save_path = save_path
         self.storage_handler = storage_handler or LocalStorageHandler(base_path=save_path)
+        self.auto_postprocess = auto_postprocess  # auto postprocess images if needed
+        self.postprocessor = ImagePostProcessor()
 
     def __call__(
         self,
@@ -51,6 +54,28 @@ class OpenAIImageEditTool(Tool):
     ):
         try:
             client = create_openai_client(self.api_key, self.organization_id)
+
+            # check if need postprocessing
+            needs_pp = self.postprocessor.needs_postprocessing("gpt-image-1", size, output_format)
+            target_size = size
+            target_format = output_format
+            target_compression = output_compression or 95
+            
+            if self.auto_postprocess and (needs_pp["need_resize"] or needs_pp["need_format_conversion"]):
+                print("🔄 detected incompatible parameters, will enable auto postprocessing:")
+                for reason in needs_pp["reason"]:
+                    print(f"   • {reason}")
+                
+                # get compatible API parameters
+                compat_params = self.postprocessor.get_compatible_params("gpt-image-1", size, output_format)
+                api_size = compat_params["api_params"].get("size")
+                api_format = compat_params["api_params"].get("output_format")
+                
+                print(f"📝 API will use: size={api_size}, format={api_format}")
+                print(f"🎯 postprocessing target: size={target_size}, format={target_format}")
+            else:
+                api_size = size
+                api_format = output_format
 
             # Accept either list[str] or a single string at runtime
             if isinstance(images, str):
@@ -74,8 +99,12 @@ class OpenAIImageEditTool(Tool):
                     "prompt": prompt,
                     "image": opened_images if len(opened_images) > 1 else opened_images[0],
                 }
-                if size is not None:
+                # use compatible parameters (if need postprocessing)
+                if api_size is not None:
+                    api_kwargs["size"] = api_size
+                elif size is not None:
                     api_kwargs["size"] = size
+                    
                 if n is not None:
                     api_kwargs["n"] = n
                 if background is not None:
@@ -84,8 +113,12 @@ class OpenAIImageEditTool(Tool):
                     api_kwargs["input_fidelity"] = input_fidelity
                 if output_compression is not None:
                     api_kwargs["output_compression"] = output_compression
-                if output_format is not None:
+                    
+                if api_format is not None:
+                    api_kwargs["output_format"] = api_format
+                elif output_format is not None:
                     api_kwargs["output_format"] = output_format
+                    
                 if partial_images is not None:
                     api_kwargs["partial_images"] = partial_images
                 if quality is not None:
@@ -125,11 +158,27 @@ class OpenAIImageEditTool(Tool):
             for i, img in enumerate(response.data):
                 try:
                     img_bytes = base64.b64decode(img.b64_json)
+                    
+                    # apply postprocessing (if needed)
+                    if self.auto_postprocess and (needs_pp["need_resize"] or needs_pp["need_format_conversion"]):
+                        print(f"🔧 postprocessing image {i+1}/{len(response.data)}...")
+                        img_bytes, ext = self.postprocessor.process_image(
+                            img_bytes,
+                            target_size=target_size,
+                            target_format=target_format,
+                            compression_quality=target_compression
+                        )
+                    else:
+                        # determine file extension
+                        ext = (output_format or "png").lower()
+                        if ext == "jpeg":
+                            ext = "jpg"
+                    
                     ts = int(time.time())
                     if image_name:
-                        filename = f"{image_name.rsplit('.', 1)[0]}_{i+1}.png"
+                        filename = f"{image_name.rsplit('.', 1)[0]}_{i+1}.{ext}"
                     else:
-                        filename = f"image_edit_{ts}_{i+1}.png"
+                        filename = f"image_edit_{ts}_{i+1}.{ext}"
                     
                     # Save using storage handler
                     result = self.storage_handler.save(filename, img_bytes)

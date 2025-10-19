@@ -8,15 +8,16 @@ def file_to_base64(path: str, storage_handler: Optional[FileStorageHandler] = No
     if storage_handler is None:
         storage_handler = LocalStorageHandler()
     
-    result = storage_handler.read(path)
-    if result["success"]:
-        if isinstance(result["content"], bytes):
-            return base64.b64encode(result["content"]).decode('utf-8')
-        else:
-            # If content is not bytes, convert to bytes first
-            return base64.b64encode(str(result["content"]).encode('utf-8')).decode('utf-8')
-    else:
-        raise FileNotFoundError(f"Could not read file {path}: {result.get('error', 'Unknown error')}")
+    # for image files, directly read raw bytes data, instead of using automatic format recognition
+    # because read() method returns PIL Image object instead of bytes for image files
+    try:
+        # convert relative path to full path
+        full_path = storage_handler.translate_in(path)
+        # use _read_raw to read raw binary content
+        content_bytes = storage_handler._read_raw(full_path)
+        return base64.b64encode(content_bytes).decode('utf-8')
+    except Exception as e:
+        raise FileNotFoundError(f"Could not read file {path}: {str(e)}")
 
 
 def file_to_base64_legacy(path: str) -> str:
