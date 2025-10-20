@@ -65,17 +65,6 @@ embedding=EmbeddingConfig(
         base_url="10.168.1.71:17174",
         dimensions=768
     )
-# For azure openai example
-embedding=EmbeddingConfig(
-    provider="azure_openai",
-    model_name=os.environ["AZURE_EMBED_DEPLOYMENT"],
-    api_key=os.environ["AZURE_EMBED_API_KEY"],
-    dimensions=3072,
-    deployment_name=os.environ["AZURE_EMBED_DEPLOYMENT"],
-    azure_endpoint=os.environ["AZURE_EMBED_ENDPOINT"],
-    api_version=os.environ["AZURE_EMBED_API_VERSION"],
-)
-
 """
 # For ollama example
 # embedding=EmbeddingConfig(
@@ -83,21 +72,11 @@ embedding=EmbeddingConfig(
 #         model_name="text-embedding-ada-002",
 #         api_key=os.environ["OPENAI_API_KEY"],
 # )
-# embedding=EmbeddingConfig(
-#         provider="huggingface",
-#         model_name=r"debug/weights/bge-small-en-v1.5",
-#         device="cuda:0"
-# )
 embedding=EmbeddingConfig(
-    provider="azure_openai",
-    model_name=os.environ["AZURE_EMBED_DEPLOYMENT"],
-    api_key=os.environ["AZURE_EMBED_API_KEY"],
-    dimensions=3072,
-    deployment_name=os.environ["AZURE_EMBED_DEPLOYMENT"],
-    azure_endpoint=os.environ["AZURE_EMBED_ENDPOINT"],
-    api_version=os.environ["AZURE_EMBED_API_VERSION"],
+        provider="huggingface",
+        model_name=r"debug/weights/bge-small-en-v1.5",
+        device="cuda:0"
 )
-
 
 rag_config = RAGConfig(
     reader=ReaderConfig(
