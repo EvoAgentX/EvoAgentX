@@ -494,11 +494,19 @@ class ExistsTool(Tool):
         """
         try:
             exists = self.storage_handler.exists(path)
-            return {
+            res = {
                 "success": True,
                 "path": path,
                 "exists": exists
             }
+            # If the underlying handler supports URL decoration, add it using the real path translation
+            try:
+                real_path = self.storage_handler.translate_in(path)
+                if getattr(self.storage_handler, "return_file_url", False):
+                    res["url"] = self.storage_handler._get_file_url(real_path)
+            except Exception:
+                pass
+            return res
             
         except Exception as e:
             logger.error(f"Error in ExistsTool: {str(e)}")
@@ -539,4 +547,4 @@ class StorageToolkit(Toolkit):
         ]
         
         super().__init__(name=name, tools=tools)
-        self.storage_handler = storage_handler 
+        self.storage_handler = storage_handler

@@ -48,6 +48,10 @@ class FileStorageHandler(StorageBase):
     def create_directory(self, path: str, **kwargs) -> Dict[str, Any]:
         return super().create_directory(path, **kwargs)
     
+    def _get_file_url(self, file_path: str, **kwargs) -> str:
+        """Create URL for others access"""
+        return super()._get_file_url(file_path, **kwargs)
+    
     
     
     # ____________________ Required Methods ____________________ #
@@ -238,6 +242,18 @@ class LocalStorageHandler(FileStorageHandler):
         except Exception as e:
             logger.error(f"Error creating directory {path}: {str(e)}")
             return False
+    
+    def _get_file_url(self, file_path: str) -> str:
+        """Create URL for others access"""
+        try:
+            # file_path provided to this method is already the resolved system path
+            # (callers pass translate_in(file_path)). To avoid duplicating base_path,
+            # simply convert to an absolute path and build the file URL.
+            abs_path = os.path.abspath(file_path)
+            return f"file://{abs_path}"
+        except Exception:
+            # Fallback: return a best-effort URL without altering the path
+            return f"file://{file_path}"
     
 
 
@@ -506,4 +522,13 @@ class SupabaseStorageHandler(FileStorageHandler):
             logger.error(f"Error creating directory {path} in Supabase: {str(e)}")
             return False
     
+    def _get_file_url(self, file_path: str) -> str:
+        """Create URL for others access"""
+        try:
+            public_url = self.supabase.storage.from_(self.bucket_name).get_public_url(file_path)
+            return public_url
+        except Exception as e:
+            logger.warning(f"Failed to create signed URL for {file_path}: {e}")
+            return file_path
+        
     

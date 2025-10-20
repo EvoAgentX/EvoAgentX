@@ -57,7 +57,10 @@ class BrowserBase(BaseModule):
             **kwargs: Additional keyword arguments for parent class initialization
         """
         # Pass to parent class initialization
-        super().__init__(name=name, timeout=timeout, browser_type=browser_type, headless=headless, **kwargs)
+        super().__init__(name=name)
+        self.timeout = timeout
+        self.browser_type = browser_type
+        self.headless=headless
         self.driver = None
         
         # Storage for element references from snapshots
@@ -1782,7 +1785,7 @@ class BrowserToolkit(Toolkit):
         self,
         name: str = "BrowserToolkit",
         browser_type: str = "chrome",
-        headless: bool = False,
+        headless: bool = True,
         timeout: int = 10,
         **kwargs
     ):

@@ -64,7 +64,7 @@ def run_search_examples():
     )
     
     # Get the individual tools from toolkits
-    wiki_tool = wiki_toolkit.get_tool("wikipedia_search")
+    # wiki_tool = wiki_toolkit.get_tool("wikipedia_search")
     google_tool = google_toolkit.get_tool("google_search")
     google_free_tool = google_free_toolkit.get_tool("google_free_search")
     ddgs_tool = ddgs_toolkit.get_tool("ddgs_search")
@@ -74,22 +74,22 @@ def run_search_examples():
     # Example search query
     query = "artificial intelligence agent architecture"
     
-    # Run Wikipedia search example
-    try:
-        print("\nWikipedia Search Example:")
-        print("-" * 50)
-        wiki_results = wiki_tool(query=query, num_search_pages=2)
+    # # Run Wikipedia search example
+    # try:
+    #     print("\nWikipedia Search Example:")
+    #     print("-" * 50)
+    #     wiki_results = wiki_tool(query=query, num_search_pages=2)
         
-        if wiki_results.get("error"):
-            print(f"Error: {wiki_results['error']}")
-        else:
-            for i, result in enumerate(wiki_results.get("results", [])):
-                print(f"Result {i+1}: {result['title']}")
-                print(f"Summary: {result['summary'][:150]}...")
-                print(f"URL: {result['url']}")
-                print("-" * 30)
-    except Exception as e:
-        print(f"Error running Wikipedia search: {str(e)}")
+    #     if wiki_results.get("error"):
+    #         print(f"Error: {wiki_results['error']}")
+    #     else:
+    #         for i, result in enumerate(wiki_results.get("results", [])):
+    #             print(f"Result {i+1}: {result['title']}")
+    #             print(f"Summary: {result['summary'][:150]}...")
+    #             print(f"URL: {result['url']}")
+    #             print("-" * 30)
+    # except Exception as e:
+    #     print(f"Error running Wikipedia search: {str(e)}")
     
     # Run Google search example (requires API key)
     try:

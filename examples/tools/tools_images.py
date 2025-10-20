@@ -1,12 +1,9 @@
 #!/usr/bin/env python3
 
 """
-Example demonstrating how to use image handling toolkits from EvoAgentX.
-This script provides comprehensive examples for:
-- ImageAnalysisToolkit for analyzing images using AI
-- OpenAI Image Generation and Editing (with auto postprocessing support)
-- Flux Image Generation and Editing (with auto postprocessing support)
-- OpenRouter Image Generation, Editing, and Analysis (with auto postprocessing support)
+Minimal, raw-input/output demos for individual image toolkits.
+Focus: OpenAIImageToolkit, OpenRouterImageToolkit, FluxImageToolkit.
+Each demo prints full input dicts and raw outputs.
 """
 
 import os
@@ -16,560 +13,174 @@ from dotenv import load_dotenv
 
 load_dotenv(override=True)
 
-# Add the parent directory to sys.path to import from evoagentx
-sys.path.append(str(Path(__file__).parent.parent))
+# Ensure project root is on sys.path to import evoagentx
+sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
 
 from evoagentx.tools import (
     OpenAIImageToolkit,
+    OpenRouterImageToolkit,
     FluxImageToolkit,
-    OpenRouterImageToolkit
 )
 
 
-def run_openai_image_toolkit_pipeline():
-    """Pipeline: generate → edit → analyze using OpenAIImageToolkit."""
-    print("\n===== OPENAI IMAGE TOOLKIT PIPELINE (GEN → EDIT → ANALYZE) =====\n")
+def run_openai_toolkit_examples():
+    """Demonstrate OpenAIImageToolkit: generation, edit, analysis (raw IO)."""
+    print("\n===== OPENAI IMAGE TOOLKIT (GEN/EDIT/ANALYSIS) =====\n")
 
     openai_api_key = os.getenv("OPENAI_API_KEY")
     openai_org_id = os.getenv("OPENAI_ORGANIZATION_ID")
     if not openai_api_key:
-        print("❌ OPENAI_API_KEY not found in environment variables")
+        print("❌ OPENAI_API_KEY not found; skipping OpenAI toolkit demos")
         return
 
-    toolkit = OpenAIImageToolkit(
-        name="DemoOpenAIImageToolkit",
-        api_key=openai_api_key,
-        organization_id=openai_org_id,
-        generation_model="gpt-image-1",
-        save_path="./openai_images"
-    )
-
-    gen = toolkit.get_tool("openai_image_generation")
-    edit = toolkit.get_tool("openai_image_edit")
-    analyze = toolkit.get_tool("openai_image_analysis")
-
-    # 1) Generate with custom parameters
-    gen_prompt = "A cute baby owl sitting on a tree branch at sunset, digital art"
-    print(f"Generating: {gen_prompt}")
-    print(f"Parameters: model=gpt-image-1, size=1024x1024, quality=high, output_format=png")
-    gen_result = gen(
-        prompt=gen_prompt, 
-        model="gpt-image-1", 
-        size="1024x1024",
-        quality="high",
-        output_format="png",
-        background="opaque",
-        n=1
-    )
-    if 'error' in gen_result:
-        print(f"❌ Generation failed: {gen_result['error']}")
-        return
-    gen_paths = gen_result.get('results', [])
-    if not gen_paths:
-        print("❌ No generated images returned")
-        return
-    src_path = gen_paths[0]
-    print(f"✓ Generated image: {src_path}")
-
-    # 2) Edit with custom parameters
-    print("\nEditing the generated image...")
-    print(f"Parameters: size=1024x1024, quality=high, output_format=jpeg, output_compression=90")
-    edit_result = edit(
-        prompt="Add a red scarf around the owl's neck",
-        images=src_path,
-        size="1024x1024",
-        background="opaque",
-        quality="high",
-        output_format="jpeg",
-        output_compression=90,
-        n=1,
-        image_name="edited_minimal"
-    )
-    if 'error' in edit_result:
-        print(f"❌ Edit failed: {edit_result['error']}")
-        return
-    edited_paths = edit_result.get('results', [])
-    if not edited_paths:
-        print("❌ No edited images returned")
-        return
-    edited_path = edited_paths[0]
-    print(f"✓ Edited image: {edited_path}")
-
-    # 3) Analyze (convert local file → data URL)
-    print("\nAnalyzing the edited image...")
     try:
-        analysis = analyze(
-            prompt="Summarize what's in this image in one sentence.",
-            image_path=edited_path,
-            model="gpt-4o-mini"
-        )
-        if 'error' in analysis:
-            print(f"❌ Analyze failed: {analysis['error']}")
-        else:
-            print("✓ Analysis:")
-            print(analysis.get('content', ''))
+        tk = OpenAIImageToolkit(api_key=openai_api_key, organization_id=openai_org_id, save_path="./generated_images")
+
+        # Generation
+        gen = tk.get_tool("openai_image_generation")
+        gen_input = {
+            "prompt": "A watercolor painting of a mountain lake at dawn",
+            "image_name": "openai_gen_demo",
+            "size": "1024x1024",
+        }
+        print("OpenAI generation input:")
+        print(gen_input)
+        gen_out = gen(**gen_input)
+        print("Raw generation output:")
+        print(gen_out)
+
+        # Editing
+        edit = tk.get_tool("openai_image_edit")
+        demo_url = "https://upload.wikimedia.org/wikipedia/commons/4/47/PNG_transparency_demonstration_1.png"
+        edit_input = {
+            "prompt": "Add a small red hat to the central subject",
+            "image_urls": [demo_url],
+            "image_name": "openai_edit_demo",
+        }
+        print("OpenAI edit input:")
+        print(edit_input)
+        edit_out = edit(**edit_input)
+        print("Raw edit output:")
+        print(edit_out)
+
+        # Analysis
+        analysis = tk.get_tool("openai_image_analysis")
+        analysis_input = {
+            "prompt": "Describe notable visual elements in this image.",
+            "image_urls": [demo_url],
+        }
+        print("OpenAI analysis input:")
+        print(analysis_input)
+        analysis_out = analysis(**analysis_input)
+        print("Raw analysis output:")
+        print(analysis_out)
     except Exception as e:
-        print(f"❌ Failed to analyze edited image: {e}")
+        print(f"Error running OpenAI toolkit demos: {str(e)}")
 
 
-def run_openai_postprocessing_test():
-    """Test OpenAI image generation with auto postprocessing for unsupported sizes/formats."""
-    print("\n===== OPENAI IMAGE POSTPROCESSING TEST (GEN → EDIT) =====\n")
+def run_openrouter_toolkit_examples():
+    """Demonstrate OpenRouterImageToolkit: generation, edit, analysis (raw IO)."""
+    print("\n===== OPENROUTER IMAGE TOOLKIT (GEN/EDIT/ANALYSIS) =====\n")
 
-    openai_api_key = os.getenv("OPENAI_API_KEY")
-    openai_org_id = os.getenv("OPENAI_ORGANIZATION_ID")
-    if not openai_api_key:
-        print("❌ OPENAI_API_KEY not found in environment variables")
+    openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
+    if not openrouter_api_key:
+        print("❌ OPENROUTER_API_KEY not found; skipping OpenRouter toolkit demos")
         return
 
-    toolkit = OpenAIImageToolkit(
-        name="DemoOpenAIPostprocessToolkit",
-        api_key=openai_api_key,
-        organization_id=openai_org_id,
-        generation_model="dall-e-3",
-        save_path="./openai_images",
-        auto_postprocess=True  # Enable auto postprocessing
-    )
-
-    gen = toolkit.get_tool("openai_image_generation")
-    edit = toolkit.get_tool("openai_image_edit")
-
-    # 1) Generate with unsupported size and format (auto postprocess)
-    gen_prompt = "A beautiful sunset over mountains, digital art"
-    print(f"Generating: {gen_prompt}")
-    print(f"Parameters: model=dall-e-3, size=800x600 (unsupported), format=jpeg (unsupported), quality=hd")
-    print(f"Note: dall-e-3 only supports sizes [1024x1024, 1792x1024, 1024x1792] and format [PNG]")
-    gen_result = gen(
-        prompt=gen_prompt,
-        model="dall-e-3",
-        size="800x600",  # Unsupported → will auto postprocess
-        output_format="jpeg",  # Unsupported → will auto postprocess
-        quality="hd",
-        style="vivid"
-    )
-    
-    if 'error' in gen_result:
-        print(f"❌ Generation failed: {gen_result['error']}")
-        return
-    gen_paths = gen_result.get('results', [])
-    if not gen_paths:
-        print("❌ No generated images returned")
-        return
-    src_path = gen_paths[0]
-    print(f"✓ Generated image: {src_path}")
-    
-    # Verify result
-    if os.path.exists(src_path):
-        try:
-            from PIL import Image
-            with Image.open(src_path) as img:
-                print(f"✓ Image dimensions: {img.size[0]}x{img.size[1]} (target was 800x600)")
-                print(f"✓ Image format: {img.format} (target was JPEG)")
-        except Exception as e:
-            print(f"⚠ Could not verify image: {e}")
-
-    # 2) Edit with unsupported size and format (auto postprocess)
-    print("\nEditing the generated image...")
-    print(f"Parameters: size=600x600 (unsupported), quality=high")
-    print(f"Note: gpt-image-1 supports sizes [1024x1024, 1536x1024, 1024x1536, auto]")
-    edit_result = edit(
-        prompt="Add a glowing red sunset reflection on the mountains",
-        images=src_path,
-        size="600x600",  # Unsupported → will auto postprocess
-        quality="high",
-        image_name="edited_sunset"
-    )
-    if 'error' in edit_result:
-        print(f"❌ Edit failed: {edit_result['error']}")
-        return
-    edited_paths = edit_result.get('results', [])
-    if not edited_paths:
-        print("❌ No edited images returned")
-        return
-    edited_path = edited_paths[0]
-    print(f"✓ Edited image: {edited_path}")
-    # Verify result
-    if os.path.exists(edited_path):
-        try:
-            from PIL import Image
-            with Image.open(edited_path) as img:
-                print(f"✓ Image dimensions: {img.size[0]}x{img.size[1]} (target was 600x600)")
-                print(f"✓ Image format: {img.format} (target was WEBP)")
-        except Exception as e:
-            print(f"⚠ Could not verify image: {e}")
-
-
-def run_flux_postprocessing_test():
-    """Test Flux image generation with auto postprocessing for unsupported sizes/formats."""
-    print("\n===== FLUX IMAGE POSTPROCESSING TEST (GEN → EDIT) =====\n")
-    
-    bfl_api_key = os.getenv("BFL_API_KEY")
-    if not bfl_api_key:
-        print("❌ BFL_API_KEY not found in environment variables")
-        return
-    
     try:
-        # Initialize toolkit with auto_postprocess enabled
-        toolkit = FluxImageToolkit(
-            name="DemoFluxPostprocessToolkit",
-            api_key=bfl_api_key,
-            save_path="./flux_images",
-            auto_postprocess=True  # Enable auto postprocessing
-        )
-        
-        gen = toolkit.get_tool("flux_image_generation")
-        edit = toolkit.get_tool("flux_image_edit")
-        
-        # 1) Generate with unsupported size and format (auto postprocess)
-        gen_prompt = "A beautiful sunset over mountains, digital art"
-        print(f"Generating: {gen_prompt}")
-        print(f"Parameters: output_size=800x600 (needs postprocessing), format=webp (needs postprocessing)")
-        print(f"Note: Flux natively supports aspect ratios (e.g., 16:9) and formats [jpeg, png]")
-        gen_result = gen(
-            prompt=gen_prompt,
-            seed=100,
-            output_size="800x600",  # Exact size → needs postprocessing
-            output_format="webp",   # WEBP → needs postprocessing
-            output_quality=90
-        )
-        
-        if 'error' in gen_result:
-            print(f"❌ Generation failed: {gen_result['error']}")
-            return
-        gen_paths = gen_result.get('results', [])
-        if not gen_paths:
-            print("❌ No generated images returned")
-            return
-        src_path = gen_paths[0]
-        print(f"✓ Generated image: {src_path}")
-        
-        # Verify result
-        if os.path.exists(src_path):
-            try:
-                from PIL import Image
-                with Image.open(src_path) as img:
-                    print(f"✓ Image dimensions: {img.size[0]}x{img.size[1]} (target was 800x600)")
-                    print(f"✓ Image format: {img.format} (target was WEBP)")
-            except Exception as e:
-                print(f"⚠ Could not verify image: {e}")
-        
-        # 2) Edit with unsupported size
-        print("\nEditing the generated image...")
-        print(f"Parameters: output_size=1024x768 (needs postprocessing)")
-        edit_result = edit(
-            prompt="Add a glowing orange sun at the horizon",
-            images=src_path,
-            seed=101,
-            output_size="1024x768",  # Exact size → needs postprocessing
-            output_format="png",
-            image_name="edited_sunset"
-        )
-        if 'error' in edit_result:
-            print(f"❌ Edit failed: {edit_result['error']}")
-            return
-        edited_paths = edit_result.get('results', [])
-        if not edited_paths:
-            print("❌ No edited images returned")
-            return
-        edited_path = edited_paths[0]
-        print(f"✓ Edited image: {edited_path}")
-        
-        # Verify result
-        if os.path.exists(edited_path):
-            try:
-                from PIL import Image
-                with Image.open(edited_path) as img:
-                    print(f"✓ Image dimensions: {img.size[0]}x{img.size[1]} (target was 1024x768)")
-                    print(f"✓ Image format: {img.format} (target was PNG)")
-            except Exception as e:
-                print(f"⚠ Could not verify image: {e}")
-        
-        print("\n✓ Flux postprocessing test completed")
-        
+        tk = OpenRouterImageToolkit(api_key=openrouter_api_key)
+
+        demo_url = "https://upload.wikimedia.org/wikipedia/commons/4/47/PNG_transparency_demonstration_1.png"
+
+        # Generation
+        gen = tk.get_tool("openrouter_image_generation")
+        gen_input = {
+            "prompt": "An isometric city at night with glowing windows",
+            "output_basename": "openrouter_gen_demo",
+        }
+        print("OpenRouter generation input:")
+        print(gen_input)
+        gen_out = gen(**gen_input)
+        print("Raw generation output:")
+        print(gen_out)
+
+        # Editing
+        edit = tk.get_tool("openrouter_image_edit")
+        edit_input = {
+            "prompt": "Overlay a translucent geometric pattern",
+            "image_urls": [demo_url],
+            "output_basename": "openrouter_edit_demo",
+        }
+        print("OpenRouter edit input:")
+        print(edit_input)
+        edit_out = edit(**edit_input)
+        print("Raw edit output:")
+        print(edit_out)
+
+        # Analysis
+        analysis = tk.get_tool("openrouter_image_analysis")
+        analysis_input = {
+            "prompt": "Summarize the visual composition",
+            "image_urls": [demo_url],
+        }
+        print("OpenRouter analysis input:")
+        print(analysis_input)
+        analysis_out = analysis(**analysis_input)
+        print("Raw analysis output:")
+        print(analysis_out)
     except Exception as e:
-        print(f"Error: {str(e)}")
+        print(f"Error running OpenRouter toolkit demos: {str(e)}")
 
 
-def run_flux_image_toolkit_pipeline():
-    """Pipeline: generate → edit → analyze using Flux backend."""
-    print("\n===== FLUX IMAGE TOOLKIT PIPELINE (GEN → EDIT → ANALYZE) =====\n")
+def run_flux_toolkit_examples():
+    """Demonstrate FluxImageToolkit: generation and edit (raw IO)."""
+    print("\n===== FLUX IMAGE TOOLKIT (GEN/EDIT) =====\n")
 
-    bfl_api_key = os.getenv("BFL_API_KEY")
-    if not bfl_api_key:
-        print("❌ BFL_API_KEY not found in environment variables")
+    flux_api_key = os.getenv("FLUX_API_KEY")
+    if not flux_api_key:
+        print("❌ FLUX_API_KEY not found; skipping Flux toolkit demos")
         return
 
-    # Initialize toolkit
-    flux = FluxImageToolkit(
-        name="DemoFluxImageToolkitPipeline",
-        api_key=bfl_api_key,
-        save_path="./flux_images"
-    )
-    gen = flux.get_tool("flux_image_generation")
-    edit = flux.get_tool("flux_image_edit")
-    analyze = flux.get_tool("image_analysis") if flux.get_tool("image_analysis") else None
-
-    # 1) Generate base image
-    gen_prompt = "A neon-lit cyberpunk alley with rain reflections, cinematic"
-    print(f"Generating: {gen_prompt}")
-    gen_result = gen(
-        prompt=gen_prompt,
-        seed=42,
-        aspect_ratio="16:9",
-        output_format="jpeg",
-        prompt_upsampling=False,
-        safety_tolerance=2
-    )
-    if 'error' in gen_result:
-        print(f"❌ Generation failed: {gen_result['error']}")
-        return
-    gen_paths = gen_result.get('results', [])
-    if not gen_paths:
-        print("❌ No generated images returned")
-        return
-    src_path = gen_paths[0]
-    print(f"✓ Generated image: {src_path}")
-
-    # 2) Edit the generated image
-    edit_prompt = "Add a glowing red umbrella held by a person in the foreground"
-    print("\nEditing the generated image...")
-    edit_result = edit(
-        prompt=edit_prompt,
-        images=src_path,
-        seed=43,
-        output_format="jpeg",
-        prompt_upsampling=False,
-        safety_tolerance=2
-    )
-    if 'error' in edit_result:
-        print(f"❌ Edit failed: {edit_result['error']}")
-        return
-    edited_paths = edit_result.get('results', [])
-    if not edited_paths:
-        print("❌ No edited images returned")
-        return
-    edited_path = edited_paths[0]
-    print(f"✓ Edited image: {edited_path}")
-
-    # 3) Analyze
-    if analyze and edited_path and os.path.exists(edited_path):
-            import base64, mimetypes
-            print("\nAnalyzing the edited image...")
-            with open(edited_path, 'rb') as f:
-                b64 = base64.b64encode(f.read()).decode('utf-8')
-            mime, _ = mimetypes.guess_type(edited_path)
-            mime = mime or 'image/jpeg'
-            data_url = f"data:{mime};base64,{b64}"
-            analysis = analyze(
-                prompt="Summarize what's in this image in one sentence.",
-                image_url=data_url,
-            )
-            if 'error' in analysis:
-                print(f"❌ Analyze failed: {analysis['error']}")
-            else:
-                print("✓ Analysis:")
-            print(analysis.get('content', ''))
-    
-    print("\n✓ Flux Image Toolkit Pipeline test completed")
-
-
-def run_openrouter_image_toolkit_pipeline():
-    """Pipeline: generate → edit → analyze using OpenRouterImageToolkit."""
-    print("\n===== OPENROUTER IMAGE TOOLKIT PIPELINE (GEN → EDIT → ANALYZE) =====\n")
-
-    or_key = os.getenv("OPENROUTER_API_KEY")
-    if not or_key:
-        print("❌ OPENROUTER_API_KEY not found")
-        return
-
-    toolkit = OpenRouterImageToolkit(
-        name="DemoORImageToolkit", 
-        api_key=or_key,
-        save_path="./openrouter_images"
-    )
-    
-    gen = toolkit.get_tool("openrouter_image_generation")
-    edit = toolkit.get_tool("openrouter_image_edit")
-    analyze = toolkit.get_tool("image_analysis")
-
-    # 1) Generate with custom parameters
-    gen_prompt = "A cute baby owl sitting on a tree branch at sunset, digital art"
-    print(f"Generating: {gen_prompt}")
-    print(f"Parameters: model=google/gemini-2.5-flash-image, output_format=png")
-    gen_result = gen(
-        prompt=gen_prompt,
-        model="google/gemini-2.5-flash-image",
-        output_format="png",
-        output_basename="or_gen"
-    )
-    
-    if 'error' in gen_result:
-        print(f"❌ Generation failed: {gen_result['error']}")
-        return
-    
-    gen_paths = gen_result.get('results', [])
-    if not gen_paths:
-        print("❌ No generated images returned")
-        return
-    src_path = gen_paths[0]
-    print(f"✓ Generated image: {src_path}")
-
-    # 2) Edit the generated image
-    print("\nEditing the generated image...")
-    print(f"Parameters: model=google/gemini-2.5-flash-image, output_format=jpeg")
-    edit_result = edit(
-        prompt="Add a red scarf around the owl's neck",
-        image_paths=[src_path],
-        model="google/gemini-2.5-flash-image",
-        output_format="jpeg",
-        output_quality=90,
-        output_basename="or_edited"
-    )
-    
-    if 'error' in edit_result:
-        print(f"❌ Edit failed: {edit_result['error']}")
-        return
-    
-    edited_paths = edit_result.get('results', [])
-    if not edited_paths:
-        print("❌ No edited images returned")
-        return
-    edited_path = edited_paths[0]
-    print(f"✓ Edited image: {edited_path}")
-    
-    # 3) Analyze the edited image
-    print("\nAnalyzing the edited image...")
     try:
-        analysis = analyze(
-            prompt="Summarize what's in this image in one sentence.",
-            image_path=edited_path,
-            model="openai/gpt-4o-mini"
-        )
-        if 'error' in analysis:
-            print(f"❌ Analyze failed: {analysis['error']}")
-        else:
-            print("✓ Analysis:")
-            print(analysis.get('content', ''))
+        tk = FluxImageToolkit(api_key=flux_api_key, save_path="./flux_generated_images")
+
+        # Generation
+        gen = tk.get_tool("flux_image_generation")
+        gen_input = {
+            "prompt": "A neon-lit cyberpunk alley with rain reflections, cinematic",
+            "image_name": "flux_gen_demo",
+        }
+        print("Flux generation input:")
+        print(gen_input)
+        gen_out = gen(**gen_input)
+        print("Raw Flux generation output:")
+        print(gen_out)
+
+        # Editing
+        edit = tk.get_tool("flux_image_edit")
+        demo_url = "https://upload.wikimedia.org/wikipedia/commons/4/47/PNG_transparency_demonstration_1.png"
+        edit_input = {
+            "prompt": "Apply a subtle vignette and cool tone",
+            "image_urls": [demo_url],
+            "image_name": "flux_edit_demo",
+        }
+        print("Flux edit input:")
+        print(edit_input)
+        edit_out = edit(**edit_input)
+        print("Raw Flux edit output:")
+        print(edit_out)
     except Exception as e:
-        print(f"❌ Failed to analyze edited image: {e}")
-
-
-
-def run_openrouter_postprocessing_test():
-    """Test OpenRouter image generation/editing with auto postprocessing for custom sizes/formats."""
-    print("\n===== OPENROUTER IMAGE POSTPROCESSING TEST (GEN → EDIT) =====\n")
-    
-    or_key = os.getenv("OPENROUTER_API_KEY")
-    if not or_key:
-        print("❌ OPENROUTER_API_KEY not found")
-        return
-    
-    try:
-        # Initialize toolkit with auto_postprocess enabled
-        ortk = OpenRouterImageToolkit(
-            name="DemoORPostprocessToolkit", 
-            api_key=or_key, 
-            auto_postprocess=True  # Enable auto postprocessing
-        )
-        
-        gen = ortk.get_tool("openrouter_image_generation")
-        edit = ortk.get_tool("openrouter_image_edit")
-        
-        # 1) Generate with custom size and format (requires postprocessing)
-        gen_prompt = "A beautiful sunset over mountains, digital art"
-        print(f"Generating: {gen_prompt}")
-        print(f"Parameters: output_size=800x600, output_format=webp, quality=90")
-        print(f"Note: OpenRouter will generate at default size and postprocess to target size/format")
-        gen_result = gen(
-            prompt=gen_prompt,
-            model="google/gemini-2.5-flash-image",
-            output_size="800x600",  # Custom size → needs postprocessing
-            output_format="webp",   # Custom format
-            output_quality=90,
-            output_basename="or_gen_pp"
-        )
-        
-        if 'error' in gen_result:
-            print(f"❌ Generation failed: {gen_result['error']}")
-            return
-        gen_paths = gen_result.get('results', [])
-        if not gen_paths:
-            print("❌ No generated images returned")
-            return
-        src_path = gen_paths[0]
-        print(f"✓ Generated image: {src_path}")
-        
-        # Verify result
-        if os.path.exists(src_path):
-            try:
-                from PIL import Image
-                with Image.open(src_path) as img:
-                    print(f"✓ Image dimensions: {img.size[0]}x{img.size[1]} (target was 800x600)")
-                    print(f"✓ Image format: {img.format} (target was WEBP)")
-            except Exception as e:
-                print(f"⚠ Could not verify image: {e}")
-        
-        # 2) Edit with custom size and format (requires postprocessing)
-        print("\nEditing the generated image...")
-        print(f"Parameters: output_size=600x600, output_format=jpeg, quality=85")
-        edit_result = edit(
-            prompt="Add a glowing orange sun at the horizon",
-            image_paths=[src_path],
-            model="google/gemini-2.5-flash-image",
-            output_size="600x600",  # Custom size → needs postprocessing
-            output_format="jpeg",
-            output_quality=85,
-            output_basename="or_edit_pp"
-        )
-        if 'error' in edit_result:
-            print(f"❌ Edit failed: {edit_result['error']}")
-            return
-        edited_paths = edit_result.get('results', [])
-        if not edited_paths:
-            print("❌ No edited images returned")
-            return
-        edited_path = edited_paths[0]
-        print(f"✓ Edited image: {edited_path}")
-        
-        # Verify result
-        if os.path.exists(edited_path):
-            try:
-                from PIL import Image
-                with Image.open(edited_path) as img:
-                    print(f"✓ Image dimensions: {img.size[0]}x{img.size[1]} (target was 1024x768)")
-                    print(f"✓ Image format: {img.format} (target was JPEG)")
-            except Exception as e:
-                print(f"⚠ Could not verify image: {e}")
-        
-        print("\n✓ OpenRouter postprocessing test completed")
-        
-    except Exception as e:
-        print(f"Error: {str(e)}")
+        print(f"Error running Flux toolkit demos: {str(e)}")
 
 
 def main():
-    """Main function to run all image tool examples"""
-    print("===== IMAGE TOOL EXAMPLES =====")
-    
-    # 1. OpenAI with AUTO POSTPROCESSING enabled (unsupported sizes/formats)
-    # run_openai_postprocessing_test()
-    
-    # 2. Full pipeline: generate → edit → analyze (OpenAI)
-    # run_openai_image_toolkit_pipeline()
-    
-    # 3. Flux with AUTO POSTPROCESSING enabled (unsupported sizes/formats)
-    # run_flux_postprocessing_test()
-    
-    # 4. Flux full pipeline: generate → edit → analyze (Flux, where analysis is done using OpenRouter)
-    # run_flux_image_toolkit_pipeline()
+    """Run individual image toolkit demos (OpenAI, OpenRouter, Flux)."""
+    print("===== INDIVIDUAL IMAGE TOOLKIT DEMOS =====")
+    run_openai_toolkit_examples()
+    # run_openrouter_toolkit_examples()
+    run_flux_toolkit_examples()
+    print("\n===== ALL INDIVIDUAL TOOLKIT DEMOS COMPLETED =====")
 
-    # 5. OpenRouter full pipeline: generate → edit → analyze (OpenRouter)
-    run_openrouter_image_toolkit_pipeline()
-    
-    # 6. OpenRouter with AUTO POSTPROCESSING enabled (unsupported sizes/formats)
-    # run_openrouter_postprocessing_test()
-    
-    print("\n===== ALL IMAGE TOOL EXAMPLES COMPLETED =====")
 
 
 if __name__ == "__main__":

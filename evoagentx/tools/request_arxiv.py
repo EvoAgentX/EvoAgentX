@@ -242,13 +242,17 @@ class ArxivBase(RequestBase):
             # Save the PDF content using storage handler
             result = storage_handler.save(save_path, pdf_content)
             if result["success"]:
-                return {
+                # Only propagate file URL if storage handler returned it
+                response: Dict[str, Any] = {
                     'success': True,
                     'file_path': save_path,
                     'size': len(pdf_content),
                     'url': pdf_url,
                     'storage_handler': type(storage_handler).__name__
                 }
+                if isinstance(result, dict) and result.get('url'):
+                    response['file_url'] = result['url']
+                return response
             else:
                 return {
                     'success': False,
@@ -379,4 +383,4 @@ class ArxivToolkit(Toolkit):
         
         # Store arxiv_base as instance variable
         self.arxiv_base = arxiv_base
-        self.storage_handler = storage_handler 
+        self.storage_handler = storage_handler

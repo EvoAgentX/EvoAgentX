@@ -2907,16 +2907,20 @@ toolkit = OpenRouterImageToolkit(
 
 ```python
 # Available tools:
-# - openrouter_image_generation_edit: Generate or edit images
-# - image_analysis: Analyze images using various models
+# - openrouter_image_generation: Generate images from text
+# - openrouter_image_edit: Edit images using provided images (URLs or local paths)
+# - openrouter_image_analysis: Analyze images using various models
 ```
+
+Note: openrouter_image_generation_edit is deprecated; use dedicated generation/edit tools instead.
 
 #### 6.2.3 Usage Example
 
 ```python
 # Get tools
-gen_tool = toolkit.get_tool("openrouter_image_generation_edit")
-analysis_tool = toolkit.get_tool("image_analysis")
+gen_tool = toolkit.get_tool("openrouter_image_generation")
+edit_tool = toolkit.get_tool("openrouter_image_edit")
+analysis_tool = toolkit.get_tool("openrouter_image_analysis")
 
 # Generate an image
 result = gen_tool(
@@ -2927,7 +2931,7 @@ result = gen_tool(
 )
 
 # Edit the image
-edit_result = gen_tool(
+edit_result = edit_tool(
     prompt="Add a bold 'GEMINI' text at the top",
     image_paths=[result["saved_paths"][0]],
     model="google/gemini-2.5-flash-image-preview",

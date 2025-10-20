@@ -56,14 +56,30 @@ class SearchGoogleFree(SearchBase):
             # Step 2: Fetch content from each page
             for url in search_results:
                 try:
-                    title, content = self._scrape_page(url)
-                    if content:  # Ensure valid content exists
-                        # Use the base class's content truncation method
-                        display_content = self._truncate_content(content, max_content_words)
-                            
+                    # The googlesearch library does not provide snippets; we only have URL.
+                    snippet = None
+                    site_title = None
+                    site_content = None
+
+                    # Attempt to scrape the page for richer content
+                    try:
+                        scraped_title, scraped_content = self._scrape_page(url, query)
+                        if scraped_title:
+                            site_title = scraped_title
+                        if scraped_content:
+                            site_content = scraped_content
+                    except Exception as e:
+                        logger.warning(f"Error processing URL {url}: {str(e)}")
+                        site_title = site_title or None
+                        site_content = site_content or None
+
+                    # Only append if we have either snippet (none here) or scraped content
+                    content_snippet = self._truncate_content(snippet, max_content_words or 400) if snippet else None
+                    if content_snippet or site_content:
                         results.append({
-                            "title": title,
-                            "content": display_content,
+                            "title": site_title or url,
+                            "content": content_snippet,
+                            "site_content": site_content,
                             "url": url,
                         })
                 except Exception as e:

@@ -6,8 +6,8 @@ from evoagentx.models import OpenAILLMConfig
 from evoagentx.agents import CustomizeAgent
 from evoagentx.prompts import StringTemplate 
 from evoagentx.tools.mcp import MCPToolkit
-from evoagentx.tools.image_analysis import ImageAnalysisTool
-from evoagentx.tools.images_flux_generation import FluxImageGenerationTool
+from evoagentx.tools.image_openrouter import OpenRouterImageAnalysisTool
+from evoagentx.tools.image_flux import FluxImageGenerationTool
 
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")

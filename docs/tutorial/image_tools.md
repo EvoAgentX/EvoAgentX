@@ -122,8 +122,11 @@ print(analyze(prompt="Summarize the image", image_path="./edited_images/edited_b
 
 `OpenRouterImageToolkit` groups:
 
-- openrouter_image_generation_edit (text-to-image and editing; supports image_urls and image_paths)
-- image_analysis (OpenRouter multimodal analysis; supports image_url / image_path / pdf_path)
+- openrouter_image_generation (text-to-image)
+- openrouter_image_edit (image editing/compositing; supports image_urls and image_paths)
+- openrouter_image_analysis (OpenRouter multimodal analysis; supports image_url / image_path / pdf_path)
+
+Note: openrouter_image_generation_edit is deprecated; use dedicated generation/edit tools instead.
 
 Example: edit with a local path
 
@@ -131,9 +134,9 @@ Example: edit with a local path
 from evoagentx.tools import OpenRouterImageToolkit
 
 tk = OpenRouterImageToolkit(api_key=OPENROUTER_API_KEY, storage_handler=None)  # Uses default LocalStorageHandler
-gen = tk.get_tool("openrouter_image_generation_edit")
+edit = tk.get_tool("openrouter_image_edit")
 
-res = gen(
+res = edit(
   prompt="Add a bold title at the top",
   image_paths=["./imgs/base.png"],
   model="google/gemini-2.5-flash-image-preview",
@@ -143,13 +146,13 @@ res = gen(
 print(res.get("saved_paths", []))
 ```
 
-### Standalone: Generation (openrouter_image_generation_edit, no image → generate)
+### Standalone: Generation (openrouter_image_generation)
 
 ```python
 from evoagentx.tools import OpenRouterImageToolkit
 
 tk = OpenRouterImageToolkit(api_key=OPENROUTER_API_KEY)
-gen = tk.get_tool("openrouter_image_generation_edit")
+gen = tk.get_tool("openrouter_image_generation")
 
 res = gen(
   prompt="A minimalist poster of a mountain at sunrise",
@@ -160,7 +163,7 @@ res = gen(
 print(res.get("saved_paths", []))
 ```
 
-### Standalone: Edit (openrouter_image_generation_edit, with images → edit)
+### Standalone: Edit (openrouter_image_edit)
 
 Accepts remote URLs or local paths: `image_urls` / `image_paths`.
 
@@ -168,10 +171,10 @@ Accepts remote URLs or local paths: `image_urls` / `image_paths`.
 from evoagentx.tools import OpenRouterImageToolkit
 
 tk = OpenRouterImageToolkit(api_key=OPENROUTER_API_KEY)
-gen = tk.get_tool("openrouter_image_generation_edit")
+edit = tk.get_tool("openrouter_image_edit")
 
 # Using local path
-res = gen(
+res = edit(
   prompt="Add a bold 'GEMINI' title",
   image_paths=["./openrouter_images/mountain.png"],
   model="google/gemini-2.5-flash-image-preview",
@@ -181,13 +184,13 @@ res = gen(
 print(res.get("saved_paths", []))
 ```
 
-### Standalone: Analysis (image_analysis)
+### Standalone: Analysis (openrouter_image_analysis)
 
 ```python
 from evoagentx.tools import OpenRouterImageToolkit
 
 tk = OpenRouterImageToolkit(api_key=OPENROUTER_API_KEY)
-analyze = tk.get_tool("image_analysis")
+analyze = tk.get_tool("openrouter_image_analysis")
 
 # Either URL or local path
 print(analyze(prompt="Describe", image_url="https://example.com/a.png"))

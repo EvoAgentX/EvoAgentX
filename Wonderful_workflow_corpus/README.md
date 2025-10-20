@@ -48,7 +48,7 @@ The corpus includes both simple workflows, such as **Arxiv Daily Digest**, **Rec
 
    ```bash
    python Wonderful_workflow_corpus/execute_workflow.py `
-     --workflow Wonderful_workflow_corpus/recipe_meal_plan/workflow.json `
+     --workflow Wonderful_workflow_corpus/recipe_generator/workflow.json `
      --goal "Generate a healthy vegetarian dinner recipe that uses tofu, broccoli, and garlic. Include step-by-step instructions and estimated cooking time." `
      --output recipe.md
    ```
@@ -86,24 +86,10 @@ The corpus includes both simple workflows, such as **Arxiv Daily Digest**, **Rec
 
 ------------------------------------------------------------
 
-5. Feng Shui Advisor
-   Generate personalized home Feng Shui (风水) analysis and improvement recommendations based on user descriptions, producing detailed room-by-room layout advice and practical remedies in the same language as the input.
-
-   ```bash
-   python Wonderful_workflow_corpus/execute_workflow.py `
-     --workflow Wonderful_workflow_corpus/Fengshui_analysis/workflow.json `
-     --goal "I live in a two-bedroom apartment on the 12th floor facing southeast. The living room and kitchen share an open layout, and my bedroom door faces directly toward the main entrance. Lately, I’ve felt low in energy and often have trouble sleeping. There’s also clutter near the balcony area where I usually work. I’d like to improve my sleep quality and create a more harmonious and productive atmosphere at home, but I can only make small, low-cost adjustments because it’s a rented apartment. Please analyze possible Feng Shui issues and give me practical suggestions for rearranging furniture, improving energy flow, and creating better balance." `
-     --output Fengshui_analysis.md
-   ```
-   
-   - Feng Shui Advisor workflow was contributed by [@xyq116](https://github.com/xyq116).
-
-------------------------------------------------------------
-
 📊 Advanced Workflow
 --------------------
 
-6. Example: Stock Analysis
+5. Example: Stock Analysis
 Run the full pipeline with:
 
 ```bash
