@@ -7,11 +7,25 @@ One base class and one toolkit managing all tools
 
 import asyncio
 import threading
-from typing import Dict, Any, Optional, List, TYPE_CHECKING
+from typing import Dict, Any, Optional, List
 
 from .tool import Tool, Toolkit
 from ..core.module import BaseModule
 from ..core.logging import logger
+
+# Event classes will be loaded dynamically
+NavigateToUrlEvent = None
+ClickElementEvent = None
+TypeTextEvent = None
+CloseTabEvent = None
+ScrollEvent = None
+BrowserStateRequestEvent = None
+GoBackEvent = None
+RefreshEvent = None
+SendKeysEvent = None
+GetDropdownOptionsEvent = None
+SelectDropdownOptionEvent = None
+SwitchTabEvent = None
 
 
 def _run_async_in_sync(browser_use_instance, async_func, *args, **kwargs):
@@ -19,8 +33,6 @@ def _run_async_in_sync(browser_use_instance, async_func, *args, **kwargs):
     Helper function to run async methods in sync context.
     Uses the dedicated browser thread's event loop.
     """
-    import asyncio
-    import threading
     
     
     # Use the browser thread's event loop
@@ -222,7 +234,6 @@ class BrowserUse(BaseModule):
     def _run_in_browser_thread(self, coro):
         """Run a coroutine in the browser thread's event loop."""
         import asyncio
-        import concurrent.futures
         
         if not self._browser_loop or self._browser_loop.is_closed():
             raise RuntimeError("Browser thread event loop is not available")
@@ -388,7 +399,7 @@ class BrowserUse(BaseModule):
             )
             
             await event
-            click_metadata = await event.event_result(raise_if_any=True, raise_if_none=False)
+            await event.event_result(raise_if_any=True, raise_if_none=False)
             
             # Get updated page state after click
             updated_state = await self._get_page_state()
@@ -455,7 +466,7 @@ class BrowserUse(BaseModule):
             )
 
             await event
-            type_metadata = await event.event_result(raise_if_any=True, raise_if_none=False)
+            await event.event_result(raise_if_any=True, raise_if_none=False)
 
             # Get updated page state after typing
             updated_state = await self._get_page_state()
@@ -703,7 +714,6 @@ class BrowserUse(BaseModule):
             await self._ensure_browser_started()
             
             # Convert direction to valid value and amount to pixels
-            from typing import Literal
             
             # Map direction string to valid literal
             direction_map = {
@@ -720,7 +730,7 @@ class BrowserUse(BaseModule):
                 ScrollEvent(direction=valid_direction, amount=pixels)  # type: ignore
             )
             await event
-            result = await event.event_result(raise_if_any=True, raise_if_none=False)
+            await event.event_result(raise_if_any=True, raise_if_none=False)
             
             # Get updated page state after scrolling
             updated_state = await self._get_page_state()
@@ -807,7 +817,7 @@ class BrowserUse(BaseModule):
             # Generate suggested actions for agent
             suggested_actions = []
             if links:
-                suggested_actions.append(f"Click on {len(links)} available links (indices: {[l['index'] for l in links[:5]]})")
+                suggested_actions.append(f"Click on {len(links)} available links (indices: {[link['index'] for link in links[:5]]})")
             if buttons:
                 suggested_actions.append(f"Click on {len(buttons)} available buttons (indices: {[b['index'] for b in buttons[:5]]})")
             if inputs:
@@ -918,7 +928,7 @@ class BrowserUse(BaseModule):
         # Generate suggested actions for agent
         suggested_actions = []
         if links:
-            suggested_actions.append(f"Click on {len(links)} available links (indices: {[l['index'] for l in links[:5]]})")
+            suggested_actions.append(f"Click on {len(links)} available links (indices: {[link['index'] for link in links[:5]]})")
         if buttons:
             suggested_actions.append(f"Click on {len(buttons)} available buttons (indices: {[b['index'] for b in buttons[:5]]})")
         if inputs:
@@ -1067,7 +1077,7 @@ class BrowserUse(BaseModule):
             if hasattr(dom_state, 'llm_representation'):
                 try:
                     text_content = dom_state.llm_representation()
-                except:
+                except Exception:
                     text_content = str(dom_state)[:500]
             elif hasattr(dom_state, 'text_content'):
                 text_content = dom_state.text_content

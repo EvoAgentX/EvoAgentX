@@ -1,12 +1,10 @@
 from .customize_action import CustomizeAction
 from ..prompts.web_agent import WEB_AGENT_ACTION_PROMPT, WEB_AGENT_SUMMARIZATION_PROMPT
 from ..models.base_model import BaseLLM
-from ..prompts.template import PromptTemplate, StringTemplate
+from ..prompts.template import StringTemplate
 from pydantic import Field
 from datetime import datetime
 from typing import Optional
-from ..models.base_model import LLMOutputParser
-from ..core.module_utils import parse_json_from_llm_output
 from ..actions.action import ActionOutput
 import json
 
@@ -100,14 +98,10 @@ class WebSearchAction(CustomizeAction):
                 new_action_record = WebOperationOutput.parse(operation_result.content).new_action_record
                 new_information = WebOperationOutput.parse(operation_result.content).new_information
                 new_links = WebOperationOutput.parse(operation_result.content).new_links
-                thinking = WebOperationOutput.parse(operation_result.content).thinking
-                decision = WebOperationOutput.parse(operation_result.content).decision
             except Exception:
                 new_action_record = ""
                 new_information = ""
                 new_links = ""
-                thinking = operation_result.content
-                decision = ""
             self._update_searching_memory(new_links, new_information, new_action_record)
             
             tool_call_args = self._extract_tool_calls(operation_result.content)
@@ -130,7 +124,6 @@ class WebSearchAction(CustomizeAction):
             
         # Get the appropriate prompt for return
         current_prompt = self._generate_operation_prompt(inputs or {})
-        content_to_extract = f"{self.searching_memory['collected_information']}"
         
         web_search_process = {
             "goal_description": self.prompt if self.prompt else self.prompt_template.get_instruction(),
@@ -168,14 +161,10 @@ class WebSearchAction(CustomizeAction):
                 new_action_record = WebOperationOutput.parse(operation_result.content).new_action_record
                 new_information = WebOperationOutput.parse(operation_result.content).new_information
                 new_links = WebOperationOutput.parse(operation_result.content).new_links
-                thinking = WebOperationOutput.parse(operation_result.content).thinking
-                decision = WebOperationOutput.parse(operation_result.content).decision
             except Exception:
                 new_action_record = ""
                 new_information = ""
                 new_links = ""
-                thinking = operation_result.content
-                decision = ""
             self._update_searching_memory(new_links, new_information, new_action_record)
             
             tool_call_args = self._extract_tool_calls(operation_result.content)
@@ -198,7 +187,6 @@ class WebSearchAction(CustomizeAction):
             
         # Get the appropriate prompt for return
         current_prompt = self._generate_operation_prompt(inputs or {})
-        content_to_extract = f"{self.searching_memory['collected_information']}"
         
         web_search_process = {
             "goal_description": self.prompt if self.prompt else self.prompt_template.get_instruction(),

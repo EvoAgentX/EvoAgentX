@@ -11,7 +11,6 @@ from evoagentx.tools.request import RequestToolkit
 from evoagentx.tools.rss_feed import RSSToolkit
 from evoagentx.tools.storage_file import StorageToolkit
 from evoagentx.tools.request_arxiv import ArxivToolkit
-from evoagentx.tools.cmd_toolkit import CMDToolkit
 from evoagentx.tools.google_maps_tool import GoogleMapsToolkit
 
 

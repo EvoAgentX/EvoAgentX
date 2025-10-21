@@ -1,4 +1,4 @@
-from .tool import Tool,Toolkit, tool
+from .tool import Tool, Toolkit
 from .interpreter_docker import DockerInterpreterToolkit
 from .interpreter_python import PythonInterpreterToolkit
 from .search_google import GoogleSearchToolkit
@@ -17,9 +17,9 @@ from .database_mongodb import MongoDBToolkit
 from .database_postgresql import PostgreSQLToolkit
 from .storage_handler import FileStorageHandler, LocalStorageHandler, SupabaseStorageHandler
 from .storage_file import StorageToolkit
-from .image_openai import OpenAIImageToolkit
-from .image_openrouter import OpenRouterImageToolkit
-from .image_flux import FluxImageToolkit
+from .image_tools.openai_image_tools.toolkit import OpenAIImageToolkit
+from .image_tools.openrouter_image_tools.toolkit import OpenRouterImageToolkit
+from .image_tools.flux_image_tools.toolkit import FluxImageToolkit
 from .cmd_toolkit import CMDToolkit
 from .rss_feed import RSSToolkit
 from .file_tool import FileToolkit

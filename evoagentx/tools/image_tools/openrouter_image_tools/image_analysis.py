@@ -1,16 +1,15 @@
+import os
 import requests
 import base64
+import mimetypes
 from typing import Dict, Optional, List
 from ...tool import Tool
 from ...storage_handler import FileStorageHandler, LocalStorageHandler
 
 
-class ImageAnalysisTool(Tool):
+class OpenRouterImageAnalysisTool(Tool):
     name: str = "image_analysis"
-    description: str = (
-        "Analyze and understand images and PDF documents using a multimodal LLM (via OpenRouter). "
-        "Supports image URLs, local image files, and local PDF files."
-    )
+    description: str = "OpenRouter image analysis supporting models like openai/gpt-4o. It supports image URLs, local image files, and local PDF files."
 
     inputs: Dict[str, Dict[str, str]] = {
         "prompt": {"type": "string", "description": "Question or instruction for image/PDF analysis."},
@@ -21,103 +20,58 @@ class ImageAnalysisTool(Tool):
     }
     required: Optional[List[str]] = ["prompt"]
 
-    def __init__(self, api_key, model="openai/gpt-4o", storage_handler: Optional[FileStorageHandler] = None):
+    def __init__(self, api_key: str = None, model: str = "openai/gpt-4o", storage_handler: Optional[FileStorageHandler] = None):
         super().__init__()
-        self.api_key = api_key
+        self.api_key = api_key or os.getenv("OPENROUTER_API_KEY")
         self.model = model
         self.storage_handler = storage_handler or LocalStorageHandler()
 
-    def __call__(
-        self,
-        prompt: str,
-        image_url: str = None,
-        image_path: str = None,
-        pdf_path: str = None,
-        model: str = None,
-    ):
-        # Use provided model or default to instance model
-        actual_model = model or self.model
-        
-        # Build message with text prompt
-        messages = [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt}
-                ]
-            }
-        ]
+    def _read_file_to_base64(self, file_path: str) -> str:
+        """Read file and convert to base64 string."""
+        system_path = self.storage_handler.translate_in(file_path)
+        content = self.storage_handler._read_raw(system_path)
+        return base64.b64encode(content).decode("utf-8")
 
-        # Add image from URL
+    def _build_image_content(self, image_url: str = None, image_path: str = None):
+        """Build image content for API request."""
+        # Prefer URL over local path
         if image_url:
-            messages[0]["content"].append({
+            return {
                 "type": "image_url",
                 "image_url": {"url": image_url}
-            })
-        # Add image from local path
-        elif image_path:
-            try:
-                import mimetypes
-                
-                # Guess MIME type from filename
-                mime, _ = mimetypes.guess_type(image_path)
-                mime = mime or "image/png"
-                
-                # Use storage handler to read raw bytes directly
-                # This bypasses the high-level read() method that processes images
-                try:
-                    # Translate user path to system path first
-                    system_path = self.storage_handler.translate_in(image_path)
-                    image_content = self.storage_handler._read_raw(system_path)
-                except Exception as e:
-                    return {"error": f"Could not read image {image_path}: {str(e)}"}
-                
-                # Encode to base64
-                base64_image = base64.b64encode(image_content).decode("utf-8")
-                
-                # Create data URL with correct MIME type
-                data_url = f"data:{mime};base64,{base64_image}"
-                messages[0]["content"].append({
-                    "type": "image_url",
-                    "image_url": {"url": data_url}
-                })
-            except Exception as e:
-                return {"error": f"Failed to read image: {e}"}
-        # Add PDF from local path
-        elif pdf_path:
-            try:
-                # Read PDF using storage handler
-                result = self.storage_handler.read(pdf_path)
-                if not result["success"]:
-                    return {"error": f"Failed to read PDF: {result.get('error', 'Unknown error')}"}
-                
-                # Get PDF content as bytes
-                if isinstance(result["content"], bytes):
-                    pdf_content = result["content"]
-                else:
-                    # If content is not bytes, convert to bytes
-                    pdf_content = str(result["content"]).encode('utf-8')
-                
-                # Encode to base64
-                base64_pdf = base64.b64encode(pdf_content).decode("utf-8")
-            except Exception as e:
-                return {"error": f"Failed to read PDF: {e}"}
+            }
+        
+        if image_path:
+            # Guess MIME type from filename
+            mime, _ = mimetypes.guess_type(image_path)
+            mime = mime or "image/png"
             
-            # Create data URL for PDF
-            data_url = f"data:application/pdf;base64,{base64_pdf}"
-            messages[0]["content"].append({
-                "type": "file",
-                "file": {"filename": pdf_path.split("/")[-1], "file_data": data_url}
-            })
+            # Read and encode image
+            base64_image = self._read_file_to_base64(image_path)
+            data_url = f"data:{mime};base64,{base64_image}"
+            
+            return {
+                "type": "image_url",
+                "image_url": {"url": data_url}
+            }
+        
+        return None
 
-        # Build API request payload
-        payload = {"model": actual_model, "messages": messages}
-        url = "https://openrouter.ai/api/v1/chat/completions"
-        headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
+    def _build_pdf_content(self, pdf_path: str):
+        """Build PDF content for API request."""
+        base64_pdf = self._read_file_to_base64(pdf_path)
+        data_url = f"data:application/pdf;base64,{base64_pdf}"
         
-        # Send request
-        response = requests.post(url, headers=headers, json=payload)
-        
+        return {
+            "type": "file",
+            "file": {
+                "filename": pdf_path.split("/")[-1],
+                "file_data": data_url
+            }
+        }
+
+    def _parse_response(self, response: requests.Response, actual_model: str) -> Dict:
+        """Parse API response and extract content."""
         try:
             data = response.json()
             
@@ -125,7 +79,7 @@ class ImageAnalysisTool(Tool):
             if "error" in data:
                 return {"error": f"OpenRouter API error: {data['error']}", "raw": data}
             
-            # Extract response content and usage info
+            # Extract response content
             content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
             
             # If content is empty, provide debug information
@@ -141,10 +95,54 @@ class ImageAnalysisTool(Tool):
                     }
                 }
             
-            result = {
+            return {
                 "content": content,
                 "usage": data.get("usage", {})
             }
-            return result
         except Exception as e:
             return {"error": f"Failed to parse OpenRouter response: {e}", "raw": response.text}
+
+    def __call__(
+        self,
+        prompt: str,
+        image_url: str = None,
+        image_path: str = None,
+        pdf_path: str = None,
+        model: str = None,
+    ):
+        try:
+            actual_model = model or self.model
+            
+            # Build message with text prompt
+            messages = [
+                {
+                    "role": "user",
+                    "content": [{"type": "text", "text": prompt}]
+                }
+            ]
+
+            # Add media content (image or PDF)
+            if pdf_path:
+                # Handle PDF files
+                media_content = self._build_pdf_content(pdf_path)
+            else:
+                # Handle images (URL or local path)
+                media_content = self._build_image_content(image_url, image_path)
+            
+            if media_content:
+                messages[0]["content"].append(media_content)
+
+            # Build API request
+            payload = {"model": actual_model, "messages": messages}
+            url = "https://openrouter.ai/api/v1/chat/completions"
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            }
+            
+            # Send request and parse response
+            response = requests.post(url, headers=headers, json=payload)
+            return self._parse_response(response, actual_model)
+            
+        except Exception as e:
+            return {"error": f"OpenRouter image analysis failed: {e}"}

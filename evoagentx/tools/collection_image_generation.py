@@ -5,9 +5,9 @@ from .tool import Toolkit
 from .collection_base import ToolCollection
 from .storage_handler import FileStorageHandler, LocalStorageHandler
 
-from .image_openrouter import OpenRouterImageGenerationTool 
-from .image_openai import OpenAIImageGenerationTool 
-from .image_flux import FluxImageProvider, FluxImageGenerationTool 
+from .image_tools.openrouter_image_tools.image_generation import OpenRouterImageGenerationTool 
+from .image_tools.openai_image_tools.image_generation import OpenAIImageGenerationTool 
+from .image_tools.flux_image_tools.image_generation import FluxImageGenerationTool 
 
 load_dotenv()
 
@@ -139,6 +139,7 @@ class ImageGenerationCollection(ToolCollection):
         storage_handler: Optional[FileStorageHandler] = None,
         base_path: str = "./images/generated",
         per_tool_timeout: Optional[float] = None,
+        auto_postprocess: bool = False,
     ):
         openai_model_is_available = openai_org_api_key is not None and openai_org_id is not None
         openrouter_model_is_available = openrouter_api_key is not None
@@ -155,10 +156,10 @@ class ImageGenerationCollection(ToolCollection):
         if openrouter_model_is_available:
             # Google Nano Banana Image Generation 
             nano_banana_image_generation = OpenRouterImageGenerationTool(
-                name="openrouter_image_generation_nano_banana",
                 api_key=openrouter_api_key, 
                 model="google/gemini-2.5-flash-image-preview",
                 storage_handler=storage_handler,
+                auto_postprocess=auto_postprocess,
             )
             tool_names.append(nano_banana_image_generation.name)
             toolkits.append(nano_banana_image_generation)
@@ -170,13 +171,18 @@ class ImageGenerationCollection(ToolCollection):
                 organization_id=openai_org_id,
                 model="dall-e-3",
                 storage_handler=storage_handler,
+                auto_postprocess=auto_postprocess,
             )
             tool_names.append(openai_image_generation.name)
             toolkits.append(openai_image_generation)
 
         if flux_model_is_available:
-            provider = FluxImageProvider(api_key=flux_api_key, storage_handler=storage_handler)
-            flux_image_generation = FluxImageGenerationTool(provider, name="flux_image_generation")
+            flux_image_generation = FluxImageGenerationTool(
+                name="flux_image_generation",
+                api_key=flux_api_key,
+                storage_handler=storage_handler,
+                auto_postprocess=auto_postprocess,
+            )
             tool_names.append(flux_image_generation.name)
             toolkits.append(flux_image_generation)
 
@@ -240,6 +246,7 @@ class ImageGenerationCollectionToolkit(Toolkit):
         flux_api_key: Optional[str] = None,
         storage_handler: Optional[FileStorageHandler] = None,
         base_path: str = "./images/generated",
+        auto_postprocess: bool = False,
     ):
         if not openai_org_api_key or not openai_org_id:
             openai_org_api_key = os.getenv("OPENAI_IMAGE_ORG_API_KEY")
@@ -259,6 +266,7 @@ class ImageGenerationCollectionToolkit(Toolkit):
             flux_api_key=flux_api_key,
             storage_handler=storage_handler,
             base_path=base_path,
+            auto_postprocess=auto_postprocess,
         )
 
         super().__init__(name=name, tools=[generation_collection])
@@ -269,3 +277,4 @@ class ImageGenerationCollectionToolkit(Toolkit):
         self.flux_api_key = flux_api_key
         self.storage_handler = storage_handler
         self.base_path = base_path
+        self.auto_postprocess = auto_postprocess

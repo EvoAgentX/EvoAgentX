@@ -5,9 +5,8 @@ from .tool import Toolkit
 from .collection_base import ToolCollection
 from .storage_handler import FileStorageHandler, LocalStorageHandler
 
-from .image_openai import OpenAIImageEditTool
-from .image_openrouter import OpenRouterImageEditTool
-from .image_flux import FluxImageProvider, FluxImageEditTool
+from .image_tools.openai_image_tools.image_edit import OpenAIImageEditTool
+from .image_tools.openrouter_image_tools.image_edit import OpenRouterImageEditTool
 
 load_dotenv()
 

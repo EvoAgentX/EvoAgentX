@@ -463,7 +463,7 @@ def extract_return_info(func):
                 m = re.match(r"^\s*[^:]+:\s*(.*)$", ret_lines[0])
                 if m:
                     first_desc = m.group(1).strip()
-                    rest = " ".join(l.strip() for l in ret_lines[1:])
+                    rest = " ".join(line.strip() for line in ret_lines[1:])
                     desc = (first_desc + (" " + rest if rest else "")).strip()
                 else:
                     desc = " ".join(ret_lines).strip()

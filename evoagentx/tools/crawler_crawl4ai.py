@@ -26,7 +26,7 @@ class Crawl4AICrawler(CrawlerBase):
         
         # Handle optional crawl4ai import
         try:
-            from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
+            import crawl4ai  # noqa: F401
             self.crawl4ai_available = True
         except ImportError:
             self.crawl4ai_available = False
@@ -113,7 +113,6 @@ class Crawl4AICrawler(CrawlerBase):
                       scan_full_page, scroll_delay):
         """Run the async crawl in a separate thread to avoid event loop conflicts."""
         import concurrent.futures
-        import asyncio
         
         def run_async():
             return asyncio.run(self._async_crawl(

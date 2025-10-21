@@ -1,13 +1,14 @@
+import os
 from typing import Dict, Optional, List
 from ...tool import Tool
 from ...storage_handler import FileStorageHandler, LocalStorageHandler
 from .openai_utils import create_openai_client
-from .image_postprocessor import ImagePostProcessor
+from .image_postprocessor import OpenAIImagePostProcessor
 
 
 class OpenAIImageEditTool(Tool):
     name: str = "openai_image_edit"
-    description: str = "Edit images using OpenAI gpt-image-1 (direct, minimal validation)."
+    description: str = "OpenAI image editing supporting models like gpt-image-1. It supports automatic postprocessing for unsupported sizes/formats."
 
     inputs: Dict[str, Dict[str, str]] = {
         "prompt": {"type": "string", "description": "Edit instruction. Required."},
@@ -26,15 +27,15 @@ class OpenAIImageEditTool(Tool):
     }
     required: Optional[List[str]] = ["prompt", "images"]
 
-    def __init__(self, api_key: str, organization_id: str = None, save_path: str = "./openai_edited_images", 
+    def __init__(self, api_key: str = None, organization_id: str = None, save_path: str = "./openai_edited_images", 
                  storage_handler: Optional[FileStorageHandler] = None, auto_postprocess: bool = False):
         super().__init__()
-        self.api_key = api_key
-        self.organization_id = organization_id
+        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
+        self.organization_id = organization_id or os.getenv("OPENAI_ORGANIZATION_ID")
         self.save_path = save_path
         self.storage_handler = storage_handler or LocalStorageHandler(base_path=save_path)
-        self.auto_postprocess = auto_postprocess  # auto postprocess images if needed
-        self.postprocessor = ImagePostProcessor()
+        self.auto_postprocess = auto_postprocess
+        self.postprocessor = OpenAIImagePostProcessor()
 
     def __call__(
         self,

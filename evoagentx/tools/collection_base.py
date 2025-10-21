@@ -60,7 +60,7 @@ class ToolCollection(Tool):
             else:
                 try:
                     cur_name = kit.name
-                except:
+                except Exception:
                     cur_name = str(kit)
                 logger.warning(f"{cur_name} not a valid Tool/Toolkit, skip adding to the collection")
         

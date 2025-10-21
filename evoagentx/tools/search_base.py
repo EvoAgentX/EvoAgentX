@@ -1,5 +1,4 @@
 import requests
-import html2text
 from bs4 import BeautifulSoup
 from typing import Tuple, Optional
 from ..core.module import BaseModule

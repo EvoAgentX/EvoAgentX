@@ -1,7 +1,8 @@
+import os
 from typing import Dict, List, Optional
 from ...tool import Tool
 from ...storage_handler import FileStorageHandler, LocalStorageHandler
-from .flux_image_postprocessor import FluxImagePostProcessor
+from .image_postprocessor import FluxImagePostProcessor
 from .utils import file_to_base64
 import requests
 import time
@@ -9,13 +10,10 @@ import time
 
 class FluxImageEditTool(Tool):
     name: str = "flux_image_edit"
-    description: str = (
-        "Edit/convert images using bfl.ai flux-kontext-max API."
-        "Provide input image (path or base64) and edit prompt."
-    )
+    description: str = "Flux image editing supporting model flux-kontext-max. It supports automatic postprocessing for unsupported sizes/formats."
 
     inputs: Dict[str, Dict] = {
-        "prompt": {"type": "string", "description": "Description of the edit operation."},
+        "prompt": {"type": "string", "description": "Edit instruction. Required."},
         "input_image": {"type": "string", "description": "Input image, can be a file path or base64 encoded image."},
         "images": {"type": "array", "description": "Input image path list (single string will be normalized to array)."},
         "seed": {"type": "integer", "description": "Random seed, default is 42.", "default": 42},
@@ -29,20 +27,14 @@ class FluxImageEditTool(Tool):
     }
     required: List[str] = ["prompt"]
 
-    def __init__(self, api_key: str, storage_handler: Optional[FileStorageHandler] = None, 
-                 base_path: str = "./imgs", save_path: str = None, auto_postprocess: bool = False):
+    def __init__(self, api_key: str = None, model: str = "flux-kontext-max",
+                 save_path: str = "./flux_edited_images",
+                 storage_handler: Optional[FileStorageHandler] = None, auto_postprocess: bool = False):
         super().__init__()
-        self.api_key = api_key
-        
-        # handle backward compatibility: if save_path is provided, use it as base_path
-        if save_path is not None:
-            base_path = save_path
-            
-        # initialize storage handler
-        if storage_handler is None:
-            self.storage_handler = LocalStorageHandler(base_path=base_path)
-        else:
-            self.storage_handler = storage_handler
+        self.api_key = api_key or os.getenv("FLUX_API_KEY")
+        self.model = model
+        self.save_path = save_path
+        self.storage_handler = storage_handler or LocalStorageHandler(base_path=save_path)
         
         self.auto_postprocess = auto_postprocess
         self.postprocessor = FluxImagePostProcessor()
@@ -53,6 +45,7 @@ class FluxImageEditTool(Tool):
         input_image: str = None,
         images: list = None,
         seed: int = 42,
+        model: str = None,
         aspect_ratio: str = None,
         output_format: str = "jpeg",
         output_size: str = None,
@@ -62,6 +55,7 @@ class FluxImageEditTool(Tool):
         image_name: str = None,
     ):
         try:
+            actual_model = model if model else self.model
             # handle input image
             if input_image is None and images is None:
                 return {"error": "must provide input_image or images parameter"}
@@ -157,7 +151,7 @@ class FluxImageEditTool(Tool):
             }
 
             # send edit request
-            response = requests.post("https://api.bfl.ai/v1/flux-kontext-max", json=payload, headers=headers)
+            response = requests.post(f"https://api.bfl.ai/v1/{actual_model}", json=payload, headers=headers)
             response.raise_for_status()
             request_data = response.json()
 

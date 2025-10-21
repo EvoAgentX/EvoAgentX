@@ -1,3 +1,4 @@
+import os
 from typing import Dict, Optional, List
 from ...tool import Tool
 from ...storage_handler import FileStorageHandler, LocalStorageHandler
@@ -6,7 +7,7 @@ from .openai_utils import create_openai_client
 
 class OpenAIImageAnalysisTool(Tool):
     name: str = "openai_image_analysis"
-    description: str = "Simple image analysis via OpenAI Responses API (input_text + input_image)."
+    description: str = "OpenAI image analysis supporting models like gpt-4o-mini, gpt-4.1, gpt-5. It supports image URLs, local image files."
 
     inputs: Dict[str, Dict[str, str]] = {
         "prompt": {"type": "string", "description": "User question/instruction. Required."},
@@ -16,11 +17,11 @@ class OpenAIImageAnalysisTool(Tool):
     }
     required: Optional[List[str]] = ["prompt"]
 
-    def __init__(self, api_key: str, organization_id: str = None, model: str = "gpt-4o-mini", 
+    def __init__(self, api_key: str = None, organization_id: str = None, model: str = "gpt-4o-mini", 
                  storage_handler: Optional[FileStorageHandler] = None):
         super().__init__()
-        self.api_key = api_key
-        self.organization_id = organization_id
+        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
+        self.organization_id = organization_id or os.getenv("OPENAI_ORGANIZATION_ID")
         self.model = model
         self.storage_handler = storage_handler or LocalStorageHandler()
 

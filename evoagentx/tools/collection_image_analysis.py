@@ -6,7 +6,7 @@ from .collection_base import ToolCollection
 from .storage_handler import FileStorageHandler, LocalStorageHandler
 
 # from .image_openai import OpenAIImageAnalysisTool 
-from .image_openrouter import OpenRouterImageAnalysisTool
+from .image_tools.openrouter_image_tools.image_analysis import OpenRouterImageAnalysisTool
 
 load_dotenv()
 

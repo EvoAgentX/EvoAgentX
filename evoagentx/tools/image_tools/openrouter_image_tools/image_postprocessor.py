@@ -3,7 +3,7 @@ from PIL import Image
 from io import BytesIO
 
 
-class ImagePostProcessor:
+class OpenRouterImagePostProcessor:
     """
     Image postprocessor for OpenRouter image generation/editing APIs.
     Handles format conversion and size adjustment for unsupported parameters.
@@ -57,8 +57,7 @@ class ImagePostProcessor:
             result["reason"].append(f"Explicit size {requested_size} requested for postprocessing")
         
         # Format conversion might be needed for less common formats
-        supported_formats = ImagePostProcessor.MODEL_SUPPORTED_FORMATS.get(model, 
-                                                                           ImagePostProcessor.MODEL_SUPPORTED_FORMATS["default"])
+        supported_formats = OpenRouterImagePostProcessor.MODEL_SUPPORTED_FORMATS.get(model, OpenRouterImagePostProcessor.MODEL_SUPPORTED_FORMATS["default"])
         if requested_format and requested_format.lower() not in supported_formats:
             result["need_format_conversion"] = True
             result["reason"].append(f"Format {requested_format} may need conversion (supported: {supported_formats})")
@@ -92,8 +91,7 @@ class ImagePostProcessor:
         # We'll let the API generate at its default size and postprocess
         
         # Use PNG as default format for API (most widely supported)
-        supported_formats = ImagePostProcessor.MODEL_SUPPORTED_FORMATS.get(model, 
-                                                                           ImagePostProcessor.MODEL_SUPPORTED_FORMATS["default"])
+        supported_formats = OpenRouterImagePostProcessor.MODEL_SUPPORTED_FORMATS.get(model, OpenRouterImagePostProcessor.MODEL_SUPPORTED_FORMATS["default"])
         if output_format and output_format.lower() in supported_formats:
             api_params["output_format"] = output_format.lower()
         else:
@@ -211,7 +209,7 @@ class ImagePostProcessor:
         """
         results = []
         for img_bytes in images_data:
-            processed_bytes, ext = ImagePostProcessor.process_image(
+            processed_bytes, ext = OpenRouterImagePostProcessor.process_image(
                 img_bytes, target_size, target_format, compression_quality
             )
             results.append((processed_bytes, ext))

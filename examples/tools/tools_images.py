@@ -10,6 +10,7 @@ This script provides comprehensive examples for:
 """
 
 import os
+from pyexpat import model
 import sys
 from pathlib import Path
 from dotenv import load_dotenv
@@ -40,7 +41,7 @@ def run_openai_image_toolkit_pipeline():
         name="DemoOpenAIImageToolkit",
         api_key=openai_api_key,
         organization_id=openai_org_id,
-        generation_model="gpt-image-1",
+        model="gpt-image-1",
         save_path="./openai_images"
     )
 
@@ -126,7 +127,7 @@ def run_openai_postprocessing_test():
         name="DemoOpenAIPostprocessToolkit",
         api_key=openai_api_key,
         organization_id=openai_org_id,
-        generation_model="dall-e-3",
+        model="dall-e-3",
         save_path="./openai_images",
         auto_postprocess=True  # Enable auto postprocessing
     )
@@ -203,16 +204,16 @@ def run_flux_postprocessing_test():
     """Test Flux image generation with auto postprocessing for unsupported sizes/formats."""
     print("\n===== FLUX IMAGE POSTPROCESSING TEST (GEN → EDIT) =====\n")
     
-    bfl_api_key = os.getenv("BFL_API_KEY")
-    if not bfl_api_key:
-        print("❌ BFL_API_KEY not found in environment variables")
+    flux_api_key = os.getenv("FLUX_API_KEY")
+    if not flux_api_key:
+        print("❌ FLUX_API_KEY not found in environment variables")
         return
     
     try:
         # Initialize toolkit with auto_postprocess enabled
         toolkit = FluxImageToolkit(
             name="DemoFluxPostprocessToolkit",
-            api_key=bfl_api_key,
+            api_key=flux_api_key,
             save_path="./flux_images",
             auto_postprocess=True  # Enable auto postprocessing
         )
@@ -294,15 +295,21 @@ def run_flux_image_toolkit_pipeline():
     """Pipeline: generate → edit → analyze using Flux backend."""
     print("\n===== FLUX IMAGE TOOLKIT PIPELINE (GEN → EDIT → ANALYZE) =====\n")
 
-    bfl_api_key = os.getenv("BFL_API_KEY")
-    if not bfl_api_key:
-        print("❌ BFL_API_KEY not found in environment variables")
+    flux_api_key = os.getenv("FLUX_API_KEY")
+    if not flux_api_key:
+        print("❌ FLUX_API_KEY not found in environment variables")
         return
 
+    openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
+    if not openrouter_api_key:
+        print("❌ OPENROUTER_API_KEY not found in environment variables")
+        return
+        
     # Initialize toolkit
     flux = FluxImageToolkit(
         name="DemoFluxImageToolkitPipeline",
-        api_key=bfl_api_key,
+        flux_api_key=flux_api_key,
+        openrouter_api_key=openrouter_api_key,
         save_path="./flux_images"
     )
     gen = flux.get_tool("flux_image_generation")
@@ -400,7 +407,7 @@ def run_openrouter_image_toolkit_pipeline():
         prompt=gen_prompt,
         model="google/gemini-2.5-flash-image",
         output_format="png",
-        output_basename="or_gen"
+        image_name="or_gen"
     )
     
     if 'error' in gen_result:
@@ -423,7 +430,7 @@ def run_openrouter_image_toolkit_pipeline():
         model="google/gemini-2.5-flash-image",
         output_format="jpeg",
         output_quality=90,
-        output_basename="or_edited"
+        image_name="or_edited"
     )
     
     if 'error' in edit_result:
@@ -486,7 +493,7 @@ def run_openrouter_postprocessing_test():
             output_size="800x600",  # Custom size → needs postprocessing
             output_format="webp",   # Custom format
             output_quality=90,
-            output_basename="or_gen_pp"
+            image_name="or_gen_pp"
         )
         
         if 'error' in gen_result:
@@ -519,7 +526,7 @@ def run_openrouter_postprocessing_test():
             output_size="600x600",  # Custom size → needs postprocessing
             output_format="jpeg",
             output_quality=85,
-            output_basename="or_edit_pp"
+            image_name="or_edit_pp"
         )
         if 'error' in edit_result:
             print(f"❌ Edit failed: {edit_result['error']}")
@@ -552,7 +559,7 @@ def main():
     print("===== IMAGE TOOL EXAMPLES =====")
     
     # 1. OpenAI with AUTO POSTPROCESSING enabled (unsupported sizes/formats)
-    # run_openai_postprocessing_test()
+    run_openai_postprocessing_test()
     
     # 2. Full pipeline: generate → edit → analyze (OpenAI)
     # run_openai_image_toolkit_pipeline()
@@ -562,12 +569,12 @@ def main():
     
     # 4. Flux full pipeline: generate → edit → analyze (Flux, where analysis is done using OpenRouter)
     # run_flux_image_toolkit_pipeline()
-
-    # 5. OpenRouter full pipeline: generate → edit → analyze (OpenRouter)
-    # run_openrouter_image_toolkit_pipeline()
     
-    # 6. OpenRouter with AUTO POSTPROCESSING enabled (unsupported sizes/formats)
-    run_openrouter_postprocessing_test()
+    # 5. OpenRouter with AUTO POSTPROCESSING enabled (unsupported sizes/formats)
+    # run_openrouter_postprocessing_test()
+
+    # 6. OpenRouter full pipeline: generate → edit → analyze (OpenRouter)
+    # run_openrouter_image_toolkit_pipeline()
     
     print("\n===== ALL IMAGE TOOL EXAMPLES COMPLETED =====")
 

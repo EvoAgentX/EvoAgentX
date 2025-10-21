@@ -1,3 +1,4 @@
+import os
 from typing import Dict, Optional, List
 from ...tool import Tool
 from ...storage_handler import FileStorageHandler, LocalStorageHandler
@@ -7,12 +8,12 @@ from .openai_utils import (
     validate_parameters,
     handle_validation_result,
 )
-from .image_postprocessor import ImagePostProcessor
+from .image_postprocessor import OpenAIImagePostProcessor
 
 
 class OpenAIImageGenerationTool(Tool):
     name: str = "openai_image_generation"
-    description: str = "OpenAI image generation supporting dall-e-2, dall-e-3, gpt-image-1 (with validation)."
+    description: str = "OpenAI image generation supporting dall-e-2, dall-e-3, gpt-image-1 (with validation). It supports automatic postprocessing for unsupported sizes/formats."
 
     inputs: Dict[str, Dict[str, str]] = {
         "prompt": {"type": "string", "description": "Prompt text. Required."},
@@ -32,17 +33,17 @@ class OpenAIImageGenerationTool(Tool):
     }
     required: Optional[List[str]] = ["prompt"]
 
-    def __init__(self, api_key: str, organization_id: str = None, model: str = "dall-e-3", 
+    def __init__(self, api_key: str = None, organization_id: str = None, model: str = "dall-e-3", 
                  save_path: str = "./openai_generated_images", storage_handler: Optional[FileStorageHandler] = None,
                  auto_postprocess: bool = False):
         super().__init__()
-        self.api_key = api_key
-        self.organization_id = organization_id
+        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
+        self.organization_id = organization_id or os.getenv("OPENAI_ORGANIZATION_ID")
         self.model = model
         self.save_path = save_path
         self.storage_handler = storage_handler or LocalStorageHandler(base_path=save_path)
         self.auto_postprocess = auto_postprocess  # auto postprocess images if needed
-        self.postprocessor = ImagePostProcessor()
+        self.postprocessor = OpenAIImagePostProcessor()
 
     def __call__(
         self,

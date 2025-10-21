@@ -9,7 +9,6 @@ from .search_google_f import GoogleFreeSearchToolkit
 from .search_serperapi import SerperAPIToolkit
 from .crawler_base import PageContentHandler, AutoPageContentHandler
 # Import logger for error handling
-from ..core.logging import logger
 
 
 class SearchCollection(ToolCollection):

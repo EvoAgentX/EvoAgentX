@@ -5,52 +5,48 @@ import base64
 import mimetypes
 from ...tool import Tool
 from ...storage_handler import FileStorageHandler, LocalStorageHandler
-from .image_postprocessor import ImagePostProcessor
+from .image_postprocessor import OpenRouterImagePostProcessor
 
 
 class OpenRouterImageEditTool(Tool):
     name: str = "openrouter_image_edit"
-    description: str = (
-        "Edit or compose images using OpenRouter models (e.g., google/gemini-2.5-flash-image). "
-        "Provide image URLs or local paths along with a text prompt to modify or enhance the image. "
-        "Supports custom output sizes and formats with automatic postprocessing."
-    )
+    description: str = "OpenRouter image editing supporting models like google/gemini-2.5-flash-image. It supports automatic postprocessing for unsupported sizes/formats."
 
     inputs: Dict[str, Dict] = {
-        "prompt": {"type": "string", "description": "Text prompt for image editing/composition."},
+        "prompt": {"type": "string", "description": "Edit instruction. Required."},
         "image_urls": {"type": "array", "description": "Remote image URLs (optional)."},
         "image_paths": {"type": "array", "description": "Local image paths (optional)."},
         "model": {"type": "string", "description": "OpenRouter model id.", "default": "google/gemini-2.5-flash-image"},
         "api_key": {"type": "string", "description": "OpenRouter API key (fallback to env OPENROUTER_API_KEY)."},
-        "save_path": {"type": "string", "description": "Directory to save edited images.", "default": "./openrouter_images"},
-        "output_basename": {"type": "string", "description": "Base filename for outputs.", "default": "or_edit"},
+        "image_name": {"type": "string", "description": "Base filename for outputs.", "default": "or_edit"},
         "output_size": {"type": "string", "description": "Output image size as 'WIDTHxHEIGHT' (e.g., '512x512', '1024x768'). If not specified, keeps original size."},
         "output_format": {"type": "string", "description": "Output format: 'png', 'jpeg', 'webp' etc. If not specified, uses PNG.", "default": "png"},
         "output_quality": {"type": "integer", "description": "JPEG/WEBP quality (1-100). Only used for jpeg/webp formats.", "default": 95}
     }
     required: List[str] = ["prompt"]
 
-    def __init__(self, api_key: str = None, storage_handler: Optional[FileStorageHandler] = None, 
-                 base_path: str = "./openrouter_images", auto_postprocess: bool = False):
+    def __init__(self, api_key: str = None, model: str = "google/gemini-2.5-flash-image",
+                 save_path: str = "./openrouter_edited_images", storage_handler: Optional[FileStorageHandler] = None, auto_postprocess: bool = False):
         super().__init__()
         self.api_key = api_key or os.getenv("OPENROUTER_API_KEY")
-        self.storage_handler = storage_handler or LocalStorageHandler(base_path=base_path)
+        self.save_path = save_path
+        self.storage_handler = storage_handler or LocalStorageHandler(base_path=save_path)
         self.auto_postprocess = auto_postprocess
-        self.postprocessor = ImagePostProcessor()
+        self.postprocessor = OpenRouterImagePostProcessor()
 
     def __call__(
         self,
         prompt: str,
         image_urls: list = None,
         image_paths: list = None,
-        model: str = "google/gemini-2.5-flash-image",
+        model: str = None,
         api_key: str = None,
-        save_path: str = "./openrouter_images",
-        output_basename: str = "or_edit",
+        image_name: str = None,
         output_size: str = None,
-        output_format: str = "png",
-        output_quality: int = 95,
+        output_format: str = None,
+        output_quality: int = None,
     ):
+        actual_model = model if model else self.model
         key = api_key or self.api_key
         if not key:
             return {"error": "OPENROUTER_API_KEY not provided."}
@@ -60,10 +56,10 @@ class OpenRouterImageEditTool(Tool):
             return {"error": "At least one of image_urls or image_paths must be provided for editing."}
 
         # Check if postprocessing is needed
-        needs_pp = self.postprocessor.needs_postprocessing(model, output_size, output_format)
+        needs_pp = self.postprocessor.needs_postprocessing(actual_model, output_size, output_format)
         target_size = output_size
         target_format = output_format
-        target_quality = output_quality
+        target_quality = output_quality if output_quality is not None else 95
         
         if self.auto_postprocess and (needs_pp["need_resize"] or needs_pp["need_format_conversion"]):
             print("🔄 Detected parameters requiring postprocessing:")
@@ -71,8 +67,8 @@ class OpenRouterImageEditTool(Tool):
                 print(f"   • {reason}")
             
             # Get compatible API parameters
-            compat_params = self.postprocessor.get_compatible_params(model, output_size, output_format)
-            api_format = compat_params["api_params"].get("output_format", "png")
+            compat_params = self.postprocessor.get_compatible_params(actual_model, output_size, output_format)
+            api_format = compat_params["api_params"].get("output_format")
             
             print(f"📝 API will generate with format: {api_format}")
             print(f"🎯 Postprocessing target: size={target_size or 'original'}, format={target_format}")
@@ -89,7 +85,7 @@ class OpenRouterImageEditTool(Tool):
         # Build API request
         messages = [{"role": "user", "content": content_parts}]
         payload = {
-            "model": model,
+            "model": actual_model,
             "messages": messages,
             "modalities": ["image", "text"]
         }
@@ -162,7 +158,7 @@ class OpenRouterImageEditTool(Tool):
                         ext = ".heif"
                     
                     # Generate unique filename
-                    filename = self._get_unique_filename(output_basename or "or_edit", ext)
+                    filename = self._get_unique_filename(image_name or "or_edit", ext)
                     
                     # Decode image data
                     image_content = base64.b64decode(b64data)

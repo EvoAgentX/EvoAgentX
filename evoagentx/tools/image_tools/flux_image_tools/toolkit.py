@@ -1,10 +1,9 @@
 from typing import Optional
-import os
 from ...tool import Toolkit
 from ...storage_handler import FileStorageHandler
 from .image_generation import FluxImageGenerationTool
 from .image_edit import FluxImageEditTool
-from ..openrouter_image_tools.image_analysis import ImageAnalysisTool
+from ..openrouter_image_tools.image_analysis import OpenRouterImageAnalysisTool
 
 
 class FluxImageToolkit(Toolkit):
@@ -12,49 +11,17 @@ class FluxImageToolkit(Toolkit):
     Flux toolkit, combines image generation, edit and analysis tools.
     """
 
-    def __init__(
-        self,
-        name: str = "FluxImageToolkit",
-        api_key: Optional[str] = None,
-        save_path: str = "./flux_images",
-        storage_handler: Optional[FileStorageHandler] = None,
-        analysis_model: str = "openai/gpt-4o-mini",
-        auto_postprocess: bool = False,
-    ):
-        tools = []
-
-        # add image generation tool
-        gen_tool = FluxImageGenerationTool(
-            api_key=api_key,
-            storage_handler=storage_handler,
-            base_path=save_path,
-            auto_postprocess=auto_postprocess,
-        )
-        tools.append(gen_tool)
-
-        # add image edit tool
-        edit_tool = FluxImageEditTool(
-            api_key=api_key,
-            storage_handler=storage_handler,
-            base_path=save_path,
-            auto_postprocess=auto_postprocess,
-        )
-        tools.append(edit_tool)
-
-        # add image analysis tool (if OPENROUTER_API_KEY is set)
-        try:
-            resolved_key = os.getenv("OPENROUTER_API_KEY")
-            if resolved_key:
-                analysis_tool = ImageAnalysisTool(
-                    api_key=resolved_key,
-                    model=analysis_model,
-                )
-                tools.append(analysis_tool)
-        except Exception:
-            pass
-
-        super().__init__(name=name, tools=tools)
-        self.api_key = api_key
+    def __init__(self, name: str = "FluxImageToolkit", flux_api_key: Optional[str] = None, openrouter_api_key: Optional[str] = None,
+                 model: str = "flux-kontext-max", save_path: str = "./flux_images", storage_handler: Optional[FileStorageHandler] = None,
+                 analysis_model: str = "openai/gpt-4o-mini", auto_postprocess: bool = False):
+        gen_tool = FluxImageGenerationTool(api_key=flux_api_key, model=model, storage_handler=storage_handler, save_path=save_path, auto_postprocess=auto_postprocess)
+        edit_tool = FluxImageEditTool(api_key=flux_api_key, model=model, storage_handler=storage_handler, save_path=save_path, auto_postprocess=auto_postprocess)
+        analysis_tool = OpenRouterImageAnalysisTool(api_key=openrouter_api_key, model=analysis_model, storage_handler=storage_handler)
+        super().__init__(name=name, tools=[gen_tool, edit_tool, analysis_tool])
+        self.flux_api_key = flux_api_key
+        self.openrouter_api_key = openrouter_api_key
+        self.model = model
+        self.analysis_model = analysis_model
         self.save_path = save_path
         self.storage_handler = storage_handler
         self.auto_postprocess = auto_postprocess

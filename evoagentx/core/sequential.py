@@ -215,7 +215,7 @@ def sequential(
         def smart_wrapper(*args, **kwargs):
             try:
                 # Check if we're in an async context
-                loop = asyncio.get_running_loop()
+                asyncio.get_running_loop()
                 # If we get here, we're in an async context
                 return async_wrapper(*args, **kwargs)
             except RuntimeError:

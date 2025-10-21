@@ -3,7 +3,7 @@ from PIL import Image
 from io import BytesIO
 
 
-class ImagePostProcessor:
+class OpenAIImagePostProcessor:
     """
     Image postprocessor, for processing images returned by OpenAI API
     support format conversion and size adjustment
@@ -49,8 +49,8 @@ class ImagePostProcessor:
             "reason": []
         }
         
-        supported_sizes = ImagePostProcessor.MODEL_SUPPORTED_SIZES.get(model, [])
-        supported_formats = ImagePostProcessor.MODEL_SUPPORTED_FORMATS.get(model, ["png"])
+        supported_sizes = OpenAIImagePostProcessor.MODEL_SUPPORTED_SIZES.get(model, [])
+        supported_formats = OpenAIImagePostProcessor.MODEL_SUPPORTED_FORMATS.get(model, ["png"])
         
         # check size
         if requested_size and requested_size != "auto" and requested_size not in supported_sizes:
@@ -81,8 +81,8 @@ class ImagePostProcessor:
         Returns:
             Dict containing api_params (for API call) and target_params (for postprocessing)
         """
-        supported_sizes = ImagePostProcessor.MODEL_SUPPORTED_SIZES.get(model, [])
-        supported_formats = ImagePostProcessor.MODEL_SUPPORTED_FORMATS.get(model, ["png"])
+        supported_sizes = OpenAIImagePostProcessor.MODEL_SUPPORTED_SIZES.get(model, [])
+        supported_formats = OpenAIImagePostProcessor.MODEL_SUPPORTED_FORMATS.get(model, ["png"])
         
         api_params = {}
         target_params = {
@@ -96,7 +96,7 @@ class ImagePostProcessor:
                 api_params["size"] = size
             else:
                 # use the closest supported size
-                api_params["size"] = ImagePostProcessor._get_closest_size(size, supported_sizes)
+                api_params["size"] = OpenAIImagePostProcessor._get_closest_size(size, supported_sizes)
         elif model == "gpt-image-1":
             api_params["size"] = "auto"
         
@@ -240,7 +240,7 @@ class ImagePostProcessor:
         """
         results = []
         for img_bytes in images_data:
-            processed_bytes, ext = ImagePostProcessor.process_image(
+            processed_bytes, ext = OpenAIImagePostProcessor.process_image(
                 img_bytes, target_size, target_format, compression_quality
             )
             results.append((processed_bytes, ext))
