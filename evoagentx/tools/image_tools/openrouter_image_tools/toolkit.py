@@ -10,6 +10,11 @@ class OpenRouterImageToolkit(Toolkit):
     def __init__(self, name: str = "OpenRouterImageToolkit", api_key: Optional[str] = None, 
                  model: str = "google/gemini-2.5-flash-image", save_path: str = "./openrouter_images", 
                  storage_handler: Optional[FileStorageHandler] = None, auto_postprocess: bool = False):
+        # Create storage handler if not provided (use save_path as base)
+        from ...storage_handler import LocalStorageHandler
+        if storage_handler is None:
+            storage_handler = LocalStorageHandler(base_path=save_path)
+        
         gen_tool = OpenRouterImageGenerationTool(api_key=api_key, model=model, save_path=save_path, 
                                                  storage_handler=storage_handler, auto_postprocess=auto_postprocess)
         edit_tool = OpenRouterImageEditTool(api_key=api_key, model=model, save_path=save_path, 

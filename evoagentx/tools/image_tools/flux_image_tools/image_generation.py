@@ -24,9 +24,10 @@ class FluxImageGenerationTool(Tool):
     }
     required: List[str] = ["prompt"]
 
-    def __init__(self, api_key: str = None, model: str = "flux-kontext-max",
+    def __init__(self, name: str = None, api_key: str = None, model: str = "flux-kontext-max",
                  save_path: str = "./flux_generated_images", storage_handler: Optional[FileStorageHandler] = None, auto_postprocess: bool = False):
         super().__init__()
+        self.name = name or self.name
         self.api_key = api_key or os.getenv("FLUX_API_KEY")
         self.model = model
         self.save_path = save_path
@@ -48,7 +49,9 @@ class FluxImageGenerationTool(Tool):
         image_name: str = None,
     ):
         try:
+            # Get actual parameters
             actual_model = model if model else self.model
+            
             # Check if postprocessing is needed
             needs_pp = self.postprocessor.needs_postprocessing(
                 output_size or aspect_ratio, 
@@ -57,7 +60,7 @@ class FluxImageGenerationTool(Tool):
             
             target_size = output_size
             target_format = output_format
-            target_quality = output_quality
+            target_quality = output_quality if output_quality is not None else 95
             
             if self.auto_postprocess and (needs_pp["need_resize"] or needs_pp["need_format_conversion"]):
                 print("🔄 Detected incompatible parameters, automatic postprocessing will be enabled:")
@@ -101,7 +104,7 @@ class FluxImageGenerationTool(Tool):
                 "Content-Type": "application/json",
             }
 
-            # Send generation request
+            # Call API
             response = requests.post(f"https://api.bfl.ai/v1/{actual_model}", json=payload, headers=headers)
             response.raise_for_status()
             request_data = response.json()
@@ -109,10 +112,10 @@ class FluxImageGenerationTool(Tool):
             request_id = request_data["id"]
             polling_url = request_data["polling_url"]
 
-            # Poll result
+            # Poll for result
             while True:
                 time.sleep(2)
-                result = requests.get(
+                poll_result = requests.get(
                     polling_url,
                     headers={
                         "accept": "application/json",
@@ -121,67 +124,77 @@ class FluxImageGenerationTool(Tool):
                     params={"id": request_id},
                 ).json()
 
-                if result["status"] == "Ready":
-                    image_url = result["result"]["sample"]
+                if poll_result["status"] == "Ready":
+                    image_url = poll_result["result"]["sample"]
                     break
-                elif result["status"] in ["Error", "Failed"]:
-                    return {"error": f"Generation failed: {result}"}
+                elif poll_result["status"] in ["Error", "Failed"]:
+                    return {"error": f"Generation failed: {poll_result}"}
 
             # Download image
             image_response = requests.get(image_url)
             image_response.raise_for_status()
-            image_content = image_response.content
+            image_bytes = image_response.content
             
-            # Apply postprocessing (if needed)
-            if self.auto_postprocess and (needs_pp["need_resize"] or needs_pp["need_format_conversion"]):
-                print("🔧 Postprocessing image...")
-                image_content, ext = self.postprocessor.process_image(
-                    image_content,
-                    target_size=target_size,
-                    target_format=target_format,
-                    compression_quality=target_quality
-                )
-            else:
-                ext = output_format if output_format != "jpeg" else "jpg"
+            # Process and save images
+            results = []
+            try:
+                # Apply postprocessing if needed
+                if self.auto_postprocess and (needs_pp["need_resize"] or needs_pp["need_format_conversion"]):
+                    print("🔧 Postprocessing image...")
+                    image_bytes, ext = self.postprocessor.process_image(
+                        image_bytes,
+                        target_size=target_size,
+                        target_format=target_format,
+                        compression_quality=target_quality
+                    )
+                else:
+                    # Determine file extension
+                    ext = output_format.lower()
+                    if ext == "jpeg":
+                        ext = "jpg"
 
-            # Generate unique filename
-            filename = self._get_unique_filename(image_name, seed, ext)
-            
-            # Use storage handler to save image
-            result = self.storage_handler.save(filename, image_content)
-            
-            if result["success"]:
-                return {
-                    "results": [filename],
-                    "count": 1,
-                    "file_path": filename,  # Backward compatibility
-                    "full_path": result.get("full_path", filename),
-                }
-            else:
-                return {
-                    "error": f"Failed to save image: {result.get('error', 'Unknown error')}"
-                }
+                # Generate unique filename
+                filename = self._get_unique_filename(image_name, 0, ext)
+                
+                # Save using storage handler
+                save_result = self.storage_handler.save(filename, image_bytes)
+                
+                if save_result["success"]:
+                    results.append(filename)
+                else:
+                    results.append(f"Error saving image: {save_result.get('error', 'Unknown error')}")
+            except Exception as e:
+                results.append(f"Error saving image: {e}")
+
+            return {"results": results, "count": len(results)}
         except Exception as e:
             return {"error": f"Image generation failed: {e}"}
     
-    def _get_unique_filename(self, image_name: str, seed: int, ext: str = "jpg") -> str:
-        """Generate unique filename for image"""
+    def _get_unique_filename(self, image_name: str, index: int, ext: str = "jpg") -> str:
+        """Generate a unique filename for the image"""
+        import time
         
         if image_name:
             base = image_name.rsplit(".", 1)[0]
-            filename = f"{base}.{ext}"
+            # Try without index suffix first (for single image case)
+            if index == 0:
+                filename = f"{base}.{ext}"
+                if not self.storage_handler.exists(filename):
+                    return filename
+            # If first attempt failed or not first image, use index suffix
+            filename = f"{base}_{index+1}.{ext}"
         else:
-            filename = f"flux_{seed}.{ext}"
-        
-        counter = 1
+            ts = int(time.time())
+            filename = f"generated_{ts}_{index+1}.{ext}"
         
         # Check if file exists and generate unique name
+        counter = 1
         while self.storage_handler.exists(filename):
             if image_name:
                 base = image_name.rsplit(".", 1)[0]
-                filename = f"{base}_{counter}.{ext}"
+                filename = f"{base}_{index+1}_{counter}.{ext}"
             else:
-                filename = f"flux_{seed}_{counter}.{ext}"
+                filename = f"generated_{ts}_{index+1}_{counter}.{ext}"
             counter += 1
             
         return filename

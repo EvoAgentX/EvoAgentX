@@ -7,6 +7,7 @@ from .storage_handler import FileStorageHandler, LocalStorageHandler
 
 from .image_tools.openai_image_tools.image_edit import OpenAIImageEditTool
 from .image_tools.openrouter_image_tools.image_edit import OpenRouterImageEditTool
+from .image_tools.flux_image_tools.image_edit import FluxImageEditTool
 
 load_dotenv()
 
@@ -19,25 +20,42 @@ IMAGE_EDIT_COLLECTION_DESC = (
 def map_args_for_openai(inputs: Dict[str, Any], outputs: Dict[str, Any]) -> Dict[str, Any]:
     mapped = {
         "prompt": inputs.get("prompt"),
-        "image_urls": inputs.get("image_urls"),
+        "image_urls": inputs.get("image_urls", None),
+        "image_paths": inputs.get("image_paths", None),
         "image_name": inputs.get("image_name", None),
     }
+    if "size" in inputs:
+        mapped["size"] = inputs["size"]
+    if "output_format" in inputs:
+        mapped["output_format"] = inputs["output_format"]
     return {k: v for k, v in mapped.items() if v is not None}
 
 def map_args_for_openrouter(inputs: Dict[str, Any], outputs: Dict[str, Any]) -> Dict[str, Any]:
     mapped = {
         "prompt": inputs.get("prompt"),
-        "image_urls": inputs.get("image_urls"), 
-        "output_basename": inputs.get("image_name", "edited"),
+        "image_urls": inputs.get("image_urls", None), 
+        "image_paths": inputs.get("image_paths", None),
+        "image_name": inputs.get("image_name", None),
     }
+    if "size" in inputs:
+        mapped["output_size"] = inputs["size"]
+    if "output_format" in inputs:
+        mapped["output_format"] = inputs["output_format"]
     return {k: v for k, v in mapped.items() if v is not None}
 
 def map_args_for_flux(inputs: Dict[str, Any], outputs: Dict[str, Any]) -> Dict[str, Any]:
     mapped = {
         "prompt": inputs.get("prompt"),
-        "image_urls": inputs.get("image_urls"),
-        "image_name": inputs.get("image_name"),
+        "image_urls": inputs.get("image_urls", None),
+        "image_paths": inputs.get("image_paths", None),
+        "image_name": inputs.get("image_name", None),
     }
+    if "size" in inputs:
+        mapped["output_size"] = inputs["size"]
+    if "aspect_ratio" in inputs:
+        mapped["aspect_ratio"] = inputs["aspect_ratio"]
+    if "output_format" in inputs:
+        mapped["output_format"] = inputs["output_format"]
     return {k: v for k, v in mapped.items() if v is not None}
 
 def convert_output_from_openai(result: Dict[str, Any]) -> Dict[str, Any]:
@@ -60,6 +78,21 @@ def convert_output_from_openai(result: Dict[str, Any]) -> Dict[str, Any]:
 def convert_output_from_openrouter(result: Dict[str, Any]) -> Dict[str, Any]:
     if "error" in result:
         return {"success": False, "error": result["error"], "provider": "openrouter"}
+    
+    # Handle unified format: {"results": [...], "count": n}
+    if "results" in result:
+        resp = {
+            "success": True,
+            "images": result["results"],
+            "count": result.get("count", len(result["results"])),
+            "provider": "openrouter",
+        }
+        urls = result.get("urls")
+        if isinstance(urls, list) and urls:
+            resp["urls"] = urls
+        return resp
+    
+    # Legacy format support
     if "saved_paths" in result:
         resp = {
             "success": True,
@@ -71,9 +104,28 @@ def convert_output_from_openrouter(result: Dict[str, Any]) -> Dict[str, Any]:
         if isinstance(urls, list) and urls:
             resp["urls"] = urls
         return resp
+    
     return {"success": False, "error": "Unknown OpenRouter output format", "provider": "openrouter"}
 
 def convert_output_from_flux(result: Dict[str, Any]) -> Dict[str, Any]:
+    # Handle error case first
+    if "error" in result:
+        return {"success": False, "error": result["error"], "provider": "flux"}
+    
+    # Handle unified format: {"results": [...], "count": n}
+    if "results" in result:
+        out = {
+            "success": True,
+            "images": result["results"],
+            "count": result.get("count", len(result["results"])),
+            "provider": "flux",
+        }
+        urls = result.get("urls")
+        if isinstance(urls, list) and urls:
+            out["urls"] = urls
+        return out
+    
+    # Legacy format support
     if result.get("success"):
         out = {
             "success": True,
@@ -84,7 +136,8 @@ def convert_output_from_flux(result: Dict[str, Any]) -> Dict[str, Any]:
         if isinstance(result.get("url"), str):
             out["urls"] = [result["url"]]
         return out
-    return {"success": False, "error": result.get("error", "Flux edit failed"), "provider": "flux"}
+    
+    return {"success": False, "error": result.get("error", "Flux operation failed"), "provider": "flux"}
 
 
 class ImageEditingCollection(ToolCollection):
@@ -110,8 +163,9 @@ class ImageEditingCollection(ToolCollection):
         openrouter_api_key: Optional[str] = None,
         flux_api_key: Optional[str] = None,
         storage_handler: Optional[FileStorageHandler] = None,
-        base_path: str = "./images/edited",
+        save_path: str = "./images/edited",
         per_tool_timeout: Optional[float] = None,
+        auto_postprocess: bool = False,
     ):
         openai_model_is_available = openai_org_api_key is not None and openai_org_id is not None
         openrouter_model_is_available = openrouter_api_key is not None
@@ -121,7 +175,7 @@ class ImageEditingCollection(ToolCollection):
             raise ValueError(f"At least one of `openai_org_api_key` (with `openai_org_id`), `openrouter_api_key`, or `flux_api_key` is required for {type(self).__name__}!")
 
         if storage_handler is None:
-            storage_handler = LocalStorageHandler(base_path=base_path)
+            storage_handler = LocalStorageHandler(base_path=save_path)
 
         toolkits, tool_names = [], [] 
         if openrouter_model_is_available:
@@ -129,7 +183,9 @@ class ImageEditingCollection(ToolCollection):
                 name="openrouter_image_edit_nano_banana",
                 api_key=openrouter_api_key,
                 model="google/gemini-2.5-flash-image-preview",
+                save_path=save_path,
                 storage_handler=storage_handler,
+                auto_postprocess=auto_postprocess,
             )
             tool_names.append(nano_banana_image_edit.name)
             toolkits.append(nano_banana_image_edit)
@@ -140,16 +196,24 @@ class ImageEditingCollection(ToolCollection):
                 api_key=openai_org_api_key,
                 organization_id=openai_org_id,
                 model="gpt-image-1", 
+                save_path=save_path,
                 storage_handler=storage_handler,
+                auto_postprocess=auto_postprocess,
             )
             tool_names.append(openai_image_edit.name)
             toolkits.append(openai_image_edit)
 
-        # if flux_model_is_available:
-        #     provider = FluxImageProvider(api_key=flux_api_key, storage_handler=storage_handler, model="flux-kontext-pro")
-        #     flux_image_edit = FluxImageEditTool(provider, name="flux_image_edit")
-        #     tool_names.append(flux_image_edit.name)
-        #     toolkits.append(flux_image_edit)
+        if flux_model_is_available:
+            flux_image_edit = FluxImageEditTool(
+                name="flux_image_edit",
+                api_key=flux_api_key,
+                model="flux-kontext-max",
+                save_path=save_path,
+                storage_handler=storage_handler,
+                auto_postprocess=auto_postprocess,
+            )
+            tool_names.append(flux_image_edit.name)
+            toolkits.append(flux_image_edit)
 
         super().__init__(
             name=name,
@@ -212,8 +276,9 @@ class ImageEditingCollectionToolkit(Toolkit):
         openai_org_id: Optional[str] = None,
         openrouter_api_key: Optional[str] = None,
         flux_api_key: Optional[str] = None,
+        save_path: str = "./images/edited",
         storage_handler: Optional[FileStorageHandler] = None,
-        base_path: str = "./images/edited",
+        auto_postprocess: bool = False,
     ):
         if not openai_org_api_key or not openai_org_id:
             openai_org_api_key = os.getenv("OPENAI_IMAGE_ORG_API_KEY")
@@ -224,7 +289,7 @@ class ImageEditingCollectionToolkit(Toolkit):
             flux_api_key = os.getenv("FLUX_API_KEY")
 
         if storage_handler is None:
-            storage_handler = LocalStorageHandler(base_path=base_path)
+            storage_handler = LocalStorageHandler(base_path=save_path)
 
         editing_collection = ImageEditingCollection(
             openai_org_api_key=openai_org_api_key,
@@ -232,7 +297,8 @@ class ImageEditingCollectionToolkit(Toolkit):
             openrouter_api_key=openrouter_api_key,
             flux_api_key=flux_api_key,
             storage_handler=storage_handler,
-            base_path=base_path,
+            save_path=save_path,
+            auto_postprocess=auto_postprocess,
         )
 
         super().__init__(name=name, tools=[editing_collection])
@@ -242,4 +308,5 @@ class ImageEditingCollectionToolkit(Toolkit):
         self.openrouter_api_key = openrouter_api_key
         self.flux_api_key = flux_api_key
         self.storage_handler = storage_handler
-        self.base_path = base_path
+        self.save_path = save_path
+        self.auto_postprocess = auto_postprocess

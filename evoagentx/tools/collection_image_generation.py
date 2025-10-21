@@ -18,24 +18,29 @@ def map_args_for_openai(inputs: Dict[str, Any], outputs: Dict[str, Any]) -> Dict
     """
     Map arguments for OpenAI image generation.
     - prompt: str (required)
-    - image_name: str
+    - image_name: str (optional)
     """
     mapped = {
         "prompt": inputs.get("prompt"),
-        "image_name": inputs.get("image_name"),
+        "image_name": inputs.get("image_name", None),
     }
     if "size" in inputs:
         mapped["size"] = inputs["size"]
     if "output_format" in inputs:
-        mapped["response_format"] = "b64_json"
+        mapped["output_format"] = inputs["output_format"]
     return {k: v for k, v in mapped.items() if v is not None}
 
 
 def map_args_for_openrouter(inputs: Dict[str, Any], outputs: Dict[str, Any]) -> Dict[str, Any]:
     mapped = {
         "prompt": inputs.get("prompt"),
-        "output_basename": inputs.get("image_name", "generated"),
+        "image_name": inputs.get("image_name", None),
     }
+    if "size" in inputs:
+        mapped["output_size"] = inputs["size"]
+    if "output_format" in inputs:
+        # mapped["output_format"] = "b64_json"
+        mapped["output_format"] = inputs["output_format"]
     return {k: v for k, v in mapped.items() if v is not None}
 
 
@@ -51,21 +56,18 @@ def map_args_for_flux(inputs: Dict[str, Any], outputs: Dict[str, Any]) -> Dict[s
     - prompt: str (required)
     - aspect_ratio: str (e.g., '1:1') derived from size if provided
     - output_format: str ('jpeg'|'png')
-    - image_name: str
+    - image_name: str (optional)
     """
     mapped = {
         "prompt": inputs.get("prompt"),
-        "image_name": inputs.get("image_name"),
+        "image_name": inputs.get("image_name", None),
     }
     if "size" in inputs:
-        size = inputs["size"]
-        if isinstance(size, str) and "x" in size:
-            w, h = size.split("x")
-            try:
-                ratio_w, ratio_h = int(w), int(h)
-                mapped["aspect_ratio"] = f"{ratio_w//_gcd(ratio_w, ratio_h)}:{ratio_h//_gcd(ratio_w, ratio_h)}"
-            except ValueError:
-                pass
+        mapped["output_size"] = inputs["size"]
+    if "aspect_ratio" in inputs:
+        mapped["aspect_ratio"] = inputs["aspect_ratio"]
+    if "output_format" in inputs:
+        mapped["output_format"] = inputs["output_format"]
     return {k: v for k, v in mapped.items() if v is not None}
 
 
@@ -87,6 +89,21 @@ def convert_output_from_openai(result: Dict[str, Any]) -> Dict[str, Any]:
 def convert_output_from_openrouter(result: Dict[str, Any]) -> Dict[str, Any]:
     if "error" in result:
         return {"success": False, "error": result["error"], "provider": "openrouter"}
+    
+    # Handle unified format: {"results": [...], "count": n}
+    if "results" in result:
+        resp = {
+            "success": True,
+            "images": result["results"],
+            "count": result.get("count", len(result["results"])),
+            "provider": "openrouter",
+        }
+        urls = result.get("urls")
+        if isinstance(urls, list) and urls:
+            resp["urls"] = urls
+        return resp
+    
+    # Legacy format support
     if "saved_paths" in result:
         resp = {
             "success": True,
@@ -98,10 +115,29 @@ def convert_output_from_openrouter(result: Dict[str, Any]) -> Dict[str, Any]:
         if isinstance(urls, list) and urls:
             resp["urls"] = urls
         return resp
+    
     return {"success": False, "error": "Unknown OpenRouter output format", "provider": "openrouter"}
 
 
 def convert_output_from_flux(result: Dict[str, Any]) -> Dict[str, Any]:
+    # Handle error case first
+    if "error" in result:
+        return {"success": False, "error": result["error"], "provider": "flux"}
+    
+    # Handle unified format: {"results": [...], "count": n}
+    if "results" in result:
+        out = {
+            "success": True,
+            "images": result["results"],
+            "count": result.get("count", len(result["results"])),
+            "provider": "flux",
+        }
+        urls = result.get("urls")
+        if isinstance(urls, list) and urls:
+            out["urls"] = urls
+        return out
+    
+    # Legacy format support
     if result.get("success"):
         out = {
             "success": True,
@@ -112,7 +148,8 @@ def convert_output_from_flux(result: Dict[str, Any]) -> Dict[str, Any]:
         if isinstance(result.get("url"), str):
             out["urls"] = [result["url"]]
         return out
-    return {"success": False, "error": result.get("error", "Flux generation failed"), "provider": "flux"}
+    
+    return {"success": False, "error": result.get("error", "Flux operation failed"), "provider": "flux"}
 
 
 class ImageGenerationCollection(ToolCollection):
@@ -137,7 +174,7 @@ class ImageGenerationCollection(ToolCollection):
         openrouter_api_key: Optional[str] = None,
         flux_api_key: Optional[str] = None,
         storage_handler: Optional[FileStorageHandler] = None,
-        base_path: str = "./images/generated",
+        save_path: str = "./images/generated",
         per_tool_timeout: Optional[float] = None,
         auto_postprocess: bool = False,
     ):
@@ -150,14 +187,16 @@ class ImageGenerationCollection(ToolCollection):
 
         # Initialize storage handler
         if storage_handler is None:
-            storage_handler = LocalStorageHandler(base_path=base_path)
+            storage_handler = LocalStorageHandler(base_path=save_path)
 
         toolkits, tool_names = [], []
         if openrouter_model_is_available:
             # Google Nano Banana Image Generation 
             nano_banana_image_generation = OpenRouterImageGenerationTool(
+                name="openrouter_image_generation_nano_banana",
                 api_key=openrouter_api_key, 
                 model="google/gemini-2.5-flash-image-preview",
+                save_path=save_path,
                 storage_handler=storage_handler,
                 auto_postprocess=auto_postprocess,
             )
@@ -170,6 +209,7 @@ class ImageGenerationCollection(ToolCollection):
                 api_key=openai_org_api_key,
                 organization_id=openai_org_id,
                 model="dall-e-3",
+                save_path=save_path,
                 storage_handler=storage_handler,
                 auto_postprocess=auto_postprocess,
             )
@@ -180,6 +220,8 @@ class ImageGenerationCollection(ToolCollection):
             flux_image_generation = FluxImageGenerationTool(
                 name="flux_image_generation",
                 api_key=flux_api_key,
+                model="flux-kontext-max",
+                save_path=save_path,
                 storage_handler=storage_handler,
                 auto_postprocess=auto_postprocess,
             )
@@ -245,7 +287,7 @@ class ImageGenerationCollectionToolkit(Toolkit):
         openrouter_api_key: Optional[str] = None,
         flux_api_key: Optional[str] = None,
         storage_handler: Optional[FileStorageHandler] = None,
-        base_path: str = "./images/generated",
+        save_path: str = "./images/generated",
         auto_postprocess: bool = False,
     ):
         if not openai_org_api_key or not openai_org_id:
@@ -257,7 +299,7 @@ class ImageGenerationCollectionToolkit(Toolkit):
             flux_api_key = os.getenv("FLUX_API_KEY")
 
         if storage_handler is None:
-            storage_handler = LocalStorageHandler(base_path=base_path)
+            storage_handler = LocalStorageHandler(base_path=save_path)
 
         generation_collection = ImageGenerationCollection(
             openai_org_api_key=openai_org_api_key,
@@ -265,7 +307,7 @@ class ImageGenerationCollectionToolkit(Toolkit):
             openrouter_api_key=openrouter_api_key,
             flux_api_key=flux_api_key,
             storage_handler=storage_handler,
-            base_path=base_path,
+            save_path=save_path,
             auto_postprocess=auto_postprocess,
         )
 
@@ -276,5 +318,5 @@ class ImageGenerationCollectionToolkit(Toolkit):
         self.openrouter_api_key = openrouter_api_key
         self.flux_api_key = flux_api_key
         self.storage_handler = storage_handler
-        self.base_path = base_path
+        self.save_path = save_path
         self.auto_postprocess = auto_postprocess

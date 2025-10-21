@@ -78,14 +78,16 @@ def demo_image_generation():
             openai_org_id=openai_org_id,
             openrouter_api_key=openrouter_key,
             flux_api_key=flux_key,
-            base_path="./demo_images"
+            save_path="./demo_images",
+            auto_postprocess=True
         )
         gen_tool = gen_toolkit.get_tool("image_generation")
 
         input_params = {
             "prompt": "A cute robot in a garden",
-            "size": "1024x1024",
+            "size": "1024x512",
             "image_name": "demo_robot",
+            "output_format": "webp",
         }
         print("Generation input:")
         print(input_params)
@@ -143,15 +145,17 @@ def demo_image_editing(src_image_url: str = None):
             openai_org_id=openai_org_id,
             openrouter_api_key=openrouter_key,
             flux_api_key=flux_key,
-            base_path="./demo_images"
+            save_path="./demo_images",
+            auto_postprocess=True
         )
         edit_tool = edit_toolkit.get_tool("image_editing")
 
         input_params = {
             "prompt": "Add a red hat to the subject",
             "image_urls": [src_image_url],
-            "size": "1024x1024",
+            "size": "500x500",
             "image_name": "demo_robot_edited",
+            "output_format": "webp",
         }
         print("Editing input:")
         print(input_params)
@@ -178,8 +182,8 @@ def demo_image_editing(src_image_url: str = None):
         return None
 
 
-def demo_image_analysis(local_image_url: str = None):
-    """Simple image analysis demo. If local_image_url provided, analyze it; otherwise, fall back to a demo URL."""
+def demo_image_analysis(src_image_url: str = None):
+    """Simple image analysis demo. If src_image_url provided, analyze it; otherwise, fall back to a demo URL."""
     print("\n=== IMAGE ANALYSIS DEMO ===")
     
     # Check for API keys
@@ -192,18 +196,18 @@ def demo_image_analysis(local_image_url: str = None):
     try:
         analysis_toolkit = ImageAnalysisCollectionToolkit(
             openrouter_api_key=openrouter_key,
-            base_path="./demo_images"
+            save_path="./demo_images"
         )
         analysis_tool = analysis_toolkit.get_tool("image_analysis")
 
         prompt = "What do you see in this image?"
 
-        if not local_image_url:
-            local_image_url = "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Gfp-wisconsin-madison-the-nature-boardwalk.jpg/2560px-Gfp-wisconsin-madison-the-nature-boardwalk.jpg"
+        if not src_image_url:
+            src_image_url = "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Gfp-wisconsin-madison-the-nature-boardwalk.jpg/2560px-Gfp-wisconsin-madison-the-nature-boardwalk.jpg"
 
         input_params = {
             "prompt": prompt,
-            "image_urls": [local_image_url],
+            "image_urls": [src_image_url],
         }
         print("Analysis input:")
         print(input_params)
@@ -228,10 +232,10 @@ def main():
     print("Demonstrating search, image generation, editing, analysis, and unified toolkit\n")
     
     # Core demos
-    demo_search()
+    # demo_search()
     # generated_image_url = demo_image_generation()
-    # edited_image_url = demo_image_editing(generated_image_url)
-    # demo_image_analysis(edited_image_url)
+    edited_image_url = demo_image_editing()
+    # demo_image_analysis()
 
     print("\n=== DEMO COMPLETED ===")
 

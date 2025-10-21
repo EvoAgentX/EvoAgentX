@@ -380,7 +380,7 @@ class StorageBase(BaseModule, ABC):
                 return self._save_pickle(target_file_path, content, **kwargs)
             elif file_extension == '.pdf':
                 return self._save_pdf(target_file_path, content, **kwargs)
-            elif file_extension in ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff']:
+            elif file_extension in ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff', '.webp', '.heic', '.heif']:
                 return self._save_image(target_file_path, content, **kwargs)
             else:
                 # For other file types, use the generic approach
@@ -442,7 +442,7 @@ class StorageBase(BaseModule, ABC):
                 return self._read_pickle(target_file_path, **kwargs)
             elif file_extension == '.pdf':
                 return self._read_pdf(target_file_path, **kwargs)
-            elif file_extension in ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff']:
+            elif file_extension in ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp', '.heic', '.heif']:
                 return self._read_image(target_file_path, **kwargs)
             else:
                 # Default to text

@@ -33,10 +33,11 @@ class OpenAIImageGenerationTool(Tool):
     }
     required: Optional[List[str]] = ["prompt"]
 
-    def __init__(self, api_key: str = None, organization_id: str = None, model: str = "dall-e-3", 
+    def __init__(self, name: str = None, api_key: str = None, organization_id: str = None, model: str = "dall-e-3", 
                  save_path: str = "./openai_generated_images", storage_handler: Optional[FileStorageHandler] = None,
                  auto_postprocess: bool = False):
         super().__init__()
+        self.name = name or self.name
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         self.organization_id = organization_id or os.getenv("OPENAI_ORGANIZATION_ID")
         self.model = model
@@ -63,17 +64,18 @@ class OpenAIImageGenerationTool(Tool):
         style: str = None,
     ):
         try:
-            client = create_openai_client(self.api_key, self.organization_id)
+            # Get actual parameters
             actual_model = model if model else self.model
+            client = create_openai_client(self.api_key, self.organization_id)
 
             # Check if postprocessing is needed
             needs_pp = self.postprocessor.needs_postprocessing(actual_model, size, output_format)
             target_size = size
             target_format = output_format
-            target_compression = output_compression or 95
+            target_compression = output_compression if output_compression is not None else 95
             
             if self.auto_postprocess and (needs_pp["need_resize"] or needs_pp["need_format_conversion"]):
-                print("🔄 detected incompatible parameters, will enable auto postprocessing:")
+                print("🔄 Detected incompatible parameters, automatic postprocessing will be enabled:")
                 for reason in needs_pp["reason"]:
                     print(f"   • {reason}")
                 
@@ -83,11 +85,12 @@ class OpenAIImageGenerationTool(Tool):
                 api_format = compat_params["api_params"].get("output_format")
                 
                 print(f"📝 API will use: size={api_size}, format={api_format}")
-                print(f"🎯 postprocessing target: size={target_size}, format={target_format}")
+                print(f"🎯 Postprocessing target: size={target_size}, format={target_format}")
             else:
                 api_size = size
                 api_format = output_format
 
+            # Build and validate parameters
             params_to_validate = build_validation_params(
                 model=actual_model,
                 prompt=prompt,
@@ -112,13 +115,15 @@ class OpenAIImageGenerationTool(Tool):
             api_params = validation_result["validated_params"].copy()
             api_params.pop("image_name", None)
 
+            # Call API
             response = client.images.generate(**api_params)
 
-            # Save results using storage handler
+            # Process and save images
             import base64
             results = []
             for i, image_data in enumerate(response.data):
                 try:
+                    # Get image bytes from response
                     if hasattr(image_data, "b64_json") and image_data.b64_json:
                         image_bytes = base64.b64decode(image_data.b64_json)
                     elif hasattr(image_data, "url") and image_data.url:
@@ -131,7 +136,7 @@ class OpenAIImageGenerationTool(Tool):
 
                     # Apply postprocessing if needed
                     if self.auto_postprocess and (needs_pp["need_resize"] or needs_pp["need_format_conversion"]):
-                        print(f"🔧 postprocessing image {i+1}/{len(response.data)}...")
+                        print(f"🔧 Postprocessing image {i+1}/{len(response.data)}...")
                         image_bytes, ext = self.postprocessor.process_image(
                             image_bytes,
                             target_size=target_size,
@@ -148,12 +153,12 @@ class OpenAIImageGenerationTool(Tool):
                     filename = self._get_unique_filename(image_name, i, ext)
                     
                     # Save using storage handler
-                    result = self.storage_handler.save(filename, image_bytes)
+                    save_result = self.storage_handler.save(filename, image_bytes)
                     
-                    if result["success"]:
+                    if save_result["success"]:
                         results.append(filename)
                     else:
-                        results.append(f"Error saving image {i+1}: {result.get('error', 'Unknown error')}")
+                        results.append(f"Error saving image {i+1}: {save_result.get('error', 'Unknown error')}")
                 except Exception as e:
                     results.append(f"Error saving image {i+1}: {e}")
 
@@ -167,6 +172,12 @@ class OpenAIImageGenerationTool(Tool):
         
         if image_name:
             base = image_name.rsplit(".", 1)[0]
+            # Try without index suffix first (for single image case)
+            if index == 0:
+                filename = f"{base}.{ext}"
+                if not self.storage_handler.exists(filename):
+                    return filename
+            # If first attempt failed or not first image, use index suffix
             filename = f"{base}_{index+1}.{ext}"
         else:
             ts = int(time.time())

@@ -71,8 +71,18 @@ class Tool(BaseModule):
             call_signature = inspect.signature(cls.__call__)
             if input_name not in call_signature.parameters:
                 raise ValueError(f"Input '{input_name}' is not found in __call__")
-            if call_signature.parameters[input_name].annotation != json_to_python_type[input_content["type"]]:
-                raise ValueError(f"Input '{input_name}' has a type mismatch in __call__")
+            
+            # Get the annotation from __call__
+            param_annotation = call_signature.parameters[input_name].annotation
+            expected_type = json_to_python_type[input_content["type"]]
+            
+            # Check if annotation matches expected type
+            # Handle both direct types (str, list) and generic types (List[str], Optional[List[str]])
+            if param_annotation != expected_type:
+                # Check if it's a generic type (e.g., List[str])
+                origin = get_origin(param_annotation)
+                if origin is None or origin != expected_type:
+                    raise ValueError(f"Input '{input_name}' has a type mismatch in __call__")
 
         if cls.required:
             for required_input in cls.required:

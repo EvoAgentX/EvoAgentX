@@ -8,20 +8,22 @@ from ...storage_handler import FileStorageHandler, LocalStorageHandler
 
 
 class OpenRouterImageAnalysisTool(Tool):
-    name: str = "image_analysis"
+    name: str = "openrouter_image_analysis"
     description: str = "OpenRouter image analysis supporting models like openai/gpt-4o. It supports image URLs, local image files, and local PDF files."
 
     inputs: Dict[str, Dict[str, str]] = {
         "prompt": {"type": "string", "description": "Question or instruction for image/PDF analysis."},
-        "image_url": {"type": "string", "description": "URL of the image (optional)."},
-        "image_path": {"type": "string", "description": "Local image file path (optional)."},
-        "pdf_path": {"type": "string", "description": "Local PDF file path (optional)."},
+        "image_urls": {"type": "array", "items": {"type": "string"}, "description": "Array of image URLs (optional)."},
+        "image_paths": {"type": "array", "items": {"type": "string"}, "description": "Array of local image file paths (optional)."},
+        "pdf_paths": {"type": "array", "items": {"type": "string"}, "description": "Array of local PDF file paths (optional)."},
         "model": {"type": "string", "description": "OpenRouter model for analysis.", "default": "openai/gpt-4o"},
     }
     required: Optional[List[str]] = ["prompt"]
 
-    def __init__(self, api_key: str = None, model: str = "openai/gpt-4o", storage_handler: Optional[FileStorageHandler] = None):
+    def __init__(self, name: str = None, api_key: str = None, 
+                 model: str = "openai/gpt-4o", storage_handler: Optional[FileStorageHandler] = None):
         super().__init__()
+        self.name = name or self.name
         self.api_key = api_key or os.getenv("OPENROUTER_API_KEY")
         self.model = model
         self.storage_handler = storage_handler or LocalStorageHandler()
@@ -105,9 +107,9 @@ class OpenRouterImageAnalysisTool(Tool):
     def __call__(
         self,
         prompt: str,
-        image_url: str = None,
-        image_path: str = None,
-        pdf_path: str = None,
+        image_urls: List[str] = None,
+        image_paths: List[str] = None,
+        pdf_paths: List[str] = None,
         model: str = None,
     ):
         try:
@@ -122,15 +124,25 @@ class OpenRouterImageAnalysisTool(Tool):
             ]
 
             # Add media content (image or PDF)
-            if pdf_path:
+            if pdf_paths:
                 # Handle PDF files
-                media_content = self._build_pdf_content(pdf_path)
+                for pdf_path in pdf_paths:
+                    media_content = self._build_pdf_content(pdf_path)
+                if media_content:
+                    messages[0]["content"].append(media_content)
             else:
-                # Handle images (URL or local path)
-                media_content = self._build_image_content(image_url, image_path)
-            
-            if media_content:
-                messages[0]["content"].append(media_content)
+                # Handle multiple images from URLs
+                if image_urls:
+                    for url in image_urls:
+                        media_content = self._build_image_content(image_url=url)
+                        if media_content:
+                            messages[0]["content"].append(media_content)
+                # Handle multiple images from local paths
+                if image_paths:
+                    for path in image_paths:
+                        media_content = self._build_image_content(image_path=path)
+                        if media_content:
+                            messages[0]["content"].append(media_content)
 
             # Build API request
             payload = {"model": actual_model, "messages": messages}

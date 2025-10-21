@@ -19,6 +19,7 @@ def map_args_for_openai(inputs: Dict[str, Any], outputs: Dict[str, Any]) -> Dict
     mapped = {
         "prompt": inputs.get("prompt"),
         "image_urls": inputs.get("image_urls"),
+        "image_paths": inputs.get("image_paths"),
     }
     return {k: v for k, v in mapped.items() if v is not None}
 
@@ -27,6 +28,7 @@ def map_args_for_openrouter(inputs: Dict[str, Any], outputs: Dict[str, Any]) -> 
     mapped = {
         "prompt": inputs.get("prompt"),
         "image_urls": inputs.get("image_urls"),
+        "image_paths": inputs.get("image_paths"),
     }
     return {k: v for k, v in mapped.items() if v is not None}
 
@@ -60,28 +62,29 @@ class ImageAnalysisCollection(ToolCollection):
 
     inputs: Dict[str, Dict[str, str]] = {
         "prompt": {"type": "string", "description": "Required. A natural language question or instruction for analyzing/understanding the input image(s)."},
-        "image_urls": {"type": "array", "items": {"type": "string", "description": "HTTP(S) image URL"}, "description": "Required. An array of one or more HTTP(S) image URLs to provide as input for analysis. Example: ['https://example.com/photo1.png'], or multiple: ['https://example.com/photo1.png', 'https://example.com/photo2.jpg']."},
+        "image_urls": {"type": "array", "items": {"type": "string", "description": "HTTP(S) image URL"}, "description": "Optional. An array of one or more HTTP(S) image URLs to provide as input for analysis. Example: ['https://example.com/photo1.png'], or multiple: ['https://example.com/photo1.png', 'https://example.com/photo2.jpg']."},
+        "image_paths": {"type": "array", "items": {"type": "string", "description": "Local file path"}, "description": "Optional. An array of one or more local image file paths to provide as input for analysis. Example: ['/path/to/image1.png'], or multiple: ['/path/to/image1.png', '/path/to/image2.jpg']. You must provide either image_urls or image_paths."},
     }
-    required: Optional[List[str]] = ["prompt", "image_urls"]
+    required: Optional[List[str]] = ["prompt"]
 
     def __init__(
         self,
         name: str = "image_analysis",
         openrouter_api_key: Optional[str] = None,
         storage_handler: Optional[FileStorageHandler] = None,
-        base_path: str = "./images/analysis_cache",
+        save_path: str = "./images/analysis_cache",
         per_tool_timeout: Optional[float] = None,
     ):
         if not openrouter_api_key:
             raise ValueError(f"`openrouter_api_key` is required for {type(self).__name__}!")
 
         if storage_handler is None:
-            storage_handler = LocalStorageHandler(base_path=base_path)
+            storage_handler = LocalStorageHandler(base_path=save_path)
 
         toolkits, tool_names = [], []
         # Google Nano Banana Image Analysis 
         nano_banana_image_analysis = OpenRouterImageAnalysisTool(
-            name="openrouter_image_analysis_nano_banana",
+            name = "openrouter_image_analysis_nano_banana",
             api_key=openrouter_api_key, 
             model="google/gemini-2.5-flash-image-preview",
             storage_handler=storage_handler,
@@ -91,7 +94,7 @@ class ImageAnalysisCollection(ToolCollection):
 
         # OpenAI GPT-4o Image Analysis
         gpt4o_image_analysis = OpenRouterImageAnalysisTool(
-            name="openrouter_image_analysis_gpt4o",
+            name = "openrouter_image_analysis_gpt4o",
             api_key=openrouter_api_key, 
             model="openai/gpt-4o",
             storage_handler=storage_handler,
@@ -101,7 +104,7 @@ class ImageAnalysisCollection(ToolCollection):
 
         # # Qwen Image Analysis
         qwen_image_analysis = OpenRouterImageAnalysisTool(
-            name="openrouter_image_analysis_qwen",
+            name = "openrouter_image_analysis_qwen",
             api_key=openrouter_api_key, 
             model="qwen/qwen3-vl-235b-a22b-instruct",
             storage_handler=storage_handler,
@@ -139,11 +142,13 @@ class ImageAnalysisCollection(ToolCollection):
         self,
         prompt: str,
         image_urls: list = None,
+        image_paths: list = None,
         **kwargs,
     ) -> Dict[str, Any]:
         inputs = {
             "prompt": prompt,
             "image_urls": image_urls,
+            "image_paths": image_paths,
             **kwargs,
         }
         return self._run_pipeline(inputs)
@@ -157,22 +162,22 @@ class ImageAnalysisCollectionToolkit(Toolkit):
         name: str = "ImageAnalysisCollectionToolkit",
         openrouter_api_key: Optional[str] = None,
         storage_handler: Optional[FileStorageHandler] = None,
-        base_path: str = "./images/analysis_cache",
+        save_path: str = "./images/analysis_cache",
     ):
         if not openrouter_api_key:
             openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
 
         if storage_handler is None:
-            storage_handler = LocalStorageHandler(base_path=base_path)
+            storage_handler = LocalStorageHandler(base_path=save_path)
 
         analysis_collection = ImageAnalysisCollection(
             openrouter_api_key=openrouter_api_key,
             storage_handler=storage_handler,
-            base_path=base_path,
+            save_path=save_path,
         )
 
         super().__init__(name=name, tools=[analysis_collection])
         # Store configuration for reference (consistent with other toolkits)
         self.openrouter_api_key = openrouter_api_key
         self.storage_handler = storage_handler
-        self.base_path = base_path
+        self.save_path = save_path

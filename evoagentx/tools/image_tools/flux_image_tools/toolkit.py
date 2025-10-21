@@ -14,6 +14,11 @@ class FluxImageToolkit(Toolkit):
     def __init__(self, name: str = "FluxImageToolkit", flux_api_key: Optional[str] = None, openrouter_api_key: Optional[str] = None,
                  model: str = "flux-kontext-max", save_path: str = "./flux_images", storage_handler: Optional[FileStorageHandler] = None,
                  analysis_model: str = "openai/gpt-4o-mini", auto_postprocess: bool = False):
+        # Create storage handler if not provided (use save_path as base)
+        from ...storage_handler import LocalStorageHandler
+        if storage_handler is None:
+            storage_handler = LocalStorageHandler(base_path=save_path)
+        
         gen_tool = FluxImageGenerationTool(api_key=flux_api_key, model=model, storage_handler=storage_handler, save_path=save_path, auto_postprocess=auto_postprocess)
         edit_tool = FluxImageEditTool(api_key=flux_api_key, model=model, storage_handler=storage_handler, save_path=save_path, auto_postprocess=auto_postprocess)
         analysis_tool = OpenRouterImageAnalysisTool(api_key=openrouter_api_key, model=analysis_model, storage_handler=storage_handler)
