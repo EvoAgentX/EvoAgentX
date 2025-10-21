@@ -448,6 +448,8 @@ We have integrated some effective agent/workflow evolution algorithms into EvoAg
 | **TextGrad**  | Gradient-based optimization for LLM prompts and reasoning chains, enabling differentiable planning. | [📄 Nature (2025)](https://www.nature.com/articles/s41586-025-08661-4) |
 | **MIPRO**     | Model-agnostic Iterative Prompt Optimization using black-box evaluations and adaptive reranking. | [📄 arXiv:2406.11695](https://arxiv.org/abs/2406.11695) |
 | **AFlow**     | Reinforcement learning-inspired agent workflow evolution using Monte Carlo Tree Search. | [📄 arXiv:2410.10762](https://arxiv.org/abs/2410.10762) |
+| **EvoPrompt**     | EvoPrompt dynamically refines prompts via feedback-driven evolution to enhance agent performance and adaptability. | [📄 arXiv:2309.08532](https://arxiv.org/abs/2309.08532) |
+
 
 **Please suggest the latest self-evolving algorithm by submitting an issue or a Pull Request.**
 
@@ -519,7 +521,7 @@ Below is a running log of scheduled and completed talks:
 | Speaker | Topic | Date | Meeting Video |
 |---|---|---|---|
 | [Hengzhe Zhang](https://hengzhe-zhang.github.io/) | Genetic Programming: From Evolutionary Algorithms to the LLM Era | 2025-08-10 | [YouTube](https://www.youtube.com/watch?v=naja_kDYc_Y) |
-| [Guibin Zhang](https://www.guibinz.top/) | G-Memory: Tracing Hierarchical Memory for Multi-Agent Systems | 2025-09-28 |  |
+| [Guibin Zhang](https://www.guibinz.top/) | G-Memory: Tracing Hierarchical Memory for Multi-Agent Systems | 2025-09-28 | [YouTube](https://www.youtube.com/watch?v=xzqZsZWfabw&t=3s) |
 | [Guanting Dong](https://dongguanting.github.io/) | Agentic Reinforced Policy Optimization | 2025-11-02 |  |
 
 
