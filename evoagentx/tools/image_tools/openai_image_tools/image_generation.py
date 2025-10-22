@@ -121,6 +121,7 @@ class OpenAIImageGenerationTool(Tool):
             # Process and save images
             import base64
             results = []
+            total_images = len(response.data)
             for i, image_data in enumerate(response.data):
                 try:
                     # Get image bytes from response
@@ -134,9 +135,20 @@ class OpenAIImageGenerationTool(Tool):
                     else:
                         raise Exception("No valid image data in response")
 
+                    # Determine original file extension
+                    original_ext = (api_format or "png").lower() if self.auto_postprocess and needs_pp["need_format_conversion"] else (output_format or "png").lower()
+                    if original_ext == "jpeg":
+                        original_ext = "jpg"
+                    
+                    # Save original image from API response
+                    original_filename = self._get_unique_filename(image_name, i, original_ext, total_images, suffix="_origin")
+                    original_save_result = self.storage_handler.save(original_filename, image_bytes)
+                    if not original_save_result["success"]:
+                        print(f"⚠️ Warning: Failed to save original image {i+1}: {original_save_result.get('error', 'Unknown error')}")
+
                     # Apply postprocessing if needed
                     if self.auto_postprocess and (needs_pp["need_resize"] or needs_pp["need_format_conversion"]):
-                        print(f"🔧 Postprocessing image {i+1}/{len(response.data)}...")
+                        print(f"🔧 Postprocessing image {i+1}/{total_images}...")
                         image_bytes, ext = self.postprocessor.process_image(
                             image_bytes,
                             target_size=target_size,
@@ -150,7 +162,7 @@ class OpenAIImageGenerationTool(Tool):
                             ext = "jpg"
 
                     # Generate unique filename
-                    filename = self._get_unique_filename(image_name, i, ext)
+                    filename = self._get_unique_filename(image_name, i, ext, total_images)
                     
                     # Save using storage handler
                     save_result = self.storage_handler.save(filename, image_bytes)
@@ -166,31 +178,47 @@ class OpenAIImageGenerationTool(Tool):
         except Exception as e:
             return {"error": f"Image generation failed: {e}"}
     
-    def _get_unique_filename(self, image_name: str, index: int, ext: str = "png") -> str:
+    def _get_unique_filename(self, image_name: str, index: int, ext: str = "png", total_count: int = 1, suffix: str = "") -> str:
         """Generate a unique filename for the image"""
         import time
         
         if image_name:
             base = image_name.rsplit(".", 1)[0]
-            # Try without index suffix first (for single image case)
-            if index == 0:
-                filename = f"{base}.{ext}"
+            # For single image, don't add index suffix
+            if total_count == 1:
+                filename = f"{base}{suffix}.{ext}"
                 if not self.storage_handler.exists(filename):
                     return filename
-            # If first attempt failed or not first image, use index suffix
-            filename = f"{base}_{index+1}.{ext}"
+                # If file exists, add counter
+                counter = 1
+                while self.storage_handler.exists(filename):
+                    filename = f"{base}_{counter}{suffix}.{ext}"
+                    counter += 1
+                return filename
+            else:
+                # For multiple images, add index suffix
+                filename = f"{base}_{index+1}{suffix}.{ext}"
         else:
             ts = int(time.time())
-            filename = f"generated_{ts}_{index+1}.{ext}"
+            if total_count == 1:
+                filename = f"generated_{ts}{suffix}.{ext}"
+            else:
+                filename = f"generated_{ts}_{index+1}{suffix}.{ext}"
         
         # Check if file exists and generate unique name
         counter = 1
         while self.storage_handler.exists(filename):
             if image_name:
                 base = image_name.rsplit(".", 1)[0]
-                filename = f"{base}_{index+1}_{counter}.{ext}"
+                if total_count == 1:
+                    filename = f"{base}_{counter}{suffix}.{ext}"
+                else:
+                    filename = f"{base}_{index+1}_{counter}{suffix}.{ext}"
             else:
-                filename = f"generated_{ts}_{index+1}_{counter}.{ext}"
+                if total_count == 1:
+                    filename = f"generated_{ts}_{counter}{suffix}.{ext}"
+                else:
+                    filename = f"generated_{ts}_{index+1}_{counter}{suffix}.{ext}"
             counter += 1
             
         return filename

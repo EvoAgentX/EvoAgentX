@@ -562,7 +562,7 @@ def main():
     print("===== IMAGE TOOL EXAMPLES =====")
     
     # 1. Full pipeline: generate → edit → analyze (OpenAI)
-    run_openai_image_toolkit_pipeline()
+    # run_openai_image_toolkit_pipeline()
     
     # 2. OpenAI with AUTO POSTPROCESSING enabled (unsupported sizes/formats)
     # run_openai_postprocessing_test()
@@ -574,7 +574,7 @@ def main():
     # run_flux_postprocessing_test()
     
     # 5. OpenRouter full pipeline: generate → edit → analyze (OpenRouter)
-    # run_openrouter_image_toolkit_pipeline()
+    run_openrouter_image_toolkit_pipeline()
 
     # 6. OpenRouter with AUTO POSTPROCESSING enabled (unsupported sizes/formats)
     # run_openrouter_postprocessing_test()
