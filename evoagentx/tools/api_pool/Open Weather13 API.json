@@ -1,0 +1,109 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "source": "RapidAPI",
+        "title": "Open Weather13 API",
+        "version": "2.0",
+        "description": "Complete weather data API via RapidAPI with 3 endpoints"
+    },
+    "servers": [
+        {"url": "https://open-weather13.p.rapidapi.com"}
+    ],
+    "paths": {
+        "/city": {
+            "get": {
+                "operationId": "getCityWeather",
+                "summary": "Get weather by city name",
+                "description": "Get current weather data by city name",
+                "parameters": [
+                    {
+                        "name": "city",
+                        "in": "query",
+                        "required": "true",
+                        "schema": {"type": "string"},
+                        "description": "City name, e.g.: new york, beijing, tokyo"
+                    },
+                    {
+                        "name": "lang",
+                        "in": "query", 
+                        "required": "false",
+                        "schema": {
+                            "type": "string",
+                            "enum": ["AF", "AL", "AR", "AZ", "BG", "CA", "CZ", "DA", "DE", "EL", "EN", "EU", "FA", "FI", "FR", "GL", "HE", "HI", "HR", "HU", "ID", "IT", "JA", "KR", "LA", "LT", "MK", "NO", "NL", "PL", "PT", "PT_BR", "RO", "RU", "SE", "SK", "SL", "SP", "ES", "SR", "TH", "TR", "UK", "VI", "ZH_CN", "ZH_TW", "ZU"],
+                            "default": "EN"
+                        },
+                        "description": "Language code, supports Simplified Chinese (ZH_CN), Traditional Chinese (ZH_TW), and many other languages"
+                    }
+                ]
+            }
+        },
+        "/latlon": {
+            "get": {
+                "operationId": "getWeatherByCoordinates",
+                "summary": "Get weather by coordinates",
+                "description": "Get current weather data using latitude and longitude",
+                "parameters": [
+                    {
+                        "name": "latitude",
+                        "in": "query",
+                        "required": "true",
+                        "schema": {"type": "string"},
+                        "description": "Latitude, e.g.: 40.730610"
+                    },
+                    {
+                        "name": "longitude",
+                        "in": "query",
+                        "required": "true",
+                        "schema": {"type": "string"},
+                        "description": "Longitude, e.g.: -73.935242"
+                    },
+                    {
+                        "name": "lang",
+                        "in": "query", 
+                        "required": "false",
+                        "schema": {
+                            "type": "string",
+                            "enum": ["AF", "AL", "AR", "AZ", "BG", "CA", "CZ", "DA", "DE", "EL", "EN", "EU", "FA", "FI", "FR", "GL", "HE", "HI", "HR", "HU", "ID", "IT", "JA", "KR", "LA", "LT", "MK", "NO", "NL", "PL", "PT", "PT_BR", "RO", "RU", "SE", "SK", "SL", "SP", "ES", "SR", "TH", "TR", "UK", "VI", "ZH_CN", "ZH_TW", "ZU"],
+                            "default": "EN"
+                        },
+                        "description": "Language code"
+                    }
+                ]
+            }
+        },
+        "/fivedaysforcast": {
+            "get": {
+                "operationId": "getFiveDayForecast",
+                "summary": "Get 5-day weather forecast",
+                "description": "Get 5-day weather forecast using latitude and longitude",
+                "parameters": [
+                    {
+                        "name": "latitude",
+                        "in": "query",
+                        "required": "true",
+                        "schema": {"type": "string"},
+                        "description": "Latitude, e.g.: 40.730610"
+                    },
+                    {
+                        "name": "longitude",
+                        "in": "query",
+                        "required": "true",
+                        "schema": {"type": "string"},
+                        "description": "Longitude, e.g.: -73.935242"
+                    },
+                    {
+                        "name": "lang",
+                        "in": "query", 
+                        "required": "false",
+                        "schema": {
+                            "type": "string",
+                            "enum": ["AF", "AL", "AR", "AZ", "BG", "CA", "CZ", "DA", "DE", "EL", "EN", "EU", "FA", "FI", "FR", "GL", "HE", "HI", "HR", "HU", "ID", "IT", "JA", "KR", "LA", "LT", "MK", "NO", "NL", "PL", "PT", "PT_BR", "RO", "RU", "SE", "SK", "SL", "SP", "ES", "SR", "TH", "TR", "UK", "VI", "ZH_CN", "ZH_TW", "ZU"],
+                            "default": "EN"
+                        },
+                        "description": "Language code"
+                    }
+                ]
+            }
+        }
+    }
+}
