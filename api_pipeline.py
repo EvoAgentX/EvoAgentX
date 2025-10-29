@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 from evoagentx.rag.schema import Query, Document, TextChunk, Corpus, ChunkMetadata
 from evoagentx.rag.rag import RAGEngine
-from evoagentx.rag.rag_config import RAGConfig, ReaderConfig, ChunkerConfig, EmbeddingConfig, IndexConfig, RetrievalConfig
+from evoagentx.rag.rag_config import RAGConfig, EmbeddingConfig, IndexConfig, RetrievalConfig
 from evoagentx.storages.base import StorageHandler
 from evoagentx.storages.storages_config import StoreConfig, VectorStoreConfig, DBConfig
 

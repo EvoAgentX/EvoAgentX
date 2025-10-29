@@ -1,0 +1,380 @@
+[
+  {
+    "api_source": "RapidAPI",
+    "api_title": "US Sales Tax Rates",
+    "function_name": "getTaxRatesByZipCode",
+    "description": "Get sales tax rates by ZIP code Retrieves sales tax information using a ZIP code. Returns state rate, county rate, city rate, special rate, and city name. Tax rates are expressed as decimal values (e.g., 0.04450 = 4.45%)."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "US Sales Tax Rates",
+    "function_name": "searchTaxRatesByCity",
+    "description": "Search sales tax rates by city name Searches for sales tax rates by city name or partial name. Returns a list of matching locations with their tax information including state, county, city, and special rates. Allows specifying the number of results to return."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "Cloud Api Hub - IPTV Auto-Subscriber",
+    "function_name": "searchIPTV",
+    "description": "Search IPTV streams Search for IPTV content including live TV channels, movies, and series. Returns matching streams based on the query string and stream type. Query string has a maximum length of 20 characters."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "Domain Reputation API",
+    "function_name": "getDomainReputation",
+    "description": "Get domain reputation score Instantly analyze any domain name and get a 0-100 reputation score with weighted heuristics. Performs comprehensive checks including DNS records (MX, TXT, NS), email authentication (SPF, DKIM, DMARC), WHOIS/RDAP metadata, blacklist status, and free-TLD verification. Returns detailed breakdown of reputation factors and security indicators. JSON response ready for automation or enrichment pipelines."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "AI Prompt Injection Security Scan",
+    "function_name": "detectPromptInjection",
+    "description": "Detect prompt injection in text Analyzes text for prompt injection attacks using hybrid detection (40% pattern matching, 60% LLM analysis). Returns risk score from 0.0 (safe) to 1.0 (dangerous), detected patterns, risk level classification, and detailed LLM reasoning. Pattern-only mode: <50ms response, Full LLM analysis: 1-3 seconds. High-risk inputs (score > 0.5) are automatically logged for security audit."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "Body Stats Calculator",
+    "function_name": "calculateBMI",
+    "description": "Calculate Body Mass Index (BMI) Calculates Body Mass Index and provides a health category based on standard BMI ranges."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "Body Stats Calculator",
+    "function_name": "calculateBMR",
+    "description": "Calculate Basal Metabolic Rate (BMR) Calculates the Basal Metabolic Rate using the Mifflin-St Jeor equation. BMR represents the number of calories your body needs at rest."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "Body Stats Calculator",
+    "function_name": "calculateBodyFat",
+    "description": "Calculate Body Fat Percentage Estimates the body fat percentage based on age, height, and weight using the U.S. Navy method for body composition analysis."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "Body Stats Calculator",
+    "function_name": "calculateDailyCalories",
+    "description": "Calculate Daily Caloric Needs Calculates daily caloric requirements based on BMR and activity level. Returns caloric needs for different activity levels."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "Body Stats Calculator",
+    "function_name": "calculateMacronutrients",
+    "description": "Calculate Macronutrient Breakdown Provides recommended macronutrient ratios (protein, carbs, fats, sugar) for daily consumption based on weight goal."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "Body Stats Calculator",
+    "function_name": "calculateTDEE",
+    "description": "Calculate Total Daily Energy Expenditure (TDEE) Calculates Total Daily Energy Expenditure including activity level adjustments. TDEE represents the total calories burned per day."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "Translo API",
+    "function_name": "translateText",
+    "description": "Translate text between languages Translates text from source language to target language. Supports automatic source language detection by setting source_lang to 'auto'. Returns translated text with detected or specified source language."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "Translo API",
+    "function_name": "detectLanguage",
+    "description": "Detect language of text Automatically detects the language of provided text. Returns detected language code and confidence score. Useful for identifying unknown languages before translation."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "Multimodel Sentiment & Text Analysis API",
+    "function_name": "getFullAnalysis",
+    "description": "Perform full text analysis Performs a comprehensive analysis of the provided text. Returns overall sentiment (VADER), polarity and subjectivity (TextBlob), dominant emotion (transformers), word/character count, and key phrase extraction with sentiment scores."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "Multimodel Sentiment & Text Analysis API",
+    "function_name": "getSentiment",
+    "description": "Analyze sentiment using VADER Performs sentiment analysis using VADER (Valence Aware Dictionary and sEntiment Reasoner). Returns positive, negative, neutral, and compound sentiment scores."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "Multimodel Sentiment & Text Analysis API",
+    "function_name": "getPolaritySubjectivity",
+    "description": "Analyze polarity and subjectivity Returns sentiment polarity and subjectivity using TextBlob. Polarity ranges from -1 (negative) to 1 (positive), and subjectivity ranges from 0 (objective) to 1 (subjective)."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "Multimodel Sentiment & Text Analysis API",
+    "function_name": "getEmotion",
+    "description": "Detect dominant emotion Detects the dominant emotion in the text using a transformer model (nateraw/bert-base-uncased-emotion). Returns the emotion label and confidence score."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "Multimodel Sentiment & Text Analysis API",
+    "function_name": "getKeyPhrases",
+    "description": "Extract key phrases with sentiment Extracts key noun phrases from the text and returns basic sentiment and polarity for each phrase. Useful for identifying specific aspects and their associated sentiments."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "Encryption Decryption API - 50+ Algorithms",
+    "function_name": "advancedEncrypt",
+    "description": "Advanced encryption with full control Full control over IV and authentication tags. Required for GCM algorithms. Returns encrypted data with IV and tag for authenticated encryption modes."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "Encryption Decryption API - 50+ Algorithms",
+    "function_name": "advancedDecrypt",
+    "description": "Advanced decryption Decrypt data encrypted with advanced mode. Requires IV and TAG from encryption for authenticated modes like GCM."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "Encryption Decryption API - 50+ Algorithms",
+    "function_name": "simpleEncrypt",
+    "description": "Simple encryption with automatic IV handling Automatic IV handling - perfect for beginners. IV is included in the encrypted package response. No need to manage IV separately."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "Encryption Decryption API - 50+ Algorithms",
+    "function_name": "simpleDecrypt",
+    "description": "Simple decryption Decrypt data from simple mode. Automatically extracts IV from encrypted package. Easy to use for beginners."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "Encryption Decryption API - 50+ Algorithms",
+    "function_name": "generateKey",
+    "description": "Generate encryption keys Generate symmetric or asymmetric keys for encryption. For RSA, returns both private and public keys. For symmetric algorithms, returns a single key."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "Encryption Decryption API - 50+ Algorithms",
+    "function_name": "generateHash",
+    "description": "Generate cryptographic hash Create cryptographic hashes of data. Supports SHA-256, SHA-512, SHA3, MD5, Whirlpool, RIPEMD and more. Perfect for password hashing and data integrity verification."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "Encryption Decryption API - 50+ Algorithms",
+    "function_name": "base64Encode",
+    "description": "Base64 encode data Encode data to Base64 format. Useful for preparing data for transmission or storage."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "Encryption Decryption API - 50+ Algorithms",
+    "function_name": "base64Decode",
+    "description": "Base64 decode data Decode Base64 encoded data back to original format."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "Encryption Decryption API - 50+ Algorithms",
+    "function_name": "createDigitalSignature",
+    "description": "Create digital signature Sign data with private key using RSA with SHA256 or SHA512. Creates cryptographic signature for document verification and authentication."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "Encryption Decryption API - 50+ Algorithms",
+    "function_name": "verifyDigitalSignature",
+    "description": "Verify digital signature Verify signature with public key. Validates that the signature was created by the holder of the corresponding private key and that the data has not been tampered with."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "Encryption Decryption API - 50+ Algorithms",
+    "function_name": "checkHealth",
+    "description": "Check API health status Returns API health status, server information, memory usage, and timestamp. Use this to verify API availability."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "Encryption Decryption API - 50+ Algorithms",
+    "function_name": "listAlgorithms",
+    "description": "List all supported algorithms Get complete list of 50+ supported encryption, hash, and signature algorithms. Organized by category: symmetric (AES, ChaCha20), asymmetric (RSA), hash (SHA, SHA3, MD5), and more."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "Encryption Decryption API - 50+ Algorithms",
+    "function_name": "getDocumentation",
+    "description": "Get complete API documentation Returns full API documentation in JSON format including all endpoints, parameters, examples, and use cases."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "Random Astronomy Facts",
+    "function_name": "getSolarSystemFact",
+    "description": "Get random solar system fact Returns a random fact about solar system celestial bodies, provided in both English and Spanish."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "Random Astronomy Facts",
+    "function_name": "getConstellationFact",
+    "description": "Get random constellation fact Returns a random fact about one of the 88 modern constellations. Could be both scientific or cultural information."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "Random Astronomy Facts",
+    "function_name": "getExoplanetData",
+    "description": "Get random exoplanet data Returns detailed data from one of the currently confirmed exoplanets. Includes orbital period, planet radius (Earth/Jupiter units), planet mass (Earth/Jupiter units), eccentricity, equilibrium temperature, and insolation flux."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "Random Astronomy Facts",
+    "function_name": "getStarData",
+    "description": "Get random star data Returns many variables from a randomly picked star, from well-known stars like Vega to lesser-known ones. Mass and luminosity are measured compared to the Sun (1 L = Sun's luminosity, 1 M = Sun's mass)."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "IRCTC Indian Railway PNR STATUS",
+    "function_name": "getPNRStatus",
+    "description": "Get PNR Status Retrieve the current status of a passenger's reservation using their PNR number. Fetches real-time PNR status directly from the IRCTC database."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "Readable API",
+    "function_name": "getReadabilityScore",
+    "description": "Calculate text readability score Evaluates text readability and returns comprehensive metrics including Flesch Reading Ease, Flesch-Kincaid Grade Level, Gunning Fog Index, SMOG Index, Automated Readability Index, Coleman-Liau Index, Dale-Chall Readability Score, and structural metrics like syllable count, word count, and sentence count. Ideal for content customization, SEO optimization, educational tools, and writing assistants."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "DataFlyr flight API",
+    "function_name": "getOneWayFlights",
+    "description": "Get one-way flights between two airports Returns detailed information about one-way flights, including price, duration, layovers, and other flight details. You can retrieve all available flights, or filter to get the cheapest or best option."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "DataFlyr flight API",
+    "function_name": "getRoundTripFlights",
+    "description": "Get round-trip flights between two airports Returns detailed information about round-trip flights for a complete journey, including price, duration, layovers, and other flight details. You can retrieve all flight options, or filter to get the cheapest or best results."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "DataFlyr flight API",
+    "function_name": "trackFlight",
+    "description": "Track a specific flight by flight number Provides real-time or scheduled tracking information for a specific flight. Returns detailed information including departure, arrival, aircraft type, and current flight status. You can retrieve full flight details or focus on delay information."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "LinkedIn Job Search API",
+    "function_name": "getJobs7Days",
+    "description": "Get LinkedIn jobs from last 7 days Returns LinkedIn job listings from the last 7 days. Supports extensive filtering options including title, location, description, company, remote status, industry, seniority, and AI-enriched fields. Returns up to 100 jobs per request with pagination support via offset parameter."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "LinkedIn Job Search API",
+    "function_name": "getJobs24Hours",
+    "description": "Get LinkedIn jobs from last 24 hours Returns LinkedIn job listings indexed during the last 24 hours. Supports all filtering options available in the 7-day endpoint. Better performance for description_filter compared to 7-day endpoint. Returns up to 100 jobs per request."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "CryptoPulse API",
+    "function_name": "getCryptoPrice",
+    "description": "Get current cryptocurrency price Returns the current price of a cryptocurrency against a fiat currency or another cryptocurrency. Aggregates data from CoinMarketCap and CoinPaprika for reliability."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "CryptoPulse API",
+    "function_name": "convertCurrency",
+    "description": "Convert between currencies Converts an amount from one currency to another. Supports crypto-to-fiat, fiat-to-crypto, and crypto-to-crypto conversions. Automatically falls back to CoinPaprika if CoinMarketCap fails, ensuring high availability."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "CryptoPulse API",
+    "function_name": "getSupportedCoins",
+    "description": "Get list of supported currencies Returns a list of supported cryptocurrencies and fiat currencies. Useful for dropdown menus, auto-complete fields, or validation in your application."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "Real-Time Amazon Scraper",
+    "function_name": "getAmazonProduct",
+    "description": "Get Amazon product details by ASIN Retrieves comprehensive product information from Amazon using the product's ASIN (Amazon Standard Identification Number). Returns details including title, price, ratings, reviews, images, description, specifications, and availability. Supports multiple country domains."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "Moon-Service-API",
+    "function_name": "getCurrentMoonData",
+    "description": "Get current moon data Returns current moon phase with precise illumination percentage, moon position including altitude, azimuth, and distance from Earth, moonrise and moonset times with timezone support, supermoon detection, and visibility status (above or below horizon)."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "Moon-Service-API",
+    "function_name": "getNextLunarEvents",
+    "description": "Get next lunar events Returns information about upcoming lunar events including next moon phases (new moon, first quarter, full moon, last quarter) and timing for your location."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "Moon-Service-API",
+    "function_name": "getMoonDistance",
+    "description": "Get moon distance information Returns detailed information about the moon's distance from Earth, including current distance, perigee (closest point), and apogee (farthest point) data."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "Moon-Service-API",
+    "function_name": "getSolarData",
+    "description": "Get solar data Returns comprehensive solar information including sunrise and sunset times, civil/nautical/astronomical twilight calculations, solar noon (when sun reaches highest point), and golden hour/blue hour times for photography planning."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "Moon-Service-API",
+    "function_name": "getUpcomingLunarEclipses",
+    "description": "Get upcoming lunar eclipses Returns predictions for upcoming lunar eclipses including date, type (total, partial, penumbral), visibility from your specific location, peak time, duration, and complete eclipse circumstances including magnitude."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "The TwinFlame Horoscope API",
+    "function_name": "getHoroscope",
+    "description": "Get horoscope for zodiac sign Retrieves daily or weekly horoscope for specified zodiac sign or all signs. Returns horoscope content with compatibility, mood, lucky number & color. Supports date queries including today, tomorrow, yesterday, specific dates (MM-DD-YYYY), this_week, last_week, next_week. Optional parameters for short versions, language translation, and date range queries."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "Whatsapp Number Validator",
+    "function_name": "validateSingleNumber",
+    "description": "Validate single WhatsApp number Checks if a single phone number is registered on WhatsApp. Returns validation status indicating whether the number has an active WhatsApp account."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "Whatsapp Number Validator",
+    "function_name": "validateBulkNumbers",
+    "description": "Validate multiple WhatsApp numbers (bulk) Checks if multiple phone numbers are registered on WhatsApp. Returns validation status for each number in the batch. Suitable for bulk verification of phone number lists."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "Whatsapp Number Validator",
+    "function_name": "validateBulkNumbers1000",
+    "description": "Validate multiple WhatsApp numbers (bulk - up to 1000) Checks if multiple phone numbers are registered on WhatsApp with support for larger batches (up to 1000 numbers). Returns validation status for each number in the batch. Optimized for high-volume verification."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "Open Weather13 API",
+    "function_name": "getCityWeather",
+    "description": "Get weather by city name Get current weather data by city name"
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "Open Weather13 API",
+    "function_name": "getWeatherByCoordinates",
+    "description": "Get weather by coordinates Get current weather data using latitude and longitude"
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "Open Weather13 API",
+    "function_name": "getFiveDayForecast",
+    "description": "Get 5-day weather forecast Get 5-day weather forecast using latitude and longitude"
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "Daily Horoscope API",
+    "function_name": "getDailyHoroscope",
+    "description": "Get horoscope reading for zodiac sign Retrieves horoscope readings for all 12 zodiac signs across six essential categories: Personal Life, Professional Life, Health, Emotions, Travel, and Luck. Supports daily (today, yesterday) and weekly readings."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "AI Trip Planner",
+    "function_name": "getDetailedPlan",
+    "description": "Get Detailed Trip Plan Generates a detailed travel itinerary based on the user's preferences, including the number of days, destination, interests, budget, and preferred mode of travel. Provides a personalized travel plan with specific activities, times, and locations for each day."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "AI Trip Planner",
+    "function_name": "getTripPlan",
+    "description": "Get Trip Plan Generates a travel itinerary based on the user's preferences, including the number of days and destination. Provides a simplified travel plan with recommended activities and locations."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "GEO Airports API",
+    "function_name": "getAirportByCode",
+    "description": "Get airport information by IATA code Fetch detailed information about an airport using its unique IATA code. Returns airport name, location coordinates, country, continent, city, and website."
+  },
+  {
+    "api_source": "RapidAPI",
+    "api_title": "GEO Airports API",
+    "function_name": "getNearestAirport",
+    "description": "Find the nearest airport to a location Identify the nearest airport to a specified geographic coordinate using latitude and longitude. Uses the Haversine formula to calculate distance in kilometers."
+  }
+]
