@@ -1,0 +1,31 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "source": "RapidAPI",
+        "title": "IRCTC Indian Railway PNR STATUS",
+        "version": "v2",
+        "description": "Get Real-Time Indian Railway PNR Status Updates. Stay informed with accurate and timely PNR status information directly from the Indian Railway Catering and Tourism Corporation (IRCTC) database. Provides real-time updates on passenger reservations."
+    },
+    "servers": [
+        {"url": "https://irctc-indian-railway-pnr-status.p.rapidapi.com"}
+    ],
+    "paths": {
+        "/getPNRStatus/{pnrNumber}": {
+            "get": {
+                "operationId": "getPNRStatus",
+                "summary": "Get PNR Status",
+                "description": "Retrieve the current status of a passenger's reservation using their PNR number. Fetches real-time PNR status directly from the IRCTC database.",
+                "parameters": [
+                    {
+                        "name": "pnrNumber",
+                        "in": "path",
+                        "required": "true",
+                        "schema": {"type": "string"},
+                        "description": "PNR (Passenger Name Record) number for the railway reservation"
+                    }
+                ]
+            }
+        }
+    }
+}
+

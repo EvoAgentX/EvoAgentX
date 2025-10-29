@@ -1,0 +1,203 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "source": "RapidAPI",
+        "title": "DataFlyr flight API",
+        "version": "v1beta1",
+        "description": "Search for flights data, like prices, schedules or delays. Returns detailed information about one-way flights, including price, duration, layovers, and other flight details."
+    },
+    "servers": [
+        {"url": "https://dataflyr-flight-api.p.rapidapi.com"}
+    ],
+    "paths": {
+        "/v1beta1/flights/{from}/{to}/{date}/{num_adults}/{num_kids}/{num_inf}/{cabin_class}": {
+            "get": {
+                "operationId": "getOneWayFlights",
+                "summary": "Get one-way flights between two airports",
+                "description": "Returns detailed information about one-way flights, including price, duration, layovers, and other flight details. You can retrieve all available flights, or filter to get the cheapest or best option.",
+                "parameters": [
+                    {
+                        "name": "from",
+                        "in": "path",
+                        "required": "true",
+                        "schema": {"type": "string"},
+                        "description": "IATA code of the departure airport, e.g.: JFK"
+                    },
+                    {
+                        "name": "to",
+                        "in": "path",
+                        "required": "true",
+                        "schema": {"type": "string"},
+                        "description": "IATA code of the destination airport, e.g.: LAX"
+                    },
+                    {
+                        "name": "date",
+                        "in": "path",
+                        "required": "true",
+                        "schema": {"type": "string"},
+                        "description": "Flight date in YYYY-MM-DD format, e.g.: 2025-12-21"
+                    },
+                    {
+                        "name": "num_adults",
+                        "in": "path",
+                        "required": "true",
+                        "schema": {"type": "integer"},
+                        "description": "Number of adult passengers, e.g.: 1"
+                    },
+                    {
+                        "name": "num_kids",
+                        "in": "path",
+                        "required": "true",
+                        "schema": {"type": "integer"},
+                        "description": "Number of child passengers, e.g.: 0"
+                    },
+                    {
+                        "name": "num_inf",
+                        "in": "path",
+                        "required": "true",
+                        "schema": {"type": "integer"},
+                        "description": "Number of infant passengers, e.g.: 0"
+                    },
+                    {
+                        "name": "cabin_class",
+                        "in": "path",
+                        "required": "true",
+                        "schema": {
+                            "type": "string",
+                            "enum": ["Economy", "Premium_Economy", "Business", "First"]
+                        },
+                        "description": "Cabin class for the flight. One of: Economy, Premium_Economy, Business, First"
+                    },
+                    {
+                        "name": "param",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {
+                            "type": "string",
+                            "enum": ["cheapest", "best"]
+                        },
+                        "description": "Filter parameter. Use 'cheapest' to get only the cheapest one-way flight, or 'best' to get the best-scored flight based on price, layovers, and layover times."
+                    }
+                ]
+            }
+        },
+        "/v1beta1/flights/round-trip/{from}/{to}/{departure_date}/{arrival_date}/{num_adults}/{num_kids}/{num_inf}/{cabin_class}": {
+            "get": {
+                "operationId": "getRoundTripFlights",
+                "summary": "Get round-trip flights between two airports",
+                "description": "Returns detailed information about round-trip flights for a complete journey, including price, duration, layovers, and other flight details. You can retrieve all flight options, or filter to get the cheapest or best results.",
+                "parameters": [
+                    {
+                        "name": "from",
+                        "in": "path",
+                        "required": "true",
+                        "schema": {"type": "string"},
+                        "description": "IATA code of the departure airport, e.g.: JFK"
+                    },
+                    {
+                        "name": "to",
+                        "in": "path",
+                        "required": "true",
+                        "schema": {"type": "string"},
+                        "description": "IATA code of the destination airport, e.g.: NRT"
+                    },
+                    {
+                        "name": "departure_date",
+                        "in": "path",
+                        "required": "true",
+                        "schema": {"type": "string"},
+                        "description": "Outbound flight date in YYYY-MM-DD format, e.g.: 2025-12-21"
+                    },
+                    {
+                        "name": "arrival_date",
+                        "in": "path",
+                        "required": "true",
+                        "schema": {"type": "string"},
+                        "description": "Return flight date in YYYY-MM-DD format, e.g.: 2025-12-28"
+                    },
+                    {
+                        "name": "num_adults",
+                        "in": "path",
+                        "required": "true",
+                        "schema": {"type": "integer"},
+                        "description": "Number of adult passengers, e.g.: 1"
+                    },
+                    {
+                        "name": "num_kids",
+                        "in": "path",
+                        "required": "true",
+                        "schema": {"type": "integer"},
+                        "description": "Number of child passengers, e.g.: 0"
+                    },
+                    {
+                        "name": "num_inf",
+                        "in": "path",
+                        "required": "true",
+                        "schema": {"type": "integer"},
+                        "description": "Number of infant passengers, e.g.: 0"
+                    },
+                    {
+                        "name": "cabin_class",
+                        "in": "path",
+                        "required": "true",
+                        "schema": {
+                            "type": "string",
+                            "enum": ["Economy", "Premium_Economy", "Business", "First"]
+                        },
+                        "description": "Cabin class for the flight. One of: Economy, Premium_Economy, Business, First"
+                    },
+                    {
+                        "name": "param",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {
+                            "type": "string",
+                            "enum": ["cheapest", "best"]
+                        },
+                        "description": "Filter parameter. Use 'cheapest' to get only the cheapest round-trip flight, or 'best' to get the best-scored flight based on price, layovers, and layover times."
+                    }
+                ]
+            }
+        },
+        "/v1beta1/tracking/{num}/{airline}/{date}": {
+            "get": {
+                "operationId": "trackFlight",
+                "summary": "Track a specific flight by flight number",
+                "description": "Provides real-time or scheduled tracking information for a specific flight. Returns detailed information including departure, arrival, aircraft type, and current flight status. You can retrieve full flight details or focus on delay information.",
+                "parameters": [
+                    {
+                        "name": "num",
+                        "in": "path",
+                        "required": "true",
+                        "schema": {"type": "string"},
+                        "description": "Flight number (numeric part only), e.g.: 33"
+                    },
+                    {
+                        "name": "airline",
+                        "in": "path",
+                        "required": "true",
+                        "schema": {"type": "string"},
+                        "description": "Airline IATA code, e.g.: DL"
+                    },
+                    {
+                        "name": "date",
+                        "in": "path",
+                        "required": "true",
+                        "schema": {"type": "string"},
+                        "description": "Flight date in YYYYMMDD format, e.g.: 20251024"
+                    },
+                    {
+                        "name": "param",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {
+                            "type": "string",
+                            "enum": ["delay"]
+                        },
+                        "description": "Filter parameter. Use 'delay' to return only delay-related data (departure and arrival delays in minutes). A negative delay means the flight departed or arrived earlier than scheduled."
+                    }
+                ]
+            }
+        }
+    }
+}

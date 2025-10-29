@@ -1,0 +1,90 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "source": "RapidAPI",
+        "title": "The TwinFlame Horoscope API",
+        "version": "v1",
+        "description": "Get accurate daily and weekly horoscopes for all zodiac signs from TwinFlame - used by the popular TwinFlame mobile app. Fast, stable, and backed by real astrologers. Retrieve daily or weekly horoscopes, sign compatibility, mood, lucky number & color, and historical date range. All content written and reviewed by in-house astrology team. Supports multiple languages via ISO-639 codes."
+    },
+    "servers": [
+        {"url": "https://the-twinflame-horoscope-api1.p.rapidapi.com"}
+    ],
+    "paths": {
+        "/": {
+            "get": {
+                "operationId": "getHoroscope",
+                "summary": "Get horoscope for zodiac sign",
+                "description": "Retrieves daily or weekly horoscope for specified zodiac sign or all signs. Returns horoscope content with compatibility, mood, lucky number & color. Supports date queries including today, tomorrow, yesterday, specific dates (MM-DD-YYYY), this_week, last_week, next_week. Optional parameters for short versions, language translation, and date range queries.",
+                "parameters": [
+                    {
+                        "name": "sign",
+                        "in": "query",
+                        "required": "true",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "aries",
+                                "taurus",
+                                "gemini",
+                                "cancer",
+                                "leo",
+                                "virgo",
+                                "libra",
+                                "scorpio",
+                                "sagittarius",
+                                "capricorn",
+                                "aquarius",
+                                "pisces",
+                                "all"
+                            ]
+                        },
+                        "description": "The zodiac sign (lowercase), e.g.: aries, gemini, scorpio, or 'all' to return all signs"
+                    },
+                    {
+                        "name": "date",
+                        "in": "query",
+                        "required": "true",
+                        "schema": {"type": "string"},
+                        "description": "Date query: 'today', 'tomorrow', 'yesterday', or MM-DD-YYYY format. Also supports 'this_week', 'last_week', 'next_week' for weekly horoscopes"
+                    },
+                    {
+                        "name": "range",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "boolean"},
+                        "description": "If set to true, returns available date range of horoscopes"
+                    },
+                    {
+                        "name": "nodate",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "boolean"},
+                        "description": "If set to true, strips the leading date qualifier from the description"
+                    },
+                    {
+                        "name": "nohistory",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "boolean"},
+                        "description": "If set to true, removes historical references from the horoscope"
+                    },
+                    {
+                        "name": "shorthoro",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "boolean"},
+                        "description": "If set to true, returns a shorter version of the horoscope with no date or history references"
+                    },
+                    {
+                        "name": "language",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "string"},
+                        "description": "ISO-639 language code for translation, e.g.: 'es' for Spanish, 'fr' for French, 'de' for German"
+                    }
+                ]
+            }
+        }
+    }
+}
+

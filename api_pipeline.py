@@ -75,10 +75,10 @@ def load_api_pool(api_pool_dir: str) -> List[Dict[str, str]]:
 
 # 配置存储（SQLite 用于元数据，FAISS 用于向量）
 store_config = StoreConfig(
-    dbConfig=DBConfig(db_name="sqlite", path="./data/api_cache.db"),
+    dbConfig=DBConfig(db_name="sqlite", path="./evoagentx/tools/api_pool/data/api_cache.db"),
     vectorConfig=VectorStoreConfig(vector_name="faiss", dimensions=1536, index_type="flat_l2"),
     graphConfig=None,
-    path="./data/api_indexing"
+    path="./evoagentx/tools/api_pool/data/api_indexing"
 )
 storage_handler = StorageHandler(storageConfig=store_config)
 
@@ -108,8 +108,8 @@ api_pool_dir = "./evoagentx/tools/api_pool"
 all_functions = load_api_pool(api_pool_dir)
 
 # 保存为 JSON 文件用于备份和调试(实际检索时使用 metadata,不需要加载此文件)
-os.makedirs("./data", exist_ok=True)
-api_json_file = "./data/api_pool_functions.json"
+os.makedirs("./evoagentx/tools/api_pool/data", exist_ok=True)
+api_json_file = "./evoagentx/tools/api_pool/data/api_pool_functions.json"
 with open(api_json_file, "w", encoding="utf-8") as f:
     json.dump(all_functions, f, ensure_ascii=False, indent=2)
 
@@ -159,8 +159,8 @@ print("API Pool 索引成功！")
 print(f"共索引 {len(all_functions)} 个函数\n")
 
 # 将索引保存到磁盘
-rag_engine.save(output_path="./data/indexing", corpus_id="api_pool_corpus", index_type="vector")
-print("索引已保存到 ./data/indexing")
+rag_engine.save(output_path="./evoagentx/tools/api_pool/data/indexing", corpus_id="api_pool_corpus", index_type="vector")
+print("索引已保存到 ./evoagentx/tools/api_pool/data/indexing")
 
 
 def search_api_functions(query_str: str, top_k: int = 3) -> List[Dict[str, str]]:

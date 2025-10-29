@@ -3,7 +3,7 @@
     "info": {
         "source": "RapidAPI",
         "title": "Open Weather13 API",
-        "version": "2.0",
+        "version": "v2",
         "description": "Complete weather data API via RapidAPI with 3 endpoints"
     },
     "servers": [

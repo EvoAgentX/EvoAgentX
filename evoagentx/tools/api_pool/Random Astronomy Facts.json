@@ -1,0 +1,47 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "source": "RapidAPI",
+        "title": "Random Astronomy Facts",
+        "version": "v1",
+        "description": "API that provides random astronomy facts on various topics including solar system celestial bodies, constellations, exoplanets, and stars. Returns scientific data and interesting facts in both English and Spanish for some topics."
+    },
+    "servers": [
+        {"url": "https://random-astronomy-facts.p.rapidapi.com"}
+    ],
+    "paths": {
+        "/api/solarsystem": {
+            "get": {
+                "operationId": "getSolarSystemFact",
+                "summary": "Get random solar system fact",
+                "description": "Returns a random fact about solar system celestial bodies, provided in both English and Spanish.",
+                "parameters": []
+            }
+        },
+        "/api/constellations": {
+            "get": {
+                "operationId": "getConstellationFact",
+                "summary": "Get random constellation fact",
+                "description": "Returns a random fact about one of the 88 modern constellations. Could be both scientific or cultural information.",
+                "parameters": []
+            }
+        },
+        "/api/exoplanets": {
+            "get": {
+                "operationId": "getExoplanetData",
+                "summary": "Get random exoplanet data",
+                "description": "Returns detailed data from one of the currently confirmed exoplanets. Includes orbital period, planet radius (Earth/Jupiter units), planet mass (Earth/Jupiter units), eccentricity, equilibrium temperature, and insolation flux.",
+                "parameters": []
+            }
+        },
+        "/api/stars": {
+            "get": {
+                "operationId": "getStarData",
+                "summary": "Get random star data",
+                "description": "Returns many variables from a randomly picked star, from well-known stars like Vega to lesser-known ones. Mass and luminosity are measured compared to the Sun (1 L = Sun's luminosity, 1 M = Sun's mass).",
+                "parameters": []
+            }
+        }
+    }
+}
+
