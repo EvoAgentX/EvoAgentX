@@ -1,0 +1,41 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "source": "RapidAPI",
+        "title": "Cloud Api Hub - IPTV Auto-Subscriber",
+        "version": "v1",
+        "description": "IPTV Auto-Subscriber API for searching live TV channels, movies, and series. Search across multiple stream types including live channels, movie libraries, and series libraries. Maximum query length is 20 characters."
+    },
+    "servers": [
+        {"url": "https://cloud-api-hub-iptv-auto-subscriber.p.rapidapi.com"}
+    ],
+    "paths": {
+        "/search": {
+            "get": {
+                "operationId": "searchIPTV",
+                "summary": "Search IPTV streams",
+                "description": "Search for IPTV content including live TV channels, movies, and series. Returns matching streams based on the query string and stream type. Query string has a maximum length of 20 characters.",
+                "parameters": [
+                    {
+                        "name": "query",
+                        "in": "query",
+                        "required": "true",
+                        "schema": {"type": "string"},
+                        "description": "Search query string. Maximum length is 20 characters, e.g.: CRTV"
+                    },
+                    {
+                        "name": "streamType",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {
+                            "type": "string",
+                            "enum": ["live", "movies", "series"]
+                        },
+                        "description": "Type of stream to search. Options: 'live' (Live TV channels), 'movies' (Movies library), 'series' (Series library). Defaults to 'live' if not specified"
+                    }
+                ]
+            }
+        }
+    }
+}
+

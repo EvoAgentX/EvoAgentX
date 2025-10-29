@@ -1,0 +1,372 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "source": "RapidAPI",
+        "title": "Encryption Decryption API - 50+ Algorithms",
+        "version": "v1",
+        "description": "Professional Crypto Encryption API with 50+ supported algorithms. Features AES-256-GCM authenticated encryption, RSA asymmetric encryption, ChaCha20 stream cipher, and SHA3 hashing. Supports encryption/decryption, hashing, digital signatures, and key generation. Perfect for secure data encryption, password hashing, digital signatures, and cryptographic operations. Zero data retention - total privacy guarantee. 2MB data limit with rate limiting."
+    },
+    "servers": [
+        {"url": "https://encryption-decryption-api-50-algorithms.p.rapidapi.com"}
+    ],
+    "paths": {
+        "/encrypt": {
+            "post": {
+                "operationId": "advancedEncrypt",
+                "summary": "Advanced encryption with full control",
+                "description": "Full control over IV and authentication tags. Required for GCM algorithms. Returns encrypted data with IV and tag for authenticated encryption modes.",
+                "requestBody": {
+                    "required": "true",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["algorithm", "data", "key"],
+                                "properties": {
+                                    "algorithm": {
+                                        "type": "string",
+                                        "description": "Encryption algorithm, e.g.: aes-256-gcm, aes-256-cbc, chacha20"
+                                    },
+                                    "data": {
+                                        "type": "string",
+                                        "description": "Data to encrypt (max 2MB)"
+                                    },
+                                    "key": {
+                                        "type": "string",
+                                        "description": "Base64 encoded encryption key"
+                                    },
+                                    "options": {
+                                        "type": "object",
+                                        "properties": {
+                                            "iv": {
+                                                "type": "string",
+                                                "description": "Optional base64 encoded IV"
+                                            },
+                                            "tag": {
+                                                "type": "string",
+                                                "description": "Optional base64 encoded authentication tag"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": []
+            }
+        },
+        "/decrypt": {
+            "post": {
+                "operationId": "advancedDecrypt",
+                "summary": "Advanced decryption",
+                "description": "Decrypt data encrypted with advanced mode. Requires IV and TAG from encryption for authenticated modes like GCM.",
+                "requestBody": {
+                    "required": "true",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["algorithm", "encrypted_data", "key"],
+                                "properties": {
+                                    "algorithm": {
+                                        "type": "string",
+                                        "description": "Decryption algorithm, e.g.: aes-256-gcm"
+                                    },
+                                    "encrypted_data": {
+                                        "type": "string",
+                                        "description": "Base64 encoded encrypted data"
+                                    },
+                                    "key": {
+                                        "type": "string",
+                                        "description": "Base64 encoded decryption key"
+                                    },
+                                    "options": {
+                                        "type": "object",
+                                        "required": ["iv"],
+                                        "properties": {
+                                            "iv": {
+                                                "type": "string",
+                                                "description": "Base64 encoded IV from encryption"
+                                            },
+                                            "tag": {
+                                                "type": "string",
+                                                "description": "Base64 encoded authentication tag (required for GCM)"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": []
+            }
+        },
+        "/encrypt-simple": {
+            "post": {
+                "operationId": "simpleEncrypt",
+                "summary": "Simple encryption with automatic IV handling",
+                "description": "Automatic IV handling - perfect for beginners. IV is included in the encrypted package response. No need to manage IV separately.",
+                "requestBody": {
+                    "required": "true",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["algorithm", "data", "key"],
+                                "properties": {
+                                    "algorithm": {
+                                        "type": "string",
+                                        "description": "Encryption algorithm, e.g.: aes-256-cbc, aes-256-gcm"
+                                    },
+                                    "data": {
+                                        "type": "string",
+                                        "description": "Data to encrypt"
+                                    },
+                                    "key": {
+                                        "type": "string",
+                                        "description": "Base64 encoded encryption key"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": []
+            }
+        },
+        "/decrypt-simple": {
+            "post": {
+                "operationId": "simpleDecrypt",
+                "summary": "Simple decryption",
+                "description": "Decrypt data from simple mode. Automatically extracts IV from encrypted package. Easy to use for beginners.",
+                "requestBody": {
+                    "required": "true",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["algorithm", "encrypted_package", "key"],
+                                "properties": {
+                                    "algorithm": {
+                                        "type": "string",
+                                        "description": "Decryption algorithm, must match encryption"
+                                    },
+                                    "encrypted_package": {
+                                        "type": "string",
+                                        "description": "Base64 encoded package containing IV and encrypted data"
+                                    },
+                                    "key": {
+                                        "type": "string",
+                                        "description": "Base64 encoded decryption key"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": []
+            }
+        },
+        "/generate-key": {
+            "post": {
+                "operationId": "generateKey",
+                "summary": "Generate encryption keys",
+                "description": "Generate symmetric or asymmetric keys for encryption. For RSA, returns both private and public keys. For symmetric algorithms, returns a single key.",
+                "requestBody": {
+                    "required": "true",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["algorithm"],
+                                "properties": {
+                                    "algorithm": {
+                                        "type": "string",
+                                        "description": "Algorithm for key generation, e.g.: aes-256-cbc, rsa-2048, rsa-4096, chacha20"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": []
+            }
+        },
+        "/hash": {
+            "post": {
+                "operationId": "generateHash",
+                "summary": "Generate cryptographic hash",
+                "description": "Create cryptographic hashes of data. Supports SHA-256, SHA-512, SHA3, MD5, Whirlpool, RIPEMD and more. Perfect for password hashing and data integrity verification.",
+                "requestBody": {
+                    "required": "true",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["algorithm", "data"],
+                                "properties": {
+                                    "algorithm": {
+                                        "type": "string",
+                                        "description": "Hash algorithm, e.g.: sha256, sha512, sha3-256, md5, whirlpool, ripemd256"
+                                    },
+                                    "data": {
+                                        "type": "string",
+                                        "description": "Data to hash"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": []
+            }
+        },
+        "/base64_encode": {
+            "post": {
+                "operationId": "base64Encode",
+                "summary": "Base64 encode data",
+                "description": "Encode data to Base64 format. Useful for preparing data for transmission or storage.",
+                "requestBody": {
+                    "required": "true",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["data"],
+                                "properties": {
+                                    "data": {
+                                        "type": "string",
+                                        "description": "Data to encode"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": []
+            }
+        },
+        "/base64_decode": {
+            "post": {
+                "operationId": "base64Decode",
+                "summary": "Base64 decode data",
+                "description": "Decode Base64 encoded data back to original format.",
+                "requestBody": {
+                    "required": "true",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["data"],
+                                "properties": {
+                                    "data": {
+                                        "type": "string",
+                                        "description": "Base64 encoded data to decode"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": []
+            }
+        },
+        "/sign": {
+            "post": {
+                "operationId": "createDigitalSignature",
+                "summary": "Create digital signature",
+                "description": "Sign data with private key using RSA with SHA256 or SHA512. Creates cryptographic signature for document verification and authentication.",
+                "requestBody": {
+                    "required": "true",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["algorithm", "data", "private_key"],
+                                "properties": {
+                                    "algorithm": {
+                                        "type": "string",
+                                        "description": "Signature algorithm, e.g.: rsa-sha256, rsa-sha512"
+                                    },
+                                    "data": {
+                                        "type": "string",
+                                        "description": "Data to sign"
+                                    },
+                                    "private_key": {
+                                        "type": "string",
+                                        "description": "RSA private key in PEM format"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": []
+            }
+        },
+        "/verify": {
+            "post": {
+                "operationId": "verifyDigitalSignature",
+                "summary": "Verify digital signature",
+                "description": "Verify signature with public key. Validates that the signature was created by the holder of the corresponding private key and that the data has not been tampered with.",
+                "requestBody": {
+                    "required": "true",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["algorithm", "data", "signature", "public_key"],
+                                "properties": {
+                                    "algorithm": {
+                                        "type": "string",
+                                        "description": "Signature algorithm, e.g.: rsa-sha256, rsa-sha512"
+                                    },
+                                    "data": {
+                                        "type": "string",
+                                        "description": "Original data that was signed"
+                                    },
+                                    "signature": {
+                                        "type": "string",
+                                        "description": "Base64 encoded signature to verify"
+                                    },
+                                    "public_key": {
+                                        "type": "string",
+                                        "description": "RSA public key in PEM format"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": []
+            }
+        },
+        "/health": {
+            "get": {
+                "operationId": "checkHealth",
+                "summary": "Check API health status",
+                "description": "Returns API health status, server information, memory usage, and timestamp. Use this to verify API availability.",
+                "parameters": []
+            }
+        },
+        "/algorithms": {
+            "get": {
+                "operationId": "listAlgorithms",
+                "summary": "List all supported algorithms",
+                "description": "Get complete list of 50+ supported encryption, hash, and signature algorithms. Organized by category: symmetric (AES, ChaCha20), asymmetric (RSA), hash (SHA, SHA3, MD5), and more.",
+                "parameters": []
+            }
+        },
+        "/docs": {
+            "get": {
+                "operationId": "getDocumentation",
+                "summary": "Get complete API documentation",
+                "description": "Returns full API documentation in JSON format including all endpoints, parameters, examples, and use cases.",
+                "parameters": []
+            }
+        }
+    }
+}
+

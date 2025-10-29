@@ -1,0 +1,61 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "source": "RapidAPI",
+        "title": "Translo API",
+        "version": "v1",
+        "description": "Translation and language detection API. Supports automatic language detection and translation between multiple languages. Provides fast and accurate text translation with auto-detect source language capability."
+    },
+    "servers": [
+        {"url": "https://translo-api.p.rapidapi.com"}
+    ],
+    "paths": {
+        "/translate": {
+            "get": {
+                "operationId": "translateText",
+                "summary": "Translate text between languages",
+                "description": "Translates text from source language to target language. Supports automatic source language detection by setting source_lang to 'auto'. Returns translated text with detected or specified source language.",
+                "parameters": [
+                    {
+                        "name": "source_lang",
+                        "in": "query",
+                        "required": "true",
+                        "schema": {"type": "string"},
+                        "description": "Source language code or 'auto' for automatic detection, e.g.: 'en', 'es', 'fr', 'de', 'auto'"
+                    },
+                    {
+                        "name": "target_lang",
+                        "in": "query",
+                        "required": "true",
+                        "schema": {"type": "string"},
+                        "description": "Target language code, e.g.: 'es', 'en', 'fr', 'de', 'zh', 'ja', 'ru'"
+                    },
+                    {
+                        "name": "text",
+                        "in": "query",
+                        "required": "true",
+                        "schema": {"type": "string"},
+                        "description": "Text to translate, e.g.: 'Hello, world!'"
+                    }
+                ]
+            }
+        },
+        "/detect": {
+            "get": {
+                "operationId": "detectLanguage",
+                "summary": "Detect language of text",
+                "description": "Automatically detects the language of provided text. Returns detected language code and confidence score. Useful for identifying unknown languages before translation.",
+                "parameters": [
+                    {
+                        "name": "text",
+                        "in": "query",
+                        "required": "true",
+                        "schema": {"type": "string"},
+                        "description": "Text to detect language from, e.g.: 'Hello, world!' or any text in unknown language"
+                    }
+                ]
+            }
+        }
+    }
+}
+
