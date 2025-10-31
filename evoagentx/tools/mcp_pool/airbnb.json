@@ -1,0 +1,13 @@
+{
+    "name": "airbnb",
+    "config":
+        {  
+            "command": "npx",
+            "args": [
+                "-y",
+                "@openbnb/mcp-server-airbnb",
+                "--ignore-robots-txt"
+            ]
+        },
+    "description": "A comprehensive Desktop Extension for searching Airbnb listings with advanced filtering capabilities and detailed property information retrieval"
+}

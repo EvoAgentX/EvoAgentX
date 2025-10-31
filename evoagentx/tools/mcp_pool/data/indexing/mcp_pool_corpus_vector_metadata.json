@@ -1,0 +1,11 @@
+{
+  "class_name": "IndexMetadata",
+  "corpus_id": "mcp_pool_corpus",
+  "index_type": "vector",
+  "collection_name": "default_collection",
+  "dimension": 1536,
+  "vector_db_type": "faiss",
+  "graph_db_type": null,
+  "embedding_model_name": "text-embedding-3-small",
+  "date": "2025-10-31 13:58:06.228988"
+}

@@ -1,0 +1,37 @@
+[
+  {
+    "name": "hirebase",
+    "config": {
+      "command": "uvx",
+      "args": [
+        "hirebase-mcp"
+      ],
+      "env": {
+        "HIREBASE_API_KEY": ""
+      }
+    },
+    "description": "Integrates with HireBase Job API to enable job searching with extensive filtering options and detailed job information retrieval for career exploration and job seeking"
+  },
+  {
+    "name": "airbnb",
+    "config": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@openbnb/mcp-server-airbnb",
+        "--ignore-robots-txt"
+      ]
+    },
+    "description": "A comprehensive Desktop Extension for searching Airbnb listings with advanced filtering capabilities and detailed property information retrieval"
+  },
+  {
+    "name": "mcp-hn",
+    "config": {
+      "command": "uvx",
+      "args": [
+        "mcp-hn"
+      ]
+    },
+    "description": "Providing tools for fetching information from Hacker News."
+  }
+]
