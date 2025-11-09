@@ -557,7 +557,25 @@ class ChatTemplate(StringTemplate):
 class MiproPromptTemplate(ChatTemplate):
 
     def render_demonstrations(self, inputs_format: LLMOutputParser, outputs_format: LLMOutputParser, parse_mode: str, title_format: str = None, custom_output_format: str = None) -> List[dict]:
-        
+
+        import dspy
+        if self.demonstrations:
+            demo = self.demonstrations[0]
+            if isinstance(demo, dspy.Example):
+                self.demonstrations = [demo.toDict() for demo in self.demonstrations]
+        return super().render_demonstrations(inputs_format, outputs_format, parse_mode, title_format, custom_output_format)
+
+
+class GEPAPromptTemplate(ChatTemplate):
+    """
+    Prompt template for GEPA optimizer.
+
+    GEPA (Genetic-Pareto) uses reflective prompt evolution to optimize instructions.
+    Unlike MIPRO, GEPA focuses on instruction-only optimization (no few-shot bootstrapping).
+    """
+
+    def render_demonstrations(self, inputs_format: LLMOutputParser, outputs_format: LLMOutputParser, parse_mode: str, title_format: str = None, custom_output_format: str = None) -> List[dict]:
+
         import dspy
         if self.demonstrations:
             demo = self.demonstrations[0]

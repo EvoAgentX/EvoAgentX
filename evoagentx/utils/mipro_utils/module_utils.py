@@ -106,6 +106,8 @@ class PromptTuningModule(dspy.Module):
         super().__init__()
         self.program = program
         self.predicts = []
+        # Stable mapping aligned with `predicts` order to survive deepcopy/signature reloads
+        self._register_names_in_order: List[str] = []
 
         seen = set()
         for name, signature in signature_dict.items():
@@ -113,6 +115,8 @@ class PromptTuningModule(dspy.Module):
                 raise ValueError(f"Duplicate name {name} in signature_dict")
             seen.add(name)
             self.predicts.append(dspy.Predict(signature, name=name))
+            # Track register name by insertion order
+            self._register_names_in_order.append(signature_name2register_name.get(name, name))
         self.registry = registry
         self.signature_name2register_name = signature_name2register_name
 
@@ -122,11 +126,16 @@ class PromptTuningModule(dspy.Module):
         """
         self.registry.reset()
 
-        for predict in self.predicts:
+        for idx, predict in enumerate(self.predicts):
             signature = predict.signature
 
-            signature_name = signature.__name__
-            register_name = self.signature_name2register_name[signature_name]
+            # Prefer positional mapping to avoid KeyError after DSPy reloads signatures as 'StringSignature'
+            register_name = self._register_names_in_order[idx] if idx < len(self._register_names_in_order) else None
+            if register_name is None:
+                signature_name = getattr(signature, "__name__", None)
+                register_name = self.signature_name2register_name.get(signature_name)
+            if register_name is None:
+                register_name = getattr(signature, "__pydantic_extra__", {}).get("register_name")
 
             register_element = self.registry.get(register_name)
 
@@ -224,7 +233,16 @@ class PromptTuningModule(dspy.Module):
         str
             The field type
         """
-        return field.json_schema_extra.get('__dspy_field_type') if field.json_schema_extra.get('__dspy_field_type') else None
+        try:
+            extra = getattr(field, "json_schema_extra", None)
+            if isinstance(extra, dict):
+                return extra.get("__dspy_field_type")
+            # Some environments expose a descriptor on the class; guard against that
+            if hasattr(extra, "get"):
+                return extra.get("__dspy_field_type")
+        except Exception:
+            pass
+        return None
 
     def is_prompt_template(self, register_name: str) -> bool:
         """
@@ -243,11 +261,18 @@ class PromptTuningModule(dspy.Module):
         return self.registry.get(register_name) is not None and isinstance(self.registry.get(register_name), PromptTemplate)
 
     def get_demos(self, demos: list) -> List[dict]:
-        result = [] 
-        for demo in demos:
-            if isinstance(demo, dspy.Example):
-                demo = demo.toDict()
-            result.append(demo)
+        result = []
+        for demo in demos or []:
+            try:
+                if isinstance(demo, dspy.Example):
+                    result.append(demo.toDict())
+                elif isinstance(demo, dict):
+                    result.append(demo)
+                else:
+                    # Fallback: coerce unknown demo types to a simple dict
+                    result.append({"text": str(demo)})
+            except Exception:
+                result.append({"text": str(demo)})
         return result
     
     def _inject_demos_to_string(self, instruction: str, demos: List[dict], input_names: List[str], output_names: List[str]) -> str:
@@ -261,12 +286,16 @@ class PromptTuningModule(dspy.Module):
             return text.replace("{", "{{").replace("}", "}}")
         
         def format_demo(demo: dict) -> str:
+            if not isinstance(demo, dict):
+                demo = {"text": str(demo)}
             demo_str = "Inputs:\n"
             inputs = {name: demo.get(name, "Not provided") for name in input_names}
             demo_str += "\n".join([f"{name}:\n{_escape_braces(str(value))}" for name, value in inputs.items()])
             demo_str += "\n\nOutputs:\n"
             outputs = {name: demo.get(name, "Not provided") for name in output_names}
             demo_str += "\n".join([f"{name}:\n{_escape_braces(str(value))}" for name, value in outputs.items()])
+            if "text" in demo:
+                demo_str += f"\n\nNotes:\n{_escape_braces(str(demo['text']))}"
             return demo_str
         
         demos_string = "\n\n".join([f"Example {i+1}:\n{format_demo(demo)}" for i, demo in enumerate(demos)])
@@ -288,7 +317,7 @@ class PromptTuningModule(dspy.Module):
         Note: Values in predictor configs take precedence as they may contain
         optimized values from recent tuning iterations.
         """
-        for predict in self.predicts:
+        for idx, predict in enumerate(self.predicts):
             signature = predict.signature
             instruction = signature.instructions
             demos = predict.demos
@@ -296,8 +325,13 @@ class PromptTuningModule(dspy.Module):
             input_names = [name for name, field in predict.signature.fields.items() if self.get_field_type(field) == 'input']
             output_names = [name for name, field in predict.signature.fields.items() if self.get_field_type(field) == 'output'] 
 
-            signature_name = signature.__name__
-            register_name = self.signature_name2register_name[signature_name]
+            # Prefer positional mapping to avoid KeyError after DSPy reloads signatures as 'StringSignature'
+            register_name = self._register_names_in_order[idx] if idx < len(self._register_names_in_order) else None
+            if register_name is None:
+                signature_name = getattr(signature, "__name__", None)
+                register_name = self.signature_name2register_name.get(signature_name)
+            if register_name is None:
+                register_name = getattr(signature, "__pydantic_extra__", {}).get("register_name")
  
             if self.is_prompt_template(register_name):
                 prompt_template: PromptTemplate = self.registry.get(register_name)
@@ -392,7 +426,12 @@ class PromptTuningModule(dspy.Module):
             dspy_trace = dspy.settings.trace
             dspy_trace.extend(trace)
 
-        return output
+        # Return a dspy.Prediction to align with dspy teleprompters' expectations
+        try:
+            return dspy.Prediction(solution=str(output))
+        except Exception:
+            # Fallback: return raw output
+            return output
 
     def deepcopy(self):
         """

@@ -1,3 +1,3 @@
-from .template import PromptTemplate, StringTemplate, ChatTemplate, MiproPromptTemplate
+from .template import PromptTemplate, StringTemplate, ChatTemplate, MiproPromptTemplate, GEPAPromptTemplate
 
-__all__ = ["PromptTemplate", "StringTemplate", "ChatTemplate", "MiproPromptTemplate"]
+__all__ = ["PromptTemplate", "StringTemplate", "ChatTemplate", "MiproPromptTemplate", "GEPAPromptTemplate"]
