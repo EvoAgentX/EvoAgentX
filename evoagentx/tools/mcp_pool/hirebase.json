@@ -1,0 +1,14 @@
+{
+    "name": "hirebase",
+    "config":
+        {  
+            "command": "uvx",
+            "args": [
+                "hirebase-mcp" 
+            ],
+            "env": {
+                "HIREBASE_API_KEY": "" 
+            }
+        },
+    "description": "Integrates with HireBase Job API to enable job searching with extensive filtering options and detailed job information retrieval for career exploration and job seeking"
+}

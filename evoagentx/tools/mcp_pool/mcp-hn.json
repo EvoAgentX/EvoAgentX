@@ -1,0 +1,11 @@
+{
+    "name": "mcp-hn",
+    "config":
+        {  
+            "command": "uvx",
+            "args": [
+                "mcp-hn"
+            ]
+        },
+    "description": "Providing tools for fetching information from Hacker News."
+}

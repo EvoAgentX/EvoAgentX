@@ -1,0 +1,83 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "source": "RapidAPI",
+        "title": "CryptoPulse API",
+        "version": "v1",
+        "description": "Powerful, fast, and reliable API for real-time cryptocurrency conversions into fiat currencies or other crypto assets. Aggregates multiple data providers (CoinMarketCap and CoinPaprika) for high availability and accurate rates. Supports 5,000+ cryptocurrencies and multiple fiat currencies. Handles crypto-to-fiat, fiat-to-crypto, and crypto-to-crypto conversions with automatic fallback. TTL caching for faster responses. Get real-time crypto prices from top exchanges like Binance, Coinbase, Kraken, and KuCoin."
+    },
+    "servers": [
+        {"url": "https://cryptopulse-api2.p.rapidapi.com"}
+    ],
+    "paths": {
+        "/price": {
+            "get": {
+                "operationId": "getCryptoPrice",
+                "summary": "Get current cryptocurrency price",
+                "description": "Returns the current price of a cryptocurrency against a fiat currency or another cryptocurrency. Aggregates data from CoinMarketCap and CoinPaprika for reliability.",
+                "parameters": [
+                    {
+                        "name": "symbol",
+                        "in": "query",
+                        "required": "true",
+                        "schema": {"type": "string"},
+                        "description": "Cryptocurrency symbol, e.g.: BTC, ETH, SOL, BNB, XRP, DOGE"
+                    },
+                    {
+                        "name": "fiat",
+                        "in": "query",
+                        "required": "true",
+                        "schema": {"type": "string"},
+                        "description": "Target fiat or crypto currency, e.g.: USD, EUR, COP, MXN, ARS, PEN, BRL"
+                    }
+                ]
+            }
+        },
+        "/convert": {
+            "get": {
+                "operationId": "convertCurrency",
+                "summary": "Convert between currencies",
+                "description": "Converts an amount from one currency to another. Supports crypto-to-fiat, fiat-to-crypto, and crypto-to-crypto conversions. Automatically falls back to CoinPaprika if CoinMarketCap fails, ensuring high availability.",
+                "parameters": [
+                    {
+                        "name": "from_symbol",
+                        "in": "query",
+                        "required": "true",
+                        "schema": {"type": "string"},
+                        "description": "Source currency symbol, e.g.: BTC, ETH, USD, EUR"
+                    },
+                    {
+                        "name": "to_symbol",
+                        "in": "query",
+                        "required": "true",
+                        "schema": {"type": "string"},
+                        "description": "Target currency symbol, e.g.: USD, EUR, ETH, BTC"
+                    },
+                    {
+                        "name": "amount",
+                        "in": "query",
+                        "required": "true",
+                        "schema": {"type": "number"},
+                        "description": "Amount to convert, e.g.: 2, 0.5, 100"
+                    },
+                    {
+                        "name": "debug",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "boolean"},
+                        "description": "Optional flag for detailed diagnostic output"
+                    }
+                ]
+            }
+        },
+        "/coins": {
+            "get": {
+                "operationId": "getSupportedCoins",
+                "summary": "Get list of supported currencies",
+                "description": "Returns a list of supported cryptocurrencies and fiat currencies. Useful for dropdown menus, auto-complete fields, or validation in your application.",
+                "parameters": []
+            }
+        }
+    }
+}
+

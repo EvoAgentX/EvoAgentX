@@ -1,0 +1,95 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "source": "RapidAPI",
+        "title": "Moon-Service-API",
+        "version": "v1",
+        "description": "Powerful Astronomical Data for Your Applications. Get accurate, real-time moon and sun calculations for any location worldwide. Perfect for astronomy apps, photography tools, outdoor planning, agriculture, and lunar calendar applications. Includes moon phases, solar information, lunar eclipse predictions, and location intelligence with support for 200,000+ cities worldwide."
+    },
+    "servers": [
+        {"url": "https://moon-service-api.p.rapidapi.com"}
+    ],
+    "paths": {
+        "/api/v1/current": {
+            "get": {
+                "operationId": "getCurrentMoonData",
+                "summary": "Get current moon data",
+                "description": "Returns current moon phase with precise illumination percentage, moon position including altitude, azimuth, and distance from Earth, moonrise and moonset times with timezone support, supermoon detection, and visibility status (above or below horizon).",
+                "parameters": [
+                    {
+                        "name": "city",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "string"},
+                        "description": "City name, e.g.: London, Paris, Tokyo. Supports 200,000+ cities worldwide. Automatic timezone detection and geocoding included."
+                    }
+                ]
+            }
+        },
+        "/api/v1/next": {
+            "get": {
+                "operationId": "getNextLunarEvents",
+                "summary": "Get next lunar events",
+                "description": "Returns information about upcoming lunar events including next moon phases (new moon, first quarter, full moon, last quarter) and timing for your location.",
+                "parameters": [
+                    {
+                        "name": "city",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "string"},
+                        "description": "City name, e.g.: London, Paris, Tokyo"
+                    }
+                ]
+            }
+        },
+        "/api/v1/distance": {
+            "get": {
+                "operationId": "getMoonDistance",
+                "summary": "Get moon distance information",
+                "description": "Returns detailed information about the moon's distance from Earth, including current distance, perigee (closest point), and apogee (farthest point) data.",
+                "parameters": [
+                    {
+                        "name": "city",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "string"},
+                        "description": "City name, e.g.: London, Paris, Tokyo"
+                    }
+                ]
+            }
+        },
+        "/api/v1/sun": {
+            "get": {
+                "operationId": "getSolarData",
+                "summary": "Get solar data",
+                "description": "Returns comprehensive solar information including sunrise and sunset times, civil/nautical/astronomical twilight calculations, solar noon (when sun reaches highest point), and golden hour/blue hour times for photography planning.",
+                "parameters": [
+                    {
+                        "name": "city",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "string"},
+                        "description": "City name, e.g.: London, Paris, Tokyo"
+                    }
+                ]
+            }
+        },
+        "/api/v1/eclipses": {
+            "get": {
+                "operationId": "getUpcomingLunarEclipses",
+                "summary": "Get upcoming lunar eclipses",
+                "description": "Returns predictions for upcoming lunar eclipses including date, type (total, partial, penumbral), visibility from your specific location, peak time, duration, and complete eclipse circumstances including magnitude.",
+                "parameters": [
+                    {
+                        "name": "city",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "string"},
+                        "description": "City name, e.g.: London, Paris, Tokyo"
+                    }
+                ]
+            }
+        }
+    }
+}
+

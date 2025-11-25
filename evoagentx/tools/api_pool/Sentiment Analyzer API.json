@@ -1,0 +1,140 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "source": "RapidAPI",
+        "title": "Multimodel Sentiment & Text Analysis API",
+        "version": "v1",
+        "description": "Comprehensive sentiment and text analysis API using multiple models including VADER, TextBlob, and transformer-based emotion detection. Performs sentiment analysis, polarity/subjectivity analysis, emotion detection, and key phrase extraction with sentiment scores."
+    },
+    "servers": [
+        {"url": "https://sentiment-analyzer-api.p.rapidapi.com"}
+    ],
+    "paths": {
+        "/api/v1/sentiment_analyzer/full_analysis": {
+            "post": {
+                "operationId": "getFullAnalysis",
+                "summary": "Perform full text analysis",
+                "description": "Performs a comprehensive analysis of the provided text. Returns overall sentiment (VADER), polarity and subjectivity (TextBlob), dominant emotion (transformers), word/character count, and key phrase extraction with sentiment scores.",
+                "requestBody": {
+                    "required": "true",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["text"],
+                                "properties": {
+                                    "text": {
+                                        "type": "string",
+                                        "description": "Text to analyze, e.g.: Works well, but could be improved."
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": []
+            }
+        },
+        "/api/v1/sentiment_analyzer/sentiment": {
+            "post": {
+                "operationId": "getSentiment",
+                "summary": "Analyze sentiment using VADER",
+                "description": "Performs sentiment analysis using VADER (Valence Aware Dictionary and sEntiment Reasoner). Returns positive, negative, neutral, and compound sentiment scores.",
+                "requestBody": {
+                    "required": "true",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["text"],
+                                "properties": {
+                                    "text": {
+                                        "type": "string",
+                                        "description": "Text to analyze, e.g.: Great product!"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": []
+            }
+        },
+        "/api/v1/sentiment_analyzer/polarity_subjectivity": {
+            "post": {
+                "operationId": "getPolaritySubjectivity",
+                "summary": "Analyze polarity and subjectivity",
+                "description": "Returns sentiment polarity and subjectivity using TextBlob. Polarity ranges from -1 (negative) to 1 (positive), and subjectivity ranges from 0 (objective) to 1 (subjective).",
+                "requestBody": {
+                    "required": "true",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["text"],
+                                "properties": {
+                                    "text": {
+                                        "type": "string",
+                                        "description": "Text to analyze, e.g.: Great product!"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": []
+            }
+        },
+        "/api/v1/sentiment_analyzer/emotion": {
+            "post": {
+                "operationId": "getEmotion",
+                "summary": "Detect dominant emotion",
+                "description": "Detects the dominant emotion in the text using a transformer model (nateraw/bert-base-uncased-emotion). Returns the emotion label and confidence score.",
+                "requestBody": {
+                    "required": "true",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["text"],
+                                "properties": {
+                                    "text": {
+                                        "type": "string",
+                                        "description": "Text to analyze, e.g.: I'm so happy with this!"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": []
+            }
+        },
+        "/api/v1/sentiment_analyzer/key_phrase": {
+            "post": {
+                "operationId": "getKeyPhrases",
+                "summary": "Extract key phrases with sentiment",
+                "description": "Extracts key noun phrases from the text and returns basic sentiment and polarity for each phrase. Useful for identifying specific aspects and their associated sentiments.",
+                "requestBody": {
+                    "required": "true",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["text"],
+                                "properties": {
+                                    "text": {
+                                        "type": "string",
+                                        "description": "Text to analyze, e.g.: The interface is clean, but the app crashes often."
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": []
+            }
+        }
+    }
+}
+

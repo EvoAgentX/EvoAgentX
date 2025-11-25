@@ -1,0 +1,54 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "source": "RapidAPI",
+        "title": "GEO Airports API",
+        "version": "v1",
+        "description": "Fetch detailed information on 9000+ airports worldwide using their IATA codes. Quickly find the nearest airport to any location by providing latitude and longitude coordinates. Perfect for travel apps, logistics, and location-based services."
+    },
+    "servers": [
+        {"url": "https://geo-airports-api.p.rapidapi.com"}
+    ],
+    "paths": {
+        "/airport": {
+            "get": {
+                "operationId": "getAirportByCode",
+                "summary": "Get airport information by IATA code",
+                "description": "Fetch detailed information about an airport using its unique IATA code. Returns airport name, location coordinates, country, continent, city, and website.",
+                "parameters": [
+                    {
+                        "name": "code",
+                        "in": "query",
+                        "required": "true",
+                        "schema": {"type": "string"},
+                        "description": "The 3-character IATA airport code (uppercase), e.g.: LHR, JFK"
+                    }
+                ]
+            }
+        },
+        "/airport/nearest": {
+            "get": {
+                "operationId": "getNearestAirport",
+                "summary": "Find the nearest airport to a location",
+                "description": "Identify the nearest airport to a specified geographic coordinate using latitude and longitude. Uses the Haversine formula to calculate distance in kilometers.",
+                "parameters": [
+                    {
+                        "name": "lat",
+                        "in": "query",
+                        "required": "true",
+                        "schema": {"type": "number"},
+                        "description": "Latitude coordinate in decimal degrees, e.g.: 40.531"
+                    },
+                    {
+                        "name": "lon",
+                        "in": "query",
+                        "required": "true",
+                        "schema": {"type": "number"},
+                        "description": "Longitude coordinate in decimal degrees, e.g.: -2.142"
+                    }
+                ]
+            }
+        }
+    }
+}
+

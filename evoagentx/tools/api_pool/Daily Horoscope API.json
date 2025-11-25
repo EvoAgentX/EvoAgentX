@@ -1,0 +1,57 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "source": "RapidAPI",
+        "title": "Daily Horoscope API",
+        "version": "v1",
+        "description": "Your go-to source for daily horoscope readings for all 12 zodiac signs, along with fascinating fun trivia. Covers six essential categories: Personal Life, Professional Life, Health, Emotions, Travel, and Luck. Provides comprehensive astrological experience with daily, weekly, and historical horoscope readings."
+    },
+    "servers": [
+        {"url": "https://daily-horoscope-api.p.rapidapi.com"}
+    ],
+    "paths": {
+        "/api/Daily-Horoscope-English/": {
+            "get": {
+                "operationId": "getDailyHoroscope",
+                "summary": "Get horoscope reading for zodiac sign",
+                "description": "Retrieves horoscope readings for all 12 zodiac signs across six essential categories: Personal Life, Professional Life, Health, Emotions, Travel, and Luck. Supports daily (today, yesterday) and weekly readings.",
+                "parameters": [
+                    {
+                        "name": "zodiacSign",
+                        "in": "query",
+                        "required": "true",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "aries",
+                                "taurus",
+                                "gemini",
+                                "cancer",
+                                "leo",
+                                "virgo",
+                                "libra",
+                                "scorpio",
+                                "sagittarius",
+                                "capricorn",
+                                "aquarius",
+                                "pisces"
+                            ]
+                        },
+                        "description": "Zodiac sign for horoscope reading, e.g.: aries, taurus, gemini, cancer, leo, virgo, libra, scorpio, sagittarius, capricorn, aquarius, pisces"
+                    },
+                    {
+                        "name": "timePeriod",
+                        "in": "query",
+                        "required": "true",
+                        "schema": {
+                            "type": "string",
+                            "enum": ["today", "yesterday", "weekly"]
+                        },
+                        "description": "Time period for horoscope: today (current day), yesterday (previous day), or weekly (week ahead)"
+                    }
+                ]
+            }
+        }
+    }
+}
+

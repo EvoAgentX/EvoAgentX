@@ -1,0 +1,96 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "source": "RapidAPI",
+        "title": "Whatsapp Number Validator",
+        "version": "v3",
+        "description": "Validate WhatsApp phone numbers to check if they are registered on WhatsApp. Supports single number validation and bulk validation for multiple numbers. Helps verify if a phone number has an active WhatsApp account before sending messages or adding contacts."
+    },
+    "servers": [
+        {"url": "https://whatsapp-number-validator3.p.rapidapi.com"}
+    ],
+    "paths": {
+        "/WhatsappNumberHasItWithToken": {
+            "post": {
+                "operationId": "validateSingleNumber",
+                "summary": "Validate single WhatsApp number",
+                "description": "Checks if a single phone number is registered on WhatsApp. Returns validation status indicating whether the number has an active WhatsApp account.",
+                "requestBody": {
+                    "required": "true",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["phone_number"],
+                                "properties": {
+                                    "phone_number": {
+                                        "type": "string",
+                                        "description": "Phone number with country code (without + or spaces), e.g.: 447984231120"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": []
+            }
+        },
+        "/WhatsappNumberHasItBulkWithToken": {
+            "post": {
+                "operationId": "validateBulkNumbers",
+                "summary": "Validate multiple WhatsApp numbers (bulk)",
+                "description": "Checks if multiple phone numbers are registered on WhatsApp. Returns validation status for each number in the batch. Suitable for bulk verification of phone number lists.",
+                "requestBody": {
+                    "required": "true",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["phone_numbers"],
+                                "properties": {
+                                    "phone_numbers": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description": "Array of phone numbers with country codes (without + or spaces), e.g.: [\"447748188019\", \"447999999999\", \"447999999977\"]"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": []
+            }
+        },
+        "/WhatsappNumberHasItBulkWithToken1000": {
+            "post": {
+                "operationId": "validateBulkNumbers1000",
+                "summary": "Validate multiple WhatsApp numbers (bulk - up to 1000)",
+                "description": "Checks if multiple phone numbers are registered on WhatsApp with support for larger batches (up to 1000 numbers). Returns validation status for each number in the batch. Optimized for high-volume verification.",
+                "requestBody": {
+                    "required": "true",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["phone_numbers"],
+                                "properties": {
+                                    "phone_numbers": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description": "Array of phone numbers with country codes (without + or spaces), supports up to 1000 numbers, e.g.: [\"447748188019\", \"447999999999\", \"447999999977\"]"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": []
+            }
+        }
+    }
+}
+

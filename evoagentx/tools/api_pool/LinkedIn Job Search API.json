@@ -1,0 +1,341 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "source": "RapidAPI",
+        "title": "LinkedIn Job Search API",
+        "version": "v1",
+        "description": "High quality job listings from LinkedIn with over 20,000 jobs indexed every hour. Contains jobs from the last 7 days with over 2 million jobs every week. Includes full job description, company industry, followers, location, specialties, and company description. Wide range of filters available: Job Title, Description, Location, Company, Remote. 10M+ AI-enriched LinkedIn jobs every month with Apply URL and hourly refresh. Returns up to 100 jobs per API call."
+    },
+    "servers": [
+        {"url": "https://linkedin-job-search-api.p.rapidapi.com"}
+    ],
+    "paths": {
+        "/active-jb-7d": {
+            "get": {
+                "operationId": "getJobs7Days",
+                "summary": "Get LinkedIn jobs from last 7 days",
+                "description": "Returns LinkedIn job listings from the last 7 days. Supports extensive filtering options including title, location, description, company, remote status, industry, seniority, and AI-enriched fields. Returns up to 100 jobs per request with pagination support via offset parameter.",
+                "parameters": [
+                    {
+                        "name": "title_filter",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "string"},
+                        "description": "Filter by job title. Supports Google-like syntax: 'Software' (contains), 'Software Engineer' (AND), '\"Software Engineer\"' (exact phrase), 'Software OR Engineer' (OR), '-\"Software Engineer\"' (exclude)"
+                    },
+                    {
+                        "name": "advanced_title_filter",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "string"},
+                        "description": "Advanced title filter with operators: & (AND), | (OR), ! (NOT), <-> (FOLLOWED BY), :* (prefix wildcard). Example: '(AI | \"Machine Learning\") & ! Marketing'. Cannot be used with regular title_filter"
+                    },
+                    {
+                        "name": "location_filter",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "string"},
+                        "description": "Filter by location. Use full names (not abbreviations). Example: '\"United States\" OR \"United Kingdom\"'. For US states use full names like \"New York\""
+                    },
+                    {
+                        "name": "description_filter",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "string"},
+                        "description": "Filter by job description keywords. Same syntax as title_filter. Warning: Risk of timeouts with 7-day endpoint, recommended for 24h endpoint"
+                    },
+                    {
+                        "name": "organization_slug_filter",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "string"},
+                        "description": "Filter by company slug(s). Comma-delimited without spaces. Example: 'microsoft,tesla-motors'. Exact matches only"
+                    },
+                    {
+                        "name": "organization_description_filter",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "string"},
+                        "description": "Filter by company LinkedIn description. Same syntax as title_filter"
+                    },
+                    {
+                        "name": "organization_specialties_filter",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "string"},
+                        "description": "Filter by company LinkedIn specialties. Same syntax as title_filter"
+                    },
+                    {
+                        "name": "type_filter",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "string"},
+                        "description": "Filter by job type. Options: CONTRACTOR, FULL_TIME, INTERN, OTHER, PART_TIME, TEMPORARY, VOLUNTEER. Comma-delimited for multiple: 'FULL_TIME,PART_TIME'"
+                    },
+                    {
+                        "name": "industry_filter",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "string"},
+                        "description": "Filter by company LinkedIn industry. Case sensitive. Comma-delimited for multiple. Example: 'Accounting,Staffing and Recruiting'. Double-quote industries with commas"
+                    },
+                    {
+                        "name": "seniority_filter",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "string"},
+                        "description": "Filter by seniority level. Case sensitive. Options: Associate, Director, Executive, Mid-Senior level, Entry level, Not Applicable, Internship. Comma-delimited: 'Mid-Senior level,Entry level'"
+                    },
+                    {
+                        "name": "remote",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "boolean"},
+                        "description": "Set to true for remote jobs only, false for non-remote only. Leave empty for both"
+                    },
+                    {
+                        "name": "agency",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "boolean"},
+                        "description": "Filter recruitment agencies: true = only agencies/job boards, false = only regular companies"
+                    },
+                    {
+                        "name": "directapply",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "boolean"},
+                        "description": "Set to true for jobs with LinkedIn EasyApply, false to exclude. Opposite of external_apply_url"
+                    },
+                    {
+                        "name": "external_apply_url",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "boolean"},
+                        "description": "Set to true to include only jobs with external apply URL. Opposite of directapply"
+                    },
+                    {
+                        "name": "employees_gte",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "integer"},
+                        "description": "Filter companies with employees greater than or equal to this number. Example: 1"
+                    },
+                    {
+                        "name": "employees_lte",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "integer"},
+                        "description": "Filter companies with employees less than or equal to this number. Example: 200"
+                    },
+                    {
+                        "name": "date_filter",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "string"},
+                        "description": "Filter jobs posted after this date. Format: 'YYYY-MM-DD' or 'YYYY-MM-DDTHH:MM:SS' (UTC). Example: '2025-01-01'"
+                    },
+                    {
+                        "name": "description_type",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "string"},
+                        "description": "Include job description in output. Set to 'text' for plain text version with /n breaks"
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "integer"},
+                        "description": "Number of jobs to return per request. Default and maximum is 100"
+                    },
+                    {
+                        "name": "offset",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "integer"},
+                        "description": "Pagination offset. Multiple of limit parameter. Example: 0, 10, 20 for limit=10"
+                    },
+                    {
+                        "name": "order",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "string"},
+                        "description": "Order of results. Default is date descending. Set to 'asc' for ascending"
+                    },
+                    {
+                        "name": "exclude_ats_duplicate",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "boolean"},
+                        "description": "Set to true to remove duplicate jobs between this API and 'Active Jobs DB' API. Only use if you use both APIs"
+                    },
+                    {
+                        "name": "include_ai",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "boolean"},
+                        "description": "BETA: Set to true to include AI-enriched fields (salary, benefits, experience level, detailed remote filters). Only for non-agency jobs"
+                    },
+                    {
+                        "name": "ai_work_arrangement_filter",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "string"},
+                        "description": "BETA: Filter by work arrangement. Options: On-site, Hybrid, Remote OK, Remote Solely. Comma-delimited: 'Hybrid,Remote OK'"
+                    },
+                    {
+                        "name": "ai_taxonomies_a_filter",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "string"},
+                        "description": "BETA: Filter by top-level taxonomies. Example: 'Technology,Healthcare'. Options include: Technology, Healthcare, Management & Leadership, Finance & Accounting, etc."
+                    },
+                    {
+                        "name": "ai_taxonomies_a_exclusion_filter",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "string"},
+                        "description": "BETA: Exclude jobs with certain taxonomies. Comma-delimited: 'Technology,Healthcare'"
+                    },
+                    {
+                        "name": "ai_has_salary",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "boolean"},
+                        "description": "BETA: Set to true to include only jobs with salary information. Requires include_ai=true"
+                    },
+                    {
+                        "name": "ai_experience_level_filter",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "string"},
+                        "description": "BETA: Filter by experience level. Options: 0-2, 2-5, 5-10, 10+. Comma-delimited: '0-2,2-5'"
+                    },
+                    {
+                        "name": "ai_visa_sponsorship_filter",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "boolean"},
+                        "description": "BETA: Set to true to filter jobs that mention visa sponsorship"
+                    }
+                ]
+            }
+        },
+        "/active-jb-24h": {
+            "get": {
+                "operationId": "getJobs24Hours",
+                "summary": "Get LinkedIn jobs from last 24 hours",
+                "description": "Returns LinkedIn job listings indexed during the last 24 hours. Supports all filtering options available in the 7-day endpoint. Better performance for description_filter compared to 7-day endpoint. Returns up to 100 jobs per request.",
+                "parameters": [
+                    {
+                        "name": "title_filter",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "string"},
+                        "description": "Filter by job title. Supports Google-like syntax"
+                    },
+                    {
+                        "name": "advanced_title_filter",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "string"},
+                        "description": "Advanced title filter with operators"
+                    },
+                    {
+                        "name": "location_filter",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "string"},
+                        "description": "Filter by location"
+                    },
+                    {
+                        "name": "description_filter",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "string"},
+                        "description": "Filter by job description keywords"
+                    },
+                    {
+                        "name": "organization_slug_filter",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "string"},
+                        "description": "Filter by company slug(s)"
+                    },
+                    {
+                        "name": "type_filter",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "string"},
+                        "description": "Filter by job type"
+                    },
+                    {
+                        "name": "industry_filter",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "string"},
+                        "description": "Filter by company industry"
+                    },
+                    {
+                        "name": "seniority_filter",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "string"},
+                        "description": "Filter by seniority level"
+                    },
+                    {
+                        "name": "remote",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "boolean"},
+                        "description": "Filter remote jobs"
+                    },
+                    {
+                        "name": "agency",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "boolean"},
+                        "description": "Filter recruitment agencies"
+                    },
+                    {
+                        "name": "directapply",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "boolean"},
+                        "description": "Filter EasyApply jobs"
+                    },
+                    {
+                        "name": "external_apply_url",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "boolean"},
+                        "description": "Filter jobs with external apply URL"
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "integer"},
+                        "description": "Number of jobs per request (max 100)"
+                    },
+                    {
+                        "name": "offset",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "integer"},
+                        "description": "Pagination offset"
+                    },
+                    {
+                        "name": "include_ai",
+                        "in": "query",
+                        "required": "false",
+                        "schema": {"type": "boolean"},
+                        "description": "Include AI-enriched fields"
+                    }
+                ]
+            }
+        }
+    }
+}
+

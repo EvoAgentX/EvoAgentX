@@ -1,0 +1,99 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "source": "RapidAPI",
+        "title": "AI Trip Planner",
+        "version": "v1",
+        "description": "This API generates personalized trip plans using artificial intelligence. It takes as input the number of days and the location of the trip, and outputs a detailed itinerary with recommended tourist attractions, local experiences, and accommodations. The API generates personalized trip plans based on the user's preferences, budget, and travel behavior."
+    },
+    "servers": [
+        {"url": "https://ai-trip-planner.p.rapidapi.com"}
+    ],
+    "paths": {
+        "/detailed-plan": {
+            "post": {
+                "operationId": "getDetailedPlan",
+                "summary": "Get Detailed Trip Plan",
+                "description": "Generates a detailed travel itinerary based on the user's preferences, including the number of days, destination, interests, budget, and preferred mode of travel. Provides a personalized travel plan with specific activities, times, and locations for each day.",
+                "requestBody": {
+                    "required": "true",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["days", "destination"],
+                                "properties": {
+                                    "days": {
+                                        "type": "integer",
+                                        "description": "Number of days for the trip, e.g.: 3"
+                                    },
+                                    "destination": {
+                                        "type": "string",
+                                        "description": "Destination city or location, e.g.: Islamabad"
+                                    },
+                                    "interests": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string",
+                                            "enum": [
+                                                "art", "theater", "museums", "history", "architecture", "cultural events",
+                                                "hiking", "wildlife", "beaches", "national parks", "adventure sports",
+                                                "cuisine", "street food", "wine tasting", "breweries", "fine dining",
+                                                "spa", "yoga retreats", "relaxation", "resorts",
+                                                "shopping", "luxury brands", "local markets",
+                                                "theme parks", "zoos", "kid-friendly activities",
+                                                "bars", "clubs", "live music", "theater shows",
+                                                "sports events", "fitness", "cycling",
+                                                "tech", "innovation", "conventions",
+                                                "photography", "scenic views"
+                                            ]
+                                        },
+                                        "description": "List of interests for the trip, e.g.: [\"fine dining\", \"cuisine\"]"
+                                    },
+                                    "budget": {
+                                        "type": "string",
+                                        "enum": ["low", "medium", "high"],
+                                        "description": "Budget level for the trip: low, medium, or high"
+                                    },
+                                    "travelMode": {
+                                        "type": "string",
+                                        "enum": [
+                                            "walking", "public transport", "rental car", "bike", "guided tours",
+                                            "private car", "scooter", "rideshare", "mixed"
+                                        ],
+                                        "description": "Preferred mode of travel during the trip, e.g.: public transport"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": []
+            }
+        },
+        "/": {
+            "get": {
+                "operationId": "getTripPlan",
+                "summary": "Get Trip Plan",
+                "description": "Generates a travel itinerary based on the user's preferences, including the number of days and destination. Provides a simplified travel plan with recommended activities and locations.",
+                "parameters": [
+                    {
+                        "name": "days",
+                        "in": "query",
+                        "required": "true",
+                        "schema": {"type": "string"},
+                        "description": "Number of days for the trip, e.g.: 3"
+                    },
+                    {
+                        "name": "destination",
+                        "in": "query",
+                        "required": "true",
+                        "schema": {"type": "string"},
+                        "description": "Destination city or location, e.g.: London,UK"
+                    }
+                ]
+            }
+        }
+    }
+}
+

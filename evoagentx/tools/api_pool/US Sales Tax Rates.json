@@ -1,0 +1,60 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "source": "RapidAPI",
+        "title": "US Sales Tax Rates",
+        "version": "v1",
+        "description": "Accurate and up-to-date sales tax information across the United States. Streamlines complex sales tax calculation, making compliance with tax regulations effortless for e-commerce platforms, financial applications, and business owners. Provides precise tax rates including state, county, city, and special rates. Tax rates expressed as decimal values (e.g., 0.04450 = 4.45%). Supports lookup by ZIP code and search by city name."
+    },
+    "servers": [
+        {"url": "https://us-sales-tax-rates.p.rapidapi.com"}
+    ],
+    "paths": {
+        "/tax/{zipCode}": {
+            "get": {
+                "operationId": "getTaxRatesByZipCode",
+                "summary": "Get sales tax rates by ZIP code",
+                "description": "Retrieves sales tax information using a ZIP code. Returns state rate, county rate, city rate, special rate, and city name. Tax rates are expressed as decimal values (e.g., 0.04450 = 4.45%).",
+                "parameters": [
+                    {
+                        "name": "zipCode",
+                        "in": "path",
+                        "required": "true",
+                        "schema": {"type": "string"},
+                        "description": "US ZIP code to lookup tax rates, e.g.: 99675, 90001, 70663"
+                    }
+                ]
+            }
+        },
+        "/tax": {
+            "post": {
+                "operationId": "searchTaxRatesByCity",
+                "summary": "Search sales tax rates by city name",
+                "description": "Searches for sales tax rates by city name or partial name. Returns a list of matching locations with their tax information including state, county, city, and special rates. Allows specifying the number of results to return.",
+                "requestBody": {
+                    "required": "true",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["city"],
+                                "properties": {
+                                    "city": {
+                                        "type": "string",
+                                        "description": "City name or partial name to search, e.g.: 'los', 'new york', 'chicago'"
+                                    },
+                                    "take": {
+                                        "type": "integer",
+                                        "description": "Number of results to return, e.g.: 3, 5, 10. Limits the response size."
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": []
+            }
+        }
+    }
+}
+

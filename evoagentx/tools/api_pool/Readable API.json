@@ -1,0 +1,45 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "source": "RapidAPI",
+        "title": "Readable API",
+        "version": "v1",
+        "description": "Comprehensive suite of tools to evaluate text readability and extract key readability metrics. Calculates multiple readability indices including Flesch Reading Ease, Flesch-Kincaid Grade Level, Gunning Fog Index, SMOG Index, and more, along with key structural metrics. Supports multiple languages: en, de, es, fr, it, ru."
+    },
+    "servers": [
+        {"url": "https://readable-api.p.rapidapi.com"}
+    ],
+    "paths": {
+        "/score": {
+            "post": {
+                "operationId": "getReadabilityScore",
+                "summary": "Calculate text readability score",
+                "description": "Evaluates text readability and returns comprehensive metrics including Flesch Reading Ease, Flesch-Kincaid Grade Level, Gunning Fog Index, SMOG Index, Automated Readability Index, Coleman-Liau Index, Dale-Chall Readability Score, and structural metrics like syllable count, word count, and sentence count. Ideal for content customization, SEO optimization, educational tools, and writing assistants.",
+                "requestBody": {
+                    "required": "true",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["text"],
+                                "properties": {
+                                    "text": {
+                                        "type": "string",
+                                        "description": "The text to analyze for readability metrics, e.g.: This is awesome"
+                                    },
+                                    "lang": {
+                                        "type": "string",
+                                        "enum": ["en", "de", "es", "fr", "it", "ru"],
+                                        "description": "Language of the text. Supported languages: en (English), de (German), es (Spanish), fr (French), it (Italian), ru (Russian). Defaults to en if not specified."
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": []
+            }
+        }
+    }
+}
+

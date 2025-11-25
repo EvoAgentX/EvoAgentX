@@ -1,0 +1,31 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "source": "RapidAPI",
+        "title": "Domain Reputation API",
+        "version": "v1",
+        "description": "Analyze any domain and instantly get a 0-100 reputation score for phishing and fraud detection. Based on DNS, WHOIS/RDAP, email-auth, and security heuristics. Helps detect suspicious, malicious, or untrustworthy domains used in phishing, spam, and fraud. Includes DNS/MX/TXT/NS inspection, SPF/DKIM/DMARC validation, WHOIS & RDAP metadata (registrar, creation date, status), blacklist & free-TLD checks. 1-hour caching to minimize latency. Ideal for cybersecurity tools, SOC automation, anti-phishing filters, and domain classification systems."
+    },
+    "servers": [
+        {"url": "https://domain-reputation-api.p.rapidapi.com"}
+    ],
+    "paths": {
+        "/v1/reputation": {
+            "get": {
+                "operationId": "getDomainReputation",
+                "summary": "Get domain reputation score",
+                "description": "Instantly analyze any domain name and get a 0-100 reputation score with weighted heuristics. Performs comprehensive checks including DNS records (MX, TXT, NS), email authentication (SPF, DKIM, DMARC), WHOIS/RDAP metadata, blacklist status, and free-TLD verification. Returns detailed breakdown of reputation factors and security indicators. JSON response ready for automation or enrichment pipelines.",
+                "parameters": [
+                    {
+                        "name": "domain",
+                        "in": "query",
+                        "required": "true",
+                        "schema": {"type": "string"},
+                        "description": "Domain name to analyze, e.g.: example.com, suspicious-site.xyz, phishing-test.tk"
+                    }
+                ]
+            }
+        }
+    }
+}
+

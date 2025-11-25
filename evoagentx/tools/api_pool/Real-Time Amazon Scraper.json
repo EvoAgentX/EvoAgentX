@@ -1,0 +1,44 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "source": "RapidAPI",
+        "title": "Real-Time Amazon Scraper",
+        "version": "v2",
+        "description": "Real-time Amazon product data scraper API. Retrieve detailed product information from Amazon including prices, ratings, reviews, images, and specifications using ASIN (Amazon Standard Identification Number). Supports multiple Amazon country domains for global product data extraction."
+    },
+    "servers": [
+        {"url": "https://real-time-amazon-scraper2.p.rapidapi.com"}
+    ],
+    "paths": {
+        "/amazon/product": {
+            "post": {
+                "operationId": "getAmazonProduct",
+                "summary": "Get Amazon product details by ASIN",
+                "description": "Retrieves comprehensive product information from Amazon using the product's ASIN (Amazon Standard Identification Number). Returns details including title, price, ratings, reviews, images, description, specifications, and availability. Supports multiple country domains.",
+                "requestBody": {
+                    "required": "true",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["country", "asin"],
+                                "properties": {
+                                    "country": {
+                                        "type": "string",
+                                        "description": "Amazon country domain code, e.g.: 'us' (United States), 'uk' (United Kingdom), 'de' (Germany), 'fr' (France), 'jp' (Japan), 'ca' (Canada)"
+                                    },
+                                    "asin": {
+                                        "type": "string",
+                                        "description": "Amazon Standard Identification Number (ASIN) of the product, e.g.: B07JGN36QH"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": []
+            }
+        }
+    }
+}
+
