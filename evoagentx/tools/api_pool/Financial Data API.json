@@ -1,0 +1,940 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "source": "Direct API",
+        "title": "Financial Data API",
+        "version": "v1",
+        "description": "Comprehensive financial data API providing stock quotes, historical prices, company information, financial statements, market data, and more for publicly traded US and international companies."
+    },
+    "servers": [
+        {"url": "https://financialdata.net/api/v1"}
+    ],
+    "paths": {
+        "/stock-symbols": {
+            "get": {
+                "operationId": "getStockSymbols",
+                "summary": "Get US stock symbols",
+                "description": "Get a list of stock symbols for publicly traded US and international companies. There is a limit of 500 records per API call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/international-stock-symbols": {
+            "get": {
+                "operationId": "getInternationalStockSymbols",
+                "summary": "Get international stock symbols",
+                "description": "Retrieve stock symbols for international companies from Toronto, London, Frankfurt, Paris, Amsterdam, Tokyo, Hong Kong, Singapore, Indonesia, Malaysia, Korea, Brazil, Mexico, India, Bombay exchanges. Limit of 500 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/etf-symbols": {
+            "get": {
+                "operationId": "getEtfSymbols",
+                "summary": "Get ETF symbols",
+                "description": "Get a list of ETF trading symbols with descriptions. Limit of 500 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/commodity-symbols": {
+            "get": {
+                "operationId": "getCommoditySymbols",
+                "summary": "Get commodity symbols",
+                "description": "Get trading symbols and information for major commodities like oil, gold, coffee, etc.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/otc-symbols": {
+            "get": {
+                "operationId": "getOtcSymbols",
+                "summary": "Get OTC symbols",
+                "description": "Get over-the-counter (OTC) trading symbols. Limit of 500 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/stock-quotes": {
+            "get": {
+                "operationId": "getStockQuotes",
+                "summary": "Get real-time stock quotes",
+                "description": "Get real-time stock quotes including last price, change, and percentage change. Timezone: EST. Limit of 300 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifiers", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Comma-separated trading symbols, e.g., MSFT,AAPL"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/stock-prices": {
+            "get": {
+                "operationId": "getStockPrices",
+                "summary": "Get historical stock prices",
+                "description": "Get more than 10 years of daily historical stock prices and volumes. Limit of 300 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Trading symbol, e.g., MSFT"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/international-stock-prices": {
+            "get": {
+                "operationId": "getInternationalStockPrices",
+                "summary": "Get international stock prices",
+                "description": "Get 10+ years of daily historical prices for international stocks. Limit of 300 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Trading symbol, e.g., SHEL.L"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/minute-prices": {
+            "get": {
+                "operationId": "getMinutePrices",
+                "summary": "Get minute-level stock prices",
+                "description": "Get 7+ years of one-minute historical prices and volumes. Timezone: UTC. Limit of 300 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Trading symbol, e.g., MSFT"},
+                    {"name": "date", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Date in YYYY-MM-DD format, e.g., 2020-01-15"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/latest-prices": {
+            "get": {
+                "operationId": "getLatestPrices",
+                "summary": "Get latest minute prices",
+                "description": "Get one-minute stock prices for the current week. Timezone: UTC. Limit of 300 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Trading symbol, e.g., MSFT"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/commodity-prices": {
+            "get": {
+                "operationId": "getCommodityPrices",
+                "summary": "Get commodity prices",
+                "description": "Get 10+ years of end-of-day historical prices for major commodities. Limit of 300 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Trading symbol, e.g., ZC"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/otc-prices": {
+            "get": {
+                "operationId": "getOtcPrices",
+                "summary": "Get OTC prices",
+                "description": "Get 10+ years of daily historical OTC prices. Limit of 300 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Trading symbol, e.g., AABB"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/otc-volume": {
+            "get": {
+                "operationId": "getOtcVolume",
+                "summary": "Get OTC monthly volume",
+                "description": "Get monthly share volume traded for OTC securities.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Trading symbol, e.g., AABB"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/index-symbols": {
+            "get": {
+                "operationId": "getIndexSymbols",
+                "summary": "Get market index symbols",
+                "description": "Get trading symbols and names of major market indexes.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/index-quotes": {
+            "get": {
+                "operationId": "getIndexQuotes",
+                "summary": "Get real-time index quotes",
+                "description": "Get real-time market index quotes. Timezone: EST. Limit of 300 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifiers", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Comma-separated index symbols, e.g., ^GSPC,^DJI"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/index-prices": {
+            "get": {
+                "operationId": "getIndexPrices",
+                "summary": "Get index prices",
+                "description": "Get 10+ years of daily historical index prices. Limit of 300 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Index symbol, e.g., ^GSPC"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/index-constituents": {
+            "get": {
+                "operationId": "getIndexConstituents",
+                "summary": "Get index constituents",
+                "description": "Get list of constituents for a specific index. Limit of 300 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Index symbol, e.g., ^GSPC"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/option-chain": {
+            "get": {
+                "operationId": "getOptionChain",
+                "summary": "Get option chain",
+                "description": "Get option chain data for a security. Limit of 300 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Trading symbol or CIK, e.g., MSFT or 0000789019"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/option-prices": {
+            "get": {
+                "operationId": "getOptionPrices",
+                "summary": "Get option prices",
+                "description": "Get daily historical stock option prices. Limit of 300 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Contract name, e.g., MSFT250417C00400000"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/option-greeks": {
+            "get": {
+                "operationId": "getOptionGreeks",
+                "summary": "Get option Greeks",
+                "description": "Get daily historical option Greek values. Limit of 300 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Contract name, e.g., MSFT250417C00400000"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/futures-symbols": {
+            "get": {
+                "operationId": "getFuturesSymbols",
+                "summary": "Get futures symbols",
+                "description": "Get list of futures symbols with descriptions. Limit of 500 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/futures-prices": {
+            "get": {
+                "operationId": "getFuturesPrices",
+                "summary": "Get futures prices",
+                "description": "Get 10+ years of historical futures prices. Limit of 300 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Futures symbol, e.g., ZN"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/crypto-symbols": {
+            "get": {
+                "operationId": "getCryptoSymbols",
+                "summary": "Get cryptocurrency symbols",
+                "description": "Get list of cryptocurrency pair symbols. Limit of 500 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/crypto-information": {
+            "get": {
+                "operationId": "getCryptoInformation",
+                "summary": "Get cryptocurrency information",
+                "description": "Get basic information about cryptocurrencies including market cap, supply, and key facts.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Crypto symbol, e.g., BTC"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/crypto-quotes": {
+            "get": {
+                "operationId": "getCryptoQuotes",
+                "summary": "Get real-time crypto quotes",
+                "description": "Get real-time cryptocurrency quotes. Timezone: UTC. Limit of 300 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifiers", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Comma-separated symbols, e.g., BTCUSD,ETHUSD"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/crypto-prices": {
+            "get": {
+                "operationId": "getCryptoPrices",
+                "summary": "Get cryptocurrency prices",
+                "description": "Get daily historical cryptocurrency prices. Limit of 300 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Crypto pair symbol, e.g., BTCUSD"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/crypto-minute-prices": {
+            "get": {
+                "operationId": "getCryptoMinutePrices",
+                "summary": "Get crypto minute prices",
+                "description": "Get one-minute historical cryptocurrency prices. Limit of 300 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Crypto pair symbol, e.g., BTCUSD"},
+                    {"name": "date", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Date in YYYY-MM-DD format, e.g., 2025-01-15"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/company-information": {
+            "get": {
+                "operationId": "getCompanyInformation",
+                "summary": "Get company information",
+                "description": "Get basic company information including industry, contact details, and key facts.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Trading symbol or CIK, e.g., MSFT or 0000789019"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/international-company-information": {
+            "get": {
+                "operationId": "getInternationalCompanyInformation",
+                "summary": "Get international company information",
+                "description": "Get basic information about international companies.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Trading symbol, e.g., SHEL.L"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/key-metrics": {
+            "get": {
+                "operationId": "getKeyMetrics",
+                "summary": "Get key financial metrics",
+                "description": "Get key financial metrics like P/E ratio, P/B ratio, free cash flow, etc.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Trading symbol or CIK, e.g., MSFT or 0000789019"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/market-cap": {
+            "get": {
+                "operationId": "getMarketCap",
+                "summary": "Get market capitalization",
+                "description": "Get historical market cap data.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Trading symbol or CIK, e.g., MSFT or 0000789019"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/employee-count": {
+            "get": {
+                "operationId": "getEmployeeCount",
+                "summary": "Get employee count",
+                "description": "Get historical employee count data.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Trading symbol or CIK, e.g., MSFT or 0000789019"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/executive-compensation": {
+            "get": {
+                "operationId": "getExecutiveCompensation",
+                "summary": "Get executive compensation",
+                "description": "Get historical executive compensation data. Limit of 100 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Trading symbol or CIK, e.g., MSFT or 0000789019"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/securities-information": {
+            "get": {
+                "operationId": "getSecuritiesInformation",
+                "summary": "Get securities information",
+                "description": "Get basic information about securities including trading symbol, CUSIP, ISIN, etc.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Trading symbol, CUSIP, or ISIN, e.g., AAPL, 594918104, US5949181045"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/income-statements": {
+            "get": {
+                "operationId": "getIncomeStatements",
+                "summary": "Get income statements",
+                "description": "Get income statement data. Limit of 50 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Trading symbol or CIK, e.g., MSFT or 0000789019"},
+                    {"name": "period", "in": "query", "required": false, "schema": {"type": "string", "enum": ["year", "quarter"]}, "description": "Accounting period"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/balance-sheet-statements": {
+            "get": {
+                "operationId": "getBalanceSheetStatements",
+                "summary": "Get balance sheet statements",
+                "description": "Get balance sheet data. Limit of 50 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Trading symbol or CIK, e.g., MSFT or 0000789019"},
+                    {"name": "period", "in": "query", "required": false, "schema": {"type": "string", "enum": ["year", "quarter"]}, "description": "Accounting period"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/cash-flow-statements": {
+            "get": {
+                "operationId": "getCashFlowStatements",
+                "summary": "Get cash flow statements",
+                "description": "Get cash flow statement data. Limit of 50 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Trading symbol or CIK, e.g., MSFT or 0000789019"},
+                    {"name": "period", "in": "query", "required": false, "schema": {"type": "string", "enum": ["year", "quarter"]}, "description": "Accounting period"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/international-income-statements": {
+            "get": {
+                "operationId": "getInternationalIncomeStatements",
+                "summary": "Get international income statements",
+                "description": "Get income statements for international companies. Limit of 50 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Trading symbol, e.g., SHEL.L"},
+                    {"name": "period", "in": "query", "required": false, "schema": {"type": "string", "enum": ["year", "quarter"]}, "description": "Accounting period"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/international-balance-sheet-statements": {
+            "get": {
+                "operationId": "getInternationalBalanceSheetStatements",
+                "summary": "Get international balance sheets",
+                "description": "Get balance sheets for international companies. Limit of 50 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Trading symbol, e.g., SHEL.L"},
+                    {"name": "period", "in": "query", "required": false, "schema": {"type": "string", "enum": ["year", "quarter"]}, "description": "Accounting period"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/international-cash-flow-statements": {
+            "get": {
+                "operationId": "getInternationalCashFlowStatements",
+                "summary": "Get international cash flow statements",
+                "description": "Get cash flow statements for international companies. Limit of 50 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Trading symbol, e.g., SHEL.L"},
+                    {"name": "period", "in": "query", "required": false, "schema": {"type": "string", "enum": ["year", "quarter"]}, "description": "Accounting period"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/liquidity-ratios": {
+            "get": {
+                "operationId": "getLiquidityRatios",
+                "summary": "Get liquidity ratios",
+                "description": "Get liquidity ratios. Limit of 50 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Trading symbol or CIK, e.g., MSFT or 0000789019"},
+                    {"name": "period", "in": "query", "required": false, "schema": {"type": "string", "enum": ["year", "quarter"]}, "description": "Accounting period"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/solvency-ratios": {
+            "get": {
+                "operationId": "getSolvencyRatios",
+                "summary": "Get solvency ratios",
+                "description": "Get solvency ratios. Limit of 50 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Trading symbol or CIK, e.g., MSFT or 0000789019"},
+                    {"name": "period", "in": "query", "required": false, "schema": {"type": "string", "enum": ["year", "quarter"]}, "description": "Accounting period"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/efficiency-ratios": {
+            "get": {
+                "operationId": "getEfficiencyRatios",
+                "summary": "Get efficiency ratios",
+                "description": "Get efficiency ratios. Limit of 50 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Trading symbol or CIK, e.g., MSFT or 0000789019"},
+                    {"name": "period", "in": "query", "required": false, "schema": {"type": "string", "enum": ["year", "quarter"]}, "description": "Accounting period"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/profitability-ratios": {
+            "get": {
+                "operationId": "getProfitabilityRatios",
+                "summary": "Get profitability ratios",
+                "description": "Get profitability ratios. Limit of 50 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Trading symbol or CIK, e.g., MSFT or 0000789019"},
+                    {"name": "period", "in": "query", "required": false, "schema": {"type": "string", "enum": ["year", "quarter"]}, "description": "Accounting period"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/valuation-ratios": {
+            "get": {
+                "operationId": "getValuationRatios",
+                "summary": "Get valuation ratios",
+                "description": "Get valuation ratios. Limit of 50 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Trading symbol or CIK, e.g., MSFT or 0000789019"},
+                    {"name": "period", "in": "query", "required": false, "schema": {"type": "string", "enum": ["year", "quarter"]}, "description": "Accounting period"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/earnings-calendar": {
+            "get": {
+                "operationId": "getEarningsCalendar",
+                "summary": "Get earnings calendar",
+                "description": "Get upcoming earnings releases. Timezone: EST. Limit of 300 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "date", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Date in YYYY-MM-DD format, e.g., 2025-10-31"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/ipo-calendar": {
+            "get": {
+                "operationId": "getIpoCalendar",
+                "summary": "Get IPO calendar",
+                "description": "Get upcoming initial public offerings.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "date", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Date in YYYY-MM-DD format, e.g., 2025-10-31"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/splits-calendar": {
+            "get": {
+                "operationId": "getSplitsCalendar",
+                "summary": "Get stock splits calendar",
+                "description": "Get upcoming stock splits.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "date", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Date in YYYY-MM-DD format, e.g., 2025-10-29"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/dividends-calendar": {
+            "get": {
+                "operationId": "getDividendsCalendar",
+                "summary": "Get dividends calendar",
+                "description": "Get upcoming dividend payments.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "date", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Date in YYYY-MM-DD format, e.g., 2025-10-29"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/economic-calendar": {
+            "get": {
+                "operationId": "getEconomicCalendar",
+                "summary": "Get economic calendar",
+                "description": "Get upcoming economic events. Timezone: EST. Limit of 300 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "date", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Date in YYYY-MM-DD format, e.g., 2025-10-19"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/insider-transactions": {
+            "get": {
+                "operationId": "getInsiderTransactions",
+                "summary": "Get insider transactions",
+                "description": "Get insider trading transactions. Limit of 50 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Trading symbol or CIK, e.g., MSFT or 0000789019"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/proposed-sales": {
+            "get": {
+                "operationId": "getProposedSales",
+                "summary": "Get proposed sales",
+                "description": "Get proposed stock sales by insiders. Limit of 100 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Trading symbol or CIK, e.g., MSFT or 0000789019"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/senate-trading": {
+            "get": {
+                "operationId": "getSenateTrading",
+                "summary": "Get Senate trading",
+                "description": "Get US Senate trading transactions. Limit of 100 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Trading symbol, e.g., MSFT"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/house-trading": {
+            "get": {
+                "operationId": "getHouseTrading",
+                "summary": "Get House trading",
+                "description": "Get US House of Representatives trading transactions. Limit of 100 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Trading symbol, e.g., MSFT"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/institutional-investors": {
+            "get": {
+                "operationId": "getInstitutionalInvestors",
+                "summary": "Get institutional investors",
+                "description": "Get list of institutional investors. Limit of 500 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/institutional-holdings": {
+            "get": {
+                "operationId": "getInstitutionalHoldings",
+                "summary": "Get institutional holdings",
+                "description": "Get institutional holdings data. Limit of 100 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Trading symbol, CUSIP, or CIK, e.g., MSFT, 594918104, 0001067983"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/institutional-portfolio-statistics": {
+            "get": {
+                "operationId": "getInstitutionalPortfolioStatistics",
+                "summary": "Get institutional portfolio statistics",
+                "description": "Get institutional portfolio statistics. Limit of 50 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Institutional investor CIK, e.g., 0000102909"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/etf-quotes": {
+            "get": {
+                "operationId": "getEtfQuotes",
+                "summary": "Get real-time ETF quotes",
+                "description": "Get real-time ETF quotes. Timezone: EST. Limit of 300 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifiers", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Comma-separated ETF symbols, e.g., SPY,QQQ"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/etf-prices": {
+            "get": {
+                "operationId": "getEtfPrices",
+                "summary": "Get ETF prices",
+                "description": "Get 10+ years of ETF prices. Limit of 300 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "ETF symbol, e.g., SPY"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/etf-holdings": {
+            "get": {
+                "operationId": "getEtfHoldings",
+                "summary": "Get ETF holdings",
+                "description": "Get ETF holdings data. Limit of 50 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "ETF symbol, e.g., SPY"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/mutual-fund-symbols": {
+            "get": {
+                "operationId": "getMutualFundSymbols",
+                "summary": "Get mutual fund symbols",
+                "description": "Get mutual fund symbols. Limit of 500 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/mutual-fund-holdings": {
+            "get": {
+                "operationId": "getMutualFundHoldings",
+                "summary": "Get mutual fund holdings",
+                "description": "Get mutual fund holdings. Limit of 50 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Mutual fund symbol, e.g., VTSAX"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/mutual-fund-statistics": {
+            "get": {
+                "operationId": "getMutualFundStatistics",
+                "summary": "Get mutual fund statistics",
+                "description": "Get mutual fund statistics. Limit of 50 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Mutual fund symbol, e.g., VTSAX"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/esg-scores": {
+            "get": {
+                "operationId": "getEsgScores",
+                "summary": "Get ESG scores",
+                "description": "Get historical ESG risk scores.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Trading symbol or CIK, e.g., MSFT or 0000789019"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/esg-ratings": {
+            "get": {
+                "operationId": "getEsgRatings",
+                "summary": "Get ESG ratings",
+                "description": "Get ESG corporate ratings and industry ranks.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Trading symbol or CIK, e.g., MSFT or 0000789019"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/industry-esg-scores": {
+            "get": {
+                "operationId": "getIndustryEsgScores",
+                "summary": "Get industry ESG scores",
+                "description": "Get ESG scores by industry.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "date", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Date in YYYY-MM-DD format, e.g., 2025-01-01"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/investment-adviser-names": {
+            "get": {
+                "operationId": "getInvestmentAdviserNames",
+                "summary": "Get investment adviser names",
+                "description": "Get list of registered investment advisers. Limit of 1000 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/investment-adviser-information": {
+            "get": {
+                "operationId": "getInvestmentAdviserInformation",
+                "summary": "Get investment adviser information",
+                "description": "Get information about registered investment advisers.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Legal name of investment adviser"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/earnings-releases": {
+            "get": {
+                "operationId": "getEarningsReleases",
+                "summary": "Get earnings releases",
+                "description": "Get earnings release data.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Trading symbol or CIK, e.g., MSFT or 0000789019"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/initial-public-offerings": {
+            "get": {
+                "operationId": "getInitialPublicOfferings",
+                "summary": "Get IPO data",
+                "description": "Get 10+ years of IPO data.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Trading symbol, e.g., ABNB"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/stock-splits": {
+            "get": {
+                "operationId": "getStockSplits",
+                "summary": "Get stock splits",
+                "description": "Get historical stock split data.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Trading symbol or CIK, e.g., MSFT or 0000789019"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/dividends": {
+            "get": {
+                "operationId": "getDividends",
+                "summary": "Get dividends",
+                "description": "Get dividend information.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Trading symbol, e.g., MSFT"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        },
+        "/short-interest": {
+            "get": {
+                "operationId": "getShortInterest",
+                "summary": "Get short interest",
+                "description": "Get short interest data. Limit of 100 records per call.",
+                "parameters": [
+                    {"name": "key", "in": "query", "required": true, "schema": {"type": "string"}, "description": "API key for authentication"},
+                    {"name": "identifier", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Trading symbol, e.g., MSFT"},
+                    {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}, "description": "The initial position of the record subset"},
+                    {"name": "format", "in": "query", "required": false, "schema": {"type": "string", "enum": ["json", "csv"], "default": "json"}, "description": "The format of the returned data"}
+                ]
+            }
+        }
+    }
+}
