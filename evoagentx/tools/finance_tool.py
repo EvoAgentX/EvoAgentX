@@ -528,7 +528,7 @@ Please return the stock code directly (e.g., AAPL) or UNKNOWN:"""
             return {"trading_symbol": extracted_symbol}
         
         # 3. Try fuzzy matching company name
-        logger.info(f"LLM extraction failed, try fuzzy matching company name...")
+        logger.info("LLM extraction failed, try fuzzy matching company name...")
         matched_symbol = self._fuzzy_match_company_name(trading_symbol)
         
         if matched_symbol:

@@ -109,7 +109,7 @@ for i, mcp in enumerate(all_mcps):
     documents.append(doc)
 
 # 直接从 Document 对象创建 Corpus
-print(f"\n开始创建 chunks...")
+print("\n开始创建 chunks...")
 chunks = []
 for i, doc in enumerate(documents):
     chunk = TextChunk(
@@ -123,7 +123,7 @@ for i, doc in enumerate(documents):
 print(f"Chunk 创建完成，共 {len(chunks)} 个")
 
 corpus = Corpus(chunks=chunks, corpus_id="mcp_pool_corpus")
-print(f"\n开始添加到向量索引（这可能需要一些时间，因为需要调用 OpenAI API 生成 embeddings）...")
+print("\n开始添加到向量索引（这可能需要一些时间，因为需要调用 OpenAI API 生成 embeddings）...")
 rag_engine.add(index_type="vector", nodes=corpus, corpus_id="mcp_pool_corpus")
 print("向量索引添加完成!")
 
@@ -205,7 +205,7 @@ for query_str in test_queries:
         print(f"候选 {i}:")
         print(f"  名称: {mcp['name']}")
         print(f"  描述: {mcp['description']}")
-        print(f"  配置:")
+        print("  配置:")
         print(f"    命令: {mcp['config']['command']}")
         print(f"    参数: {mcp['config']['args']}")
         if mcp['config'].get('env'):
@@ -219,7 +219,7 @@ for query_str in test_queries:
     print()
     
     # 保存配置文件
-    output_path = f"./evoagentx/tools/mcp_pool/data/mcp.config"
+    output_path = "./evoagentx/tools/mcp_pool/data/mcp.config"
     save_mcp_config(mcp_servers, output_path)
     print()
 

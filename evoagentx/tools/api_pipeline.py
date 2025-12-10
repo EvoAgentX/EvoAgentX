@@ -136,7 +136,7 @@ for i, func in enumerate(all_functions):
     documents.append(doc)
 
 # 直接从 Document 对象创建 Corpus
-print(f"\n开始创建 chunks...")
+print("\n开始创建 chunks...")
 chunks = []
 for i, doc in enumerate(documents):
     chunk = TextChunk(
@@ -151,7 +151,7 @@ for i, doc in enumerate(documents):
 print(f"Chunk 创建完成，共 {len(chunks)} 个")
 
 corpus = Corpus(chunks=chunks, corpus_id="api_pool_corpus")
-print(f"\n开始添加到向量索引（这可能需要一些时间，因为需要调用 OpenAI API 生成 embeddings）...")
+print("\n开始添加到向量索引（这可能需要一些时间，因为需要调用 OpenAI API 生成 embeddings）...")
 rag_engine.add(index_type="vector", nodes=corpus, corpus_id="api_pool_corpus")
 print("向量索引添加完成!")
 
@@ -254,7 +254,7 @@ for query_str in test_queries:
         if "error" not in details:
             print(f"  方法: {details['method']} {details['path']}")
             if details['parameters']:
-                print(f"  参数:")
+                print("  参数:")
                 for param in details['parameters']:
                     required = "(必需)" if param.get('required') in ['true', True] else "(可选)"
                     print(f"    - {param.get('name')} {required}: {param.get('description', '')}")

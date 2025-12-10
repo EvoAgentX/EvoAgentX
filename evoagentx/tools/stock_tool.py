@@ -1,7 +1,6 @@
 import requests
-from typing import Dict, List, Optional, Any
+from typing import Optional
 from .api_converter import APITool, APIToolkit
-from ..core.logging import logger
 
 
 def create_stock_symbols_tool(api_key: Optional[str] = None) -> APITool:
