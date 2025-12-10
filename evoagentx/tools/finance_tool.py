@@ -12,7 +12,7 @@ from ..core.logging import logger
 
 class FinanceTool(Tool):
     name: str = "finance_tool"
-    description: str = f"Retrieve financial price data for stocks, indexes, and crypto. Current date: {datetime.now().strftime('%Y-%m-%d')}. The tool automatically corrects future dates and wrong years."
+    description: str = f"Retrieve financial price data for stocks, indexes, and crypto. Current date: {datetime.now().strftime('%Y-%m-%d')}."
     inputs: Dict[str, Dict[str, Any]] = {
         "trading_symbol": {
             "type": "string",
