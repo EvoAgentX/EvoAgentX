@@ -10,9 +10,8 @@ Compatible with EvoAgentX tool architecture and follows Gmail API patterns.
 """
 
 import os
-import json
 import base64
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
@@ -1429,15 +1428,15 @@ class SendDraftTool(Tool):
         """
         try:
             service = self.gmail_base._get_service()
-            
+            '''
             # Get draft
             draft = service.users().drafts().get(
                 userId='me',
                 id=draft_id,
                 format='full'
-            ).execute()
+            ).execute()'''
             
-            message = draft.get('message', {})
+            #message = draft.get('message', {})
             
             # Send the draft
             sent_message = service.users().drafts().send(
