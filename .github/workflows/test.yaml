@@ -1,0 +1,51 @@
+name: test
+
+on:
+  push: {branches: [main]} # pushes to main
+  pull_request: {} # all PRs
+
+jobs:
+  pytest:
+    strategy:
+      matrix:
+        os: ['ubuntu-latest']
+        python-version: ['3.11', '3.12']
+
+    runs-on: ${{ matrix.os }}
+    env:
+      runtag: ${{ matrix.os }}-${{ matrix.python-version }}
+
+    steps:
+     - name: Checkout
+       uses: actions/checkout@v4
+
+     - name: Install Python ${{ matrix.python-version }}
+       uses: actions/setup-python@v5
+       with:
+         python-version: ${{ matrix.python-version }}
+
+     - name: Install Dependencies
+       run: |
+         python -m pip install --upgrade pip 
+         pip install -r requirements.txt
+         pip install -e .
+
+     - name: Unit Test
+       run: |
+         pytest --durations=20 -p no:faulthandler --json-report --json-report-file ${{ env.runtag }}.results.json --cov evoagentx --cov-report json:${{ env.runtag }}.coverage.json tests/
+
+     - name: Upload Test Results
+       if: always()
+       uses: actions/upload-artifact@v4
+       with:
+         name: test-results-${{ env.runtag }}
+         path: ${{ env.runtag }}.*.json
+         overwrite: true
+
+     - name: Report Test Results
+       if: always()
+       run: |
+         printf "**Test Results**\n\n" >> $GITHUB_STEP_SUMMARY
+         jq '.summary' ${{ env.runtag }}.results.json >> $GITHUB_STEP_SUMMARY
+         printf "\n\n**Test Coverage**\n\n" >> $GITHUB_STEP_SUMMARY
+         jq '.files | to_entries[] | " - `" + .key + "`: **" + .value.summary.percent_covered_display + "%**"' -r ${{ env.runtag }}.coverage.json >> $GITHUB_STEP_SUMMARY

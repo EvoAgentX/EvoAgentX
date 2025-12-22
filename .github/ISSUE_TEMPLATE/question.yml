@@ -1,0 +1,24 @@
+name: 🤔 Questions / Help / Support
+description: Ask a question or request help with using EvoAgentX
+title: "[Question] "
+labels: [question]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Your Question
+      description: Clearly describe your question or the help you need. Include relevant details such as code snippets, configs, links, error messages, or screenshots.
+      placeholder: |
+        I'm trying to use EvoAgentX to build a multi-agent workflow, but I'm not sure how to ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context (Optional)
+      description: Any other context, environment info, or related issues.
+      placeholder: |
+        Python version, OS, EvoAgentX version, etc.
+    validations:
+      required: false

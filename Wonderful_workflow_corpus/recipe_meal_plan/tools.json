@@ -1,0 +1,5 @@
+{
+  "tools": [
+    { "module": "evoagentx.tools.file_tool", "class": "FileToolkit" }
+  ]
+}

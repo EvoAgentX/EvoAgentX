@@ -1,0 +1,155 @@
+[
+    {
+        "source_file": "Benchmark Questions Verification V2.ipynb",
+        "task_id": 273,
+        "prompt": "Write a function that takes in two tuples and subtracts the elements of the first tuple by the elements of the second tuple with the same index.\n\ndef substract_elements(test_tup1, test_tup2):\n",
+        "code": "def substract_elements(test_tup1, test_tup2):\n  res = tuple(map(lambda i, j: i - j, test_tup1, test_tup2))\n  return (res) ",
+        "test_imports": [],
+        "test_list": [
+            "assert substract_elements((10, 4, 5), (2, 5, 18)) == (8, -1, -13)",
+            "assert substract_elements((11, 2, 3), (24, 45 ,16)) == (-13, -43, -13)",
+            "assert substract_elements((7, 18, 9), (10, 11, 12)) == (-3, 7, -3)"
+        ],
+        "entry_point": "substract_elements",
+        "canonical_solution": "def substract_elements(test_tup1, test_tup2):\n  res = tuple(map(lambda i, j: i - j, test_tup1, test_tup2))\n  return (res) ",
+        "test": "def check(candidate):\n    assert substract_elements((10, 4, 5), (2, 5, 18)) == (8, -1, -13)\n    assert substract_elements((11, 2, 3), (24, 45 ,16)) == (-13, -43, -13)\n    assert substract_elements((7, 18, 9), (10, 11, 12)) == (-3, 7, -3)\n"
+    },
+    {
+        "source_file": "Benchmark Questions Verification V2.ipynb",
+        "task_id": 800,
+        "prompt": "Write a function to remove all whitespaces from a string.\n\nimport re\n\ndef remove_all_spaces(text):\n",
+        "code": "import re\ndef remove_all_spaces(text):\n return (re.sub(r'\\s+', '',text))",
+        "test_imports": [],
+        "test_list": [
+            "assert remove_all_spaces('python  program')==('pythonprogram')",
+            "assert remove_all_spaces('python   programming    language')==('pythonprogramminglanguage')",
+            "assert remove_all_spaces('python                     program')==('pythonprogram')",
+            "assert remove_all_spaces('   python                     program')=='pythonprogram'"
+        ],
+        "entry_point": "remove_all_spaces",
+        "canonical_solution": "import re\ndef remove_all_spaces(text):\n return (re.sub(r'\\s+', '',text))",
+        "test": "def check(candidate):\n    assert remove_all_spaces('python  program')==('pythonprogram')\n    assert remove_all_spaces('python   programming    language')==('pythonprogramminglanguage')\n    assert remove_all_spaces('python                     program')==('pythonprogram')\n    assert remove_all_spaces('   python                     program')=='pythonprogram'\n"
+    },
+    {
+        "source_file": "Benchmark Questions Verification V2.ipynb",
+        "task_id": 272,
+        "prompt": "Write a function that takes in a list of tuples and returns a list containing the rear element of each tuple.\n\ndef rear_extract(test_list):\n",
+        "code": "def rear_extract(test_list):\n  res = [lis[-1] for lis in test_list]\n  return (res) ",
+        "test_imports": [],
+        "test_list": [
+            "assert rear_extract([(1, 'Rash', 21), (2, 'Varsha', 20), (3, 'Kil', 19)]) == [21, 20, 19]",
+            "assert rear_extract([(1, 'Sai', 36), (2, 'Ayesha', 25), (3, 'Salman', 45)]) == [36, 25, 45]",
+            "assert rear_extract([(1, 'Sudeep', 14), (2, 'Vandana', 36), (3, 'Dawood', 56)]) == [14, 36, 56]"
+        ],
+        "entry_point": "rear_extract",
+        "canonical_solution": "def rear_extract(test_list):\n  res = [lis[-1] for lis in test_list]\n  return (res) ",
+        "test": "def check(candidate):\n    assert rear_extract([(1, 'Rash', 21), (2, 'Varsha', 20), (3, 'Kil', 19)]) == [21, 20, 19]\n    assert rear_extract([(1, 'Sai', 36), (2, 'Ayesha', 25), (3, 'Salman', 45)]) == [36, 25, 45]\n    assert rear_extract([(1, 'Sudeep', 14), (2, 'Vandana', 36), (3, 'Dawood', 56)]) == [14, 36, 56]\n"
+    },
+    {
+        "source_file": "Benchmark Questions Verification V2.ipynb",
+        "task_id": 723,
+        "prompt": "The input is defined as two lists of the same length. Write a function to count indices where the lists have the same values.\n\nfrom operator import eq\n\ndef count_same_pair(nums1, nums2):\n",
+        "code": "from operator import eq\ndef count_same_pair(nums1, nums2):\n    result = sum(map(eq, nums1, nums2))\n    return result",
+        "test_imports": [],
+        "test_list": [
+            "assert count_same_pair([1, 2, 3, 4, 5, 6, 7, 8],[2, 2, 3, 1, 2, 6, 7, 9])==4",
+            "assert count_same_pair([0, 1, 2, -1, -5, 6, 0, -3, -2, 3, 4, 6, 8],[2, 1, 2, -1, -5, 6, 4, -3, -2, 3, 4, 6, 8])==11",
+            "assert count_same_pair([2, 4, -6, -9, 11, -12, 14, -5, 17],[2, 1, 2, -1, -5, 6, 4, -3, -2, 3, 4, 6, 8])==1",
+            "assert count_same_pair([0, 1, 1, 2],[0, 1, 2, 2])==3"
+        ],
+        "entry_point": "count_same_pair",
+        "canonical_solution": "from operator import eq\ndef count_same_pair(nums1, nums2):\n    result = sum(map(eq, nums1, nums2))\n    return result",
+        "test": "def check(candidate):\n    assert count_same_pair([1, 2, 3, 4, 5, 6, 7, 8],[2, 2, 3, 1, 2, 6, 7, 9])==4\n    assert count_same_pair([0, 1, 2, -1, -5, 6, 0, -3, -2, 3, 4, 6, 8],[2, 1, 2, -1, -5, 6, 4, -3, -2, 3, 4, 6, 8])==11\n    assert count_same_pair([2, 4, -6, -9, 11, -12, 14, -5, 17],[2, 1, 2, -1, -5, 6, 4, -3, -2, 3, 4, 6, 8])==1\n    assert count_same_pair([0, 1, 1, 2],[0, 1, 2, 2])==3\n"
+    },
+    {
+        "source_file": "Benchmark Questions Verification V2.ipynb",
+        "task_id": 639,
+        "prompt": "Write a function to sum the length of the names of a given list of names after removing the names that start with a lowercase letter.\n\ndef sample_nam(sample_names):\n",
+        "code": "def sample_nam(sample_names):\n  sample_names=list(filter(lambda el:el[0].isupper() and el[1:].islower(),sample_names))\n  return len(''.join(sample_names))",
+        "test_imports": [],
+        "test_list": [
+            "assert sample_nam(['sally', 'Dylan', 'rebecca', 'Diana', 'Joanne', 'keith'])==16",
+            "assert sample_nam([\"php\", \"res\", \"Python\", \"abcd\", \"Java\", \"aaa\"])==10",
+            "assert sample_nam([\"abcd\", \"Python\", \"abba\", \"aba\"])==6"
+        ],
+        "entry_point": "sample_nam",
+        "canonical_solution": "def sample_nam(sample_names):\n  sample_names=list(filter(lambda el:el[0].isupper() and el[1:].islower(),sample_names))\n  return len(''.join(sample_names))",
+        "test": "def check(candidate):\n    assert sample_nam(['sally', 'Dylan', 'rebecca', 'Diana', 'Joanne', 'keith'])==16\n    assert sample_nam([\"php\", \"res\", \"Python\", \"abcd\", \"Java\", \"aaa\"])==10\n    assert sample_nam([\"abcd\", \"Python\", \"abba\", \"aba\"])==6\n"
+    },
+    {
+        "source_file": "Benchmark Questions Verification V2.ipynb",
+        "task_id": 588,
+        "prompt": "Write a python function to find the difference between largest and smallest value in a given list.\n\ndef big_diff(nums):\n",
+        "code": "def big_diff(nums):\n     diff= max(nums)-min(nums)\n     return diff",
+        "test_imports": [],
+        "test_list": [
+            "assert big_diff([1,2,3,4]) == 3",
+            "assert big_diff([4,5,12]) == 8",
+            "assert big_diff([9,2,3]) == 7"
+        ],
+        "entry_point": "big_diff",
+        "canonical_solution": "def big_diff(nums):\n     diff= max(nums)-min(nums)\n     return diff",
+        "test": "def check(candidate):\n    assert big_diff([1,2,3,4]) == 3\n    assert big_diff([4,5,12]) == 8\n    assert big_diff([9,2,3]) == 7\n"
+    },
+    {
+        "source_file": "Benchmark Questions Verification V2.ipynb",
+        "task_id": 594,
+        "prompt": "Write a function to find the difference of the first even and first odd number of a given list.\n\ndef diff_even_odd(list1):\n",
+        "code": "def diff_even_odd(list1):\n    first_even = next((el for el in list1 if el%2==0),-1)\n    first_odd = next((el for el in list1 if el%2!=0),-1)\n    return (first_even-first_odd)",
+        "test_imports": [],
+        "test_list": [
+            "assert diff_even_odd([1,3,5,7,4,1,6,8])==3",
+            "assert diff_even_odd([1,2,3,4,5,6,7,8,9,10])==1",
+            "assert diff_even_odd([1,5,7,9,10])==9"
+        ],
+        "entry_point": "diff_even_odd",
+        "canonical_solution": "def diff_even_odd(list1):\n    first_even = next((el for el in list1 if el%2==0),-1)\n    first_odd = next((el for el in list1 if el%2!=0),-1)\n    return (first_even-first_odd)",
+        "test": "def check(candidate):\n    assert diff_even_odd([1,3,5,7,4,1,6,8])==3\n    assert diff_even_odd([1,2,3,4,5,6,7,8,9,10])==1\n    assert diff_even_odd([1,5,7,9,10])==9\n"
+    },
+    {
+        "source_file": "Benchmark Questions Verification V2.ipynb",
+        "task_id": 226,
+        "prompt": "Write a python function to remove the characters which have odd index values of a given string.\n\ndef odd_values_string(str):\n",
+        "code": "def odd_values_string(str):\n  result = \"\" \n  for i in range(len(str)):\n    if i % 2 == 0:\n      result = result + str[i]\n  return result",
+        "test_imports": [],
+        "test_list": [
+            "assert odd_values_string('abcdef') == 'ace'",
+            "assert odd_values_string('python') == 'pto'",
+            "assert odd_values_string('data') == 'dt'",
+            "assert odd_values_string('lambs') == 'lms'"
+        ],
+        "entry_point": "odd_values_string",
+        "canonical_solution": "def odd_values_string(str):\n  result = \"\" \n  for i in range(len(str)):\n    if i % 2 == 0:\n      result = result + str[i]\n  return result",
+        "test": "def check(candidate):\n    assert odd_values_string('abcdef') == 'ace'\n    assert odd_values_string('python') == 'pto'\n    assert odd_values_string('data') == 'dt'\n    assert odd_values_string('lambs') == 'lms'\n"
+    },
+    {
+        "source_file": "Benchmark Questions Verification V2.ipynb",
+        "task_id": 790,
+        "prompt": "Write a python function to check whether every even index contains even numbers of a given list.\n\ndef even_position(nums):\n",
+        "code": "def even_position(nums):\n\treturn all(nums[i]%2==i%2 for i in range(len(nums)))",
+        "test_imports": [],
+        "test_list": [
+            "assert even_position([3,2,1]) == False",
+            "assert even_position([1,2,3]) == False",
+            "assert even_position([2,1,4]) == True"
+        ],
+        "entry_point": "even_position",
+        "canonical_solution": "def even_position(nums):\n\treturn all(nums[i]%2==i%2 for i in range(len(nums)))",
+        "test": "def check(candidate):\n    assert even_position([3,2,1]) == False\n    assert even_position([1,2,3]) == False\n    assert even_position([2,1,4]) == True\n"
+    },
+    {
+        "source_file": "Mike's Copy of Benchmark Questions Verification V2.ipynb",
+        "task_id": 143,
+        "prompt": "Write a function to find number of lists present in the given tuple.\n\ndef find_lists(Input):\n",
+        "code": "def find_lists(Input): \n\tif isinstance(Input, list): \n\t\treturn 1\n\telse: \n\t\treturn len(Input) ",
+        "test_imports": [],
+        "test_list": [
+            "assert find_lists(([1, 2, 3, 4], [5, 6, 7, 8])) == 2",
+            "assert find_lists(([1, 2], [3, 4], [5, 6]))  == 3",
+            "assert find_lists(([9, 8, 7, 6, 5, 4, 3, 2, 1])) == 1"
+        ],
+        "entry_point": "find_lists",
+        "canonical_solution": "def find_lists(Input): \n\tif isinstance(Input, list): \n\t\treturn 1\n\telse: \n\t\treturn len(Input) ",
+        "test": "def check(candidate):\n    assert find_lists(([1, 2, 3, 4], [5, 6, 7, 8])) == 2\n    assert find_lists(([1, 2], [3, 4], [5, 6]))  == 3\n    assert find_lists(([9, 8, 7, 6, 5, 4, 3, 2, 1])) == 1\n"
+    }
+]

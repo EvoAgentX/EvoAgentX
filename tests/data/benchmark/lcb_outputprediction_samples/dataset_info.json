@@ -1,0 +1,74 @@
+{
+  "builder_name": "parquet",
+  "citation": "",
+  "config_name": "default",
+  "dataset_name": "test_generation",
+  "dataset_size": 329044,
+  "description": "",
+  "download_checksums": {
+    "hf://datasets/livecodebench/test_generation@6f3ac40bbecf81eba15899139d279b077f2816fd/test.parquet": {
+      "num_bytes": 73331,
+      "checksum": null
+    }
+  },
+  "download_size": 73331,
+  "features": {
+    "question_title": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "question_content": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "question_id": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "contest_id": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "test_id": {
+      "dtype": "int64",
+      "_type": "Value"
+    },
+    "contest_date": {
+      "dtype": "timestamp[ns]",
+      "_type": "Value"
+    },
+    "starter_code": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "function_name": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "difficulty": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "test": {
+      "dtype": "string",
+      "_type": "Value"
+    }
+  },
+  "homepage": "",
+  "license": "",
+  "size_in_bytes": 402375,
+  "splits": {
+    "test": {
+      "name": "test",
+      "num_bytes": 329044,
+      "num_examples": 442,
+      "dataset_name": "test_generation"
+    }
+  },
+  "version": {
+    "version_str": "0.0.0",
+    "major": 0,
+    "minor": 0,
+    "patch": 0
+  }
+}

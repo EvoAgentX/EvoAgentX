@@ -1,0 +1,81 @@
+{
+  "builder_name": "parquet",
+  "citation": "",
+  "config_name": "default",
+  "dataset_name": "execution-v2",
+  "dataset_size": 218133,
+  "description": "",
+  "download_checksums": {
+    "hf://datasets/livecodebench/execution-v2@ff6ea0e2a638001006ddcc41259eff23a4283fb2/data/test-00000-of-00001.parquet": {
+      "num_bytes": 71483,
+      "checksum": null
+    }
+  },
+  "download_size": 71483,
+  "features": {
+    "question_id": {
+      "dtype": "int64",
+      "_type": "Value"
+    },
+    "id": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "function_name": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "code": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "input": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "output": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "numsteps": {
+      "dtype": "int64",
+      "_type": "Value"
+    },
+    "problem_id": {
+      "feature": {
+        "dtype": "int64",
+        "_type": "Value"
+      },
+      "_type": "Sequence"
+    },
+    "contest_id": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "contest_date": {
+      "dtype": "timestamp[us]",
+      "_type": "Value"
+    },
+    "difficulty": {
+      "dtype": "string",
+      "_type": "Value"
+    }
+  },
+  "homepage": "",
+  "license": "",
+  "size_in_bytes": 289616,
+  "splits": {
+    "test": {
+      "name": "test",
+      "num_bytes": 218133,
+      "num_examples": 479,
+      "dataset_name": "execution-v2"
+    }
+  },
+  "version": {
+    "version_str": "0.0.0",
+    "major": 0,
+    "minor": 0,
+    "patch": 0
+  }
+}

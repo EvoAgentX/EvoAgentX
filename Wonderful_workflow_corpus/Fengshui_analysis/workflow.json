@@ -1,0 +1,343 @@
+{
+    "class_name": "WorkFlowGraph",
+    "goal": "Act as an AI Feng Shui Advisor that provides personalized home Feng Shui (\u98ce\u6c34) consultation. \nGiven a user's description of their home layout, living situation, and goals (such as improving health, wealth, relationships, or study efficiency), \ngenerate a structured Feng Shui analysis and recommendation plan.\n\nThe workflow should:\n1. Analyze the user's basic input (home type, room layout, occupants, main concerns).\n2. Identify potential Feng Shui issues (e.g., door alignment, bed/stove/mirror placement, clutter, lighting, orientation).\n3. Provide explanations of how these affect energy flow and wellbeing.\n4. Suggest practical remedies and rearrangements using accessible, low-cost adjustments (furniture movement, decoration, lighting, colors, plants, mirrors, etc.).\n5. Generate a concise summary of the analysis and a list of recommended actions.\n\nThe output should include:\n- Overview of the user\u2019s home and goals\n- Key Feng Shui findings\n- Recommended layout and design adjustments\n- Suggested improvement actions grouped by room or theme\n- Optional follow-up advice for periodic review\n\nKeep the tone professional, culturally respectful, and easy for general users to follow.",
+    "nodes": [
+        {
+            "class_name": "WorkFlowNode",
+            "name": "input_analysis",
+            "description": "Analyze the user's basic input to understand the home type, room layout, occupants, and main concerns.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "goal",
+                    "type": "string",
+                    "description": "The user's goal in textual format.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "user_input_analysis",
+                    "type": "string",
+                    "description": "A detailed analysis of the home layout, living situation, and user's main concerns.",
+                    "required": true
+                }
+            ],
+            "reason": "This sub-task gathers essential context needed for further analysis by understanding the user's environment and personal goals.",
+            "agents": [
+                {
+                    "name": "user_input_analysis_agent",
+                    "description": "This agent analyzes the user's goals and environment to understand the home type, room layout, occupants, and main concerns, generating a detailed analysis.",
+                    "inputs": [
+                        {
+                            "name": "goal",
+                            "type": "string",
+                            "description": "The user's goal in textual format.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "user_input_analysis",
+                            "type": "string",
+                            "description": "A detailed analysis of the home layout, living situation, and user's main concerns.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Language Rule\nDetect the user’s language from <input>{goal}</input>. If Chinese, respond fully in Chinese; if English, respond fully in English. Do NOT mix languages unless explicitly instructed.\n\n### Objective\nExtract a rich, structured snapshot of the user’s home and goals to feed downstream Feng Shui analysis.\n\n### Instructions\n1) Read the goal text: <input>{goal}</input>.\n2) Normalize into sections:\n   - Home Snapshot: dwelling type, approximate size (㎡/sqft if given), room list, floor level, known/fuzzy orientation, rental limits.\n   - Residents: count, roles, pets; optional birth years (if provided) without over-interpreting.\n   - Concerns & Goals: rank top 3–5 concerns (e.g., sleep, focus, clutter, privacy, relationships, wealth) with one-line rationale each.\n   - Constraints: budget bracket, style preferences, time/effort limits, landlord restrictions.\n   - Missing Info & Assumptions: list unknowns and cautious assumptions (e.g., generic orientation).\n3) Outline spaces by area (Entry, Living, Kitchen, Bedroom(s), Study/Work corner, Bathroom, Balcony), noting adjacency/flows if described.\n4) Stay grounded in the input; do not invent dimensions.\n\n### Output Format\nYour final output should ALWAYS be in the following format:\n\n## Thought\nBriefly explain how you parsed and normalized the user input.\n\n## user_input_analysis\nWrite 150–250 words with bullets and short paragraphs covering all sections above."
+                }
+            ],
+            "status": "pending"
+        },
+        {
+            "class_name": "WorkFlowNode",
+            "name": "feng_shui_issue_identification",
+            "description": "Identify potential Feng Shui issues in the environment based on the analyzed input.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "goal",
+                    "type": "string",
+                    "description": "The user's goal in textual format.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "user_input_analysis",
+                    "type": "string",
+                    "description": "A detailed analysis of the home layout, living situation, and user's main concerns.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "feng_shui_issues",
+                    "type": "string",
+                    "description": "A list of identified Feng Shui issues impacting energy flow and wellbeing.",
+                    "required": true
+                }
+            ],
+            "reason": "Identifying Feng Shui issues is crucial for providing targeted recommendations to improve energy flow and wellbeing.",
+            "agents": [
+                {
+                    "name": "feng_shui_issue_identifier",
+                    "description": "This agent identifies Feng Shui issues from the user's goal and home analysis to assess elements that may negatively impact energy flow and wellbeing.",
+                    "inputs": [
+                        {
+                            "name": "goal",
+                            "type": "string",
+                            "description": "The user's goal in textual format.",
+                            "required": true
+                        },
+                        {
+                            "name": "user_input_analysis",
+                            "type": "string",
+                            "description": "A detailed analysis of the home layout, living situation, and user's main concerns.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "feng_shui_issues",
+                            "type": "string",
+                            "description": "A list of identified Feng Shui issues impacting energy flow and wellbeing.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Language Rule\nDetect the user’s language from <input>{goal}</input> and <input>{user_input_analysis}</input>. If Chinese, respond fully in Chinese; if English, respond fully in English. Do NOT mix languages unless explicitly instructed.\n\n### Objective\nIdentify concrete, high-signal Feng Shui issues from the user input and normalized analysis to address elements that may negatively affect energy flow and wellbeing.\n\n### Instructions\n1) Review the user's goal: <input>{goal}</input>\n2) Examine the detailed analysis: <input>{user_input_analysis}</input>\n3) Derive a list of 6–10 issues. For each issue, include:\n   - Title: short and specific (e.g., \"Bedroom door aligned with main entrance\").\n   - Trigger/Pattern: what layout/placement causes it.\n   - Affected Area(s): room/sector or pathway.\n   - Impact: sleep/focus/qi flow/privacy/visual clutter, etc.\n   - Severity: 1–5 and Confidence: % with one-sentence rationale.\n   - Tags: 2–4 labels (door_alignment, mirror, clutter, lighting, corners, stove_sink, walkway, orientation_conditional).\n   - Link-to-Goal: which user concern(s) this relates to.\n4) Prefer concrete observations over vague claims; if orientation is unknown, mark orientation-dependent items as \"conditional\".\n5) Do not propose remedies here; save them for the next step.\n\n### Output Format\nYour final output should ALWAYS be in the following format:\n\n## Thought\nBriefly explain the reasoning process for achieving the objective.\n\n## feng_shui_issues\nBullet list with 6–10 items. Each item spans 4–6 lines covering all fields above (≈200–300 words total)."
+                }
+            ],
+            "status": "pending"
+        },
+        {
+            "class_name": "WorkFlowNode",
+            "name": "explanation_of_issues",
+            "description": "Provide explanations of how identified Feng Shui issues affect energy flow and wellbeing.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "feng_shui_issues",
+                    "type": "string",
+                    "description": "A list of identified Feng Shui issues impacting energy flow and wellbeing.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "issue_explanations",
+                    "type": "string",
+                    "description": "Explanations of how each identified issue affects energy and wellbeing.",
+                    "required": true
+                }
+            ],
+            "reason": "This sub-task educates the user on the impact of Feng Shui issues, enhancing understanding and commitment to improvement.",
+            "agents": [
+                {
+                    "name": "feng_shui_issues_explanation_agent",
+                    "description": "This agent provides detailed explanations of how each identified Feng Shui issue impacts energy flow and wellbeing within the home.",
+                    "inputs": [
+                        {
+                            "name": "feng_shui_issues",
+                            "type": "string",
+                            "description": "A list of identified Feng Shui issues impacting energy flow and wellbeing.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "issue_explanations",
+                            "type": "string",
+                            "description": "Explanations of how each identified issue affects energy and wellbeing.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Language Rule\nDetect the user’s language from <input>{feng_shui_issues}</input>. If Chinese, respond fully in Chinese; if English, respond fully in English. Do NOT mix languages unless explicitly instructed.\n\n### Objective\nExplain the mechanism and rationale behind each identified issue to build user understanding and motivation.\n\n### Instructions\n1) Use the identified list: <input>{feng_shui_issues}</input>\n2) For each issue, explain:\n   - Mechanism: qi-flow logic, sightlines, circulation, privacy, or Five Elements balance (only when relevant).\n   - Evidence: which details from the user input/analysis make this plausible.\n   - Quick Check: a simple way the user can verify it on-site (e.g., stand at entrance and check direct line-of-sight to bed).\n   - Risk Notes: when this issue matters most (e.g., light sleepers) and when it may be negligible.\n3) Keep tone respectful and practical; avoid superstition claims. Prefer environmental, psychological, and spatial reasoning.\n\n### Output Format\nYour final output should ALWAYS be in the following format:\n\n## Thought\nHow you connected each issue to user evidence.\n\n## issue_explanations\n200–350 words total, grouped by issue title with short sub-bullets per issue."
+                }
+            ],
+            "status": "pending"
+        },
+        {
+            "class_name": "WorkFlowNode",
+            "name": "remedy_suggestions",
+            "description": "Suggest practical remedies and rearrangements to address the identified Feng Shui issues.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "feng_shui_issues",
+                    "type": "string",
+                    "description": "A list of identified Feng Shui issues impacting energy flow and wellbeing.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "issue_explanations",
+                    "type": "string",
+                    "description": "Explanations of how each identified issue affects energy and wellbeing.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "feng_shui_remedies",
+                    "type": "string",
+                    "description": "A list of practical and accessible suggestions for addressing each identified Feng Shui issue.",
+                    "required": true
+                }
+            ],
+            "reason": "Offering actionable solutions allows the user to make positive changes and improve their space according to Feng Shui principles.",
+            "agents": [
+                {
+                    "name": "feng_shui_remedy_suggester",
+                    "description": "This agent suggests practical remedies and rearrangements to address the identified Feng Shui issues, enhancing energy flow and wellbeing.",
+                    "inputs": [
+                        {
+                            "name": "feng_shui_issues",
+                            "type": "string",
+                            "description": "A list of identified Feng Shui issues impacting energy flow and wellbeing.",
+                            "required": true
+                        },
+                        {
+                            "name": "issue_explanations",
+                            "type": "string",
+                            "description": "Explanations of how each identified issue affects energy and wellbeing.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "feng_shui_remedies",
+                            "type": "string",
+                            "description": "A list of practical and accessible suggestions for addressing each identified Feng Shui issue.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Language Rule\nDetect the user’s language from <input>{feng_shui_issues}</input> and <input>{issue_explanations}</input>. If Chinese, respond fully in Chinese; if English, respond fully in English. Do NOT mix languages unless explicitly instructed.\n\n### Objective\nProvide practical, renter-friendly remedies for each issue with clear, actionable steps and lightweight materials.\n\n### Instructions\n1) Inputs:\n   - Issues: <input>{feng_shui_issues}</input>\n   - Explanations: <input>{issue_explanations}</input>\n2) For each issue, propose 2–3 remedy options including:\n   - Action Steps: numbered, 3–6 steps (move/rotate furniture, clear walkway, adjust lighting, add plants or soft furnishings, mirror placement caveats).\n   - Effort & Cost: effort (minutes/hours) + cost tier (Low < $30 / Medium $30–$120 / High > $120). Prefer Low/Medium.\n   - Materials: concise list (e.g., tension rod curtain, 1× floor lamp, 2× cable clips).\n   - Do/Don’t: 1–2 guardrails (e.g., don’t place mirror facing bed).\n   - Landlord-Safe: note if noninvasive.\n3) Add a Room-by-Room checklist (Entry, Living, Kitchen, Bedroom(s), Study, Bathroom, Balcony): 3–5 actions per room.\n4) Add a 30/60/90-Day plan (Quick Wins → Rearrangement → Refinement) with 3–4 bullets per phase.\n\n### Output Format\nYour final output should ALWAYS be in the following format:\n\n## Thought\nHow you matched remedies to issues and constraints.\n\n## feng_shui_remedies\n400–600 words with subsections: Per-Issue Remedies, Room-by-Room Checklist, 30/60/90-Day Plan."
+                }
+            ],
+            "status": "pending"
+        },
+        {
+            "class_name": "WorkFlowNode",
+            "name": "summary_generation",
+            "description": "Generate a concise summary of the analysis and provide a list of recommended actions.",
+            "inputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "user_input_analysis",
+                    "type": "string",
+                    "description": "A detailed analysis of the home layout, living situation, and user's main concerns.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "feng_shui_issues",
+                    "type": "string",
+                    "description": "A list of identified Feng Shui issues impacting energy flow and wellbeing.",
+                    "required": true
+                },
+                {
+                    "class_name": "Parameter",
+                    "name": "feng_shui_remedies",
+                    "type": "string",
+                    "description": "A list of practical and accessible suggestions for addressing each identified Feng Shui issue.",
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "class_name": "Parameter",
+                    "name": "recommendation_summary",
+                    "type": "string",
+                    "description": "A concise summary of the Feng Shui analysis and a comprehensive list of recommended actions.",
+                    "required": true
+                }
+            ],
+            "reason": "A final summary helps the user clearly understand the findings and the necessary steps to enhance their home's Feng Shui.",
+            "agents": [
+                {
+                    "name": "summary_generation_agent",
+                    "description": "This agent synthesizes the user's detailed input analysis, identified Feng Shui issues, and suggested remedies to produce a concise summary and list of recommended actions to improve Feng Shui.",
+                    "inputs": [
+                        {
+                            "name": "user_input_analysis",
+                            "type": "string",
+                            "description": "A detailed analysis of the home layout, living situation, and user's main concerns.",
+                            "required": true
+                        },
+                        {
+                            "name": "feng_shui_issues",
+                            "type": "string",
+                            "description": "A list of identified Feng Shui issues impacting energy flow and wellbeing.",
+                            "required": true
+                        },
+                        {
+                            "name": "feng_shui_remedies",
+                            "type": "string",
+                            "description": "A list of practical and accessible suggestions for addressing each identified Feng Shui issue.",
+                            "required": true
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "recommendation_summary",
+                            "type": "string",
+                            "description": "A concise summary of the Feng Shui analysis and a comprehensive list of recommended actions.",
+                            "required": true
+                        }
+                    ],
+                    "prompt": "### Language Rule\nDetect the user’s language from <input>{user_input_analysis}</input>, <input>{feng_shui_issues}</input>, and <input>{feng_shui_remedies}</input>. If Chinese, respond fully in Chinese; if English, respond fully in English. Do NOT mix languages unless explicitly instructed.\n\n### Objective\nSynthesize a long-form, user-ready Feng Shui report with priorities, room actions, and a shopping list.\n\n### Instructions\n1) Inputs:\n   - Analysis: <input>{user_input_analysis}</input>\n   - Issues: <input>{feng_shui_issues}</input>\n   - Remedies: <input>{feng_shui_remedies}</input>\n2) Report sections (use clear headings and concise bullets):\n   - Home Snapshot: 5–8 bullets.\n   - Top Priorities: rank 1–5 with one-line rationale each.\n   - Bagua Mapping: high-level; generic if orientation unknown; include how to refine later.\n   - Room-by-Room Actions (Entry, Living, Kitchen, Bedroom(s), Study, Bathroom, Balcony): 3–6 actions each.\n   - Shopping Checklist: grouped by category, with quantities and rough total budget; renter-friendly items preferred.\n   - 30/60/90-Day Plan: 3–4 bullets per phase.\n   - Assumptions & How to Verify: list uncertainties and simple verification steps.\n3) Keep it specific to the user; avoid repeating identical sentence patterns.\n4) Length target: 600–900 words.\n\n### Output Format\nYour final output should ALWAYS be in the following format:\n\n## Thought\nHow you merged inputs and chose priorities.\n\n## recommendation_summary\nA structured report following the sections above, ready to present to the user."
+                }
+            ],
+            "status": "pending"
+        }
+    ],
+    "edges": [
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "input_analysis",
+            "target": "feng_shui_issue_identification",
+            "priority": 0
+        },
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "input_analysis",
+            "target": "summary_generation",
+            "priority": 0
+        },
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "feng_shui_issue_identification",
+            "target": "explanation_of_issues",
+            "priority": 0
+        },
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "feng_shui_issue_identification",
+            "target": "remedy_suggestions",
+            "priority": 0
+        },
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "feng_shui_issue_identification",
+            "target": "summary_generation",
+            "priority": 0
+        },
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "explanation_of_issues",
+            "target": "remedy_suggestions",
+            "priority": 0
+        },
+        {
+            "class_name": "WorkFlowEdge",
+            "source": "remedy_suggestions",
+            "target": "summary_generation",
+            "priority": 0
+        }
+    ],
+    "graph": null
+}

@@ -1,0 +1,68 @@
+name: 🐞 Bug Report
+description: Report something that isn't working as expected
+title: "[Bug] <describe your bug>"
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please provide as much detail as possible to help us diagnose the issue.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Describe the Bug
+      description: A clear and concise summary of what the bug is.
+      placeholder: |
+        When I try to run `evoagentx.run()`, I get an unexpected error.
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating System
+      placeholder: "e.g., macOS 14.0, Ubuntu 22.04, Windows 11"
+    validations:
+      required: true
+
+  - type: input
+    id: python
+    attributes:
+      label: Python Version
+      placeholder: "e.g., 3.10.12"
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Provide the exact steps to reproduce the bug
+      placeholder: |
+        1. Install the package
+        2. Run the following code: `...`
+        3. Observe the error
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or Screenshots
+      description: Paste traceback, logs, or attach screenshots
+      placeholder: |
+        ```
+        Paste logs or errors here
+        ```
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Any other info that may help us debug (e.g., environment, configs)
+      placeholder: Add links, config files, or other related issues
+    validations:
+      required: false

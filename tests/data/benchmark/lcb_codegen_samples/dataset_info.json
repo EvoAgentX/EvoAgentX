@@ -1,0 +1,94 @@
+{
+  "builder_name": "code_generation_lite",
+  "citation": "@article{jain2024livecodebench,\n    title={LiveCodeBench: Holistic and Contamination Free Evaluation of Large Language Models for Code},\n    author={Jain, Naman and Han, King and Gu, Alex and Li, Wen-Ding and Yan, Fanjia and Zhang, Tianjun and Wang, Sida and Solar-Lezama, Armando and Sen, Koushik and Stoica, Ion},\n    journal={arXiv preprint arXiv:2403.07974},\n    year={2024}\n}\n",
+  "config_name": "release_latest",
+  "dataset_name": "code_generation_lite",
+  "dataset_size": 1252491529,
+  "description": "LiveCodeBench is a temporaly updating benchmark for code generation. Please check the homepage: https://livecodebench.github.io/.\n",
+  "download_checksums": {
+    "test.jsonl": {
+      "num_bytes": 1252609773,
+      "checksum": null
+    },
+    "test2.jsonl": {
+      "num_bytes": 713377060,
+      "checksum": null
+    },
+    "test3.jsonl": {
+      "num_bytes": 623360766,
+      "checksum": null
+    },
+    "test4.jsonl": {
+      "num_bytes": 1204644685,
+      "checksum": null
+    },
+    "test5.jsonl": {
+      "num_bytes": 557699297,
+      "checksum": null
+    }
+  },
+  "download_size": 4351691581,
+  "features": {
+    "question_title": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "question_content": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "platform": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "question_id": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "contest_id": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "contest_date": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "starter_code": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "difficulty": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "public_test_cases": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "private_test_cases": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "metadata": {
+      "dtype": "string",
+      "_type": "Value"
+    }
+  },
+  "homepage": "https://livecodebench.github.io/",
+  "license": "MIT License",
+  "size_in_bytes": 5604183110,
+  "splits": {
+    "test": {
+      "name": "test",
+      "num_bytes": 1252491529,
+      "num_examples": 400,
+      "dataset_name": "code_generation_lite"
+    }
+  },
+  "version": {
+    "version_str": "0.0.0",
+    "major": 0,
+    "minor": 0,
+    "patch": 0
+  }
+}

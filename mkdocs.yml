@@ -1,0 +1,261 @@
+site_name: EvoAgentX
+site_url: https://evoagentx.github.io/EvoAgentX/
+use_directory_urls: false
+theme:
+  name: material
+  custom_dir: docs/overrides
+  font:
+    text: Exo 2
+    code: Fira Code
+  icon:
+    repo: fontawesome/brands/git-alt 
+  logo: assets/logo.svg
+  favicon: assets/logo.svg
+  features:
+    # - header.autohide
+    - navigation.sections 
+    - navigation.expand 
+    - navigation.footer
+    - navigation.path
+    - content.code.select
+    - content.code.copy 
+    - navigation.indexes
+    - navigation.expand
+    - navigation.tabs
+    - content.tabs.link
+    - navigation.top
+    - navigation.tracking
+    - navigation.search.highlight
+    - navigation.search.share
+    - navigation.search.suggest
+    # - navigation.instant # Instant loading not supported
+    # - navigation.instant.prefetch
+    # - navigation.instant.progress
+    - content.code.annotate
+    - content.heading.auto-number 
+    # - navigation.tabs.sticky
+    - toc.follow
+    - announce.dismiss 
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/link
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: teal
+      toggle:
+        icon: material/toggle-switch
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: teal
+      toggle:
+        icon: material/toggle-switch-off
+        name: Switch to system preference
+
+  # icon:
+  #   repo: fontawesome/brands/github
+
+# Repository
+repo_url: https://github.com/EvoAgentX/EvoAgentX
+repo_name: EvoAgentX
+# repo_type: github
+
+extra_css:
+  - stylesheets/extra.css
+
+extra:
+  language: en
+  alternate:
+    - name: English
+      link: /
+      lang: en
+    - name: 中文
+      link: /zh/
+      lang: zh
+  social:
+    - icon: fontawesome/solid/house
+      link: https://evo-agent-x-landing-page.vercel.app/
+    - icon: fontawesome/brands/github
+      link: https://github.com/EvoAgentX/EvoAgentX
+    - icon: fontawesome/brands/x-twitter
+      link: https://x.com/EvoAgentX
+    - icon: fontawesome/brands/discord
+      link: https://discord.gg/w3x2YrCa
+    - icon: fontawesome/solid/envelope
+      link: mailto:evoagentx.ai@gmail.com
+  generator: false
+
+copyright: Copyright © 2025 EvoAgentX Team.
+
+markdown_extensions:
+  - toc:
+      # title: On this page
+      permalink: true
+      toc_depth: 4
+      slugify: !!python/name:pymdownx.slugs.uslugify
+      anchorlink: true
+  - attr_list
+  - md_in_html
+  - pymdownx.emoji:
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - admonition
+  - pymdownx.mark
+  - pymdownx.details
+  - pymdownx.caret
+
+
+# nav:
+#   # - Home: index.md
+#   - Getting Started:
+#     - Home: index.md
+#     - Install: installation.md 
+#     - Quickstart: quickstart.md
+#   - Tutorials:
+#     - Build Your First Agent: tutorial/first_agent.md
+#     - Build Your First Workflow: tutorial/first_workflow.md
+#     - Benchmark and Evaluation: tutorial/benchmark_and_evaluation.md
+#     - AFlow Optimizer: tutorial/aflow_optimizer.md
+#     - SEW Optimizer: tutorial/sew_optimizer.md
+#   - Key Modules:
+#     - LLM: modules/llm.md 
+#     - Agent: modules/agent.md
+#     - Customize Agent: modules/customize_agent.md
+#     - Workflow Graph: modules/workflow_graph.md
+#     - Action Graph: modules/action_graph.md
+#     - Benchmark: modules/benchmark.md 
+#     - Evaluator: modules/evaluator.md 
+#   - API Reference:
+#     - Core: api/core.md
+#     - Models: api/models.md
+#     - Agents: api/agents.md
+#     - Workflow: api/workflow.md
+#     - Storages: api/storages.md
+#     - Memory: api/memory.md
+#     - Tools: api/tools.md 
+#     - Actions: api/actions.md
+#     - Benchmark: api/benchmark.md
+#     - Evaluators: api/evaluators.md
+#     - Optimizers: api/optimizers.md
+
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            heading_level: 2
+            show_root_toc_entry: true
+            show_root_heading: true
+            show_source: true
+            merge_init_into_class: true
+            show_signature: true
+            show_docstring: true
+            separate_signature: true
+            members_order: source
+            signature_crossrefs: true
+            show_signature_annotations: true
+  - i18n:
+      default_language: en
+      docs_structure: folder
+      keep_nav_position: true
+      languages:
+        - locale: en
+          default: true
+          name: English
+          build: true
+          nav:
+            - Getting Started:
+              - Getting Started: index.md
+              - Install: installation.md 
+              - Quickstart: quickstart.md
+            - Tutorials:
+              - Build Your First Agent: tutorial/first_agent.md
+              - Build Your First Workflow: tutorial/first_workflow.md
+              - Tools: tutorial/tools.md
+              - RAG: tutorial/rag.md
+              - Human-in-the-Loop (HITL): tutorial/hitl.md
+              - MCP: tutorial/mcp.md
+              - Benchmark and Evaluation: tutorial/benchmark_and_evaluation.md
+              - AFlow Optimizer: tutorial/aflow_optimizer.md
+              - SEW Optimizer: tutorial/sew_optimizer.md
+              - TextGrad Optimizer: tutorial/textgrad_optimizer.md
+              - Colab Notebooks: tutorial/colab_notebooks.md
+              - Multi Agent Debate: tutorial/multi_agent_debate.md
+            - Key Modules:
+              - LLM: modules/llm.md 
+              - Agent: modules/agent.md
+              - Customize Agent: modules/customize_agent.md
+              - Prompt Template: modules/prompt_template.md
+              - Workflow Graph: modules/workflow_graph.md
+              - Action Graph: modules/action_graph.md
+              - RAG: modules/rag.md
+              - Storages: modules/storages.md
+              - Benchmark: modules/benchmark.md 
+              - Evaluator: modules/evaluator.md 
+            - API Reference:
+              - Core: api/core.md
+              - Models: api/models.md
+              - Agents: api/agents.md
+              - Workflow: api/workflow.md
+              - Storages: api/storages.md
+              - Memory: api/memory.md
+              - Tools: api/tools.md 
+              - Actions: api/actions.md
+              - Benchmark: api/benchmark.md
+              - Evaluators: api/evaluators.md
+              - Optimizers: api/optimizers.md
+
+        - locale: zh
+          name: 中文
+          build: true
+          nav:
+          - 快速开始:
+              - 快速开始: index.md
+              - 安装指南: installation.md 
+              - 快速上手: quickstart.md
+          - 教程:
+              - 构建你的第一个 Agent: tutorial/first_agent.md
+              - 构建你的第一个工作流: tutorial/first_workflow.md
+              - 使用工具: tutorial/tools.md
+              - RAG 检索增强生成: tutorial/rag.md
+              - 基准测试与评估: tutorial/benchmark_and_evaluation.md
+              - AFlow 优化器: tutorial/aflow_optimizer.md
+              - SEW 优化器: tutorial/sew_optimizer.md
+              - TextGrad 优化器: tutorial/textgrad_optimizer.md
+              - Colab 笔记本: tutorial/colab_notebooks.md
+          - 核心模块:
+              - 大语言模型（LLM）: modules/llm.md 
+              - Agent 模块: modules/agent.md
+              - 自定义 Agent: modules/customize_agent.md
+              - 提示模板: modules/prompt_template.md
+              - 工作流图: modules/workflow_graph.md
+              - 动作图: modules/action_graph.md
+              - RAG 检索增强生成: modules/rag.md
+              - 存储模块: modules/storages.md
+              - 基准测试模块: modules/benchmark.md 
+              - 评估器模块: modules/evaluator.md 
+          - API 参考:
+              - 核心模块: api/core.md
+              - 模型接口: api/models.md
+              - Agent 接口: api/agents.md
+              - 工作流接口: api/workflow.md
+              - 存储模块: api/storages.md
+              - 记忆模块: api/memory.md
+              - 工具集接口: api/tools.md 
+              - 动作接口: api/actions.md
+              - 基准测试接口: api/benchmark.md
+              - 评估器接口: api/evaluators.md
+              - 优化器接口: api/optimizers.md

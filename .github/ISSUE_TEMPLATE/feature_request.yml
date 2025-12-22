@@ -1,0 +1,61 @@
+name: 💡 Feature Request
+description: Suggest a new idea or improvement for EvoAgentX
+title: "[Feature] <short description of the idea>"
+labels: [enhancement]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for suggesting a feature for **EvoAgentX**!  
+        Please provide as much context as possible so we can better understand your idea.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Describe the Feature
+      description: What is the new feature or improvement you'd like to see?
+      placeholder: |
+        I'd like to add support for...
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Why is this feature needed?
+      description: Describe the problem or use case that this feature would help solve.
+      placeholder: |
+        Currently, there's no way to ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: How do you envision this feature being implemented?
+      placeholder: |
+        We could add a new module/class that ...
+    validations:
+      required: false
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Any alternative approaches you've thought about?
+      placeholder: |
+        Another way could be ...
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Add links, mockups, diagrams, or any other useful info here.
+      placeholder: |
+        Related issues: #123, external resources: ...
+    validations:
+      required: false
