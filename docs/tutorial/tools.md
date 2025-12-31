@@ -17,6 +17,7 @@ We'll cover:
 - `examples/tools/google_maps_example.py` - Google Maps integration examples (Section 3.10)
 - `examples/tools/telegram_example.py` - Telegram integration examples (Section 3.11)
 - `examples/tools/tools_converters.py` - Converters (MCP + API Converter) examples (Section 8)
+ - `examples/tools/gmail_example.py` - Gmail integration examples (Section 3.12)
 
 
 1. **Understanding the Tool Architecture**: Learn about the base Tool class and Toolkit system
@@ -39,9 +40,8 @@ By the end of this tutorial, you'll understand how to leverage these tools in yo
 
 **⚠️ Import Note**: Some toolkits (like `FaissToolkit`) need to be imported directly from their specific modules (e.g., `from evoagentx.tools.database_faiss import FaissToolkit`) rather than from the main `evoagentx.tools` package.
 
-
-<details>
-<summary>Click to expand full table 🔽</summary>
+ 
+## 4. FileSystem Tools
 
 <br>
   
@@ -62,6 +62,7 @@ By the end of this tutorial, you'll understand how to leverage these tools in yo
 | [RSSToolkit](#39-rsstoolkit) | Fetch RSS feeds (with optional webpage content extraction) and validate feeds. | [evoagentx/tools/rss_feed.py](../../evoagentx/tools/rss_feed.py) | [examples/tools/tools_search.py](../../examples/tools/tools_search.py) |
 | [GoogleMapsToolkit](#310-googlemapstoolkit) | Geoinformation retrieval and path planning via Google API service. | [evoagentx/tools/google_maps_tool.py](../../evoagentx/tools/google_maps_tool.py) | [examples/tools/google_maps_example.py](../../examples/tools/google_maps_example.py) |
 | [TelegramToolkit](#311-telegramtoolkit) | Comprehensive Telegram integration with messaging, file operations, and contact management. | [evoagentx/tools/telegram_tools.py](../../evoagentx/tools/telegram_tools.py) | [examples/tools/telegram_example.py](../../examples/tools/telegram_example.py) |
+| [GmailToolkit](#312-gmailtoolkit) | Gmail integration for reading/searching messages, managing drafts, attachments and labels. | [evoagentx/tools/gmail_tools.py](../../evoagentx/tools/gmail_tools.py) | [examples/tools/gmail_example.py](../../examples/tools/gmail_example.py) |
 | **🧰 FileSystem Tools** |  |  |  |
 | [StorageToolkit](#41-storagetoolkit) | File I/O utilities: save/read/append/delete, check existence, list files, list supported formats (pluggable storage backends). | [evoagentx/tools/storage_file.py](../../evoagentx/tools/storage_file.py) | [examples/tools/tools_files.py](../../examples/tools/tools_files.py) |
 | [CMDToolkit](#42-cmdtoolkit) | Execute shell/CLI commands with working directory and timeout control; returns stdout/stderr/return code. | [evoagentx/tools/cmd_toolkit.py](../../evoagentx/tools/cmd_toolkit.py) | [examples/tools/tools_files.py](../../examples/tools/tools_files.py) |
@@ -115,6 +116,7 @@ python -m examples.tools.tools_browser            # Browser automation tools
 python -m examples.tools.tools_integration        # MCP and integration tools
 python -m examples.tools.google_maps_example.py   # Google maps tool
 python -m examples.tools.telegram_example         # Telegram tools
+python -m examples.tools.gmail_example            # Gmail tools
 ```
 
 **Note**: The original `tools.py` file contains all examples in one place, while the separated files focus on specific tool categories for easier learning and testing.
@@ -2036,8 +2038,6 @@ The toolkit provides robust error handling for common scenarios:
 - **Contact Not Found**: Clear error messages with suggestions
 - **Ambiguous Names**: Lists available contacts for clarification
 - **File Not Found**: Specific error messages for missing files
-- **Network Issues**: Automatic retry and connection management
-- **Permission Errors**: Graceful handling of access restrictions
 
 #### 3.11.6 Integration with AI Agents
 
@@ -2060,6 +2060,212 @@ The TelegramToolkit is designed for seamless integration with AI agents:
     "contact_name": "John Smith"
 }
 ```
+
+### 3.12 GmailToolkit
+
+**The GmailToolkit provides Gmail integration for reading, searching, sending and managing messages, drafts, attachments, and labels. It supports OAuth2 credentials, thread-based operations, attachment download and content extraction, and intelligent summarization of email threads.**
+
+#### 3.12.1 Setup
+
+```python
+from evoagentx.tools import GmailToolkit
+
+# Initialize the toolkit - credentials will be automatically retrieved from environment
+toolkit = GmailToolkit()
+
+# Or initialize with explicit credential paths
+toolkit = GmailToolkit(
+    credentials_path="/path/to/client_secret.json",
+    token_path="/path/to/token.json",
+    user_id="me"
+)
+```
+
+**Environment Variables / Files (common setup)**:
+```bash
+GMAIL_CREDENTIALS_PATH=/path/to/client_secret.json
+GMAIL_TOKEN_PATH=/path/to/token.json
+GMAIL_USER=me  # optional, defaults to 'me'
+```
+
+#### 3.12.2 Available Methods
+
+The `GmailToolkit` provides **8 callable tools**:
+
+##### Tool 1: fetch_recent_messages
+
+**Description**: Retrieve recent messages matching a query or label for quick overview.
+
+**Usage Example**:
+```python
+# Get the fetch messages tool
+fetch_tool = toolkit.get_tool("fetch_recent_messages")
+
+# Fetch recent messages
+result = fetch_tool(query="from:alice@example.com", max_results=10)
+
+if result["success"]:
+    for msg in result["messages"]:
+        print(msg["snippet"])  # short preview
+else:
+    print(result["error"])
+```
+
+**Parameters**:
+- `query` (str, optional): Gmail API query string (e.g., "from:alice@example.com subject:report")
+- `label_ids` (List[str], optional): Filter by label ids
+- `max_results` (int, optional): Maximum messages to return (default: 10)
+
+**Return Type**: `Dict[str, Any]`
+
+##### Tool 2: search_messages_by_keyword
+
+**Description**: Search messages by keyword across mailboxes or within specific labels.
+
+**Usage Example**:
+```python
+search_tool = toolkit.get_tool("search_messages_by_keyword")
+res = search_tool(keyword="invoice", label_ids=["INBOX"], max_results=5)
+if res["success"]:
+    for m in res["messages"]:
+        print(m["snippet"]) 
+```
+
+**Parameters**:
+- `keyword` (str, required): Search term
+- `label_ids` (List[str], optional)
+- `max_results` (int, optional)
+
+##### Tool 3: send_message
+
+**Description**: Send an email message via the Gmail API.
+
+**Usage Example**:
+```python
+send_tool = toolkit.get_tool("send_message")
+result = send_tool(
+    to=["bob@example.com"],
+    subject="Project Update",
+    body="Hi Bob, here's the latest update...",
+    cc=[],
+    bcc=[]
+)
+if result["success"]:
+    print("Message sent. ID:", result["message_id"]) 
+```
+
+**Parameters**:
+- `to` (List[str], required)
+- `subject` (str, required)
+- `body` (str, required)
+- `attachments` (List[str], optional): Local file paths to attach
+
+##### Tool 4: list_labels
+
+**Description**: List Gmail labels and their metadata.
+
+**Usage Example**:
+```python
+labels_tool = toolkit.get_tool("list_labels")
+res = labels_tool()
+if res["success"]:
+    for lbl in res["labels"]:
+        print(lbl["name"], lbl["id"]) 
+```
+
+##### Tool 5: find_and_download_attachments
+
+**Description**: Find messages with attachments matching a filename query and download them.
+
+**Usage Example**:
+```python
+attach_tool = toolkit.get_tool("find_and_download_attachments")
+res = attach_tool(query="subject:invoice", filename_query="invoice", download_dir="downloads")
+if res["success"]:
+    for a in res["attachments"]:
+        print(a["filename"], a["file_path"]) 
+```
+
+**Parameters**:
+- `query` (str, optional): Gmail query to filter messages
+- `filename_query` (str, required)
+- `download_dir` (str, optional)
+
+##### Tool 6: summarize_thread
+
+**Description**: Generate a concise summary of an email thread (by thread id or query).
+
+**Usage Example**:
+```python
+sum_tool = toolkit.get_tool("summarize_thread")
+res = sum_tool(thread_query="subject:weekly update", max_messages=50)
+if res["success"]:
+    print(res["summary"]) 
+```
+
+**Parameters**:
+- `thread_id` (str, optional)
+- `thread_query` (str, optional)
+- `max_messages` (int, optional)
+
+##### Tool 7: create_draft
+
+**Description**: Create an email draft with optional attachments.
+
+**Usage Example**:
+```python
+draft_tool = toolkit.get_tool("create_draft")
+res = draft_tool(
+    to=["alice@example.com"],
+    subject="Draft: Proposal",
+    body="Draft body here",
+    attachments=["/path/to/file.pdf"]
+)
+if res["success"]:
+    print("Draft created:", res["draft_id"]) 
+```
+
+##### Tool 8: read_attachment_content
+
+**Description**: Extract and read attachment content with support for text and PDF extraction.
+
+**Usage Example**:
+```python
+read_tool = toolkit.get_tool("read_attachment_content")
+res = read_tool(message_id="12345", attachment_id="att_1", content_type="summary")
+if res["success"]:
+    print(res["content"]) 
+```
+
+**Parameters**:
+- `message_id` (str, optional)
+- `attachment_id` (str, optional)
+- `content_type` (str, optional): "full", "first_lines", "summary" 
+
+#### 3.12.3 Key Features
+
+- **OAuth2 Support**: Uses credentials JSON + token flow, compatible with Google Cloud OAuth setup
+- **Label Management**: List, filter, and operate on messages by label
+- **Attachment Handling**: Download attachments and extract text (PDF, TXT)
+- **Thread Summarization**: Produce concise summaries of multi-message threads
+
+#### 3.12.4 Advanced Capabilities
+
+- **Bulk Export**: Batch-download attachments or export message metadata
+- **PDF/Text Extraction**: Full-text extraction for indexing or analysis
+- **Automated Draft Workflows**: Create and update drafts programmatically before sending
+
+#### 3.12.5 Error Handling
+
+Common errors are surfaced with clear messages:
+
+- **Credentials Not Found**: Guidance to set `GMAIL_CREDENTIALS_PATH` and obtain OAuth client secrets
+- **Permission Denied**: Token scopes may be insufficient (update scopes to include Gmail compose/read)
+- **Quota Exceeded**: API quota limits returned by Gmail API
+- **Attachment Not Found**: File not located or already removed
+- **Network Issues**: Automatic retry and connection management
+- **Permission Errors**: Graceful handling of access restrictions
+
 
 ## 4. FileSystem Tools
 
