@@ -1,5 +1,6 @@
 """
-Gmail API Tool for EvoAgentX
+Gmail Toolkit for Evo Agent X
+-----------------------------
 
 This module provides comprehensive Gmail integration including:
 - Message retrieval and reading
@@ -7,6 +8,11 @@ This module provides comprehensive Gmail integration including:
 - Draft creation, retrieval, update, and sending
 
 Compatible with EvoAgentX tool architecture and follows Gmail API patterns.
+
+IMPORTANT:
+Please refer to the setup guide at `docs/tools/Gmail_api_setup.md` 
+to configure your Google Cloud Project and credentials before using this toolkit.
+
 """
 
 import os
