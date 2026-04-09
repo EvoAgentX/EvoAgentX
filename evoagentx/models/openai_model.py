@@ -152,7 +152,7 @@ class OpenAILLM(BaseLLM):
             completion_params = self.get_completion_params(**kwargs)
 
             # Use synchronous client in async context to avoid issues
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             response = await loop.run_in_executor(
                 None, 
                 lambda: isolated_client.chat.completions.create(
