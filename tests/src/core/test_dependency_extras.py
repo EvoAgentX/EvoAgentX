@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 def read_pyproject_text() -> str:
-    repo_root = Path(__file__).resolve().parents[1]
+    repo_root = Path(__file__).resolve().parents[3]
     return (repo_root / "pyproject.toml").read_text(encoding="utf-8")
 
 

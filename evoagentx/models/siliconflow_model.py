@@ -1,3 +1,4 @@
+import asyncio
 from tenacity import (
     retry,
     stop_after_attempt,
@@ -54,6 +55,42 @@ class SiliconFlowLLM(OpenAILLM):
                 print("Warning: Account balance insufficient. Please recharge your account.")
                 return ""
             raise RuntimeError(f"Error during single_generate of OpenAILLM: {str(e)}")
+
+        return output
+
+    async def single_generate_async(self, messages: List[dict], **kwargs) -> str:
+
+        stream = kwargs.get("stream", self.config.stream)
+        output_response = kwargs.get("output_response", self.config.output_response)
+
+        try:
+            isolated_client = self._init_client(self.config)
+            completion_params = self.get_completion_params(**kwargs)
+
+            loop = asyncio.get_event_loop()
+            response = await loop.run_in_executor(
+                None,
+                lambda: isolated_client.chat.completions.create(
+                    messages=messages,
+                    **completion_params
+                )
+            )
+
+            if stream:
+                output, stream_response = self.get_stream_output(response, output_response=output_response)
+                cost = self._completion_cost(stream_response)
+            else:
+                output: str = response.choices[0].message.content
+                cost = self._completion_cost(response)
+                self._last_response = response
+                if output_response:
+                    print(output)
+            self._update_cost(cost=cost)
+        except Exception as e:
+            if "account balance is insufficient" in str(e):
+                print("Warning: Account balance insufficient. Please recharge your account.")
+                return ""
+            raise RuntimeError(f"Error during single_generate_async of SiliconFlowLLM: {str(e)}")
 
         return output
 

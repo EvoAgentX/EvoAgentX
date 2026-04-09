@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import copy
 import random
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple, Union
 
 from .engine.base import BaseOptimizer
 from .engine.decorators import EntryPoint
@@ -158,12 +159,12 @@ class MapElitesOptimizer(BaseOptimizer):
         return idx
 
     def _random_cfg(self) -> Dict[str, Any]:
-        return {name: random.choice(values) for name, values in self.search_space.items()}
+        return {name: copy.deepcopy(random.choice(values)) for name, values in self.search_space.items()}
 
     def _mutate_cfg(self, parent_cfg: Dict[str, Any]) -> Dict[str, Any]:
         if not self.search_space:
-            return dict(parent_cfg)
-        cfg = dict(parent_cfg)
+            return copy.deepcopy(parent_cfg)
+        cfg = copy.deepcopy(parent_cfg)
         key = random.choice(list(self.search_space.keys()))
         choices = self.search_space[key]
         if len(choices) <= 1:
