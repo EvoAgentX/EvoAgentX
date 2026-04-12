@@ -74,6 +74,7 @@ Pillow
 docker>=6.0.0
 googlesearch-python>=1.2.0
 ddgs # Dux Distributed Global Search
+exa-py>=2.0.0 # Exa AI-powered search
 wikipedia>=1.4.0
 fastmcp>=0.1.0
 requests>=2.28.0

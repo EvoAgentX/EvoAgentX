@@ -28,6 +28,7 @@ from .rss_feed import RSSToolkit
 from .file_tool import FileToolkit
 from .search_serperapi import SerperAPIToolkit
 from .search_serpapi import SerpAPIToolkit
+from .search_exa import ExaSearchToolkit
 
 __all__ = [
     "Tool", 
@@ -62,5 +63,6 @@ __all__ = [
     "RSSToolkit",
     "FileToolkit",
     "SerperAPIToolkit",
-    "SerpAPIToolkit"
+    "SerpAPIToolkit",
+    "ExaSearchToolkit"
 ]

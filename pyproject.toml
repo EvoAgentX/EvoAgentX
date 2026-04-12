@@ -81,7 +81,8 @@ tools = [
     "PyPDF2",
     "docx2txt",
     "python-pptx",
-    "Pillow"
+    "Pillow",
+    "exa-py>=2.0.0"
 ]
 multimodal = [
     "colpali-engine==0.3.9",
@@ -144,7 +145,8 @@ all = [
     "sympy",
     "scipy",
     "nltk>=3.9.1",
-    "matplotlib>=3.10.0"
+    "matplotlib>=3.10.0",
+    "exa-py>=2.0.0"
 ]
 
 [project.urls]
