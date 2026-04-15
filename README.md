@@ -520,9 +520,18 @@ Below is a running log of scheduled and completed talks:
 
 | Speaker | Topic | Date | Meeting Video |
 |---|---|---|---|
-| [Hengzhe Zhang](https://hengzhe-zhang.github.io/) | Genetic Programming: From Evolutionary Algorithms to the LLM Era | 2025-08-10 | [YouTube](https://www.youtube.com/watch?v=naja_kDYc_Y) |
-| [Guibin Zhang](https://www.guibinz.top/) | G-Memory: Tracing Hierarchical Memory for Multi-Agent Systems | 2025-09-28 | [YouTube](https://www.youtube.com/watch?v=xzqZsZWfabw&t=3s) |
-| [Guanting Dong](https://dongguanting.github.io/) | Agentic Reinforced Policy Optimization | 2025-10-30 |  [YouTube](https://www.youtube.com/watch?v=UB-FL5JFXJY)  |
+| [Xi Zhang](https://x-izhang.github.io/) | [EvoAgentX Talk] EvoScientist | 2026-04-05 |  [YouTube](https://www.youtube.com/watch?v=EVrxBC99_1k&t=2745s)  |
+| [Guanting Dong](https://dongguanting.github.io/) | [EvoAgentX Talk] Agentic Reinforced Policy Optimization | 2025-10-30 |  [YouTube](https://www.youtube.com/watch?v=UB-FL5JFXJY)  |
+| [Guibin Zhang](https://www.guibinz.top/) | [EvoAgentX Talk] How Agentic RL Transforms LLMs into Automated Agents | 2025-09-28 | [YouTube](https://www.youtube.com/watch?v=xzqZsZWfabw&t=3s) |
+| [EvoAgentX Team](https://github.com/EvoAgentX/EvoAgentX) | [EvoAgentX Demo] Self-Evolving Agents in Action: Stock Analysis Assistant & arXiv Paper Recommender | 2025-09-04 | [YouTube](https://www.youtube.com/watch?v=8ALcspHOe0o&t=33s) |
+| [EvoAgentX Team](https://github.com/EvoAgentX/EvoAgentX) | [EvoAgentX Meeting] EvoAgentX Open-Source Meeting:2025-08-17 | 2025-08-17 | [YouTube](https://www.youtube.com/watch?v=Xy4sObew-a0&t=9s) |
+| [Hengzhe Zhang](https://hengzhe-zhang.github.io/) | [EvoAgentX Talk] Genetic Programming: From Evolutionary Algorithms to the LLM Era | 2025-08-10 | [YouTube](https://www.youtube.com/watch?v=naja_kDYc_Y) |
+| [EvoAgentX Team](https://github.com/EvoAgentX/EvoAgentX) | [EvoAgentX Meeting] EvoAgentX Open-Source Meeting: 2025-07-27 | 2025-07-27 | [YouTube](https://www.youtube.com/watch?v=dgJFCrbllWI) |
+| [EvoAgentX Team](https://github.com/EvoAgentX/EvoAgentX) | [EvoAgentX Meeting] EvoAgentX Open-Source Meeting: 2025-07-20 | 2025-07-20 | [YouTube](https://www.youtube.com/watch?v=mnJYmdgo8HA&t=68s) |
+| [EvoAgentX Team](https://github.com/EvoAgentX/EvoAgentX) | [EvoAgentX Meeting] EvoAgentX Open-Source Meeting: 2025-07-06 | 2025-07-06 | [YouTube](https://www.youtube.com/watch?v=AIAl6rB4fC0) |
+| [EvoAgentX Team](https://github.com/EvoAgentX/EvoAgentX) | [EvoAgentX Meeting] EvoAgentX Open-Source Meeting: 2025-06-22 | 2025-06-22 | [YouTube](https://www.youtube.com/watch?v=3y0Ppq3BN1A&t=1401s) |
+| [EvoAgentX Team](https://github.com/EvoAgentX/EvoAgentX) | [EvoAgentX Meeting] EvoAgentX First Community Call: Exploring the Future of Self-Evolving AI Agents! | 2025-06-10 | [YouTube](https://www.youtube.com/watch?v=WzWo9aYPHMs&t=414s) |
+| [EvoAgentX Team](https://github.com/EvoAgentX/EvoAgentX) | [EvoAgentX Demo] EvoAgentX Workflow Generation Demo | 2025-05-14 | [YouTube](https://www.youtube.com/watch?v=Wu0ZydYDqgg) |
 
 
 ## 🎯 Roadmap

@@ -532,9 +532,19 @@ EvoAgentX 定期邀请顶尖研究人员开展讲座，分享 AI 领域的前沿
 
 | 发言者 | 主题 | 日期 | 会议视频 |
 |---|---|---|---|
-| [张恒哲](https://hengzhe-zhang.github.io/) | 遗传编程：从进化算法到 LLM 时代 | 2025-08-10 | [YouTube](https://www.youtube.com/watch?v=naja_kDYc_Y) |
-| [张桂彬](https://www.guibinz.top/) | G-Memory：追踪多智能体系统的分层记忆 | 2025-09-28 | [YouTube](https://www.youtube.com/watch?v=xzqZsZWfabw&t=3s) |
-| [董冠霖](https://dongguanting.github.io/) | 智能体强化策略优化 | 2025-10-30 | [YouTube](https://www.youtube.com/watch?v=UB-FL5JFXJY) |
+| [张曦](https://x-izhang.github.io/) | [EvoAgentX 讲座] EvoScientist | 2026-04-05 |  [YouTube](https://www.youtube.com/watch?v=EVrxBC99_1k&t=2745s)  |
+| [董冠霖](https://dongguanting.github.io/) | [EvoAgentX 讲座] 基于智能体的强化策略优化 | 2025-10-30 |  [YouTube](https://www.youtube.com/watch?v=UB-FL5JFXJY)  |
+| [张桂彬](https://www.guibinz.top/) | [EvoAgentX 讲座] 智能体强化学习如何将大模型转化为自动化智能体 | 2025-09-28 | [YouTube](https://www.youtube.com/watch?v=xzqZsZWfabw&t=3s) |
+| [EvoAgentX 团队](https://github.com/EvoAgentX/EvoAgentX) | [EvoAgentX 演示] 自进化智能体实战：股票分析助手与 arXiv 论文推荐系统 | 2025-09-04 | [YouTube](https://www.youtube.com/watch?v=8ALcspHOe0o&t=33s) |
+| [EvoAgentX 团队](https://github.com/EvoAgentX/EvoAgentX) | [EvoAgentX 会议] EvoAgentX 开源会议：2025-08-17 | 2025-08-17 | [YouTube](https://www.youtube.com/watch?v=Xy4sObew-a0&t=9s) |
+| [张恒哲](https://hengzhe-zhang.github.io/) | [EvoAgentX 讲座] 遗传编程：从进化算法到大模型时代 | 2025-08-10 | [YouTube](https://www.youtube.com/watch?v=naja_kDYc_Y) |
+| [EvoAgentX 团队](https://github.com/EvoAgentX/EvoAgentX) | [EvoAgentX 会议] EvoAgentX 开源会议：2025-07-27 | 2025-07-27 | [YouTube](https://www.youtube.com/watch?v=dgJFCrbllWI) |
+| [EvoAgentX 团队](https://github.com/EvoAgentX/EvoAgentX) | [EvoAgentX 会议] EvoAgentX 开源会议：2025-07-20 | 2025-07-20 | [YouTube](https://www.youtube.com/watch?v=mnJYmdgo8HA&t=68s) |
+| [EvoAgentX 团队](https://github.com/EvoAgentX/EvoAgentX) | [EvoAgentX 会议] EvoAgentX 开源会议：2025-07-06 | 2025-07-06 | [YouTube](https://www.youtube.com/watch?v=AIAl6rB4fC0) |
+| [EvoAgentX 团队](https://github.com/EvoAgentX/EvoAgentX) | [EvoAgentX 会议] EvoAgentX 开源会议：2025-06-22 | 2025-06-22 | [YouTube](https://www.youtube.com/watch?v=3y0Ppq3BN1A&t=1401s) |
+| [EvoAgentX 团队](https://github.com/EvoAgentX/EvoAgentX) | [EvoAgentX 会议] EvoAgentX 首次社区会议：探索自进化 AI 智能体的未来！ | 2025-06-10 | [YouTube](https://www.youtube.com/watch?v=WzWo9aYPHMs&t=414s) |
+| [EvoAgentX 团队](https://github.com/EvoAgentX/EvoAgentX) | [EvoAgentX 演示] EvoAgentX 工作流生成演示 | 2025-05-14 | [YouTube](https://www.youtube.com/watch?v=Wu0ZydYDqgg) |
+
 
 
 ## 🎯 路线图
