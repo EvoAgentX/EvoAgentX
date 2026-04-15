@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import random
+import copy
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple, Union
 
@@ -171,5 +172,5 @@ class MapElitesOptimizer(BaseOptimizer):
             return cfg
         current = cfg.get(key)
         alternatives = [v for v in choices if v != current]
-        cfg[key] = random.choice(alternatives) if alternatives else current
+        cfg[key] = copy.deepcopy(random.choice(alternatives)) if alternatives else current
         return cfg
