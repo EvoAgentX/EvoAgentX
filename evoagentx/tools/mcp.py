@@ -22,7 +22,7 @@ from contextlib import AsyncExitStack, asynccontextmanager
 
 # FastMCP 2.0 imports - replacing official MCP SDK
 from fastmcp import Client
-from fastmcp.exceptions import ClientError, McpError
+from fastmcp.exceptions import ClientError, FastMCPError
 import json
 
 class MCPTool(Tool):
@@ -244,7 +244,7 @@ class MCPClient:
                 result = future.result(timeout=30)  # Reduced timeout to 30 seconds
                 logger.info(f"MCP tool {name} call completed successfully")
                 return result
-            except (TimeoutError, ClientError, McpError) as e:
+            except (TimeoutError, ClientError, FastMCPError) as e:
                 logger.error(f"Error calling MCP tool {name}: {str(e)}")
                 raise
             except Exception as e:

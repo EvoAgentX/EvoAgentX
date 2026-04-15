@@ -448,7 +448,7 @@ When working with MCP tools, it's important to handle errors gracefully:
 
 ```python
 from evoagentx.tools import MCPToolkit
-from fastmcp.exceptions import ClientError, McpError
+from fastmcp.exceptions import ClientError, FastMCPError
 import logging
 
 # Set up logging to see MCP connection details
@@ -478,7 +478,7 @@ try:
                 print(f"Tool {tool.name} result: {result}")
             except ClientError as e:
                 print(f"Client error with tool {tool.name}: {e}")
-            except McpError as e:
+            except FastMCPError as e:
                 print(f"MCP protocol error with tool {tool.name}: {e}")
             except Exception as e:
                 print(f"Unexpected error with tool {tool.name}: {e}")
@@ -558,7 +558,7 @@ Here are some common issues and their solutions:
 
 - **Tool Execution Errors**: FastMCP 2.0 provides specific error types:
   - `ClientError`: Indicates client-side issues (connection, configuration, etc.)
-  - `McpError`: Indicates server-side MCP protocol errors
+  - `FastMCPError`: Base class for server-side MCP protocol errors
   Check the error message for details about what went wrong.
 
 - **Server Not Starting**: If an MCP server fails to start, verify the command path and environment variables in your configuration.
