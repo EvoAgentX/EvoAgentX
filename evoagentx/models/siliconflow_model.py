@@ -41,7 +41,7 @@ class SiliconFlowLLM(OpenAILLM):
                 **completion_params
             )
             if stream:
-                output, stream_response = self.get_stream_output(response, output_response=output_response)
+                output, stream_response = self._get_stream_output_with_response(response, output_response=output_response)
                 cost = self._completion_cost(stream_response)
             else:
                 output: str = response.choices[0].message.content
@@ -141,7 +141,11 @@ class SiliconFlowLLM(OpenAILLM):
 
         return cost_info
 
-    def get_stream_output(self, response: Stream, output_response: bool=True) -> Tuple[str, object]:
+    def get_stream_output(self, response: Stream, output_response: bool=True) -> str:
+        output, _ = self._get_stream_output_with_response(response, output_response=output_response)
+        return output
+
+    def _get_stream_output_with_response(self, response: Stream, output_response: bool=True) -> Tuple[str, object]:
         output = ""
         last_chunk = None
         for chunk in response:
