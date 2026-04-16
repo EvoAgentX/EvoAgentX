@@ -18,7 +18,6 @@ After this module executes, regular imports such as
 
 from __future__ import annotations
 
-import sys
 import contextvars
 from contextlib import contextmanager
 from concurrent.futures import ThreadPoolExecutor
