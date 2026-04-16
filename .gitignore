@@ -134,3 +134,4 @@ evaluation_pipeline/results/
 .venv*/
 workplace/
 openevolve/
+evoagentx/tools/assets/research_tools/*
