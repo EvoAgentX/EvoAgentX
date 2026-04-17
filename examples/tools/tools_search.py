@@ -10,6 +10,7 @@ This module provides comprehensive examples for:
 - DDGSSearchToolkit: Search using DuckDuckGo
 - SerpAPIToolkit: Multi-engine search (Google, Bing, Baidu, Yahoo, DuckDuckGo)
 - SerperAPIToolkit: Google search via SerperAPI
+- ExaSearchToolkit: Search using Exa AI (requires EXA_API_KEY)
 - RequestToolkit: Perform HTTP operations (GET, POST, PUT, DELETE)
 - ArxivToolkit: Search for research papers
 - RSSToolkit: Fetch and validate RSS feeds
@@ -35,6 +36,7 @@ from evoagentx.tools import (
     RSSToolkit,
     RequestToolkit
 )
+from evoagentx.tools.search_exa import ExaSearchToolkit
 
 
 def run_search_examples():
@@ -303,6 +305,61 @@ def run_rss_tool_example():
         print("Note: RSS feed availability may vary. Some feeds may be temporarily unavailable.")
 
 
+def run_exa_search_example():
+    """Example using ExaSearchToolkit (requires EXA_API_KEY)."""
+    print("\n===== EXA SEARCH TOOL EXAMPLE =====\n")
+
+    exa_api_key = os.getenv("EXA_API_KEY")
+    if not exa_api_key:
+        print("❌ EXA_API_KEY not found in environment variables")
+        print("To test Exa search, set your API key:")
+        print("export EXA_API_KEY='your-exa-api-key-here'")
+        print("Get your key from: https://exa.ai/")
+        print("✓ ExaSearchToolkit initialized successfully (API key required for search)")
+        return
+
+    try:
+        toolkit = ExaSearchToolkit(
+            num_search_pages=3,
+            max_content_words=120,
+            search_type="auto",
+            content_mode="highlights",
+        )
+        exa_search = toolkit.get_tool("exa_search")
+        print("✓ ExaSearchToolkit initialized")
+        print(f"✓ Using Exa API key: {exa_api_key[:8]}...")
+
+        query = "artificial intelligence agent architecture"
+        print(f"Searching for '{query}'...")
+
+        result = exa_search(
+            query=query,
+            num_search_pages=3,
+            max_content_words=120,
+            search_type="auto",
+            content_mode="highlights",
+            user_location="US",
+        )
+
+        if result.get("error"):
+            print(f"❌ Error: {result['error']}")
+        else:
+            results = result.get("results", [])
+            print(f"✓ Returned {len(results)} results")
+            for i, item in enumerate(results, start=1):
+                print(f"\nResult {i}: {item.get('title', 'No Title')}")
+                print(f"  URL: {item.get('url', '')}")
+                content = item.get("content")
+                if content:
+                    print(f"  Content: {content[:200]}...")
+                print("-" * 30)
+
+        print("\n✓ ExaSearchToolkit test completed")
+
+    except Exception as e:
+        print(f"Error running Exa search: {str(e)}")
+
+
 def run_request_tool_example():
     """Simple example using RequestToolkit for HTTP operations."""
     print("\n===== REQUEST TOOL EXAMPLE =====\n")
@@ -399,16 +456,19 @@ def main():
     
     # Run search tools examples
     run_search_examples()
-    
-    # # Run arXiv tool example
+
+    # Run arXiv tool example
     run_arxiv_tool_example()
-    
-    # # Run RSS tool example
+
+    # Run RSS tool example
     run_rss_tool_example()
-    
-    # # Run Request tool example
+
+    # Run Exa search example (requires EXA_API_KEY)
+    run_exa_search_example()
+
+    # Run Request tool example
     run_request_tool_example()
-    
+
     print("\n===== ALL SEARCH AND REQUEST EXAMPLES COMPLETED =====")
 
 
