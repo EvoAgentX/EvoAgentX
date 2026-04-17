@@ -14,6 +14,10 @@ This module provides comprehensive examples for:
 - RequestToolkit: Perform HTTP operations (GET, POST, PUT, DELETE)
 - ArxivToolkit: Search for research papers
 - RSSToolkit: Fetch and validate RSS feeds
+- ResearchToolkit: Academic research tools for paper search, metadata
+  fetching, and BibTeX lookup (ArxivPaperSearchTool works without API keys;
+  PaperSearchTool, FetchPaperMetaDataTool, and BibReferenceTool require
+  SERPAPI_KEY and optionally OPENROUTER_API_KEY)
 
 The examples demonstrate various search capabilities and HTTP operations.
 """
@@ -34,9 +38,16 @@ from evoagentx.tools import (
     SerperAPIToolkit,
     ArxivToolkit,
     RSSToolkit,
-    RequestToolkit
+    RequestToolkit,
+    ResearchToolkit,
 )
 from evoagentx.tools.search_exa import ExaSearchToolkit
+from evoagentx.tools.research_tools import (
+    ArxivPaperSearchTool,
+    PaperSearchTool,
+    FetchPaperMetaDataTool,
+    BibReferenceTool,
+)
 
 
 def run_search_examples():
@@ -450,24 +461,285 @@ def run_request_tool_example():
         print(f"Error: {str(e)}")
 
 
+def run_research_tools_example():
+    """
+    Showcase for the ResearchToolkit and its individual tools.
+
+    Tools demonstrated:
+    - ResearchToolkit (unified toolkit, auto-registers tools based on available API keys)
+    - ArxivPaperSearchTool (no API key required)
+    - PaperSearchTool (requires SERPAPI_KEY)
+    - FetchPaperMetaDataTool (requires SERPAPI_KEY)
+    - BibReferenceTool (requires SERPAPI_KEY)
+    """
+    print("\n===== RESEARCH TOOLS EXAMPLES =====\n")
+
+    serpapi_key = os.getenv("SERPAPI_KEY")
+    openrouter_key = os.getenv("OPENROUTER_API_KEY")
+
+    # ------------------------------------------------------------------
+    # 1. ArxivPaperSearchTool — works without any API keys
+    # ------------------------------------------------------------------
+    try:
+        print("1. ArxivPaperSearchTool (no API key needed)")
+        print("-" * 50)
+
+        arxiv_tool = ArxivPaperSearchTool()
+        print("✓ ArxivPaperSearchTool initialized")
+
+        query = "retrieval-augmented generation"
+        print(f"Searching arXiv for '{query}' (top 3)...")
+
+        result = arxiv_tool(query=query, topk=3)
+        papers = result.result  # dict returned by Arxiv.search_arxiv
+
+        if isinstance(papers, dict) and papers.get("papers"):
+            for i, paper in enumerate(papers["papers"], start=1):
+                print(f"\n  Paper {i}: {paper.get('title', 'N/A')}")
+                print(f"    Authors : {', '.join(paper.get('authors', [])[:3])}")
+                print(f"    Published: {paper.get('published_date', 'N/A')}")
+                links = paper.get("links", {})
+                print(f"    Link    : {links.get('html', links.get('pdf', 'N/A'))}")
+                summary = paper.get("summary", "")
+                if summary:
+                    print(f"    Summary : {summary[:150]}...")
+        elif isinstance(papers, list):
+            for i, paper in enumerate(papers[:3], start=1):
+                print(f"\n  Paper {i}: {paper.get('title', 'N/A')}")
+        else:
+            print(f"  Raw result: {str(papers)[:300]}")
+
+        print("\n✓ ArxivPaperSearchTool test completed")
+
+    except Exception as e:
+        print(f"Error running ArxivPaperSearchTool: {e}")
+
+    # ------------------------------------------------------------------
+    # 2. ResearchToolkit — unified toolkit (auto-detects API keys)
+    # ------------------------------------------------------------------
+    try:
+        print("\n2. ResearchToolkit (unified toolkit)")
+        print("-" * 50)
+
+        research_toolkit = ResearchToolkit()
+        available_tools = [t.name for t in research_toolkit.tools]
+        print(f"✓ ResearchToolkit initialized with tools: {available_tools}")
+
+        # The toolkit always registers ArxivPaperSearchTool as 'search_papers'
+        search_tool = research_toolkit.get_tool("search_papers")
+        if search_tool:
+            print("✓ 'search_papers' tool is available via the toolkit")
+
+            result = search_tool(query="large language model agents", topk=2)
+            papers = result.result
+            if isinstance(papers, dict) and papers.get("papers"):
+                print(f"  Found {len(papers['papers'])} papers")
+                for p in papers["papers"][:2]:
+                    print(f"    - {p.get('title', 'N/A')}")
+            else:
+                print(f"  Result: {str(papers)[:200]}")
+        else:
+            print("⚠ 'search_papers' tool not found in toolkit")
+
+        # Check for full-featured tools
+        if "fetch_paper_metadata" in available_tools:
+            print("✓ 'fetch_paper_metadata' tool is available (SERPAPI_KEY detected)")
+        if "search_bibtex" in available_tools:
+            print("✓ 'search_bibtex' tool is available (SERPAPI_KEY detected)")
+
+        print("\n✓ ResearchToolkit test completed")
+
+    except Exception as e:
+        print(f"Error running ResearchToolkit: {e}")
+
+    # ------------------------------------------------------------------
+    # 3. PaperSearchTool — full-featured multi-source search
+    # ------------------------------------------------------------------
+    if serpapi_key:
+        try:
+            print("\n3. PaperSearchTool (multi-source, requires SERPAPI_KEY)")
+            print("-" * 50)
+            print(f"✓ Using SERPAPI_KEY: {serpapi_key[:8]}...")
+
+            from evoagentx.tools.storage_handler import LocalStorageHandler
+            storage = LocalStorageHandler()
+
+            paper_search = PaperSearchTool(
+                storage_handler=storage,
+                serpapi_key=serpapi_key,
+                openrouter_key=openrouter_key,
+            )
+            print("✓ PaperSearchTool initialized")
+
+            # 3a. General search
+            print("\n  3a. General search mode:")
+            result = paper_search(
+                queries=["retrieval-augmented generation"],
+                search_mode="general",
+                topk=3,
+            )
+            query_papers = result.result.get("query_papers", {})
+            for query_text, papers in query_papers.items():
+                print(f"    Query: '{query_text}' → {len(papers)} papers")
+                for p in papers[:2]:
+                    print(f"      - {p.get('paper_title', 'N/A')} ({p.get('year', '?')})")
+                    print(f"        Citations: {p.get('citation_count', 'N/A')}")
+
+            # 3b. Venue-specific search (arXiv)
+            print("\n  3b. Venue-specific search (arXiv):")
+            result = paper_search(
+                queries=["arxiv: multi-agent cooperation"],
+                search_mode="venue_specific",
+                topk=3,
+                year_from=2024,
+            )
+            query_papers = result.result.get("query_papers", {})
+            for query_text, papers in query_papers.items():
+                print(f"    Query: '{query_text}' → {len(papers)} papers")
+                for p in papers[:2]:
+                    print(f"      - {p.get('paper_title', 'N/A')} ({p.get('year', '?')})")
+
+            # 3c. Lookup a specific paper
+            print("\n  3c. Lookup mode (find a specific paper):")
+            result = paper_search(
+                queries=["Attention is All You Need"],
+                search_mode="lookup",
+                topk=1,
+            )
+            query_papers = result.result.get("query_papers", {})
+            for query_text, papers in query_papers.items():
+                if papers:
+                    p = papers[0]
+                    print(f"    Found: {p.get('paper_title', 'N/A')}")
+                    print(f"    Link : {p.get('paper_link', 'N/A')}")
+                    print(f"    Year : {p.get('year', 'N/A')}")
+                    print(f"    Cite : {p.get('citation_count', 'N/A')}")
+
+            print("\n  ✓ PaperSearchTool test completed")
+
+        except Exception as e:
+            print(f"Error running PaperSearchTool: {e}")
+    else:
+        print("\n3. PaperSearchTool (multi-source)")
+        print("-" * 50)
+        print("❌ SERPAPI_KEY not found — skipping PaperSearchTool")
+        print("   Set SERPAPI_KEY to enable: export SERPAPI_KEY='your-key'")
+        print("   Get a key from: https://serpapi.com/")
+
+    # ------------------------------------------------------------------
+    # 4. FetchPaperMetaDataTool — detailed metadata retrieval
+    # ------------------------------------------------------------------
+    if serpapi_key:
+        try:
+            print("\n4. FetchPaperMetaDataTool (requires SERPAPI_KEY)")
+            print("-" * 50)
+
+            fetch_tool = FetchPaperMetaDataTool(
+                serpapi_key=serpapi_key,
+                openrouter_key=openrouter_key,
+            )
+            print("✓ FetchPaperMetaDataTool initialized")
+
+            papers_to_fetch = [
+                {"paper_title": "Attention is All You Need", "paper_link": "https://arxiv.org/abs/1706.03762"},
+            ]
+            print(f"  Fetching metadata for {len(papers_to_fetch)} paper(s)...")
+
+            result = fetch_tool(papers=papers_to_fetch)
+            metadata_list = result.result.get("paper_metadata", [])
+
+            for meta in metadata_list:
+                print(f"\n  Title   : {meta.get('paper_title', 'N/A')}")
+                authors = meta.get("authors", [])
+                if authors:
+                    print(f"  Authors : {', '.join(authors[:5])}{'...' if len(authors) > 5 else ''}")
+                print(f"  Year    : {meta.get('year', 'N/A')}")
+                print(f"  Venue   : {meta.get('venue', 'N/A')}")
+                print(f"  Citations: {meta.get('citation_count', 'N/A')}")
+                print(f"  Link    : {meta.get('paper_link', 'N/A')}")
+                print(f"  PDF     : {meta.get('paper_pdf_link', 'N/A')}")
+                abstract = meta.get("abstract", "")
+                if abstract:
+                    print(f"  Abstract: {abstract[:200]}...")
+
+            print("\n  ✓ FetchPaperMetaDataTool test completed")
+
+        except Exception as e:
+            print(f"Error running FetchPaperMetaDataTool: {e}")
+    else:
+        print("\n4. FetchPaperMetaDataTool")
+        print("-" * 50)
+        print("❌ SERPAPI_KEY not found — skipping FetchPaperMetaDataTool")
+
+    # ------------------------------------------------------------------
+    # 5. BibReferenceTool — BibTeX lookup
+    # ------------------------------------------------------------------
+    if serpapi_key:
+        try:
+            print("\n5. BibReferenceTool (requires SERPAPI_KEY)")
+            print("-" * 50)
+
+            bib_tool = BibReferenceTool(
+                serpapi_key=serpapi_key,
+                openrouter_key=openrouter_key,
+            )
+            print("✓ BibReferenceTool initialized")
+
+            titles = [
+                "Attention is All You Need",
+                "BERT: Pre-training of Deep Bidirectional Transformers",
+            ]
+            print(f"  Searching BibTeX for {len(titles)} paper(s)...")
+
+            result = bib_tool(titles_or_keywords=titles)
+            bibtex_entries = result.result.get("bibtex_entries", {})
+
+            for title, bib in bibtex_entries.items():
+                print(f"\n  Title: {title}")
+                if bib and "@" in bib:
+                    # Show first 5 lines of BibTeX entry
+                    bib_lines = bib.strip().splitlines()
+                    for line in bib_lines[:5]:
+                        print(f"    {line}")
+                    if len(bib_lines) > 5:
+                        print(f"    ... ({len(bib_lines) - 5} more lines)")
+                else:
+                    print(f"    BibTeX not found: {bib}")
+
+            print("\n  ✓ BibReferenceTool test completed")
+
+        except Exception as e:
+            print(f"Error running BibReferenceTool: {e}")
+    else:
+        print("\n5. BibReferenceTool")
+        print("-" * 50)
+        print("❌ SERPAPI_KEY not found — skipping BibReferenceTool")
+
+    print("\n✓ Research tools examples completed")
+
+
 def main():
     """Main function to run all search and request examples"""
     print("===== SEARCH AND REQUEST TOOLS EXAMPLES =====")
     
-    # Run search tools examples
-    run_search_examples()
+    # # Run search tools examples
+    # run_search_examples()
 
-    # Run arXiv tool example
-    run_arxiv_tool_example()
+    # # Run arXiv tool example
+    # run_arxiv_tool_example()
 
-    # Run RSS tool example
-    run_rss_tool_example()
+    # # Run RSS tool example
+    # run_rss_tool_example()
 
-    # Run Exa search example (requires EXA_API_KEY)
-    run_exa_search_example()
+    # # Run Exa search example (requires EXA_API_KEY)
+    # run_exa_search_example()
 
-    # Run Request tool example
-    run_request_tool_example()
+    # # Run Request tool example
+    # run_request_tool_example()
+
+    # Run Research tools example (ArxivPaperSearchTool, PaperSearchTool,
+    # FetchPaperMetaDataTool, BibReferenceTool via ResearchToolkit)
+    run_research_tools_example()
 
     print("\n===== ALL SEARCH AND REQUEST EXAMPLES COMPLETED =====")
 

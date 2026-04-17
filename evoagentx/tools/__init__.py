@@ -30,6 +30,11 @@ from .search_serperapi import SerperAPIToolkit
 from .search_serpapi import SerpAPIToolkit
 from .search_exa import ExaSearchToolkit
 
+try:
+    from .research_tools import ResearchToolkit
+except ImportError:
+    ResearchToolkit = None
+
 __all__ = [
     "Tool", 
     "Toolkit",
@@ -64,5 +69,6 @@ __all__ = [
     "FileToolkit",
     "SerperAPIToolkit",
     "SerpAPIToolkit",
-    "ExaSearchToolkit"
+    "ExaSearchToolkit",
+    "ResearchToolkit",
 ]
