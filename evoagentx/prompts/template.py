@@ -1,4 +1,5 @@
 import regex
+import json
 from copy import deepcopy 
 from pydantic import Field
 from pydantic_core import PydanticUndefined
@@ -9,6 +10,7 @@ from ..core.module import BaseModule
 from ..models.base_model import LLMOutputParser, PARSER_VALID_MODE 
 from ..tools import Toolkit
 from ..prompts.tool_calling import TOOL_CALLING_TEMPLATE
+from ..prompts.output_format import JSON_SCHEMA_OUTPUT_FORMAT, JSON_SCHEMA_OUTPUT_FORMAT_JSON
 
 class PromptTemplate(BaseModule):
 
@@ -217,6 +219,19 @@ class PromptTemplate(BaseModule):
             return "### Outputs Format\nPlease generate a response that best fits the task instruction.\n"
         
         ouptut_template, output_keys = self.get_output_template(outputs_format, parse_mode=parse_mode, title_format=title_format)
+        json_schema = outputs_format.model_config.get("json_schema_extra")
+        if json_schema:
+            example_values = {} 
+            for key in output_keys:
+                field_info = outputs_format.model_fields.get(key)
+                if field_info and field_info.description:
+                    example_values[key] = "[" + field_info.description + "]"
+                else:
+                    example_values[key] = "[Your output here]"
+            example = ouptut_template.format(**example_values)
+            if parse_mode == "json":
+                return JSON_SCHEMA_OUTPUT_FORMAT_JSON.format(json_schema=json.dumps(json_schema, ensure_ascii=False, indent=4), example=example)
+            return JSON_SCHEMA_OUTPUT_FORMAT.format(json_schema=json.dumps(json_schema, ensure_ascii=False, indent=4), parse_mode=parse_mode, example=example)
         output_str = "### Outputs Format\nYou MUST strictly follow the following format when generating your output:\n\n"
         if parse_mode == "json":
             output_str += "Format your output in json format, such as:\n"

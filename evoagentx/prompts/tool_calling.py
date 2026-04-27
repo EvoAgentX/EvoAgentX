@@ -1,28 +1,39 @@
 OUTPUT_EXTRACTION_PROMPT = """
-You are given the following text:
-{text}
+## Task
+You are given a piece of unstructured text and a list of fields to extract. Each field includes:
+- `name`: The name of the field.
+- `description`: A description of the field.
+- `type`: The type of the field.
+- `required`: Whether the field is required.
+- `json_schema`: The JSON schema for the field. If provided, your output must strictly follow the JSON schema.
 
-We need you to process this text and generate high-quality outputs for each of the following fields:
-{output_description}
+Your task is to analyze the text carefully and generate a valid JSON object that includes all of the requested fields
 
-**Instructions:**
+## Instructions
 1. Read through the provided text carefully.
-2. For each of the listed output fields, analyze the relevant information from the text and generate a well-formulated response.
+2. For each of the listed fields, analyze the relevant information from the text and generate a well-formulated response.
 3. You may summarize, process, restructure, or enhance the information as needed to provide the best possible answer.
 4. Your analysis should be faithful to the content but can go beyond simple extraction - provide meaningful insights where appropriate.
-5. Return your processed outputs in a single JSON object, where the JSON keys **exactly match** the output names given above.
-6. If there is insufficient information for an output, provide your best reasonable inference or set its value to an empty string ("") or `null`.
+5. Return your processed outputs in a single JSON object, where the JSON keys **exactly match** the field names provided in **Fields** section.
+6. If there is insufficient information for an output follow the following rules:
+    - If the field is not required, set it to `null`.
+    - If the field is required and `type` is `string`, return an empty string `""`.
+    - If the field is required and `type` is `array`, return an empty array `[]`.
+    - If the field is required and `type` is `object`, return an empty object `{{}}`.
+    - If the field is required and `type` is none of the above, provide your best reasonable inference.
 7. Do not include any additional keys in the JSON.
 8. Your final output should be valid JSON and should not include any explanatory text.
 
-**Example JSON format:**
-{{
-  "<OUTPUT_NAME_1>": "Processed content here",
-  "<OUTPUT_NAME_2>": "Processed content here",
-  "<OUTPUT_NAME_3>": "Processed content here"
-}}
+## Text
+{text}
 
-Now, based on the text and the instructions above, provide your final JSON output.
+## Fields
+```json
+{output_description}
+```
+
+## Output
+```json
 """
 
 

@@ -7,6 +7,7 @@ from tqdm import tqdm
 from typing import Union, Any, List, Set
 
 from ..core.logging import logger
+from ..core.registry import MODULE_REGISTRY
 
 def make_parent_folder(path: str):
     """Checks if the parent folder of a given path exists, and creates it if not.
@@ -34,6 +35,48 @@ def generate_dynamic_class_name(base_name: str) -> str:
     class_name = ''.join(x.capitalize() for x in components)
 
     return class_name if class_name else 'DefaultClassName'
+
+def get_unique_class_name(candidate_name: str) -> str:
+    if not MODULE_REGISTRY.has_module(candidate_name):
+        return candidate_name 
+    
+    i = 1 
+    while True:
+        unique_name = f"{candidate_name}V{i}"
+        if not MODULE_REGISTRY.has_module(unique_name):
+            break
+        i += 1 
+    return unique_name 
+
+string_to_python_type = {
+    "string": str,
+    "integer": int,
+    "number": float,
+    "boolean": bool,
+    "object": dict,
+    "array": list,
+    "str": str,
+    "int": int,
+    "float": float,
+    "bool": bool,
+    "dict": dict,
+    "list": list,
+}
+
+string_to_json_schema_type = {
+    "string": "string",
+    "integer": "integer",
+    "number": "number",
+    "boolean": "boolean",
+    "object": "object",
+    "array": "array", 
+    "str": "string",
+    "int": "integer",
+    "float": "number",
+    "bool": "boolean",
+    "dict": "object",
+    "list": "array",
+}
 
 def normalize_text(s: str) -> str:
 

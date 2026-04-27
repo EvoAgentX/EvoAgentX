@@ -1,4 +1,5 @@
 from pydantic import Field
+from pydantic_core import PydanticUndefined
 from typing import Optional, Any, Callable, List, Union
 import re
 import json
@@ -114,11 +115,20 @@ class CustomizeAction(Action):
         Returns:
             str: Formatted extraction prompt
         """
-        attr_descriptions: dict = self.outputs_format.get_attr_descriptions()
         output_description_list = [] 
-        for i, (name, desc) in enumerate(attr_descriptions.items()):
-            output_description_list.append(f"{i+1}. {name}\nDescription: {desc}")
-        output_description = "\n\n".join(output_description_list)
+        param_specs = {param["name"]: param for param in getattr(self.outputs_format, "_evoagentx_param_specs", [])}
+        for name, field_info in self.outputs_format.model_fields.items():
+            if name not in self.outputs_format.get_attrs():
+                continue
+            param_spec = param_specs.get(name, {})
+            output_description_list.append({
+                "name": name,
+                "type": param_spec.get("type", "string"),
+                "description": field_info.description,
+                "required": field_info.default is PydanticUndefined,
+                "json_schema": field_info.json_schema_extra
+            })
+        output_description = json.dumps(output_description_list, ensure_ascii=False, indent=4)
         return OUTPUT_EXTRACTION_PROMPT.format(text=llm_output_content, output_description=output_description)
     
     def _get_unique_class_name(self, candidate_name: str) -> str:

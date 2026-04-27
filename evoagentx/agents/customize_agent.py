@@ -1,18 +1,20 @@
 import json
 import inspect
-from pydantic import create_model, Field
-from typing import Optional, Callable, Type, List, Any, Union, Dict
+from copy import deepcopy
+from pydantic import ConfigDict, create_model, Field
+from typing import Optional, Callable, Type, List, Any, Union, Dict, Literal
 
 from .agent import Agent
 from ..core.logging import logger
 from ..core.registry import MODULE_REGISTRY, PARSE_FUNCTION_REGISTRY
 from ..core.message import Message, MessageType
+from ..core.base_config import Parameter
 from ..models.model_configs import LLMConfig 
 from ..models.base_model import PARSER_VALID_MODE
 from ..prompts.utils import DEFAULT_SYSTEM_PROMPT
 from ..prompts.template import PromptTemplate
 from ..actions.action import Action, ActionOutput
-from ..utils.utils import generate_dynamic_class_name, make_parent_folder
+from ..utils.utils import generate_dynamic_class_name, get_unique_class_name, make_parent_folder, string_to_json_schema_type, string_to_python_type
 from ..actions.customize_action import CustomizeAction
 from ..actions.action import ActionInput
 from ..tools.tool import Toolkit, Tool
@@ -67,8 +69,8 @@ class CustomizeAgent(Agent):
         prompt: Optional[str] = None, 
         prompt_template: Optional[PromptTemplate] = None, 
         llm_config: Optional[LLMConfig] = None, 
-        inputs: Optional[List[dict]] = None, 
-        outputs: Optional[List[dict]] = None, 
+        inputs: Optional[List[Union[dict, Parameter]]] = None, 
+        outputs: Optional[List[Union[dict, Parameter]]] = None, 
         system_prompt: Optional[str] = None,
         output_parser: Optional[Type[ActionOutput]] = None, 
         parse_mode: Optional[str] = "title", 
@@ -82,6 +84,8 @@ class CustomizeAgent(Agent):
         system_prompt = system_prompt or DEFAULT_SYSTEM_PROMPT
         inputs = inputs or [] 
         outputs = outputs or [] 
+        inputs = [item.to_dict(ignore=["class_name"]) if isinstance(item, Parameter) else item for item in inputs]
+        outputs = [item.to_dict(ignore=["class_name"]) if isinstance(item, Parameter) else item for item in outputs]
         if tools is not None:
             raw_tool_map = {tool.name: tool for tool in tools}
             tools = [tool if isinstance(tool, Toolkit) else Toolkit(name=tool.name, tools=[tool]) for tool in tools]
@@ -139,7 +143,9 @@ class CustomizeAgent(Agent):
             actions=[customize_action], 
             **kwargs
         )
-        self._store_inputs_outputs_info(inputs, outputs, raw_tool_map)
+        self.inputs = inputs
+        self.outputs = outputs
+        self._raw_tool_map = raw_tool_map
         self.output_parser = output_parser 
         self.parse_mode = parse_mode 
         self.parse_func = parse_func 
@@ -193,6 +199,26 @@ class CustomizeAgent(Agent):
             The prompt template for the primary custom action
         """
         return self.action.prompt_template
+
+    def _check_params_types(self, params: List[dict], param_name: str):
+
+        if not params:
+            return 
+        
+        # check if params is a list of dict  
+        if not isinstance(params, list):
+            raise ValueError(f"`{param_name}` must be a list of dict.")
+        for param in params:
+            if not isinstance(param, dict):
+                raise ValueError(f"`{param_name}` must be a list of dict.")
+            try:
+                Parameter.from_dict(param)
+            except Exception as e:
+                raise ValueError(
+                    f"`{param}` is an invalid {param_name} item. \n"
+                    f"Expected format: `{{'name': str, 'type': str, 'description': str, ['required': bool, 'json_schema': dict]}}`. \n"
+                    f"Details: {e}"
+                )
     
     def validate_data(self, prompt: str, prompt_template: PromptTemplate, inputs: List[dict], outputs: List[dict], output_parser: Type[ActionOutput], parse_mode: str, parse_func: Callable, title_format: str):
 
@@ -206,6 +232,10 @@ class CustomizeAgent(Agent):
             inputs_names_not_in_prompt = [name for name in all_input_names if f'{{{name}}}' not in prompt]
             if inputs_names_not_in_prompt:
                 raise KeyError(f"The following inputs are not found in the prompt: {inputs_names_not_in_prompt}.") 
+
+        # check the inputs and outputs types
+        self._check_params_types(inputs, "inputs")
+        self._check_params_types(outputs, "outputs")
         
         # check if the output_parser is valid 
         if output_parser is not None:
@@ -214,6 +244,11 @@ class CustomizeAgent(Agent):
         # check the parse_mode, parse_func, and title_format
         if parse_mode not in PARSER_VALID_MODE:
             raise ValueError(f"'{parse_mode}' is an invalid value for `parse_mode`. Available choices: {PARSER_VALID_MODE}.")
+
+        # `parse_mode` must be "json" when there are object or array parameters in the outputs 
+        if any(output_item.get("type") in {"object", "array"} for output_item in outputs):
+            if parse_mode != "json":
+                raise ValueError("`parse_mode` must be 'json' when there are object or array parameters in the outputs. ") 
         
         if parse_mode == "custom":
             if parse_func is None:
@@ -241,14 +276,14 @@ class CustomizeAgent(Agent):
             if r'{title}' not in title_format:
                 raise ValueError(r"`title_format` must contain the placeholder `{title}`.")
             
+    @staticmethod
     def create_customize_action(
-        self, 
         name: str, 
         desc: str, 
         prompt: str, 
         prompt_template: PromptTemplate, 
-        inputs: List[dict], 
-        outputs: List[dict], 
+        inputs: List[Union[dict, Parameter]], 
+        outputs: List[Union[dict, Parameter]], 
         parse_mode: str, 
         parse_func: Optional[Callable] = None,
         output_parser: Optional[ActionOutput] = None,
@@ -282,46 +317,19 @@ class CustomizeAgent(Agent):
         """
         assert prompt is not None or prompt_template is not None, "must provide `prompt` or `prompt_template` when creating CustomizeAgent"
 
-        # create the action input type
-        action_input_fields = {}
-        for field in inputs:
-            required = field.get("required", True)
-            if required:
-                action_input_fields[field["name"]] = (str, Field(description=field["description"]))
-            else:
-                action_input_fields[field["name"]] = (Optional[str], Field(default=None, description=field["description"]))
+        inputs = [item.to_dict(ignore=["class_name"]) if isinstance(item, Parameter) else item for item in inputs]
+        outputs = [item.to_dict(ignore=["class_name"]) if isinstance(item, Parameter) else item for item in outputs]
 
-        action_input_type = create_model(
-            self._get_unique_class_name(
-                generate_dynamic_class_name(name+" action_input")
-            ),
-            **action_input_fields, 
-            __base__=ActionInput
-        )
+        action_input_type = CustomizeAgent.create_action_input(inputs, name)
         
         # create the action output type
         if output_parser is None:
-            action_output_fields = {}
-            for field in outputs:
-                required = field.get("required", True)
-                if required:
-                    action_output_fields[field["name"]] = (Any, Field(description=field["description"]))
-                else:
-                    action_output_fields[field["name"]] = (Optional[Any], Field(default=None, description=field["description"]))
-            action_output_type = create_model(
-                self._get_unique_class_name(
-                    generate_dynamic_class_name(name+" action_output")
-                ),
-                **action_output_fields, 
-                __base__=ActionOutput,
-                # get_content_data=customize_get_content_data,
-                # to_str=customize_to_str
-            )
+            action_output_type = CustomizeAgent.create_action_output(outputs, name)
         else:
             # self._check_output_parser(outputs, output_parser)
             action_output_type = output_parser
         
-        action_cls_name = self._get_unique_class_name(
+        action_cls_name = get_unique_class_name(
             generate_dynamic_class_name(name+" action")
         )
 
@@ -347,6 +355,100 @@ class CustomizeAgent(Agent):
         )
 
         return customize_action
+
+    @staticmethod
+    def _prepare_action_info(params: List[Dict]) -> Dict:
+        """
+        Returns the fields for ActionInput/ActionOutput.
+        """
+        action_fields = {}
+        for field in params:
+            required = field.get("required", True)
+            try:
+                field_type = string_to_python_type[field["type"]]
+            except KeyError:
+                logger.warning(f'Could not find Python type for "{field["type"]}" (field: "{field["name"]}"), falling back to `Any`.')
+                field_type = Any
+
+            json_schema = field.get("json_schema", None)
+            
+            if required:
+                action_fields[field["name"]] = (field_type, Field(description=field["description"], json_schema_extra=json_schema))
+            else:
+                action_fields[field["name"]] = (Optional[field_type], Field(default=None, description=field["description"], json_schema_extra=json_schema))
+
+        return action_fields
+
+    @staticmethod
+    def _create_action_parser(params: List[Union[dict, Parameter]], action_name: str, type: Literal["input", "output"]) -> Type[Union[ActionInput, ActionOutput]]:
+        params = [item.to_dict(ignore=["class_name"]) if isinstance(item, Parameter) else item for item in params]
+
+        action_parser_type = ActionInput if type == "input" else ActionOutput
+        action_fields = CustomizeAgent._prepare_action_info(params)
+
+        if CustomizeAgent.contain_json_schema(params):
+            json_schema = CustomizeAgent.create_json_schema(params)
+        else:
+            json_schema = None
+
+        action_parser_class = create_model(
+            get_unique_class_name(
+                generate_dynamic_class_name(action_name+" action_input_output")
+            ),
+            **action_fields, 
+            __base__=action_parser_type,
+            __config__=ConfigDict(
+                json_schema_extra=json_schema
+            )
+        )
+        action_parser_class._evoagentx_param_specs = params
+        return action_parser_class
+
+    @staticmethod
+    def create_action_input(inputs: List[Union[dict, Parameter]], action_name: str) -> Type[ActionInput]:
+        return CustomizeAgent._create_action_parser(inputs, action_name, "input")
+
+    @staticmethod
+    def create_action_output(outputs: List[Union[dict, Parameter]], action_name: str) -> Type[ActionOutput]:
+        return CustomizeAgent._create_action_parser(outputs, action_name, "output")
+    
+    @staticmethod
+    def create_json_schema(params: List[dict]) -> Optional[dict]:
+
+        if not params:
+            return None 
+
+        properties = {}
+        required_params = [] 
+        for param in params:
+            param_name = param["name"]
+            param_type = string_to_json_schema_type[param["type"]]
+            param_description = param["description"]
+            param_required = param.get("required", True)
+            param_json_schema = param.get("json_schema", None)
+            if not param_json_schema:
+                param_json_schema = {
+                    "type": param_type, 
+                    "description": param_description
+                }
+            properties[param_name] = param_json_schema
+            if param_required:
+                required_params.append(param_name) 
+        
+        json_schema = {
+            "type": "object", 
+            "properties": properties, 
+            "required": required_params
+        }
+
+        return json_schema
+
+    @staticmethod
+    def contain_json_schema(params: List[dict]) -> bool:
+        for param in params:
+            if param.get("json_schema", None):
+                return True
+        return False
     
     def _check_output_parser(self, outputs: List[dict], output_parser: Type[ActionOutput]):
 
@@ -381,6 +483,31 @@ class CustomizeAgent(Agent):
             self._action_output_types[field["name"]] = field["type"]
             self._action_output_required[field["name"]] = required
         self._raw_tool_map = tool_map
+
+    def update_inputs(self, inputs: List[Union[dict, Parameter]]):
+        """
+        Update the inputs format of the customize agent.
+
+        Args:
+            inputs (List[Union[dict, Parameter]]): The new inputs format of the customize agent.
+        """
+        inputs = [item.to_dict(ignore=["class_name"]) if isinstance(item, Parameter) else item for item in inputs]
+        self.inputs = inputs
+        new_action_input = CustomizeAgent.create_action_input(inputs, self.name)
+        self.action.inputs_format = new_action_input
+
+
+    def update_outputs(self, outputs: List[Union[dict, Parameter]]):
+        """
+        Update the outputs format of the customize agent.
+
+        Args:
+            outputs (List[Union[dict, Parameter]]): The new outputs format of the customize agent.
+        """
+        outputs = [item.to_dict(ignore=["class_name"]) if isinstance(item, Parameter) else item for item in outputs]
+        self.outputs = outputs
+        new_action_output = CustomizeAgent.create_action_output(outputs, self.name)
+        self.action.outputs_format = new_action_output
     
     def __call__(self, inputs: dict = None, return_msg_type: MessageType = MessageType.UNKNOWN, **kwargs) -> Message:
         """
@@ -402,8 +529,6 @@ class CustomizeAgent(Agent):
         Get the information of the customize agent.
         """
         customize_action = self.get_action(self.customize_action_name)
-        action_input_params = customize_action.inputs_format.get_attrs()
-        action_output_params = customize_action.outputs_format.get_attrs()
         
         config = {
             "class_name": "CustomizeAgent",
@@ -412,24 +537,8 @@ class CustomizeAgent(Agent):
             "prompt": customize_action.prompt,
             "prompt_template": customize_action.prompt_template.to_dict() if customize_action.prompt_template is not None else None, 
             # "llm_config": self.llm_config.to_dict(exclude_none=True),
-            "inputs": [
-                {
-                    "name": field,
-                    "type": self._action_input_types[field],
-                    "description": field_info.description,
-                    "required": self._action_input_required[field]
-                }
-                for field, field_info in customize_action.inputs_format.model_fields.items() if field in action_input_params
-            ],
-            "outputs": [
-                {
-                    "name": field,
-                    "type": self._action_output_types[field],
-                    "description": field_info.description,
-                    "required": self._action_output_required[field]
-                }
-                for field, field_info in customize_action.outputs_format.model_fields.items() if field in action_output_params
-            ],
+            "inputs": self.inputs,
+            "outputs": self.outputs,
             "system_prompt": self.system_prompt,
             "output_parser": self.output_parser.__name__ if self.output_parser is not None else None,
             "parse_mode": self.parse_mode,
@@ -504,6 +613,46 @@ class CustomizeAgent(Agent):
                 break
             i += 1 
         return unique_name 
+
+    @classmethod
+    def from_dict(
+        cls, 
+        data: Dict[str, Any], 
+        llm_config: Optional[LLMConfig] = None, 
+        tools: Optional[List[Union[Toolkit, Tool]]] = None, 
+        **kwargs
+    ) -> 'CustomizeAgent':
+
+        agent_data = deepcopy(data)
+
+        class_name = agent_data.pop("class_name", None)
+        if class_name is not None and class_name != "CustomizeAgent":
+            raise ValueError(f"Expected class name 'CustomizeAgent', but got '{class_name}'")
+
+        if llm_config is not None:
+            agent_data["llm_config"] = llm_config
+        tool_names = agent_data.pop("tool_names", None)
+        
+        if tool_names:
+            if tools is None:
+                raise ValueError(f"Must provide the following tools: {tool_names}")
+            tool_map = {tool.name: tool for tool in tools}
+            agent_data["tools"] = [tool_map[tool_name] for tool_name in tool_names]
+        
+        parse_mode = agent_data.get("parse_mode")
+
+        # if parse_mode is not 'json', check if there are outputs in format 'object' or 'array'
+        if parse_mode != "json":
+            agent_outputs = agent_data.get("outputs")
+
+            if agent_outputs is not None:
+                for output in agent_outputs:
+                    if output["type"] == "object" or output["type"] == "array":
+                        agent_data["parse_mode"] = "json"
+                        logger.warning(f"`parse_mode` is set to 'json' for '{agent_data['name']}' because it has outputs in format 'object' or 'array'")
+                        break
+
+        return cls(**agent_data, **kwargs)
     
     def get_config(self) -> dict:
         """

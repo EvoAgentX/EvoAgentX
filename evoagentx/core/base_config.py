@@ -1,5 +1,5 @@
 # from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from .module import BaseModule
 
 class BaseConfig(BaseModule):
@@ -64,4 +64,4 @@ class Parameter(BaseModule):
     type: str 
     description: str 
     required: Optional[bool] = True 
-
+    json_schema: Optional[Dict[str, Any]] = None 
