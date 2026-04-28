@@ -31,7 +31,7 @@ class TestModule(unittest.TestCase):
     @patch("evoagentx.models.litellm_model.LiteLLM.single_generate")
     @patch("evoagentx.models.litellm_model.LiteLLM.single_generate_async")
     def test_simple_agent(self, mock_generate, mock_generate_async):
-        msg = "<answer>Hello, world!</answer>"
+        msg = "Hello, world!"
         mock_generate.return_value = msg
         mock_generate_async.return_value = msg
         llm_config = LiteLLMConfig(model="gpt-4o-mini", openai_key="xxxxx")
@@ -65,7 +65,7 @@ class TestModule(unittest.TestCase):
     @patch("evoagentx.models.litellm_model.LiteLLM.single_generate")
     @patch("evoagentx.models.litellm_model.LiteLLM.single_generate_async")
     def test_agent_with_inputs_and_outputs(self, mock_generate, mock_generate_async):
-        msg = "<answer>```python\nprint('Hello, world!')```</answer>"
+        msg = "```python\nprint('Hello, world!')```"
         mock_generate.return_value = msg 
         mock_generate_async.return_value = msg 
         llm_config = LiteLLMConfig(model="gpt-4o-mini", openai_key="xxxxx")

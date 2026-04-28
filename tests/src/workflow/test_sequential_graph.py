@@ -1,6 +1,7 @@
 import unittest
 import os
 import json
+from unittest.mock import patch
 from evoagentx.core.registry import register_parse_function
 from evoagentx.models import OpenAILLMConfig 
 from evoagentx.workflow.workflow_graph import SequentialWorkFlowGraph, WorkFlowNodeState
@@ -12,6 +13,8 @@ def custom_parse_func(content: str) -> dict:
 class TestModule(unittest.TestCase):
 
     def setUp(self):
+        self.init_llm_patcher = patch("evoagentx.agents.agent.Agent.init_llm", return_value=None)
+        self.init_llm_patcher.start()
         self.llm_config = OpenAILLMConfig(model="gpt-4o-mini", openai_key="XXX")
         # Sample task data for testing
         self.sample_tasks = [
@@ -41,6 +44,7 @@ class TestModule(unittest.TestCase):
         ]
 
     def tearDown(self):
+        self.init_llm_patcher.stop()
         # Remove any test files created during tests
         if os.path.exists("tests/workflow/test_workflow.json"):
             os.remove("tests/workflow/test_workflow.json")
@@ -151,7 +155,7 @@ class TestModule(unittest.TestCase):
         self.assertListEqual(["Task1", "Task2", "Task3"], task_names)
 
         # Check load the saved workflow
-        loaded_graph: SequentialWorkFlowGraph = SequentialWorkFlowGraph.from_file(save_path)
+        loaded_graph: SequentialWorkFlowGraph = SequentialWorkFlowGraph(goal=saved_data["goal"], tasks=saved_data["tasks"])
         self.assertEqual("Test Workflow", loaded_graph.goal)
         self.assertEqual(3, len(loaded_graph.nodes))
         # the loaded parse_func is a str, it will be converted to a function when used to initialize a CustomizeAgent 

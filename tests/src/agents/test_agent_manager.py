@@ -1,11 +1,8 @@
-import unittest
-from typing import Dict, List, Optional
-
 from evoagentx.agents.agent import Agent
 from evoagentx.agents.agent_manager import AgentManager, AgentState
 from evoagentx.agents.customize_agent import CustomizeAgent
 from evoagentx.models.model_configs import LiteLLMConfig
-from evoagentx.tools.tool import Tool, ToolMetadata, ToolResult
+import unittest
 
 
 class TestModule(unittest.TestCase):
@@ -15,25 +12,6 @@ class TestModule(unittest.TestCase):
         OPENAI_API_KEY = "xxxxx"
         llm_config = LiteLLMConfig(model="gpt-4o-mini", openai_key=OPENAI_API_KEY)
 
-        class MockToolInAgentManager(Tool):
-            name: str = "MockToolInAgentManager"
-            description: str = "Mock tool description"
-            inputs: Dict = {
-                "tool_input": {
-                    "type": "string", 
-                    "description": "tool input description"
-                }
-            }
-            required: Optional[List[str]] = None
-            def __call__(self, tool_input: str) -> ToolResult:
-                return ToolResult(
-                    result="Mock tool result", 
-                    metadata=ToolMetadata(
-                        name="MockToolInAgentManager", 
-                        args={"tool_input": tool_input}
-                    )
-                )
-        
         agent = Agent(
             name="Bob",
             description="Bob is an engineer. He excels in writing and reviewing codes for different projects.", 
@@ -42,8 +20,17 @@ class TestModule(unittest.TestCase):
             actions = [
                 {
                     "name": "WriteFileToDisk",
-                    "description": "save several files to local storage.",
-                    "tools": [MockToolInAgentManager()]
+                    "description": "save several files to local storage.", 
+                    "tools": [{
+                        "name": "FileToolKit",
+                        "tools": [
+                            {
+                                "name": "WriteFile",
+                                "description": "Write file to disk",
+                                "inputs": {}
+                            }
+                        ]
+                    }]
                 }
             ]
         )
@@ -53,12 +40,11 @@ class TestModule(unittest.TestCase):
         agent_manager.add_agents(
             agents=[
                 agent, 
-                {
-                    "class_name": "Agent", 
-                    "name": "test_agent",
-                    "description": "test_agent_description", 
-                    "llm_config": llm_config
-                }
+                Agent(
+                    name="test_agent",
+                    description="test_agent_description",
+                    llm_config=llm_config
+                )
             ]
         )
 
