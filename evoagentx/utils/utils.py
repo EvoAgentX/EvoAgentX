@@ -4,10 +4,15 @@ import time
 import regex
 import requests
 from tqdm import tqdm
-from typing import Union, Any, List, Set, Optional, Dict
+from typing import TYPE_CHECKING, Union, Any, List, Set, Optional, Dict
 
 from ..core.logging import logger
 from ..core.registry import MODULE_REGISTRY
+
+# Import for type hints (avoiding circular imports with TYPE_CHECKING)
+if TYPE_CHECKING:
+    from ..agents import Agent
+    from ..models import LLMConfig
 
 def make_parent_folder(path: str):
     """Checks if the parent folder of a given path exists, and creates it if not.
