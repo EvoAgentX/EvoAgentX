@@ -29,8 +29,11 @@ class TestModule(unittest.TestCase):
         ]
 
     @patch("evoagentx.models.litellm_model.LiteLLM.single_generate")
-    def test_simple_agent(self, mock_generate):
-        mock_generate.return_value = "Hello, world!"
+    @patch("evoagentx.models.litellm_model.LiteLLM.single_generate_async")
+    def test_simple_agent(self, mock_generate, mock_generate_async):
+        msg = "<answer>Hello, world!</answer>"
+        mock_generate.return_value = msg
+        mock_generate_async.return_value = msg
         llm_config = LiteLLMConfig(model="gpt-4o-mini", openai_key="xxxxx")
 
         simple_agent = CustomizeAgent(
@@ -60,8 +63,11 @@ class TestModule(unittest.TestCase):
         self.assertEqual(msg.content.content, "Hello, world!")
     
     @patch("evoagentx.models.litellm_model.LiteLLM.single_generate")
-    def test_agent_with_inputs_and_outputs(self, mock_generate):
-        mock_generate.return_value = "```python\nprint('Hello, world!')```" 
+    @patch("evoagentx.models.litellm_model.LiteLLM.single_generate_async")
+    def test_agent_with_inputs_and_outputs(self, mock_generate, mock_generate_async):
+        msg = "<answer>```python\nprint('Hello, world!')```</answer>"
+        mock_generate.return_value = msg 
+        mock_generate_async.return_value = msg 
         llm_config = LiteLLMConfig(model="gpt-4o-mini", openai_key="xxxxx")
         agent_with_inputs = CustomizeAgent(
             name = "CodeWriter",
