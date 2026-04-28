@@ -1,0 +1,525 @@
+{
+    "goal": "Generates a complete fairy tale based on user-provided themes, characters, and settings, including a moral lesson and character traits.",
+    "edges": [],
+    "nodes": [
+        {
+            "name": "Generate Fairy Tale and Character Profile",
+            "agents": [
+                {
+                    "name": "FairyTaleGeneratorAgent",
+                    "inputs": [
+                        {
+                            "name": "story_theme",
+                            "type": "string",
+                            "required": true,
+                            "class_name": "Parameter",
+                            "description": "The central theme of the fairy tale.",
+                            "json_schema": {
+                                "enum": [
+                                    "adventure",
+                                    "friendship",
+                                    "courage",
+                                    "mystery",
+                                    "love",
+                                    "magic"
+                                ],
+                                "type": "string",
+                                "description": "The central theme of the fairy tale."
+                            }
+                        },
+                        {
+                            "name": "story_context",
+                            "type": "string",
+                            "required": true,
+                            "class_name": "Parameter",
+                            "description": "The setting or background for the fairy tale (e.g., 'a magical forest with ancient trees').",
+                            "json_schema": {
+                                "type": "string",
+                                "description": "The setting or background for the fairy tale (e.g., 'a magical forest with ancient trees')."
+                            }
+                        },
+                        {
+                            "name": "character_type",
+                            "type": "string",
+                            "required": true,
+                            "class_name": "Parameter",
+                            "description": "The archetype of the main character (e.g., 'hero', 'wise old wizard').",
+                            "json_schema": {
+                                "type": "string",
+                                "description": "The archetype of the main character (e.g., 'hero', 'wise old wizard')."
+                            }
+                        },
+                        {
+                            "name": "target_audience",
+                            "type": "string",
+                            "required": false,
+                            "class_name": "Parameter",
+                            "description": "The intended audience for the fairy tale.",
+                            "json_schema": {
+                                "enum": [
+                                    "children",
+                                    "young_adults",
+                                    "adults"
+                                ],
+                                "type": "string",
+                                "description": "The intended audience for the fairy tale."
+                            }
+                        },
+                        {
+                            "name": "basic_description",
+                            "type": "string",
+                            "required": true,
+                            "class_name": "Parameter",
+                            "description": "A brief description of the main character (e.g., 'a brave little mouse named Whiskers').",
+                            "json_schema": {
+                                "type": "string",
+                                "description": "A brief description of the main character (e.g., 'a brave little mouse named Whiskers')."
+                            }
+                        },
+                        {
+                            "name": "plot_twist_element",
+                            "type": "string",
+                            "required": false,
+                            "class_name": "Parameter",
+                            "description": "An optional element to introduce a plot twist (e.g., 'a talking mirror').",
+                            "json_schema": {
+                                "type": "string",
+                                "description": "An optional element to introduce a plot twist (e.g., 'a talking mirror')."
+                            }
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "name": "title",
+                            "type": "string",
+                            "required": true,
+                            "class_name": "Parameter",
+                            "description": "The generated title of the fairy tale.",
+                            "json_schema": {
+                                "type": "string",
+                                "description": "The generated title of the fairy tale."
+                            }
+                        },
+                        {
+                            "name": "story_content",
+                            "type": "string",
+                            "required": true,
+                            "class_name": "Parameter",
+                            "description": "The full text content of the generated fairy tale.",
+                            "json_schema": {
+                                "type": "string",
+                                "description": "The full text content of the generated fairy tale."
+                            }
+                        },
+                        {
+                            "name": "moral_lesson",
+                            "type": "string",
+                            "required": true,
+                            "class_name": "Parameter",
+                            "description": "The moral or lesson conveyed by the fairy tale.",
+                            "json_schema": {
+                                "type": "string",
+                                "description": "The moral or lesson conveyed by the fairy tale."
+                            }
+                        },
+                        {
+                            "name": "character_name",
+                            "type": "string",
+                            "required": true,
+                            "class_name": "Parameter",
+                            "description": "The name of the main character in the generated story.",
+                            "json_schema": {
+                                "type": "string",
+                                "description": "The name of the main character in the generated story."
+                            }
+                        },
+                        {
+                            "name": "character_traits",
+                            "type": "array",
+                            "required": false,
+                            "class_name": "Parameter",
+                            "description": "Key traits of the main character.",
+                            "json_schema": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                },
+                                "description": "Key traits of the main character."
+                            }
+                        },
+                        {
+                            "name": "character_background",
+                            "type": "string",
+                            "required": false,
+                            "class_name": "Parameter",
+                            "description": "A brief background for the main character.",
+                            "json_schema": {
+                                "type": "string",
+                                "description": "A brief background for the main character."
+                            }
+                        },
+                        {
+                            "name": "suggested_image_prompt",
+                            "type": "string",
+                            "required": false,
+                            "class_name": "Parameter",
+                            "description": "A prompt that can be used to generate an image for the fairy tale.",
+                            "json_schema": {
+                                "type": "string",
+                                "description": "A prompt that can be used to generate an image for the fairy tale."
+                            }
+                        }
+                    ],
+                    "class_name": "CustomizeAgent",
+                    "parse_mode": "json",
+                    "tool_names": [
+                        "StorageToolkit"
+                    ],
+                    "description": "An expert storyteller agent that develops detailed character profiles and writes complete, engaging fairy tales based on specified themes, settings, and character inputs.",
+                    "prompt_template": {
+                        "class_name": "ChatTemplate",
+                        "constraints": [
+                            "The story must have a clear narrative arc: beginning (introduction), middle (conflict/climax), and end (resolution).",
+                            "The tone and vocabulary of the story must strictly align with the specified target_audience.",
+                            "The plot twist element, if provided, must not feel forced; it should logically fit within the magical rules of the story.",
+                            "All outputs must be in English."
+                        ],
+                        "instruction": "You are an expert storyteller and character designer. Your task is to generate a complete fairy tale and character profile based on the provided inputs. Follow these steps strictly:\n1. **Character Development**: Based on the `character_type` and `basic_description`, invent a fitting `character_name` (if not already provided in the description). Determine 3 to 5 `character_traits` (e.g., brave, curious, wise) and write a 2-3 sentence `character_background` explaining their origins, past, or motivations.\n2. **Story Generation**: Write the `story_content` (approximately 500-800 words). The narrative must revolve around the `story_theme` and take place in the `story_context`. Tailor the tone, vocabulary, and complexity to the `target_audience` (if provided, otherwise default to a general audience). If a `plot_twist_element` is provided, seamlessly integrate it into the climax or rising action of the story to surprise the reader.\n3. **Title and Moral**: Create an engaging, magical, and catchy `title` for the fairy tale. Formulate a clear, 1-2 sentence `moral_lesson` that reflects the story's conclusion and core theme.\n4. **Image Prompt Creation**: Write a highly detailed `suggested_image_prompt` (around 50-75 words) that vividly describes a key, visually striking scene from the story. Include details about the main character's appearance, the setting, lighting, colors, and mood, formatted suitably for an AI image generator.\nEnsure all outputs are produced in English."
+                    }
+                }
+            ],
+            "inputs": [
+                {
+                    "name": "story_theme",
+                    "type": "string",
+                    "required": true,
+                    "class_name": "Parameter",
+                    "description": "The central theme of the fairy tale.",
+                    "json_schema": {
+                        "enum": [
+                            "adventure",
+                            "friendship",
+                            "courage",
+                            "mystery",
+                            "love",
+                            "magic"
+                        ],
+                        "type": "string",
+                        "description": "The central theme of the fairy tale."
+                    }
+                },
+                {
+                    "name": "story_context",
+                    "type": "string",
+                    "required": true,
+                    "class_name": "Parameter",
+                    "description": "The setting or background for the fairy tale (e.g., 'a magical forest with ancient trees').",
+                    "json_schema": {
+                        "type": "string",
+                        "description": "The setting or background for the fairy tale (e.g., 'a magical forest with ancient trees')."
+                    }
+                },
+                {
+                    "name": "character_type",
+                    "type": "string",
+                    "required": true,
+                    "class_name": "Parameter",
+                    "description": "The archetype of the main character (e.g., 'hero', 'wise old wizard').",
+                    "json_schema": {
+                        "type": "string",
+                        "description": "The archetype of the main character (e.g., 'hero', 'wise old wizard')."
+                    }
+                },
+                {
+                    "name": "target_audience",
+                    "type": "string",
+                    "required": false,
+                    "class_name": "Parameter",
+                    "description": "The intended audience for the fairy tale.",
+                    "json_schema": {
+                        "enum": [
+                            "children",
+                            "young_adults",
+                            "adults"
+                        ],
+                        "type": "string",
+                        "description": "The intended audience for the fairy tale."
+                    }
+                },
+                {
+                    "name": "basic_description",
+                    "type": "string",
+                    "required": true,
+                    "class_name": "Parameter",
+                    "description": "A brief description of the main character (e.g., 'a brave little mouse named Whiskers').",
+                    "json_schema": {
+                        "type": "string",
+                        "description": "A brief description of the main character (e.g., 'a brave little mouse named Whiskers')."
+                    }
+                },
+                {
+                    "name": "plot_twist_element",
+                    "type": "string",
+                    "required": false,
+                    "class_name": "Parameter",
+                    "description": "An optional element to introduce a plot twist (e.g., 'a talking mirror').",
+                    "json_schema": {
+                        "type": "string",
+                        "description": "An optional element to introduce a plot twist (e.g., 'a talking mirror')."
+                    }
+                }
+            ],
+            "reason": "A single comprehensive stage allows for the cohesive generation of the character profile and the story, ensuring that the character's traits and background are perfectly integrated into the narrative, moral lesson, and visual prompt without disjointed steps.",
+            "status": "pending",
+            "outputs": [
+                {
+                    "name": "title",
+                    "type": "string",
+                    "required": true,
+                    "class_name": "Parameter",
+                    "description": "The generated title of the fairy tale.",
+                    "json_schema": {
+                        "type": "string",
+                        "description": "The generated title of the fairy tale."
+                    }
+                },
+                {
+                    "name": "story_content",
+                    "type": "string",
+                    "required": true,
+                    "class_name": "Parameter",
+                    "description": "The full text content of the generated fairy tale.",
+                    "json_schema": {
+                        "type": "string",
+                        "description": "The full text content of the generated fairy tale."
+                    }
+                },
+                {
+                    "name": "moral_lesson",
+                    "type": "string",
+                    "required": true,
+                    "class_name": "Parameter",
+                    "description": "The moral or lesson conveyed by the fairy tale.",
+                    "json_schema": {
+                        "type": "string",
+                        "description": "The moral or lesson conveyed by the fairy tale."
+                    }
+                },
+                {
+                    "name": "character_name",
+                    "type": "string",
+                    "required": true,
+                    "class_name": "Parameter",
+                    "description": "The name of the main character in the generated story.",
+                    "json_schema": {
+                        "type": "string",
+                        "description": "The name of the main character in the generated story."
+                    }
+                },
+                {
+                    "name": "character_traits",
+                    "type": "array",
+                    "required": false,
+                    "class_name": "Parameter",
+                    "description": "Key traits of the main character.",
+                    "json_schema": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Key traits of the main character."
+                    }
+                },
+                {
+                    "name": "character_background",
+                    "type": "string",
+                    "required": false,
+                    "class_name": "Parameter",
+                    "description": "A brief background for the main character.",
+                    "json_schema": {
+                        "type": "string",
+                        "description": "A brief background for the main character."
+                    }
+                },
+                {
+                    "name": "suggested_image_prompt",
+                    "type": "string",
+                    "required": false,
+                    "class_name": "Parameter",
+                    "description": "A prompt that can be used to generate an image for the fairy tale.",
+                    "json_schema": {
+                        "type": "string",
+                        "description": "A prompt that can be used to generate an image for the fairy tale."
+                    }
+                }
+            ],
+            "class_name": "WorkFlowNode",
+            "description": "Develop the character details and write the complete fairy tale, including the title, story content, moral lesson, and a suggested image prompt, based on the provided themes, settings, and character inputs."
+        }
+    ],
+    "auto_fix": true,
+    "class_name": "WorkFlowGraph",
+    "workflow_inputs": [
+        {
+            "name": "story_theme",
+            "type": "string",
+            "required": true,
+            "class_name": "Parameter",
+            "description": "The central theme of the fairy tale.",
+            "json_schema": {
+                "enum": [
+                    "adventure",
+                    "friendship",
+                    "courage",
+                    "mystery",
+                    "love",
+                    "magic"
+                ],
+                "type": "string",
+                "description": "The central theme of the fairy tale."
+            }
+        },
+        {
+            "name": "story_context",
+            "type": "string",
+            "required": true,
+            "class_name": "Parameter",
+            "description": "The setting or background for the fairy tale (e.g., 'a magical forest with ancient trees').",
+            "json_schema": {
+                "type": "string",
+                "description": "The setting or background for the fairy tale (e.g., 'a magical forest with ancient trees')."
+            }
+        },
+        {
+            "name": "character_type",
+            "type": "string",
+            "required": true,
+            "class_name": "Parameter",
+            "description": "The archetype of the main character (e.g., 'hero', 'wise old wizard').",
+            "json_schema": {
+                "type": "string",
+                "description": "The archetype of the main character (e.g., 'hero', 'wise old wizard')."
+            }
+        },
+        {
+            "name": "target_audience",
+            "type": "string",
+            "required": false,
+            "class_name": "Parameter",
+            "description": "The intended audience for the fairy tale.",
+            "json_schema": {
+                "enum": [
+                    "children",
+                    "young_adults",
+                    "adults"
+                ],
+                "type": "string",
+                "description": "The intended audience for the fairy tale."
+            }
+        },
+        {
+            "name": "basic_description",
+            "type": "string",
+            "required": true,
+            "class_name": "Parameter",
+            "description": "A brief description of the main character (e.g., 'a brave little mouse named Whiskers').",
+            "json_schema": {
+                "type": "string",
+                "description": "A brief description of the main character (e.g., 'a brave little mouse named Whiskers')."
+            }
+        },
+        {
+            "name": "plot_twist_element",
+            "type": "string",
+            "required": false,
+            "class_name": "Parameter",
+            "description": "An optional element to introduce a plot twist (e.g., 'a talking mirror').",
+            "json_schema": {
+                "type": "string",
+                "description": "An optional element to introduce a plot twist (e.g., 'a talking mirror')."
+            }
+        }
+    ],
+    "workflow_outputs": [
+        {
+            "name": "title",
+            "type": "string",
+            "required": true,
+            "class_name": "Parameter",
+            "description": "The generated title of the fairy tale.",
+            "json_schema": {
+                "type": "string",
+                "description": "The generated title of the fairy tale."
+            }
+        },
+        {
+            "name": "story_content",
+            "type": "string",
+            "required": true,
+            "class_name": "Parameter",
+            "description": "The full text content of the generated fairy tale.",
+            "json_schema": {
+                "type": "string",
+                "description": "The full text content of the generated fairy tale."
+            }
+        },
+        {
+            "name": "moral_lesson",
+            "type": "string",
+            "required": true,
+            "class_name": "Parameter",
+            "description": "The moral or lesson conveyed by the fairy tale.",
+            "json_schema": {
+                "type": "string",
+                "description": "The moral or lesson conveyed by the fairy tale."
+            }
+        },
+        {
+            "name": "character_name",
+            "type": "string",
+            "required": true,
+            "class_name": "Parameter",
+            "description": "The name of the main character in the generated story.",
+            "json_schema": {
+                "type": "string",
+                "description": "The name of the main character in the generated story."
+            }
+        },
+        {
+            "name": "character_traits",
+            "type": "array",
+            "required": false,
+            "class_name": "Parameter",
+            "description": "Key traits of the main character.",
+            "json_schema": {
+                "type": "array",
+                "items": {
+                    "type": "string"
+                },
+                "description": "Key traits of the main character."
+            }
+        },
+        {
+            "name": "character_background",
+            "type": "string",
+            "required": false,
+            "class_name": "Parameter",
+            "description": "A brief background for the main character.",
+            "json_schema": {
+                "type": "string",
+                "description": "A brief background for the main character."
+            }
+        },
+        {
+            "name": "suggested_image_prompt",
+            "type": "string",
+            "required": false,
+            "class_name": "Parameter",
+            "description": "A prompt that can be used to generate an image for the fairy tale.",
+            "json_schema": {
+                "type": "string",
+                "description": "A prompt that can be used to generate an image for the fairy tale."
+            }
+        }
+    ]
+}

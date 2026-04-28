@@ -16,8 +16,8 @@ from evoagentx.tools.storage_file import StorageToolkit
 load_dotenv() # Loads environment variables from .env file
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-output_file = "debug/output/test_workflow_output.md"
-module_save_path = "examples/output/test_workflow.json"
+output_file = "examples/output/test_workflow_output.md"
+module_save_path = "examples/workflow/graphs/json_workflow.json"
 
 def main(goal=None):
     # LLM configuration
