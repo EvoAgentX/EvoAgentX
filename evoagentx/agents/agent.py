@@ -280,6 +280,17 @@ class Agent(BaseModule):
             return message, action_input_data
         return message
     
+    def set_llm_config(self, llm_config: LLMConfig):
+        """Set a new LLM config and rebuild the LLM instance from it."""
+        self.llm_config = llm_config
+        llm_cls = MODEL_REGISTRY.get_model(llm_config.llm_type)
+        self.llm = llm_cls(config=llm_config)
+
+    def set_llm(self, llm: BaseLLM):
+        """Set a new LLM instance and sync llm_config from it."""
+        self.llm = llm
+        self.llm_config = llm.config
+    
     def init_llm(self):
         """
         Initialize the language model for the agent.

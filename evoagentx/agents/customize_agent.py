@@ -14,7 +14,7 @@ from ..models.base_model import PARSER_VALID_MODE
 from ..prompts.utils import DEFAULT_SYSTEM_PROMPT
 from ..prompts.template import PromptTemplate
 from ..actions.action import Action, ActionOutput
-from ..utils.utils import generate_dynamic_class_name, get_unique_class_name, make_parent_folder, string_to_json_schema_type, string_to_python_type
+from ..utils.utils import add_llm_config_to_agent_dict, generate_dynamic_class_name, get_unique_class_name, make_parent_folder, string_to_json_schema_type, string_to_python_type, tool_names_to_tools
 from ..actions.customize_action import CustomizeAction
 from ..actions.action import ActionInput
 from ..tools.tool import Toolkit, Tool
@@ -629,15 +629,11 @@ class CustomizeAgent(Agent):
         if class_name is not None and class_name != "CustomizeAgent":
             raise ValueError(f"Expected class name 'CustomizeAgent', but got '{class_name}'")
 
-        if llm_config is not None:
-            agent_data["llm_config"] = llm_config
+        agent_data = add_llm_config_to_agent_dict(agent_data, llm_config)
         tool_names = agent_data.pop("tool_names", None)
         
-        if tool_names:
-            if tools is None:
-                raise ValueError(f"Must provide the following tools: {tool_names}")
-            tool_map = {tool.name: tool for tool in tools}
-            agent_data["tools"] = [tool_map[tool_name] for tool_name in tool_names]
+        if tool_names and "tools" not in agent_data:
+            agent_data["tools"] = tool_names_to_tools(tool_names, tools)
         
         parse_mode = agent_data.get("parse_mode")
 

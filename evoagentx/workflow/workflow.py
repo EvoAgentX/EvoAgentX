@@ -2,7 +2,7 @@ import inspect
 import asyncio
 from copy import deepcopy
 from pydantic import Field, create_model
-from typing import Optional, List
+from typing import Dict, Optional, List
 from ..core.logging import logger
 from ..core.module import BaseModule
 from ..core.message import Message, MessageType
@@ -16,7 +16,7 @@ from .workflow_manager import WorkFlowManager, NextAction
 from .workflow_graph import WorkFlowNode, WorkFlowGraph
 from .action_graph import ActionGraph
 from ..hitl import HITLManager, HITLBaseAgent
-from ..utils.utils import generate_dynamic_class_name
+from ..utils.utils import fix_property_name, generate_dynamic_class_name
 from ..actions import ActionInput, ActionOutput
 
 class WorkFlow(BaseModule):
@@ -39,13 +39,16 @@ class WorkFlow(BaseModule):
             self.workflow_manager = WorkFlowManager(llm=self.llm)
         if self.agent_manager is None:
             logger.warning("agent_manager is NoneType when initializing a WorkFlow instance")
+        
+        self.output_names = {output.name: output.required for output in self.graph.workflow_outputs}
 
-    def execute(self, inputs: dict = {}, **kwargs) -> str:
+    def execute(self, inputs: dict = {}, extract_output: bool = False, **kwargs) -> str:
         """
         Synchronous wrapper for async_execute. Creates a new event loop and runs the async method.
         
         Args:
             inputs: Dictionary of inputs for workflow execution
+            extract_output: Use LLM to extract the workflow output
             **kwargs (Any): Additional keyword arguments
             
         Returns:
@@ -54,16 +57,17 @@ class WorkFlow(BaseModule):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
-            return loop.run_until_complete(self.async_execute(inputs, **kwargs))
+            return loop.run_until_complete(self.async_execute(inputs, extract_output, **kwargs))
         finally:
             loop.close()
 
-    async def async_execute(self, inputs: dict = {}, **kwargs) -> str:
+    async def async_execute(self, inputs: dict = {}, extract_output: bool = False, **kwargs) -> str:
         """
         Asynchronously execute the workflow.
         
         Args:
             inputs: Dictionary of inputs for workflow execution
+            extract_output: Use LLM to extract the final workflow output
             **kwargs (Any): Additional keyword arguments
             
         Returns:
@@ -105,8 +109,27 @@ class WorkFlow(BaseModule):
             return "Workflow Execution Failed"
         
         logger.info("Extracting WorkFlow Output ...")
-        output: str = await self.workflow_manager.extract_output(graph=self.graph, env=self.environment)
+        if extract_output:
+            output: str = await self.workflow_manager.extract_output(graph=self.graph, env=self.environment)
+        else:
+            output: dict = self.environment.get_execution_data(self.output_names)
+            output = self._fix_outputs(output)
         return output
+
+    def _fix_outputs(self, outputs: Dict) -> Dict:
+        """
+        Recursively fixes the property names of the outputs to match the provided JSON schema.
+        """
+
+        outputs_copy = deepcopy(outputs)
+
+        for output_name, output in outputs_copy.items():
+            json_schema = self.graph.workflow_outputs_dict[output_name].json_schema
+
+            if json_schema:
+                outputs_copy[output_name] = fix_property_name(output, json_schema)
+
+        return outputs_copy
     
     def _prepare_inputs(self, inputs: dict) -> dict:
         """

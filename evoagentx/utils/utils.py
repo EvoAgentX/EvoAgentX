@@ -4,7 +4,7 @@ import time
 import regex
 import requests
 from tqdm import tqdm
-from typing import Union, Any, List, Set
+from typing import Union, Any, List, Set, Optional, Dict
 
 from ..core.logging import logger
 from ..core.registry import MODULE_REGISTRY
@@ -78,6 +78,65 @@ string_to_json_schema_type = {
     "list": "array",
 }
 
+def tool_names_to_tools(
+    tool_names: Optional[List[str]] = None, 
+    tools: Optional[List] = None,
+) -> Optional[List]:
+
+    if not tool_names:
+        return None
+
+    if not tools:
+        raise ValueError(f"Must provide the following tools: {tool_names}")
+
+    tool_map = {tool.name: tool for tool in tools}
+    
+    tool_list = []
+    for tool_name in tool_names:
+        if tool_name not in tool_map:
+            raise ValueError(f"'{tool_name}' not found in provided tools")
+        tool_list.append(tool_map[tool_name])
+    return tool_list
+
+def add_llm_config_to_agent_dict(agent_dict: Dict, llm_config: Optional['LLMConfig'] = None) -> Dict:
+    """Assign the llm_config to agent_dict, overwriting any existing value.
+    If `llm` exists, it will be overwritten by `llm_config` to prevent conflicts.
+    If `is_human` is True, llm_config will not be added.
+    """
+
+    agent_dict_copy = agent_dict.copy()
+
+    if agent_dict_copy.get("is_human", False):
+        return agent_dict_copy
+
+    agent_llm_config = agent_dict_copy.get("llm_config", None)
+    agent_llm = agent_dict_copy.get("llm", None)
+
+    if llm_config is None and agent_llm_config is None and agent_llm is None:
+        raise ValueError("Must provide `llm_config` or `llm` for agent")
+
+    if llm_config is not None:
+        agent_dict_copy.pop("llm", None)
+        agent_dict_copy["llm_config"] = llm_config
+    return agent_dict_copy
+
+def create_agent_from_dict(
+    agent_dict: Dict, 
+    llm_config: Optional['LLMConfig'] = None,
+    tools: Optional[List] = None,
+    agents: Optional[List] = None,
+    **kwargs
+) -> 'Agent':
+
+    agent_class_name = agent_dict.pop("class_name", None)
+
+    if agent_class_name is None:
+        agent_class_name = "CustomizeAgent"
+    
+    cls = MODULE_REGISTRY.get_module(agent_class_name)
+    agent = cls.from_dict(data=agent_dict, llm_config=llm_config, tools=tools, agents=agents, **kwargs)
+    return agent
+
 def normalize_text(s: str) -> str:
 
     def remove_articles(text):
@@ -145,3 +204,48 @@ def download_file(url: str, save_file: str, max_retries=3, timeout=10):
         error_message = "Exceeded maximum retries. Download failed."
         logger.error(error_message)
         raise RuntimeError(error_message)
+
+
+def fix_property_name(object: Any, json_schema: Dict) -> Any:
+    """
+    Recursively fixes the property names of `object` to match the provided JSON schema.
+    """
+    if object is None:
+        return object
+
+    if json_schema["type"] == "array" and json_schema["items"]["type"] == "object":
+        return [fix_property_name(item, json_schema["items"]) for item in object]
+
+    elif json_schema["type"] == "object":
+        fixed_object = dict()
+        properties = json_schema.get("properties")
+
+        if properties is None:
+            return object
+        
+        for property_name, property_schema in properties.items():
+
+            if property_schema["type"] == "array":
+                property = object.get(property_name, None)
+                if property is not None:
+                    fixed_object[property_name] = [fix_property_name(item, property_schema["items"]) for item in property]
+            
+            elif property_schema["type"] == "object":
+                property = object.get(property_name, None)
+                if property is not None:
+                    fixed_object[property_name] = fix_property_name(property, property_schema)
+            
+            else:
+                object_properties_lower = {name.lower(): name for name in object}
+                schema_properties_lower = {name.lower(): name for name in properties}
+                
+                for name in object_properties_lower:
+                    if name in schema_properties_lower:
+                        fixed_object[schema_properties_lower[name]] = object[object_properties_lower[name]]
+                    else:
+                        fixed_object[object_properties_lower[name]] = object[object_properties_lower[name]]
+        
+        return fixed_object
+
+    else:
+        return object

@@ -1,6 +1,7 @@
 import json
 import inspect
 import threading
+import os
 from enum import Enum
 import networkx as nx 
 from copy import deepcopy
@@ -15,9 +16,12 @@ from ..core.module import BaseModule
 from ..core.base_config import Parameter
 from .action_graph import ActionGraph
 from ..agents.agent import Agent 
-from ..utils.utils import generate_dynamic_class_name, make_parent_folder
+from ..models.model_configs import LLMConfig
+from ..tools.tool import Tool, Toolkit
+from ..utils.utils import create_agent_from_dict, generate_dynamic_class_name, make_parent_folder
 from ..prompts.workflow.sew_workflow import SEW_WORKFLOW
 from ..prompts.utils import DEFAULT_SYSTEM_PROMPT
+from .model_selector import DefaultModelSelector, ModelSelector
 # from ..tools.tool import Toolkit, Tool
 
 
@@ -61,7 +65,7 @@ class WorkFlowNode(BaseModule):
     inputs: List[Parameter] # inputs for the task
     outputs: List[Parameter] # outputs of the task
     reason: Optional[str] = None
-    agents: Optional[List[Union[str, dict]]] = None
+    agents: Optional[List[Union[str, dict, Agent]]] = None
     action_graph: Optional[ActionGraph] = None
     status: Optional[WorkFlowNodeState] = WorkFlowNodeState.PENDING
 
@@ -76,11 +80,13 @@ class WorkFlowNode(BaseModule):
             if isinstance(agent, str):
                 validated_agents.append(agent)
             elif isinstance(agent, Agent):
-                validated_agents.append(agent.get_config())
+                validated_agents.append(agent)
             elif isinstance(agent, dict):
                 assert "name" in agent and "description" in agent, \
                     "must provide the name and description of an agent when specifying an agent with a dict."
                 validated_agents.append(agent)
+            else:
+                raise TypeError(f"'{type(agent)}' is an unknown agent type!")
         return validated_agents
 
     @model_validator(mode="after")
@@ -179,6 +185,8 @@ class WorkFlowNode(BaseModule):
                 agent_names.append(agent)
             elif isinstance(agent, dict):
                 agent_names.append(agent["name"])
+            elif isinstance(agent, Agent):
+                agent_names.append(agent.name)
             else:
                 raise TypeError(f"{type(agent)} is an unknown agent type!")
         return agent_names
@@ -306,6 +314,9 @@ class WorkFlowGraph(BaseModule):
     nodes: Optional[List[WorkFlowNode]] = []
     edges: Optional[List[WorkFlowEdge]] = []
     graph: Optional[Union[MultiDiGraph, "WorkFlowGraph"]] = Field(default=None, exclude=True)
+    workflow_inputs: Optional[List[Parameter]] = None
+    workflow_outputs: Optional[List[Parameter]] = None
+    auto_fix: bool = False
 
     def init_module(self):
         self._lock = threading.Lock()
@@ -317,6 +328,26 @@ class WorkFlowGraph(BaseModule):
             self._init_from_workflowgraph(self.graph, self.nodes, self.edges)
         else:
             raise TypeError(f"{type(self.graph)} is an unknown type for graph. Supported types: [MultiDiGraph, WorkFlowGraph]")
+        
+        # If `workflow_inputs` is not provided, set it to the inputs of initial nodes
+        if self.workflow_inputs is None:
+            initial_nodes = [node for node, in_degree in self.graph.in_degree() if in_degree==0]
+            workflow_inputs = []
+            for node_name in initial_nodes:
+                workflow_inputs.extend(self.get_node(node_name).inputs)
+            self.workflow_inputs = workflow_inputs
+
+        # If `workflow_outputs` is not provided, set it to the outputs of end nodes
+        if self.workflow_outputs is None:
+            end_nodes = [node for node, out_degree in self.graph.out_degree() if out_degree==0]
+            workflow_outputs = []
+            for node_name in end_nodes:
+                workflow_outputs.extend(self.get_node(node_name).outputs)
+            self.workflow_outputs = workflow_outputs
+
+        self.workflow_inputs_dict = {param.name: param for param in self.workflow_inputs}
+        self.workflow_outputs_dict = {param.name: param for param in self.workflow_outputs}
+
         self._validate_workflow_structure()
         self.update_graph()
     
@@ -1072,6 +1103,104 @@ class WorkFlowGraph(BaseModule):
         config = self.to_dict() 
         config.pop("graph", None)
         return config
+
+    @classmethod
+    def from_file(cls, path: str, load_function: Callable=None, **kwargs) -> 'WorkFlowGraph':
+        use_logger = kwargs.pop("log", True)
+        if not os.path.exists(path):
+            error_message = f"File \"{path}\" does not exist!"
+            if use_logger:
+                logger.error(error_message)
+            raise ValueError(error_message)
+        
+        function = load_function or cls.load_module
+        content = function(path, **kwargs)
+        module = cls.from_dict(content, **kwargs)
+
+        return module
+
+    @classmethod
+    def from_dict(
+        cls, 
+        data: Dict, 
+        llm_config: Optional[LLMConfig] = None, 
+        tools: Optional[List[Union[Tool, Toolkit]]] = None, 
+        agents: Optional[List[Agent]] = None,
+        auto_fix: bool = False,
+        model_selector: Optional[ModelSelector] = None,
+        override: bool = True,
+        **kwargs
+    ) -> 'WorkFlowGraph':
+        """
+        Create a WorkFlowGraph instance from a dictionary.
+
+        Args:
+            data (Dict): The dictionary to create the WorkFlowGraph from.
+            llm_config (Optional[LLMConfig]): The LLM configuration to use for the agents.
+            tools (Optional[List[Union[Tool, Toolkit]]]): The tools to use for the agents.
+            agents (Optional[List[Agent]]): The agents to use for the workflow.
+            auto_fix (bool): Whether to automatically fix mismatched `type` and `required` fields when the parameter name is the same.
+            model_selector (Optional[ModelSelector]): The model selector to use for the agents. If None, a DefaultModelSelector will be used.
+            override (bool): Whether to override the existing LLMConfig of the agents.
+            **kwargs: Additional keyword arguments to pass to the create_agent_from_dict function.
+        """
+
+        kwargs.pop("log", None)
+
+        if override and not llm_config and not model_selector:
+            override = False
+
+        if model_selector is None:
+            model_selector = DefaultModelSelector(llm_config, override=override)
+
+        workflow_dict = deepcopy(data)
+
+        for node in workflow_dict["nodes"]:
+            for i, agent in enumerate(node.get("agents") or []):
+                if isinstance(agent, dict):
+                    agent_llm_config = model_selector.get_model(agent)
+
+                    if agent_llm_config is None and not agent.get("is_human", False):
+                        agent_dict_llm_config = agent.get("llm_config", None)
+                        agent_llm = agent.get("llm", None)
+                        if agent_dict_llm_config is None and agent_llm is None:
+                            raise ValueError(f"Must provide `llm_config` or `llm` for agent '{agent.get('name', '')}'")
+
+                    node["agents"][i] = create_agent_from_dict(
+                        agent_dict=agent, 
+                        llm_config=agent_llm_config, 
+                        tools=tools, 
+                        agents=agents,
+                        **kwargs
+                    )
+                
+                elif isinstance(agent, Agent):
+                    agent_llm_config = model_selector.get_model(agent)
+
+                    if agent_llm_config is not None:
+                        agent.set_llm_config(agent_llm_config)
+                
+                elif isinstance(agent, str):
+                    continue
+                
+                else:
+                    raise TypeError(f"'{type(agent)}' is an unknown agent type!")
+
+        workflow_inputs = BaseModule._process_data(workflow_dict.get("workflow_inputs", None))
+        workflow_outputs = BaseModule._process_data(workflow_dict.get("workflow_outputs", None))
+        nodes = BaseModule._process_data(workflow_dict.get("nodes", []))
+        edges = BaseModule._process_data(workflow_dict.get("edges", []))
+        
+        workflow_graph: WorkFlowGraph = cls(
+            goal=workflow_dict.get("goal", ""),
+            nodes=nodes,
+            edges=edges,
+            workflow_inputs=workflow_inputs,
+            workflow_outputs=workflow_outputs,
+            auto_fix=auto_fix
+        )
+
+        return workflow_graph
 
 
 class SequentialWorkFlowGraph(WorkFlowGraph):
