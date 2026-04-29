@@ -1,7 +1,80 @@
-from typing import Any, Callable, Dict, List, Optional
 import abc
+from enum import Enum
+from pydantic import Field, model_validator
+from jsonschema import validate, ValidationError
+from typing import Any, Callable, Dict, List, Optional
+
+from ...core.module import BaseModule
 from .decorators import EntryPoint
 from .registry import ParamRegistry
+
+class OptimizationUnitType(str, Enum):
+    FIELD = "field"
+    PROMPT = "prompt"
+    MODEL = "model"
+    MEMORY = "memory"
+    SKILLS = "skills"
+
+
+class OptimizationUnit(BaseModule):
+    name: str = Field(description="Name of the optimization unit; also serves as the default uid")
+    unitType: OptimizationUnitType = Field(description="Type of the optimization unit")
+    uid: str = Field(default="", description="Stable unique ID for this unit across adapter reconstructions; defaults to name if not set explicitly")
+    json_schema: Optional[dict] = Field(default=None, description="Optional schema for the optimization unit, used to validate the parameters associated with this unit")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _default_uid_to_name(cls, data: Any) -> Any:
+        if isinstance(data, dict) and not data.get("uid"):
+            data = {**data, "uid": data.get("name", "")}
+        return data
+
+
+class UnitChange(BaseModule):
+    uid: str = Field(description="Unique ID of the optimization unit to change")
+    value: Any = Field(description="New value to apply to the optimization unit")
+    old_value: Optional[Any] = Field(default=None, description="Previous value of the optimization unit before change (optional)")
+
+    @staticmethod
+    def validate_value(value: Any, unit: OptimizationUnit) -> None:
+        """
+        Validate a value against the json_schema of the given OptimizationUnit.
+
+        Args:
+            value: The candidate value to validate.
+            unit: The OptimizationUnit whose json_schema defines the validation rules.
+
+        Raises:
+            ValueError: If the value does not conform to the unit's json_schema.
+        """
+        if unit.json_schema is None:
+            return # No schema means no validation needed
+        
+        try:
+            validate(instance=value, schema=unit.json_schema)
+        except ValidationError as e:
+            raise ValueError(
+                f"Value for unit '{unit.name} (uid={unit.uid}) "
+                f"does not conform to its json_schema: {e.message}"
+            )
+            
+    @classmethod
+    def create(cls, unit: OptimizationUnit, new_value: Any, old_value: Optional[Any] = None) -> "UnitChange":
+        """
+        Preferred constructor for optimizer-side change construction.
+        Validates the value against the unit's json_schema before constructing the instance, ensuring changes applied to a unit are always valid. 
+
+        Args:
+            unit: The OptimizationUnit being changed.
+            new_value: The new value to apply to the unit.
+            old_value: The previous value of the unit before change (optional).
+        
+        Returns:
+            A UnitChange instance with the provided values if validation passes.
+        """
+        cls.validate_value(new_value, unit)
+        return cls(uid=unit.uid, value=new_value, old_value=old_value)
+
 
 class BaseOptimizer(abc.ABC):
     # def __init__(
