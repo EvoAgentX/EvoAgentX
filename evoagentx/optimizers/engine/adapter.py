@@ -1,17 +1,11 @@
 import abc
+from dataclasses import dataclass
 from uuid import uuid4
 from pydantic import Field
-from typing import final, List, Any, Optional, Dict
+from typing import final, List, Any, Optional, Dict, Literal
 
 from ...core.module import BaseModule
 from .base import OptimizationUnit, UnitChange
-
-
-class ProgramAdapterMeta(abc.ABCMeta):
-    def __call__(cls, *args, **kwargs) -> Any:
-        instance = super().__call__(*args, **kwargs)
-        instance._post_init()
-        return instance
 
 
 class SnapShot(BaseModule):
@@ -20,8 +14,20 @@ class SnapShot(BaseModule):
     program_config: Optional[Dict[str, Any]] = Field(default=None, description="Complete adapter-defined configuration required to fully reconstruct the underlying program (e.g. model settings, pipeline paths, non-optimizable params). Opaque to the framework; populated and consumed exclusively by the adapter's take_snapshot / from_snapshot. Set to None if unit_values alone is sufficient for reconstruction.")
 
 
+@dataclass
+class ApplyResult:
+    """Return value of ProgramAdapter.apply, carrying either a successful (adapter, snapshot) pair or a failure description."""
+    status: Literal["success", "failed"]
+    adapter: Optional["ProgramAdapter"] = None
+    snapshot: Optional[SnapShot] = None
+    error: Optional[str] = None
 
-class ProgramAdapter(abc.ABC, metaclass=ProgramAdapterMeta):
+    @property
+    def ok(self) -> bool:
+        return self.status == "success"
+
+
+class ProgramAdapter(abc.ABC):
 
     def __init_subclass__(cls, **kwargs) -> None:
         super().__init_subclass__(**kwargs)
@@ -33,9 +39,6 @@ class ProgramAdapter(abc.ABC, metaclass=ProgramAdapterMeta):
             raise TypeError(
                 f"{cls.__name__} must implement execute() or async_execute()."
             )
-
-    def _post_init(self) -> None:
-        self._units = self._validate_units(self.register_units())
 
     def _validate_units(self, units: List[OptimizationUnit]) -> List[OptimizationUnit]:
         if not units:
@@ -78,37 +81,50 @@ class ProgramAdapter(abc.ABC, metaclass=ProgramAdapterMeta):
             UnitChange.validate_value(change.value, unit)
 
     @final
-    def apply(self, snapshot: SnapShot, changes: List[UnitChange], **kwargs) -> "ProgramAdapter":
+    def apply(self, snapshot: SnapShot, changes: List[UnitChange], **kwargs) -> ApplyResult:
         """
-        Apply a changeset on top of a snapshot and return a new adapter reflecting the result.
+        Apply a changeset on top of a snapshot and return an ApplyResult.
 
         Subclasses should NOT override this method. Use `pre_apply_hook` / `post_apply_hook`
         for lifecycle customization, and `from_snapshot` / `merge_changes` for the core logic.
 
-        The original adapter and the input snapshot should not be modified.
+        The original adapter and the input snapshot are never modified. On success the returned
+        ApplyResult carries both the new adapter and the SnapShot produced by `merge_changes`,
+        so the caller never needs to call `take_snapshot()` again to obtain a consistent snapshot.
 
         Args:
             snapshot: The baseline snapshot to apply changes on top of.
             changes:  List of UnitChange objects specifying which units to update.
 
         Returns:
-            A new ProgramAdapter instance reflecting the applied changes.
-
-        Raises:
-            ValueError: If validation fails (see `_validate_changes`).
-            TypeError:  If `from_snapshot` does not return a ProgramAdapter instance.
+            ApplyResult with status="success" and (adapter, snapshot) on success, or
+            status="failed" and an error message string on any exception.
         """
-        processed_changes = self.pre_apply_hook(snapshot, changes, **kwargs)
-        self._validate_changes(processed_changes)
-        new_snapshot = self.merge_changes(snapshot, processed_changes, **kwargs)
-        new_adapter = self.from_snapshot(new_snapshot, **kwargs)
-        if not isinstance(new_adapter, ProgramAdapter):
-            raise TypeError(
-                f"from_snapshot() must return a ProgramAdapter instance, "
-                f"got {type(new_adapter).__name__}."
-            )
-        self.post_apply_hook(new_adapter, processed_changes)
-        return new_adapter
+        try:
+            processed_changes = self.pre_apply_hook(snapshot, changes, **kwargs)
+            self._validate_changes(processed_changes)
+            new_snapshot = self.merge_changes(snapshot, processed_changes, **kwargs)
+            new_adapter = self.from_snapshot(new_snapshot, **kwargs)
+            if not isinstance(new_adapter, ProgramAdapter):
+                raise TypeError(
+                    f"from_snapshot() must return a ProgramAdapter instance, "
+                    f"got {type(new_adapter).__name__}."
+                )
+            self.post_apply_hook(new_adapter, processed_changes)
+            return ApplyResult(status="success", adapter=new_adapter, snapshot=new_snapshot)
+        except Exception as e:
+            return ApplyResult(status="failed", error=str(e))
+
+    @property
+    def supports_concurrent_execution(self) -> bool:
+        """
+        Whether multiple concurrent evaluate calls are safe on adapters produced by this class.
+
+        Return True if the underlying program is stateless or otherwise safe to evaluate
+        concurrently (e.g. pure API calls, read-only inference). Defaults to False so the
+        optimizer runs trials sequentially unless the adapter explicitly opts in.
+        """
+        return False
 
     @final
     def load_snapshot(self, snapshot: SnapShot, **kwargs) -> "ProgramAdapter":

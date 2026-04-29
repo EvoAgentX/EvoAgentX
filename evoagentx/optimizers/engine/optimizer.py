@@ -1,10 +1,12 @@
 import abc
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from pydantic import Field
-from typing import Any, Callable, FrozenSet, Optional, List, Dict, Literal
+from typing import Any, Awaitable, Callable, FrozenSet, Optional, List, Dict, Literal
 
 from ...core.module import BaseModule
 from .base import OptimizationUnitType, OptimizationUnit, UnitChange
-from .adapter import SnapShot, ProgramAdapter
+from .adapter import SnapShot, ProgramAdapter, ApplyResult
 
 
 class OptimizationProposal(BaseModule):
@@ -144,17 +146,19 @@ class TrialRuntime:
 
         Pipeline:
         1. Fetch `base_snapshot = state.get_snapshot(proposal.source_snapshot_id)`, then
-           call `self.adapter.apply(base_snapshot, proposal.changes)` to produce
-           `new_adapter`. `self.adapter` is never modified and remains the stable base
-           for all trials in the run.
-        2. Call `new_adapter.take_snapshot()` immediately to capture the clean post-apply
-           configuration before any evaluation side-effects can pollute it.
-        3. Run evaluation: call `evaluate_fn(new_adapter)` to obtain a metrics dict.
+           call `result = self.adapter.apply(base_snapshot, proposal.changes)`.
+           `self.adapter` is never modified and remains the stable base for all trials.
+           If `result.ok` is False, record the trial as status="failed" with `result.error`
+           and return without updating best_snapshot_id.
+        2. Use `result.snapshot` (produced by `merge_changes` inside `apply`) directly as
+           the canonical snapshot for this trial. Do NOT call `new_adapter.take_snapshot()`
+           — the snapshot from `apply` is guaranteed consistent with the adapter's state.
+        3. Run evaluation: call `evaluate_fn(result.adapter)` to obtain a metrics dict.
            On exception, record the trial as status="failed" with the error message
            and append the failed record to state without updating best_snapshot_id.
         4. Build a TrialRecord (trial_id = len(state.trial_records)) with the
            snapshot_id, metrics, and status.
-        5. Append the new SnapShot and TrialRecord to `state`.
+        5. Append `result.snapshot` and the TrialRecord to `state`.
         6. Update `state.best_snapshot_id` using `objective.select_best_snapshot_id`.
 
         Note: `state.current_step` is NOT incremented here; the caller (`Optimizer.optimize`)
@@ -174,7 +178,114 @@ class TrialRuntime:
         # when calling self.adapter.apply, pass the copied base_snapshot, since the it might be modified in-place by the apply method
         pass
 
+    async def async_run(
+        self,
+        state: OptimizationRunState,
+        proposal: OptimizationProposal,
+        evaluate_fn: Callable[[ProgramAdapter], Awaitable[Dict[str, Any]]],
+        objective: Objective,
+        **kwargs
+    ) -> OptimizationRunState:
+        """
+        Async variant of `run`. Identical pipeline but `evaluate_fn` is awaited.
 
+        Args:
+            state: The current optimization run state.
+            proposal: The proposed changeset and its source snapshot.
+            evaluate_fn: Async callable that executes the adapted program and returns metrics.
+            objective: Used to update `best_snapshot_id` after the trial completes.
+            **kwargs: Forwarded to `self.adapter.apply`.
+
+        Returns:
+            Updated OptimizationRunState (see `run` for full pipeline description).
+        """
+        pass
+
+    def run_batch(
+        self,
+        state: OptimizationRunState,
+        proposals: List[OptimizationProposal],
+        evaluate_fn: Callable[[ProgramAdapter], Dict[str, Any]],
+        objective: Objective,
+        execution_mode: Literal["sequential", "concurrent"] = "sequential",
+        **kwargs
+    ) -> OptimizationRunState:
+        """
+        Run a batch of proposals and return the updated state.
+
+        Sequential mode evaluates proposals one after another; each trial sees the
+        state already updated by its predecessors.
+
+        Concurrent mode submits all trials to a ThreadPoolExecutor so that
+        I/O-bound evaluate calls (e.g. LLM API requests) run in parallel. All
+        trials start from the same read-only snapshot of the current state;
+        results are merged in submission order after all threads finish. Only use
+        when `adapter.supports_concurrent_execution` is True.
+
+        Args:
+            state: Current optimization run state.
+            proposals: List of proposals to evaluate.
+            evaluate_fn: Sync callable returning evaluation metrics.
+            objective: Used to update `best_snapshot_id` after the batch.
+            execution_mode: "sequential" (default) or "concurrent".
+            **kwargs: Forwarded to each `run` call.
+
+        Returns:
+            Updated OptimizationRunState after all proposals have been evaluated.
+        """
+        if execution_mode == "sequential":
+            for proposal in proposals:
+                state = self.run(state, proposal, evaluate_fn, objective, **kwargs)
+            return state
+
+        # concurrent: each thread runs one trial independently from the current state.
+        # Results are merged in submission order after all threads finish.
+        # TODO: implement _single_trial_outcome that returns (SnapShot, TrialRecord)
+        #   without modifying state, then submit all via ThreadPoolExecutor and merge.
+        pass
+
+    async def async_run_batch(
+        self,
+        state: OptimizationRunState,
+        proposals: List[OptimizationProposal],
+        evaluate_fn: Callable[[ProgramAdapter], Awaitable[Dict[str, Any]]],
+        objective: Objective,
+        execution_mode: Literal["sequential", "concurrent"] = "sequential",
+        **kwargs
+    ) -> OptimizationRunState:
+        """
+        Run a batch of proposals and return the updated state.
+
+        Sequential mode evaluates proposals one after another, so each trial sees the
+        state already updated by its predecessors.
+
+        Concurrent mode launches all trials from the *same* read-only snapshot of the
+        current state via `asyncio.gather`, collects (snapshot, record) pairs without
+        touching shared state, then merges all results in order. This avoids race
+        conditions at the cost of trials not seeing each other's intermediate results.
+        Only use when `adapter.supports_concurrent_execution` is True.
+
+        Args:
+            state: Current optimization run state.
+            proposals: List of proposals to evaluate.
+            evaluate_fn: Async callable returning evaluation metrics.
+            objective: Used to update `best_snapshot_id` after the batch.
+            execution_mode: "sequential" (default) or "concurrent".
+            **kwargs: Forwarded to each `async_run` call.
+
+        Returns:
+            Updated OptimizationRunState after all proposals have been evaluated.
+        """
+        if execution_mode == "sequential":
+            for proposal in proposals:
+                state = await self.async_run(state, proposal, evaluate_fn, objective, **kwargs)
+            return state
+
+        # concurrent: each trial reads the current state independently, results merged after
+        # TODO: implement _async_single_outcome helper that runs one trial without
+        #   modifying state, then gather all, append snapshots/records, and update
+        #   best_snapshot_id once at the end.
+        pass
 
 
 class Optimizer(abc.ABC):
@@ -196,25 +307,13 @@ class Optimizer(abc.ABC):
         self.kwargs = kwargs
 
         # TODO: check the compatibility between adapter's units and optimizer's supported unit types, warn or raise error if incompatible
-    
-    def optimize(
-        self,
-        evaluate_fn: Callable[[ProgramAdapter], dict[str, Any]],
-        objective: Optional[Objective] = None,
-        max_trials: Optional[int] = 3,
-        save_dir: Optional[str] = None,
-        resume_from: Optional[str] = None,
-        **kwargs
-    ) -> ProgramAdapter:
-        
-        if not isinstance(max_trials, int) or max_trials <= 0:
-            raise ValueError(f"`max_trials` must be a positive integer, got {max_trials}")
-        
-        # define default objective if not provided
-        if objective is None:
-            objective = Objective() # TODO: placehoder, change when Objective is defined
 
-        # load or initialize optimization state
+    def _init_run_state(
+        self,
+        save_dir: Optional[str],
+        resume_from: Optional[str],
+    ) -> OptimizationRunState:
+        """Load or create OptimizationRunState and seed the initial snapshot."""
         if resume_from:
             state = OptimizationRunState.load_state(resume_from)
         else:
@@ -227,34 +326,95 @@ class Optimizer(abc.ABC):
             state.snapshots.append(initial_snapshot)
             state.best_snapshot_id = initial_snapshot.snapshot_id
 
-        for step in range(max_trials):
-            if step < state.current_step:
-                continue # skip already completed trials when resuming
-            
-            # the algorithm chooses a snapshot to start from in this trial, 
-            # and propose a set of changes to apply on the snapshot
-            proposal: OptimizationProposal = self.propose(state, objective, **kwargs)
+        return state
 
-            # apply the proposed changes on the base snapshot specified in the proposal,
-            # generate a new snapshot and record the generated snapshot,
-            # then execute, evaluate and record the trial results
-            state: OptimizationRunState = self.runtime.run(
+    def optimize(
+        self,
+        evaluate_fn: Callable[[ProgramAdapter], Dict[str, Any]],
+        objective: Optional[Objective] = None,
+        max_trials: Optional[int] = 3,
+        save_dir: Optional[str] = None,
+        resume_from: Optional[str] = None,
+        **kwargs
+    ) -> ProgramAdapter:
+
+        if not isinstance(max_trials, int) or max_trials <= 0:
+            raise ValueError(f"`max_trials` must be a positive integer, got {max_trials}")
+
+        if objective is None:
+            objective = Objective()
+
+        state = self._init_run_state(save_dir, resume_from)
+
+        while state.current_step < max_trials:
+            remaining = max_trials - state.current_step
+            proposals = self.batch_propose(state, objective, **kwargs)[:remaining]
+            state = self.runtime.run_batch(
                 state=state,
-                proposal=proposal,
+                proposals=proposals,
                 evaluate_fn=evaluate_fn,
                 objective=objective,
                 **kwargs
             )
+            state.current_step += len(proposals)
+            state.save_state()
 
-            # save the candidate snapshot, trial results
-            state.current_step = step + 1
-            state.save_state() # TODO: implement save_state method
-        
-        # reconstruct and return the adapter corresponding to the best snapshot found
         best_snapshot = state.get_snapshot(state.best_snapshot_id)
-        optimized_adapter = self.adapter.load_snapshot(best_snapshot)
+        return self.adapter.load_snapshot(best_snapshot)
 
-        return optimized_adapter
+    async def async_optimize(
+        self,
+        evaluate_fn: Callable[[ProgramAdapter], Awaitable[Dict[str, Any]]],
+        objective: Optional[Objective] = None,
+        max_trials: Optional[int] = 3,
+        save_dir: Optional[str] = None,
+        resume_from: Optional[str] = None,
+        execution_mode: Optional[Literal["sequential", "concurrent"]] = None,
+        **kwargs
+    ) -> ProgramAdapter:
+        """
+        Async variant of `optimize`. Supports both sequential and concurrent trial execution.
+
+        Args:
+            evaluate_fn: Async callable `(adapter) -> Awaitable[Dict[str, Any]]` returning metrics.
+            objective: Optimization objective. Defaults to maximizing "score".
+            max_trials: Total number of individual trials to run.
+            save_dir: Directory to write per-trial state checkpoints.
+            resume_from: Path to a prior checkpoint to resume from.
+            execution_mode: "sequential" or "concurrent". Defaults to "concurrent" when
+                            `adapter.supports_concurrent_execution` is True, otherwise "sequential".
+            **kwargs: Forwarded to `batch_propose` and `async_run_batch`.
+
+        Returns:
+            A new ProgramAdapter reflecting the best configuration found.
+        """
+        if not isinstance(max_trials, int) or max_trials <= 0:
+            raise ValueError(f"`max_trials` must be a positive integer, got {max_trials}")
+
+        if objective is None:
+            objective = Objective()
+
+        if execution_mode is None:
+            execution_mode = "concurrent" if self.adapter.supports_concurrent_execution else "sequential"
+
+        state = self._init_run_state(save_dir, resume_from)
+
+        while state.current_step < max_trials:
+            remaining = max_trials - state.current_step
+            proposals = self.batch_propose(state, objective, **kwargs)[:remaining]
+            state = await self.runtime.async_run_batch(
+                state=state,
+                proposals=proposals,
+                evaluate_fn=evaluate_fn,
+                objective=objective,
+                execution_mode=execution_mode,
+                **kwargs
+            )
+            state.current_step += len(proposals)
+            state.save_state()
+
+        best_snapshot = state.get_snapshot(state.best_snapshot_id)
+        return self.adapter.load_snapshot(best_snapshot)
     
     @property
     @abc.abstractmethod
@@ -272,19 +432,46 @@ class Optimizer(abc.ABC):
         **kwargs
     ) -> OptimizationProposal:
         """
-        Propose a set of changes to apply on the program for the next trial step.
+        Propose a single changeset for the next trial.
 
-        It should first select a snapshot as the base to apply changes on. 
-        If there is no trial yet, use the initial snapshot from the adapter.
-        Then it should propose changes to the optimization units, and return the 
-        proposed changes along with the source snapshot id in an OptimizationProposal.
+        Select a source snapshot from `state`, propose changes to optimization units,
+        and return them as an OptimizationProposal. Called by the default `batch_propose`;
+        algorithms that natively generate multiple candidates should override `batch_propose`
+        directly instead.
 
-        Parameters:
-        - state: current optimization run state, including past trial records and metadata
-        - objective: the optimization objective that the proposed changes should aim to improve
-        - kwargs: any additional information that might be useful for proposing changes (e.g. current parameter values, trial history, etc.)
+        Args:
+            state: Current optimization run state (past snapshots, trial records, best id).
+            objective: The objective the proposed changes should aim to improve.
+            **kwargs: Algorithm-specific arguments forwarded from `optimize`.
 
         Returns:
-        - A list of UnitChange objects representing the proposed changes for the next trial.
+            An OptimizationProposal carrying the source snapshot id and the list of changes.
         """
         raise NotImplementedError
+
+    def batch_propose(
+        self,
+        state: OptimizationRunState,
+        objective: Objective,
+        **kwargs
+    ) -> List[OptimizationProposal]:
+        """
+        Propose one or more changesets for the next optimization step.
+
+        Default implementation delegates to `propose()` and returns a single-element list,
+        which gives sequential algorithms free compatibility with the batch execution path.
+
+        Override to return multiple proposals when the algorithm naturally generates a
+        population of candidates (e.g. evolutionary search, beam search, TPE with parallel
+        workers). The caller (`optimize` / `async_optimize`) will trim the list to the
+        remaining trial budget before passing it to the runtime.
+
+        Args:
+            state: Current optimization run state.
+            objective: The objective the proposed changes should aim to improve.
+            **kwargs: Forwarded to `propose` (or used directly if overriding).
+
+        Returns:
+            A non-empty list of OptimizationProposal objects.
+        """
+        return [self.propose(state, objective, **kwargs)]

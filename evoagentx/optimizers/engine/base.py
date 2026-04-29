@@ -18,7 +18,7 @@ class OptimizationUnitType(str, Enum):
 
 class OptimizationUnit(BaseModule):
     name: str = Field(description="Name of the optimization unit; also serves as the default uid")
-    unitType: OptimizationUnitType = Field(description="Type of the optimization unit")
+    unit_type: OptimizationUnitType = Field(description="Type of the optimization unit")
     uid: str = Field(default="", description="Stable unique ID for this unit across adapter reconstructions; defaults to name if not set explicitly")
     json_schema: Optional[dict] = Field(default=None, description="Optional schema for the optimization unit, used to validate the parameters associated with this unit")
 
