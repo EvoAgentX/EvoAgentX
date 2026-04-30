@@ -64,6 +64,10 @@ class ScalarObjective(Objective):
         metric: str = "score",
         direction: Literal["maximize", "minimize"] = "maximize",
     ) -> None:
+        if not isinstance(metric, str) or not metric:
+            raise ValueError(f"metric must be a non-empty string, got {metric!r}")
+        if direction not in ("maximize", "minimize"):
+            raise ValueError(f"direction must be 'maximize' or 'minimize', got {direction!r}")
         self.metric = metric
         self.direction = direction
 
@@ -74,5 +78,12 @@ class ScalarObjective(Objective):
             return False
         if val_b is None:
             return True
-        return val_a > val_b if self.direction == "maximize" else val_a < val_b
+        try:
+            return val_a > val_b if self.direction == "maximize" else val_a < val_b
+        except TypeError:
+            raise TypeError(
+                f"Cannot compare values for metric '{self.metric}': "
+                f"{val_a!r} (type {type(val_a).__name__}) vs {val_b!r} (type {type(val_b).__name__}). "
+                "Metric values must be comparable scalars (e.g. int, float)."
+            )
 

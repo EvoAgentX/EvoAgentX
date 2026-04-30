@@ -1,7 +1,8 @@
 import abc
+import json
 from dataclasses import dataclass
 from uuid import uuid4
-from pydantic import Field
+from pydantic import Field, field_validator
 from typing import final, List, Any, Optional, Dict, Literal
 
 from ...core.module import BaseModule
@@ -10,8 +11,35 @@ from .base import OptimizationUnit, UnitChange
 
 class SnapShot(BaseModule):
     snapshot_id: str = Field(default_factory=lambda: uuid4().hex[:8], description="Unique identifier for the snapshot")
-    unit_values: Dict[str, Any] = Field(default_factory=dict, description="Mapping from unit uid to its current value; covers only the optimizable units declared by the adapter")
-    program_config: Optional[Dict[str, Any]] = Field(default=None, description="Complete adapter-defined configuration required to fully reconstruct the underlying program (e.g. model settings, pipeline paths, non-optimizable params). Opaque to the framework; populated and consumed exclusively by the adapter's take_snapshot / from_snapshot. Set to None if unit_values alone is sufficient for reconstruction.")
+    unit_values: Dict[str, Any] = Field(default_factory=dict, description="Mapping from unit uid to its current value; covers only the optimizable units declared by the adapter. All values must be JSON-serializable (str, int, float, bool, None, list, dict) so snapshots can be persisted and resumed without data loss.")
+    program_config: Optional[Dict[str, Any]] = Field(default=None, description="Complete adapter-defined configuration required to fully reconstruct the underlying program (e.g. model settings, pipeline paths, non-optimizable params). Opaque to the framework; populated and consumed exclusively by the adapter's take_snapshot / from_snapshot. Set to None if unit_values alone is sufficient for reconstruction. Must be JSON-serializable (str, int, float, bool, None, list, dict) — non-serializable objects will be rejected at construction time.")
+
+    @field_validator("unit_values", mode="before")
+    @classmethod
+    def _require_unit_values_json_safe(cls, v: Any) -> Any:
+        if not isinstance(v, dict):
+            return v  # let pydantic's type check handle non-dict
+        for uid, value in v.items():
+            try:
+                json.dumps(value)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    f"unit_values[{uid!r}] must be JSON-serializable; serialization failed: {exc}"
+                ) from exc
+        return v
+
+    @field_validator("program_config", mode="before")
+    @classmethod
+    def _require_program_config_json_safe(cls, v: Any) -> Any:
+        if v is None:
+            return v
+        try:
+            json.dumps(v)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"program_config must be JSON-serializable; serialization failed: {exc}"
+            ) from exc
+        return v
 
 
 @dataclass
@@ -104,13 +132,18 @@ class ProgramAdapter(abc.ABC):
             processed_changes = self.pre_apply_hook(snapshot, changes, **kwargs)
             self._validate_changes(processed_changes)
             new_snapshot = self.merge_changes(snapshot, processed_changes, **kwargs)
+            if not isinstance(new_snapshot, SnapShot):
+                raise TypeError(
+                    f"merge_changes() must return a SnapShot instance, "
+                    f"got {type(new_snapshot).__name__}."
+                )
             new_adapter = self.from_snapshot(new_snapshot, **kwargs)
             if not isinstance(new_adapter, ProgramAdapter):
                 raise TypeError(
                     f"from_snapshot() must return a ProgramAdapter instance, "
                     f"got {type(new_adapter).__name__}."
                 )
-            self.post_apply_hook(new_adapter, processed_changes)
+            self.post_apply_hook(new_adapter, processed_changes, **kwargs)
             return ApplyResult(status="success", adapter=new_adapter, snapshot=new_snapshot)
         except Exception as e:
             return ApplyResult(status="failed", error=str(e))
@@ -159,8 +192,8 @@ class ProgramAdapter(abc.ABC):
         Example:
             def register_units(self) -> List[OptimizationUnit]:
                 return [
-                    OptimizationUnit(name="system_prompt", unitType=OptimizationUnitType.PROMPT),
-                    OptimizationUnit(name="model_name", unitType=OptimizationUnitType.MODEL),
+                    OptimizationUnit(name="system_prompt", unit_type=OptimizationUnitType.PROMPT),
+                    OptimizationUnit(name="model_name", unit_type=OptimizationUnitType.MODEL),
                 ]
         """
         raise NotImplementedError
@@ -173,7 +206,9 @@ class ProgramAdapter(abc.ABC):
         Must populate `unit_values` as a dict mapping each registered unit's `uid`
         to its current value. If `from_snapshot` needs additional context beyond
         `unit_values` to reconstruct the adapter (e.g. non-optimizable model settings,
-        pipeline paths), also populate `program_config`.
+        pipeline paths), also populate `program_config`. All values in `program_config`
+        must be JSON-serializable (str, int, float, bool, None, list, dict) so the
+        snapshot can be persisted and restored without data loss.
 
         Returns:
             A SnapShot capturing the current value of every registered optimization unit.

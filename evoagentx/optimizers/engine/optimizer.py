@@ -3,7 +3,7 @@ import asyncio
 import os
 from concurrent.futures import ThreadPoolExecutor
 from pydantic import Field
-from typing import Any, Awaitable, Callable, FrozenSet, Optional, List, Dict, Literal, Tuple
+from typing import Any, Awaitable, Callable, ClassVar, FrozenSet, Optional, List, Dict, Literal, Tuple
 
 from ...core.module import BaseModule
 from .base import OptimizationUnitType, OptimizationProposal, TrialRecord
@@ -107,6 +107,15 @@ def _sync_best(state: OptimizationRunState, objective: Objective) -> None:
         state.best_metrics = best_record.metrics
 
 
+def _validate_metrics(metrics: Any, trial_id: int) -> None:
+    """Raise TypeError if evaluate_fn did not return a dict."""
+    if not isinstance(metrics, dict):
+        raise TypeError(
+            f"evaluate_fn must return a dict, got {type(metrics).__name__!r} "
+            f"(trial_id={trial_id})"
+        )
+
+
 def _run_trial(
     adapter: ProgramAdapter,
     base_snapshot: SnapShot,
@@ -121,6 +130,14 @@ def _run_trial(
     Returns (snapshot, record): snapshot is None when the trial failed.
     Does not touch shared state — callers are responsible for merging the result.
     """
+    if base_snapshot is None:
+        return None, TrialRecord(
+            trial_id=trial_id,
+            changes=proposal.changes,
+            source_snapshot_id=proposal.source_snapshot_id,
+            status="failed",
+            error=f"source_snapshot_id '{proposal.source_snapshot_id}' not found in run state",
+        )
     result: ApplyResult = adapter.apply(base_snapshot.model_copy(deep=True), proposal.changes, **kwargs)
     if not result.ok:
         return None, TrialRecord(
@@ -132,6 +149,7 @@ def _run_trial(
         )
     try:
         metrics = evaluate_fn(result.adapter)
+        _validate_metrics(metrics, trial_id)
     except Exception as exc:
         return None, TrialRecord(
             trial_id=trial_id,
@@ -166,6 +184,14 @@ async def _async_run_trial(
     Returns (snapshot, record): snapshot is None when the trial failed.
     Does not touch shared state — callers are responsible for merging the result.
     """
+    if base_snapshot is None:
+        return None, TrialRecord(
+            trial_id=trial_id,
+            changes=proposal.changes,
+            source_snapshot_id=proposal.source_snapshot_id,
+            status="failed",
+            error=f"source_snapshot_id '{proposal.source_snapshot_id}' not found in run state",
+        )
     result: ApplyResult = adapter.apply(base_snapshot.model_copy(deep=True), proposal.changes, **kwargs)
     if not result.ok:
         return None, TrialRecord(
@@ -181,6 +207,7 @@ async def _async_run_trial(
                 metrics = await evaluate_fn(result.adapter)
         else:
             metrics = await evaluate_fn(result.adapter)
+        _validate_metrics(metrics, trial_id)
     except Exception as exc:
         return None, TrialRecord(
             trial_id=trial_id,
@@ -309,6 +336,9 @@ class TrialRuntime:
         Returns:
             Updated OptimizationRunState after all proposals have been evaluated.
         """
+        if max_workers is not None and max_workers <= 1:
+            execution_mode = "sequential"
+
         if execution_mode == "sequential":
             for proposal in proposals:
                 state = self.run(state, proposal, evaluate_fn, objective, **kwargs)
@@ -362,6 +392,9 @@ class TrialRuntime:
         Returns:
             Updated OptimizationRunState after all proposals have been evaluated.
         """
+        if max_workers is not None and max_workers <= 1:
+            execution_mode = "sequential"
+
         if execution_mode == "sequential":
             for proposal in proposals:
                 state = await self.async_run(state, proposal, evaluate_fn, objective, **kwargs)
@@ -391,7 +424,30 @@ class TrialRuntime:
 class Optimizer(abc.ABC):
     """
     Abstract base class for all optimizers.
+
+    Subclasses MUST define `supported_unit_types` as a class-level frozenset::
+
+        class MyOptimizer(Optimizer):
+            supported_unit_types: ClassVar[FrozenSet[OptimizationUnitType]] = frozenset({
+                OptimizationUnitType.PROMPT,
+            })
+
+    Defining it as an instance property is not allowed: `Optimizer.__init__` reads
+    `supported_unit_types` before the subclass constructor body has run, so any property
+    that depends on instance state will observe a partially-constructed object.
     """
+
+    supported_unit_types: ClassVar[FrozenSet[OptimizationUnitType]]
+
+    def __init_subclass__(cls, **kwargs) -> None:
+        super().__init_subclass__(**kwargs)
+        if "supported_unit_types" in cls.__dict__:
+            val = cls.__dict__["supported_unit_types"]
+            if not isinstance(val, frozenset):
+                raise TypeError(
+                    f"{cls.__name__}.supported_unit_types must be a frozenset, "
+                    f"got {type(val).__name__!r}"
+                )
 
     def __init__(
         self,
@@ -406,7 +462,24 @@ class Optimizer(abc.ABC):
         self.runtime = TrialRuntime(adapter)
         self.kwargs = kwargs
 
-        # TODO: check the compatibility between adapter's units and optimizer's supported unit types, warn or raise error if incompatible
+        if not isinstance(getattr(type(self), "supported_unit_types", None), frozenset):
+            raise TypeError(
+                f"{self.__class__.__name__}.supported_unit_types must be defined as a "
+                f"frozenset[OptimizationUnitType] class attribute"
+            )
+
+        unsupported = {
+            unit.unit_type
+            for unit in self.adapter.units
+            if unit.unit_type not in self.supported_unit_types
+        }
+        if unsupported:
+            raise TypeError(
+                f"{self.__class__.__name__} supports unit type(s): "
+                f"{{{', '.join(t.value for t in sorted(self.supported_unit_types, key=lambda t: t.value))}}}; "
+                f"but the adapter declares unsupported unit type(s): "
+                f"{{{', '.join(t.value for t in sorted(unsupported, key=lambda t: t.value))}}}."
+            )
 
     def _init_run_state(
         self,
@@ -435,6 +508,26 @@ class Optimizer(abc.ABC):
 
         return state
 
+    @staticmethod
+    def _validate_optimize_args(
+        objective: Any,
+        max_trials: Any,
+        execution_mode: Any,
+        max_workers: Any,
+    ) -> Literal["sequential", "concurrent"]:
+        """Validate optimize / async_optimize arguments and return the (possibly normalized) execution_mode."""
+        if not isinstance(objective, Objective):
+            raise TypeError(f"`objective` must be an instance of Objective, got {type(objective).__name__!r}")
+        if not isinstance(max_trials, int) or max_trials <= 0:
+            raise ValueError(f"`max_trials` must be a positive integer, got {max_trials}")
+        if execution_mode not in ("sequential", "concurrent"):
+            raise ValueError(f"execution_mode must be 'sequential' or 'concurrent', got {execution_mode!r}")
+        if max_workers is not None and (not isinstance(max_workers, int) or max_workers < 1):
+            raise ValueError(f"max_workers must be a positive integer or None, got {max_workers!r}")
+        if max_workers is not None and max_workers <= 1:
+            return "sequential"
+        return execution_mode
+
     def optimize(
         self,
         evaluate_fn: Callable[[ProgramAdapter], Dict[str, Any]],
@@ -447,8 +540,7 @@ class Optimizer(abc.ABC):
         **kwargs
     ) -> ProgramAdapter:
 
-        if not isinstance(max_trials, int) or max_trials <= 0:
-            raise ValueError(f"`max_trials` must be a positive integer, got {max_trials}")
+        execution_mode = self._validate_optimize_args(objective, max_trials, execution_mode, max_workers)
 
         # Initialize or load the optimization run state
         state = self._init_run_state(save_dir, resume_from)
@@ -456,7 +548,9 @@ class Optimizer(abc.ABC):
         # Evaluate baseline once if not yet done; persists so resume skips this.
         baseline_record = state.get_baseline_record()
         if baseline_record is not None and baseline_record.metrics is None:
-            baseline_record.metrics = evaluate_fn(self.adapter)
+            metrics = evaluate_fn(self.adapter)
+            _validate_metrics(metrics, BASELINE_TRIAL_ID)
+            baseline_record.metrics = metrics
             state.save_state()
 
         # Sync best_snapshot_id / best_metrics from objective (covers both fresh and resume).
@@ -465,6 +559,8 @@ class Optimizer(abc.ABC):
         while state.current_step < max_trials:
             remaining = max_trials - state.current_step
             proposals = self.batch_propose(state, objective, **kwargs)[:remaining]
+            if not proposals:
+                break
             state = self.runtime.run_batch(
                 state=state,
                 proposals=proposals,
@@ -477,13 +573,23 @@ class Optimizer(abc.ABC):
             state.current_step += len(proposals)
             state.save_state()
 
+        if state.best_snapshot_id is None:
+            raise RuntimeError(
+                "Optimization finished but no best snapshot was recorded. "
+                "This usually means all trials failed or the run state is corrupted."
+            )
         best_snapshot = state.get_snapshot_by_id(state.best_snapshot_id)
+        if best_snapshot is None:
+            raise RuntimeError(
+                f"best_snapshot_id '{state.best_snapshot_id}' not found in run state. "
+                "The saved state may be incomplete or corrupted."
+            )
         return self.adapter.load_snapshot(best_snapshot)
 
     async def async_optimize(
         self,
         evaluate_fn: Callable[[ProgramAdapter], Awaitable[Dict[str, Any]]],
-        objective: Optional[Objective] = None,
+        objective: Objective,
         max_trials: Optional[int] = 3,
         save_dir: Optional[str] = None,
         resume_from: Optional[str] = None,
@@ -496,7 +602,7 @@ class Optimizer(abc.ABC):
 
         Args:
             evaluate_fn: Async callable `(adapter) -> Awaitable[Dict[str, Any]]` returning metrics.
-            objective: Optimization objective. Defaults to maximizing "score".
+            objective: Optimization objective.
             max_trials: Total number of individual trials to run.
             save_dir: Directory to write per-trial state checkpoints.
             resume_from: Path to a prior checkpoint to resume from.
@@ -510,15 +616,16 @@ class Optimizer(abc.ABC):
         Returns:
             A new ProgramAdapter reflecting the best configuration found.
         """
-        if not isinstance(max_trials, int) or max_trials <= 0:
-            raise ValueError(f"`max_trials` must be a positive integer, got {max_trials}")
+        execution_mode = self._validate_optimize_args(objective, max_trials, execution_mode, max_workers)
 
         state = self._init_run_state(save_dir, resume_from)
 
         # Evaluate baseline once if not yet done; persists so resume skips this.
         baseline_record = state.get_baseline_record()
         if baseline_record is not None and baseline_record.metrics is None:
-            baseline_record.metrics = await evaluate_fn(self.adapter)
+            metrics = await evaluate_fn(self.adapter)
+            _validate_metrics(metrics, BASELINE_TRIAL_ID)
+            baseline_record.metrics = metrics
             state.save_state()
 
         # Sync best_snapshot_id / best_metrics from objective (covers both fresh and resume).
@@ -527,6 +634,8 @@ class Optimizer(abc.ABC):
         while state.current_step < max_trials:
             remaining = max_trials - state.current_step
             proposals = self.batch_propose(state, objective, **kwargs)[:remaining]
+            if not proposals:
+                break
             state = await self.runtime.async_run_batch(
                 state=state,
                 proposals=proposals,
@@ -539,16 +648,18 @@ class Optimizer(abc.ABC):
             state.current_step += len(proposals)
             state.save_state()
 
+        if state.best_snapshot_id is None:
+            raise RuntimeError(
+                "Optimization finished but no best snapshot was recorded. "
+                "This usually means all trials failed or the run state is corrupted."
+            )
         best_snapshot = state.get_snapshot_by_id(state.best_snapshot_id)
+        if best_snapshot is None:
+            raise RuntimeError(
+                f"best_snapshot_id '{state.best_snapshot_id}' not found in run state. "
+                "The saved state may be incomplete or corrupted."
+            )
         return self.adapter.load_snapshot(best_snapshot)
-
-    @property
-    @abc.abstractmethod
-    def supported_unit_types(self) -> FrozenSet[OptimizationUnitType]:
-        """
-        Return a set of OptimizationUnitType that this optimizer can handle.
-        """
-        raise NotImplementedError
 
     @abc.abstractmethod
     def propose(
