@@ -2,7 +2,7 @@ import abc
 from enum import Enum
 from pydantic import Field, model_validator
 from jsonschema import validate, ValidationError
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Literal
 
 from ...core.module import BaseModule
 from .decorators import EntryPoint
@@ -74,6 +74,23 @@ class UnitChange(BaseModule):
         """
         cls.validate_value(new_value, unit)
         return cls(uid=unit.uid, value=new_value, old_value=old_value)
+
+
+class OptimizationProposal(BaseModule):
+    source_snapshot_id: str = Field(description="The snapshot_id of the base snapshot that the proposed changes will be applied on")
+    changes: List[UnitChange] = Field(description="List of proposed changes to apply on the base snapshot for the next trial")
+
+
+class TrialRecord(BaseModule):
+    """Data model for recording the results of a single optimization trial."""
+    trial_id: int = Field(description="Unique identifier for the trial")
+    changes: List[UnitChange] = Field(description="List of changes applied in this trial")
+    source_snapshot_id: str = Field(description="The snapshot_id of the base snapshot that the proposed changes were applied on in this trial")
+    status: Literal["completed", "failed"] = Field(description="Status of the trial")
+
+    snapshot_id: Optional[str] = Field(default=None, description="The snapshot_id of the program state after applying the changes in this trial")
+    metrics: Optional[Dict[str, Any]] = Field(default=None, description="Evaluation metrics collected for this trial")
+    error: Optional[str] = Field(default=None, description="Error message if the trial failed")
 
 
 class BaseOptimizer(abc.ABC):
