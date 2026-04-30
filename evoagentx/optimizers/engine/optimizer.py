@@ -7,7 +7,7 @@ from typing import Any, Awaitable, Callable, FrozenSet, Optional, List, Dict, Li
 
 from ...core.module import BaseModule
 from .base import OptimizationUnitType, OptimizationProposal, TrialRecord
-from .adapter import SnapShot, ProgramAdapter
+from .adapter import SnapShot, ProgramAdapter, ApplyResult
 from .objective import Objective
 
 BASELINE_TRIAL_ID = 0
@@ -77,10 +77,12 @@ class OptimizationRunState(BaseModule):
             The restored OptimizationRunState, including all past snapshots,
             trial records, best_snapshot_id, and current_step.
         """
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"{path} does not exist, cannot load optimization state")
+        
         if os.path.isdir(path):
             path = os.path.join(path, "optimization_state.json")
-        with open(path, "r") as f:
-            return OptimizationRunState.model_validate_json(f.read())
+        return OptimizationRunState.from_file(path=path)
 
     def save_state(self) -> str:
         """
@@ -93,8 +95,7 @@ class OptimizationRunState(BaseModule):
         """
         os.makedirs(self.save_dir, exist_ok=True)
         path = os.path.join(self.save_dir, "optimization_state.json")
-        with open(path, "w") as f:
-            f.write(self.model_dump_json(indent=2))
+        self.save_module(path=path)
         return path
 
 
@@ -104,6 +105,112 @@ def _sync_best(state: OptimizationRunState, objective: Objective) -> None:
     if best_record is not None:
         state.best_snapshot_id = best_record.snapshot_id
         state.best_metrics = best_record.metrics
+
+
+def _run_trial(
+    adapter: ProgramAdapter,
+    base_snapshot: SnapShot,
+    proposal: OptimizationProposal,
+    trial_id: int,
+    evaluate_fn: Callable[[ProgramAdapter], Dict[str, Any]],
+    **kwargs,
+) -> Tuple[Optional[SnapShot], TrialRecord]:
+    """
+    Apply a proposal and evaluate it synchronously.
+
+    Returns (snapshot, record): snapshot is None when the trial failed.
+    Does not touch shared state — callers are responsible for merging the result.
+    """
+    result: ApplyResult = adapter.apply(base_snapshot.model_copy(deep=True), proposal.changes, **kwargs)
+    if not result.ok:
+        return None, TrialRecord(
+            trial_id=trial_id,
+            changes=proposal.changes,
+            source_snapshot_id=proposal.source_snapshot_id,
+            status="failed",
+            error=result.error,
+        )
+    try:
+        metrics = evaluate_fn(result.adapter)
+    except Exception as exc:
+        return None, TrialRecord(
+            trial_id=trial_id,
+            changes=proposal.changes,
+            source_snapshot_id=proposal.source_snapshot_id,
+            status="failed",
+            error=str(exc),
+        )
+    return result.snapshot, TrialRecord(
+        trial_id=trial_id,
+        changes=proposal.changes,
+        source_snapshot_id=proposal.source_snapshot_id,
+        status="completed",
+        snapshot_id=result.snapshot.snapshot_id,
+        metrics=metrics,
+    )
+
+
+async def _async_run_trial(
+    adapter: ProgramAdapter,
+    base_snapshot: SnapShot,
+    proposal: OptimizationProposal,
+    trial_id: int,
+    evaluate_fn: Callable[[ProgramAdapter], Awaitable[Dict[str, Any]]],
+    sem: Optional[asyncio.Semaphore] = None,
+    **kwargs,
+) -> Tuple[Optional[SnapShot], TrialRecord]:
+    """
+    Apply a proposal and evaluate it asynchronously.
+
+    `sem` throttles concurrent evaluate calls when set; pass None for uncapped concurrency.
+    Returns (snapshot, record): snapshot is None when the trial failed.
+    Does not touch shared state — callers are responsible for merging the result.
+    """
+    result: ApplyResult = adapter.apply(base_snapshot.model_copy(deep=True), proposal.changes, **kwargs)
+    if not result.ok:
+        return None, TrialRecord(
+            trial_id=trial_id,
+            changes=proposal.changes,
+            source_snapshot_id=proposal.source_snapshot_id,
+            status="failed",
+            error=result.error,
+        )
+    try:
+        if sem is not None:
+            async with sem:
+                metrics = await evaluate_fn(result.adapter)
+        else:
+            metrics = await evaluate_fn(result.adapter)
+    except Exception as exc:
+        return None, TrialRecord(
+            trial_id=trial_id,
+            changes=proposal.changes,
+            source_snapshot_id=proposal.source_snapshot_id,
+            status="failed",
+            error=str(exc),
+        )
+    return result.snapshot, TrialRecord(
+        trial_id=trial_id,
+        changes=proposal.changes,
+        source_snapshot_id=proposal.source_snapshot_id,
+        status="completed",
+        snapshot_id=result.snapshot.snapshot_id,
+        metrics=metrics,
+    )
+
+
+def _merge_outcomes(
+    state: OptimizationRunState,
+    outcomes: List[Tuple[Optional[SnapShot], TrialRecord]],
+    objective: Objective,
+) -> OptimizationRunState:
+    """Append (snapshot, record) pairs to state and sync the best pointer."""
+    for snapshot, record in outcomes:
+        if snapshot is not None:
+            state.snapshots.append(snapshot)
+        state.trial_records.append(record)
+    _sync_best(state, objective)
+    return state
 
 
 class TrialRuntime:
@@ -122,75 +229,25 @@ class TrialRuntime:
         """
         Execute a single optimization trial and return the updated run state.
 
-        Pipeline:
-        1. Fetch `base_snapshot = state.get_snapshot_by_id(proposal.source_snapshot_id)`, then
-           call `result = self.adapter.apply(base_snapshot, proposal.changes)`.
-           `self.adapter` is never modified and remains the stable base for all trials.
-           If `result.ok` is False, record the trial as status="failed" with `result.error`
-           and return without updating best_snapshot_id.
-        2. Use `result.snapshot` (produced by `merge_changes` inside `apply`) directly as
-           the canonical snapshot for this trial. Do NOT call `new_adapter.take_snapshot()`
-           — the snapshot from `apply` is guaranteed consistent with the adapter's state.
-        3. Run evaluation: call `evaluate_fn(result.adapter)` to obtain a metrics dict.
-           On exception, record the trial as status="failed" with the error message
-           and append the failed record to state without updating best_snapshot_id.
-        4. Build a TrialRecord (trial_id = len(state.trial_records)) with the
-           snapshot_id, metrics, and status.
-        5. Append `result.snapshot` and the TrialRecord to `state`.
-        6. Update `state.best_snapshot_id` using `objective.select_best_snapshot_id`.
-
-        Note: `state.current_step` is NOT incremented here; the caller (`Optimizer.optimize`)
-        is responsible for that.
+        Calls `_run_trial` to apply the proposal and evaluate it, then merges the
+        result into `state`. `state.current_step` is NOT incremented here; the
+        caller (`Optimizer.optimize`) is responsible for that.
 
         Args:
             state: The current optimization run state.
             proposal: The proposed changeset and its source snapshot.
             evaluate_fn: Callable that executes the adapted program and returns metrics.
             objective: Used to update `best_snapshot_id` after the trial completes.
-            **kwargs: Forwarded to `base_adapter.apply`.
+            **kwargs: Forwarded to `adapter.apply`.
 
         Returns:
             Updated OptimizationRunState with the new snapshot, trial record, and
             (if the trial succeeded) a potentially updated best_snapshot_id.
         """
-        # when calling self.adapter.apply, pass the copied base_snapshot, since it might be modified in-place by the apply method
         base_snapshot = state.get_snapshot_by_id(proposal.source_snapshot_id)
-        result = self.adapter.apply(base_snapshot.model_copy(deep=True), proposal.changes, **kwargs)
         trial_id = len(state.trial_records)
-
-        if not result.ok:
-            state.trial_records.append(TrialRecord(
-                trial_id=trial_id,
-                changes=proposal.changes,
-                source_snapshot_id=proposal.source_snapshot_id,
-                status="failed",
-                error=result.error,
-            ))
-            return state
-
-        try:
-            metrics = evaluate_fn(result.adapter)
-        except Exception as exc:
-            state.trial_records.append(TrialRecord(
-                trial_id=trial_id,
-                changes=proposal.changes,
-                source_snapshot_id=proposal.source_snapshot_id,
-                status="failed",
-                error=str(exc),
-            ))
-            return state
-
-        state.snapshots.append(result.snapshot)
-        state.trial_records.append(TrialRecord(
-            trial_id=trial_id,
-            changes=proposal.changes,
-            source_snapshot_id=proposal.source_snapshot_id,
-            status="completed",
-            snapshot_id=result.snapshot.snapshot_id,
-            metrics=metrics,
-        ))
-        _sync_best(state, objective)
-        return state
+        outcome = _run_trial(self.adapter, base_snapshot, proposal, trial_id, evaluate_fn, **kwargs)
+        return _merge_outcomes(state, [outcome], objective)
 
     async def async_run(
         self,
@@ -208,48 +265,15 @@ class TrialRuntime:
             proposal: The proposed changeset and its source snapshot.
             evaluate_fn: Async callable that executes the adapted program and returns metrics.
             objective: Used to update `best_snapshot_id` after the trial completes.
-            **kwargs: Forwarded to `self.adapter.apply`.
+            **kwargs: Forwarded to `adapter.apply`.
 
         Returns:
             Updated OptimizationRunState (see `run` for full pipeline description).
         """
         base_snapshot = state.get_snapshot_by_id(proposal.source_snapshot_id)
-        result = self.adapter.apply(base_snapshot.model_copy(deep=True), proposal.changes, **kwargs)
         trial_id = len(state.trial_records)
-
-        if not result.ok:
-            state.trial_records.append(TrialRecord(
-                trial_id=trial_id,
-                changes=proposal.changes,
-                source_snapshot_id=proposal.source_snapshot_id,
-                status="failed",
-                error=result.error,
-            ))
-            return state
-
-        try:
-            metrics = await evaluate_fn(result.adapter)
-        except Exception as exc:
-            state.trial_records.append(TrialRecord(
-                trial_id=trial_id,
-                changes=proposal.changes,
-                source_snapshot_id=proposal.source_snapshot_id,
-                status="failed",
-                error=str(exc),
-            ))
-            return state
-
-        state.snapshots.append(result.snapshot)
-        state.trial_records.append(TrialRecord(
-            trial_id=trial_id,
-            changes=proposal.changes,
-            source_snapshot_id=proposal.source_snapshot_id,
-            status="completed",
-            snapshot_id=result.snapshot.snapshot_id,
-            metrics=metrics,
-        ))
-        _sync_best(state, objective)
-        return state
+        outcome = await _async_run_trial(self.adapter, base_snapshot, proposal, trial_id, evaluate_fn, **kwargs)
+        return _merge_outcomes(state, [outcome], objective)
 
     def run_batch(
         self,
@@ -258,6 +282,7 @@ class TrialRuntime:
         evaluate_fn: Callable[[ProgramAdapter], Dict[str, Any]],
         objective: Objective,
         execution_mode: Literal["sequential", "concurrent"] = "sequential",
+        max_workers: Optional[int] = None,
         **kwargs
     ) -> OptimizationRunState:
         """
@@ -269,8 +294,7 @@ class TrialRuntime:
         Concurrent mode submits all trials to a ThreadPoolExecutor so that
         I/O-bound evaluate calls (e.g. LLM API requests) run in parallel. All
         trials start from the same read-only snapshot of the current state;
-        results are merged in submission order after all threads finish. Only use
-        when `adapter.supports_concurrent_execution` is True.
+        results are merged in submission order after all threads finish.
 
         Args:
             state: Current optimization run state.
@@ -278,7 +302,9 @@ class TrialRuntime:
             evaluate_fn: Sync callable returning evaluation metrics.
             objective: Used to update `best_snapshot_id` after the batch.
             execution_mode: "sequential" (default) or "concurrent".
-            **kwargs: Forwarded to each `run` call.
+            max_workers: Maximum number of parallel threads in concurrent mode.
+                         None means no cap beyond the number of proposals.
+            **kwargs: Forwarded to each trial.
 
         Returns:
             Updated OptimizationRunState after all proposals have been evaluated.
@@ -288,52 +314,20 @@ class TrialRuntime:
                 state = self.run(state, proposal, evaluate_fn, objective, **kwargs)
             return state
 
-        # concurrent: each thread runs one trial independently from a frozen copy of the
-        # current state; results are merged in submission order after all threads finish.
+        # concurrent: each thread runs one trial independently from a frozen copy of
+        # the current state; results are merged in submission order after all finish.
         base_trial_count = len(state.trial_records)
+        effective_workers = min(max_workers, len(proposals)) if max_workers is not None else len(proposals)
 
         def _single_outcome(idx_proposal: Tuple[int, OptimizationProposal]) -> Tuple[Optional[SnapShot], TrialRecord]:
             idx, proposal = idx_proposal
             base_snapshot = state.get_snapshot_by_id(proposal.source_snapshot_id)
-            result = self.adapter.apply(base_snapshot.model_copy(deep=True), proposal.changes, **kwargs)
-            trial_id = base_trial_count + idx
-            if not result.ok:
-                return None, TrialRecord(
-                    trial_id=trial_id,
-                    changes=proposal.changes,
-                    source_snapshot_id=proposal.source_snapshot_id,
-                    status="failed",
-                    error=result.error,
-                )
-            try:
-                metrics = evaluate_fn(result.adapter)
-            except Exception as exc:
-                return None, TrialRecord(
-                    trial_id=trial_id,
-                    changes=proposal.changes,
-                    source_snapshot_id=proposal.source_snapshot_id,
-                    status="failed",
-                    error=str(exc),
-                )
-            return result.snapshot, TrialRecord(
-                trial_id=trial_id,
-                changes=proposal.changes,
-                source_snapshot_id=proposal.source_snapshot_id,
-                status="completed",
-                snapshot_id=result.snapshot.snapshot_id,
-                metrics=metrics,
-            )
+            return _run_trial(self.adapter, base_snapshot, proposal, base_trial_count + idx, evaluate_fn, **kwargs)
 
-        with ThreadPoolExecutor() as pool:
+        with ThreadPoolExecutor(max_workers=effective_workers) as pool:
             outcomes = list(pool.map(_single_outcome, enumerate(proposals)))
 
-        for snapshot, record in outcomes:
-            if snapshot is not None:
-                state.snapshots.append(snapshot)
-            state.trial_records.append(record)
-
-        _sync_best(state, objective)
-        return state
+        return _merge_outcomes(state, outcomes, objective)
 
     async def async_run_batch(
         self,
@@ -342,19 +336,18 @@ class TrialRuntime:
         evaluate_fn: Callable[[ProgramAdapter], Awaitable[Dict[str, Any]]],
         objective: Objective,
         execution_mode: Literal["sequential", "concurrent"] = "sequential",
+        max_workers: Optional[int] = None,
         **kwargs
     ) -> OptimizationRunState:
         """
-        Run a batch of proposals and return the updated state.
+        Async variant of `run_batch`.
 
         Sequential mode evaluates proposals one after another, so each trial sees the
         state already updated by its predecessors.
 
-        Concurrent mode launches all trials from the *same* read-only snapshot of the
-        current state via `asyncio.gather`, collects (snapshot, record) pairs without
-        touching shared state, then merges all results in order. This avoids race
-        conditions at the cost of trials not seeing each other's intermediate results.
-        Only use when `adapter.supports_concurrent_execution` is True.
+        Concurrent mode launches all trials via `asyncio.gather` from the same read-only
+        snapshot of the current state, then merges results in order. `max_workers` caps
+        the number of coroutines that may call `evaluate_fn` simultaneously via a semaphore.
 
         Args:
             state: Current optimization run state.
@@ -362,7 +355,9 @@ class TrialRuntime:
             evaluate_fn: Async callable returning evaluation metrics.
             objective: Used to update `best_snapshot_id` after the batch.
             execution_mode: "sequential" (default) or "concurrent".
-            **kwargs: Forwarded to each `async_run` call.
+            max_workers: Maximum number of coroutines running concurrently in concurrent mode.
+                         None means all proposals run at once (no semaphore).
+            **kwargs: Forwarded to each trial.
 
         Returns:
             Updated OptimizationRunState after all proposals have been evaluated.
@@ -372,49 +367,25 @@ class TrialRuntime:
                 state = await self.async_run(state, proposal, evaluate_fn, objective, **kwargs)
             return state
 
-        # concurrent: each trial reads the current state independently, results merged after
+        # concurrent: all trials launched together; semaphore throttles evaluate calls.
         base_trial_count = len(state.trial_records)
+        effective_workers = min(max_workers, len(proposals)) if max_workers is not None else None
+        sem = asyncio.Semaphore(effective_workers) if effective_workers is not None else None
 
-        async def _single_outcome(idx: int, proposal: OptimizationProposal) -> Tuple[Optional[SnapShot], TrialRecord]:
-            base_snapshot = state.get_snapshot_by_id(proposal.source_snapshot_id)
-            result = self.adapter.apply(base_snapshot.model_copy(deep=True), proposal.changes, **kwargs)
-            trial_id = base_trial_count + idx
-            if not result.ok:
-                return None, TrialRecord(
-                    trial_id=trial_id,
-                    changes=proposal.changes,
-                    source_snapshot_id=proposal.source_snapshot_id,
-                    status="failed",
-                    error=result.error,
-                )
-            try:
-                metrics = await evaluate_fn(result.adapter)
-            except Exception as exc:
-                return None, TrialRecord(
-                    trial_id=trial_id,
-                    changes=proposal.changes,
-                    source_snapshot_id=proposal.source_snapshot_id,
-                    status="failed",
-                    error=str(exc),
-                )
-            return result.snapshot, TrialRecord(
-                trial_id=trial_id,
-                changes=proposal.changes,
-                source_snapshot_id=proposal.source_snapshot_id,
-                status="completed",
-                snapshot_id=result.snapshot.snapshot_id,
-                metrics=metrics,
+        outcomes = await asyncio.gather(*[
+            _async_run_trial(
+                self.adapter,
+                state.get_snapshot_by_id(proposal.source_snapshot_id),
+                proposal,
+                base_trial_count + idx,
+                evaluate_fn,
+                sem,
+                **kwargs,
             )
+            for idx, proposal in enumerate(proposals)
+        ])
 
-        outcomes = await asyncio.gather(*[_single_outcome(i, p) for i, p in enumerate(proposals)])
-
-        for snapshot, record in outcomes:
-            if snapshot is not None:
-                state.snapshots.append(snapshot)
-            state.trial_records.append(record)
-
-        _sync_best(state, objective)
-        return state
+        return _merge_outcomes(state, outcomes, objective)
 
 
 class Optimizer(abc.ABC):
@@ -472,6 +443,7 @@ class Optimizer(abc.ABC):
         save_dir: Optional[str] = None,
         resume_from: Optional[str] = None,
         execution_mode: Literal["sequential", "concurrent"] = "sequential",
+        max_workers: Optional[int] = None,
         **kwargs
     ) -> ProgramAdapter:
 
@@ -499,6 +471,7 @@ class Optimizer(abc.ABC):
                 evaluate_fn=evaluate_fn,
                 objective=objective,
                 execution_mode=execution_mode,
+                max_workers=max_workers,
                 **kwargs
             )
             state.current_step += len(proposals)
@@ -515,6 +488,7 @@ class Optimizer(abc.ABC):
         save_dir: Optional[str] = None,
         resume_from: Optional[str] = None,
         execution_mode: Literal["sequential", "concurrent"] = "sequential",
+        max_workers: Optional[int] = None,
         **kwargs
     ) -> ProgramAdapter:
         """
@@ -529,6 +503,8 @@ class Optimizer(abc.ABC):
             execution_mode: "sequential" (default) or "concurrent". Pass "concurrent" when the
                             underlying program is stateless or safe to evaluate in parallel
                             (e.g. pure API calls, read-only inference).
+            max_workers: Maximum number of coroutines running concurrently in concurrent mode.
+                         None means all proposals run at once (no semaphore).
             **kwargs: Forwarded to `batch_propose` and `async_run_batch`.
 
         Returns:
@@ -557,6 +533,7 @@ class Optimizer(abc.ABC):
                 evaluate_fn=evaluate_fn,
                 objective=objective,
                 execution_mode=execution_mode,
+                max_workers=max_workers,
                 **kwargs
             )
             state.current_step += len(proposals)
