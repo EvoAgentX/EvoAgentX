@@ -3,14 +3,15 @@ import asyncio
 import os
 from concurrent.futures import ThreadPoolExecutor
 from pydantic import Field
-from typing import Any, Awaitable, Callable, ClassVar, FrozenSet, Optional, List, Dict, Literal, Tuple
+from typing import Any, Awaitable, Callable, ClassVar, FrozenSet, Optional, List, Dict, Literal, Tuple, Iterable, Union
 
 from ...core.module import BaseModule
-from .base import OptimizationUnitType, OptimizationProposal, TrialRecord
-from .adapter import SnapShot, ProgramAdapter, ApplyResult
+from .base import EvaluationResult, OptimizationUnit, OptimizationUnitType, OptimizationProposal, TrialRecord, ValidationResult
+from .adapter import SnapShot, ProgramAdapter, ApplyResult, TrialWorkspace
 from .objective import Objective
 
 BASELINE_TRIAL_ID = 0
+EvaluationReturn = Union[Dict[str, Any], EvaluationResult]
 
 
 def _validate_execution_config(
@@ -48,8 +49,11 @@ class OptimizationRunState(BaseModule):
     trial_records: List[TrialRecord] = Field(default_factory=list, description="List of records for all completed trials in the optimization run")
     best_snapshot_id: Optional[str] = Field(default=None, description="The snapshot_id of the best snapshot found so far in the optimization run, according to the defined objective and evaluation metrics")
     best_metrics: Optional[Dict[str, Any]] = Field(default=None, description="The evaluation metrics associated with best_snapshot_id; None until the baseline has been evaluated")
+    optimizer_state: Dict[str, Any] = Field(default_factory=dict, description="Optimizer-owned persistent state, such as sampler state, populations, archives, generated candidate pools, or minibatch cursors.")
+    adapter_fingerprint: Optional[Dict[str, Any]] = Field(default=None, description="Adapter compatibility fingerprint captured at run initialization.")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Run-level metadata.")
 
-    current_step: int = Field(default=0, description="Current trial step (0-indexed, not started) in the optimization run")
+    current_step: int = Field(default=0, description="Number of proposals attempted so far (not successful evaluations). Incremented by len(proposals) each batch, including failed trials.")
     save_dir: Optional[str] = Field(default="./", description="Directory to save optimization state and results")
 
     def get_snapshot_by_id(self, snapshot_id: str) -> Optional[SnapShot]:
@@ -146,12 +150,86 @@ def _validate_metrics(metrics: Any, trial_id: int) -> None:
         )
 
 
+def _normalize_evaluation_result(result: Any, trial_id: int) -> EvaluationResult:
+    """
+    Normalize legacy metric dictionaries and structured evaluation results.
+
+    Existing evaluators can keep returning `dict` metrics. Newer evaluators may
+    return `EvaluationResult` to attach traces, artifacts, and metadata without
+    overloading objective-facing metrics.
+    """
+    if isinstance(result, EvaluationResult):
+        _validate_metrics(result.metrics, trial_id)
+        return result
+    _validate_metrics(result, trial_id)
+    return EvaluationResult(metrics=result)
+
+
+def _normalize_validation_results(results: Any, trial_id: int) -> List[ValidationResult]:
+    """Validate and normalize adapter validation output."""
+    if results is None:
+        return []
+    if isinstance(results, ValidationResult):
+        return [results]
+    if not isinstance(results, list):
+        raise TypeError(
+            f"validate_trial must return a ValidationResult, a list of ValidationResult objects, "
+            f"or None; got {type(results).__name__!r} (trial_id={trial_id})"
+        )
+    if not all(isinstance(result, ValidationResult) for result in results):
+        raise TypeError(
+            f"validate_trial must return only ValidationResult objects (trial_id={trial_id})"
+        )
+    return results
+
+
+def _validation_failure_message(results: List[ValidationResult]) -> Optional[str]:
+    failures = [result for result in results if result.status == "failed"]
+    if not failures:
+        return None
+    return "; ".join(
+        f"{failure.validator}: {failure.message or 'validation failed'}"
+        for failure in failures
+    )
+
+
+def _prepare_trial_workspace(
+    adapter: ProgramAdapter,
+    snapshot: SnapShot,
+    trial_id: int,
+    workspace_root: Optional[str],
+    keep_trial_workspaces: bool,
+    metadata: Optional[Dict[str, Any]] = None,
+    **kwargs,
+) -> Optional[TrialWorkspace]:
+    """Bind and prepare a per-trial workspace when workspace isolation is enabled."""
+    if workspace_root is None:
+        adapter.bind_workspace(None)
+        return None
+    workspace_dir = os.path.join(
+        workspace_root,
+        f"trial_{trial_id:04d}_{snapshot.snapshot_id}",
+    )
+    workspace = TrialWorkspace.create(
+        root_dir=workspace_dir,
+        trial_id=trial_id,
+        source_snapshot_id=snapshot.snapshot_id,
+        metadata=metadata,
+        keep=keep_trial_workspaces,
+    )
+    adapter.bind_workspace(workspace)
+    adapter.prepare_workspace(workspace, snapshot, **kwargs)
+    return workspace
+
+
 def _run_trial(
     adapter: ProgramAdapter,
     base_snapshot: SnapShot,
     proposal: OptimizationProposal,
     trial_id: int,
-    evaluate_fn: Callable[[ProgramAdapter], Dict[str, Any]],
+    evaluate_fn: Callable[[ProgramAdapter], EvaluationReturn],
+    workspace_root: Optional[str] = None,
+    keep_trial_workspaces: bool = True,
     **kwargs,
 ) -> Tuple[Optional[SnapShot], TrialRecord]:
     """
@@ -177,24 +255,64 @@ def _run_trial(
             status="failed",
             error=result.error,
         )
+    workspace: Optional[TrialWorkspace] = None
+    validation_results: List[ValidationResult] = []
     try:
-        metrics = evaluate_fn(result.adapter)
-        _validate_metrics(metrics, trial_id)
+        workspace = _prepare_trial_workspace(
+            result.adapter,
+            result.snapshot,
+            trial_id,
+            workspace_root,
+            keep_trial_workspaces,
+            metadata=proposal.metadata,
+            **kwargs,
+        )
+        validation_results = _normalize_validation_results(
+            result.adapter.validate_trial(
+                result.snapshot,
+                proposal.changes,
+                workspace=workspace,
+                **kwargs,
+            ),
+            trial_id,
+        )
+        validation_error = _validation_failure_message(validation_results)
+        if validation_error is not None:
+            return None, TrialRecord(
+                trial_id=trial_id,
+                changes=proposal.changes,
+                source_snapshot_id=proposal.source_snapshot_id,
+                status="failed",
+                validation_results=validation_results,
+                workspace_dir=workspace.root_dir if workspace is not None else None,
+                error=validation_error,
+            )
+        evaluation = _normalize_evaluation_result(evaluate_fn(result.adapter), trial_id)
     except Exception as exc:
         return None, TrialRecord(
             trial_id=trial_id,
             changes=proposal.changes,
             source_snapshot_id=proposal.source_snapshot_id,
             status="failed",
+            validation_results=validation_results,
+            workspace_dir=workspace.root_dir if workspace is not None else None,
             error=str(exc),
         )
+    finally:
+        if workspace is not None:
+            workspace.cleanup()
     return result.snapshot, TrialRecord(
         trial_id=trial_id,
         changes=proposal.changes,
         source_snapshot_id=proposal.source_snapshot_id,
         status="completed",
         snapshot_id=result.snapshot.snapshot_id,
-        metrics=metrics,
+        metrics=evaluation.metrics,
+        traces=evaluation.traces,
+        artifacts=evaluation.artifacts,
+        metadata=evaluation.metadata,
+        validation_results=validation_results,
+        workspace_dir=workspace.root_dir if workspace is not None else None,
     )
 
 
@@ -203,8 +321,10 @@ async def _async_run_trial(
     base_snapshot: SnapShot,
     proposal: OptimizationProposal,
     trial_id: int,
-    evaluate_fn: Callable[[ProgramAdapter], Awaitable[Dict[str, Any]]],
+    evaluate_fn: Callable[[ProgramAdapter], Awaitable[EvaluationReturn]],
     sem: Optional[asyncio.Semaphore] = None,
+    workspace_root: Optional[str] = None,
+    keep_trial_workspaces: bool = True,
     **kwargs,
 ) -> Tuple[Optional[SnapShot], TrialRecord]:
     """
@@ -231,28 +351,68 @@ async def _async_run_trial(
             status="failed",
             error=result.error,
         )
+    workspace: Optional[TrialWorkspace] = None
+    validation_results: List[ValidationResult] = []
     try:
+        workspace = _prepare_trial_workspace(
+            result.adapter,
+            result.snapshot,
+            trial_id,
+            workspace_root,
+            keep_trial_workspaces,
+            metadata=proposal.metadata,
+            **kwargs,
+        )
+        validation_results = _normalize_validation_results(
+            await result.adapter.async_validate_trial(
+                result.snapshot,
+                proposal.changes,
+                workspace=workspace,
+                **kwargs,
+            ),
+            trial_id,
+        )
+        validation_error = _validation_failure_message(validation_results)
+        if validation_error is not None:
+            return None, TrialRecord(
+                trial_id=trial_id,
+                changes=proposal.changes,
+                source_snapshot_id=proposal.source_snapshot_id,
+                status="failed",
+                validation_results=validation_results,
+                workspace_dir=workspace.root_dir if workspace is not None else None,
+                error=validation_error,
+            )
         if sem is not None:
             async with sem:
-                metrics = await evaluate_fn(result.adapter)
+                evaluation = _normalize_evaluation_result(await evaluate_fn(result.adapter), trial_id)
         else:
-            metrics = await evaluate_fn(result.adapter)
-        _validate_metrics(metrics, trial_id)
+            evaluation = _normalize_evaluation_result(await evaluate_fn(result.adapter), trial_id)
     except Exception as exc:
         return None, TrialRecord(
             trial_id=trial_id,
             changes=proposal.changes,
             source_snapshot_id=proposal.source_snapshot_id,
             status="failed",
+            validation_results=validation_results,
+            workspace_dir=workspace.root_dir if workspace is not None else None,
             error=str(exc),
         )
+    finally:
+        if workspace is not None:
+            workspace.cleanup()
     return result.snapshot, TrialRecord(
         trial_id=trial_id,
         changes=proposal.changes,
         source_snapshot_id=proposal.source_snapshot_id,
         status="completed",
         snapshot_id=result.snapshot.snapshot_id,
-        metrics=metrics,
+        metrics=evaluation.metrics,
+        traces=evaluation.traces,
+        artifacts=evaluation.artifacts,
+        metadata=evaluation.metadata,
+        validation_results=validation_results,
+        workspace_dir=workspace.root_dir if workspace is not None else None,
     )
 
 
@@ -279,8 +439,10 @@ class TrialRuntime:
         self,
         state: OptimizationRunState,
         proposal: OptimizationProposal,
-        evaluate_fn: Callable[[ProgramAdapter], Dict[str, Any]],
+        evaluate_fn: Callable[[ProgramAdapter], EvaluationReturn],
         objective: Objective,
+        workspace_root: Optional[str] = None,
+        keep_trial_workspaces: bool = True,
         **kwargs
     ) -> OptimizationRunState:
         """
@@ -302,16 +464,27 @@ class TrialRuntime:
             (if the trial succeeded) a potentially updated best_snapshot_id.
         """
         base_snapshot = state.get_snapshot_by_id(proposal.source_snapshot_id)
-        trial_id = len(state.trial_records)
-        outcome = _run_trial(self.adapter, base_snapshot, proposal, trial_id, evaluate_fn, **kwargs)
+        trial_id = max((r.trial_id for r in state.trial_records), default=-1) + 1
+        outcome = _run_trial(
+            self.adapter,
+            base_snapshot,
+            proposal,
+            trial_id,
+            evaluate_fn,
+            workspace_root=workspace_root,
+            keep_trial_workspaces=keep_trial_workspaces,
+            **kwargs,
+        )
         return _merge_outcomes(state, [outcome], objective)
 
     async def async_run(
         self,
         state: OptimizationRunState,
         proposal: OptimizationProposal,
-        evaluate_fn: Callable[[ProgramAdapter], Awaitable[Dict[str, Any]]],
+        evaluate_fn: Callable[[ProgramAdapter], Awaitable[EvaluationReturn]],
         objective: Objective,
+        workspace_root: Optional[str] = None,
+        keep_trial_workspaces: bool = True,
         **kwargs
     ) -> OptimizationRunState:
         """
@@ -328,18 +501,29 @@ class TrialRuntime:
             Updated OptimizationRunState (see `run` for full pipeline description).
         """
         base_snapshot = state.get_snapshot_by_id(proposal.source_snapshot_id)
-        trial_id = len(state.trial_records)
-        outcome = await _async_run_trial(self.adapter, base_snapshot, proposal, trial_id, evaluate_fn, **kwargs)
+        trial_id = max((r.trial_id for r in state.trial_records), default=-1) + 1
+        outcome = await _async_run_trial(
+            self.adapter,
+            base_snapshot,
+            proposal,
+            trial_id,
+            evaluate_fn,
+            workspace_root=workspace_root,
+            keep_trial_workspaces=keep_trial_workspaces,
+            **kwargs,
+        )
         return _merge_outcomes(state, [outcome], objective)
 
     def run_batch(
         self,
         state: OptimizationRunState,
         proposals: List[OptimizationProposal],
-        evaluate_fn: Callable[[ProgramAdapter], Dict[str, Any]],
+        evaluate_fn: Callable[[ProgramAdapter], EvaluationReturn],
         objective: Objective,
         execution_mode: Literal["sequential", "concurrent"] = "sequential",
         max_workers: Optional[int] = None,
+        workspace_root: Optional[str] = None,
+        keep_trial_workspaces: bool = True,
         **kwargs
     ) -> OptimizationRunState:
         """
@@ -371,20 +555,37 @@ class TrialRuntime:
 
         if execution_mode == "sequential":
             for proposal in proposals:
-                state = self.run(state, proposal, evaluate_fn, objective, **kwargs)
+                state = self.run(
+                    state,
+                    proposal,
+                    evaluate_fn,
+                    objective,
+                    workspace_root=workspace_root,
+                    keep_trial_workspaces=keep_trial_workspaces,
+                    **kwargs,
+                )
             return state
         if not proposals:
             return state
 
         # concurrent: each thread runs one trial independently from a frozen copy of
         # the current state; results are merged in submission order after all finish.
-        base_trial_count = len(state.trial_records)
+        base_trial_id = max((r.trial_id for r in state.trial_records), default=-1) + 1
         effective_workers = min(max_workers, len(proposals))
 
         def _single_outcome(idx_proposal: Tuple[int, OptimizationProposal]) -> Tuple[Optional[SnapShot], TrialRecord]:
             idx, proposal = idx_proposal
             base_snapshot = state.get_snapshot_by_id(proposal.source_snapshot_id)
-            return _run_trial(self.adapter, base_snapshot, proposal, base_trial_count + idx, evaluate_fn, **kwargs)
+            return _run_trial(
+                self.adapter,
+                base_snapshot,
+                proposal,
+                base_trial_id + idx,
+                evaluate_fn,
+                workspace_root=workspace_root,
+                keep_trial_workspaces=keep_trial_workspaces,
+                **kwargs,
+            )
 
         with ThreadPoolExecutor(max_workers=effective_workers) as pool:
             outcomes = list(pool.map(_single_outcome, enumerate(proposals)))
@@ -395,10 +596,12 @@ class TrialRuntime:
         self,
         state: OptimizationRunState,
         proposals: List[OptimizationProposal],
-        evaluate_fn: Callable[[ProgramAdapter], Awaitable[Dict[str, Any]]],
+        evaluate_fn: Callable[[ProgramAdapter], Awaitable[EvaluationReturn]],
         objective: Objective,
         execution_mode: Literal["sequential", "concurrent"] = "sequential",
         max_workers: Optional[int] = None,
+        workspace_root: Optional[str] = None,
+        keep_trial_workspaces: bool = True,
         **kwargs
     ) -> OptimizationRunState:
         """
@@ -429,13 +632,21 @@ class TrialRuntime:
 
         if execution_mode == "sequential":
             for proposal in proposals:
-                state = await self.async_run(state, proposal, evaluate_fn, objective, **kwargs)
+                state = await self.async_run(
+                    state,
+                    proposal,
+                    evaluate_fn,
+                    objective,
+                    workspace_root=workspace_root,
+                    keep_trial_workspaces=keep_trial_workspaces,
+                    **kwargs,
+                )
             return state
         if not proposals:
             return state
 
         # concurrent: all trials launched together; semaphore throttles evaluate calls.
-        base_trial_count = len(state.trial_records)
+        base_trial_id = max((r.trial_id for r in state.trial_records), default=-1) + 1
         effective_workers = min(max_workers, len(proposals))
         sem = asyncio.Semaphore(effective_workers)
 
@@ -444,9 +655,11 @@ class TrialRuntime:
                 self.adapter,
                 state.get_snapshot_by_id(proposal.source_snapshot_id),
                 proposal,
-                base_trial_count + idx,
+                base_trial_id + idx,
                 evaluate_fn,
                 sem,
+                workspace_root=workspace_root,
+                keep_trial_workspaces=keep_trial_workspaces,
                 **kwargs,
             )
             for idx, proposal in enumerate(proposals)
@@ -486,6 +699,9 @@ class Optimizer(abc.ABC):
     def __init__(
         self,
         adapter: ProgramAdapter,
+        runtime: Optional[TrialRuntime] = None,
+        target_unit_uids: Optional[Iterable[str]] = None,
+        target_unit_types: Optional[Union[OptimizationUnitType, str, Iterable[Union[OptimizationUnitType, str]]]] = None,
         **kwargs
     ) -> None:
 
@@ -493,7 +709,7 @@ class Optimizer(abc.ABC):
             raise TypeError(f"Expected adapter to be an instance of ProgramAdapter, got {type(adapter)}")
 
         self.adapter = adapter
-        self.runtime = TrialRuntime(adapter)
+        self.runtime = runtime or TrialRuntime(adapter)
         self.kwargs = kwargs
 
         if not isinstance(getattr(type(self), "supported_unit_types", None), frozenset):
@@ -502,18 +718,77 @@ class Optimizer(abc.ABC):
                 f"frozenset[OptimizationUnitType] class attribute"
             )
 
-        unsupported = {
-            unit.unit_type
-            for unit in self.adapter.units
-            if unit.unit_type not in self.supported_unit_types
-        }
+        self.target_units = self._select_target_units(
+            target_unit_uids=target_unit_uids,
+            target_unit_types=target_unit_types,
+        )
+        self.target_units_by_uid = {unit.uid: unit for unit in self.target_units}
+
+        unsupported = {unit.unit_type for unit in self.target_units if unit.unit_type not in self.supported_unit_types}
         if unsupported:
             raise TypeError(
                 f"{self.__class__.__name__} supports unit type(s): "
                 f"{{{', '.join(t.value for t in sorted(self.supported_unit_types, key=lambda t: t.value))}}}; "
-                f"but the adapter declares unsupported unit type(s): "
+                f"but the selected target unit(s) include unsupported type(s): "
                 f"{{{', '.join(t.value for t in sorted(unsupported, key=lambda t: t.value))}}}."
             )
+
+    @staticmethod
+    def _coerce_unit_type(unit_type: Union[OptimizationUnitType, str]) -> OptimizationUnitType:
+        if isinstance(unit_type, OptimizationUnitType):
+            return unit_type
+        try:
+            return OptimizationUnitType(unit_type)
+        except ValueError as exc:
+            raise ValueError(f"Unknown OptimizationUnitType: {unit_type!r}") from exc
+
+    @classmethod
+    def _coerce_unit_types(
+        cls,
+        unit_types: Optional[Union[OptimizationUnitType, str, Iterable[Union[OptimizationUnitType, str]]]],
+    ) -> Optional[FrozenSet[OptimizationUnitType]]:
+        if unit_types is None:
+            return None
+        if isinstance(unit_types, (OptimizationUnitType, str)):
+            return frozenset({cls._coerce_unit_type(unit_types)})
+        return frozenset(cls._coerce_unit_type(unit_type) for unit_type in unit_types)
+
+    def _select_target_units(
+        self,
+        target_unit_uids: Optional[Iterable[str]] = None,
+        target_unit_types: Optional[Union[OptimizationUnitType, str, Iterable[Union[OptimizationUnitType, str]]]] = None,
+    ) -> List[OptimizationUnit]:
+        """
+        Select the units this optimizer is allowed to propose changes for.
+
+        By default, a mixed adapter is allowed: the optimizer targets all adapter
+        units whose type is in `supported_unit_types` and ignores unrelated units.
+        Passing explicit `target_unit_uids` and/or `target_unit_types` narrows that
+        set further.
+        """
+        requested_types = self._coerce_unit_types(target_unit_types)
+        if requested_types is None and target_unit_uids is None:
+            requested_types = self.supported_unit_types
+        requested_uids = set(target_unit_uids) if target_unit_uids is not None else None
+
+        unknown_uids = requested_uids - {unit.uid for unit in self.adapter.units} if requested_uids is not None else set()
+        if unknown_uids:
+            raise ValueError(f"target_unit_uids reference unknown unit uid(s): {sorted(unknown_uids)}")
+
+        target_units = self.adapter.select_units(unit_types=requested_types, uids=requested_uids)
+        if not target_units:
+            requested_type_values = sorted(t.value for t in requested_types) if requested_types is not None else None
+            raise ValueError(
+                f"{self.__class__.__name__} found no target units. "
+                f"requested types={requested_type_values}, "
+                f"requested uids={sorted(requested_uids) if requested_uids is not None else None}."
+            )
+        return target_units
+
+    @property
+    def target_unit_uids(self) -> List[str]:
+        """Return target unit uids in adapter registration order."""
+        return [unit.uid for unit in self.target_units]
 
     def _init_run_state(
         self,
@@ -523,8 +798,14 @@ class Optimizer(abc.ABC):
         """Load or create OptimizationRunState and seed the initial snapshot and baseline record."""
         if resume_from:
             state = OptimizationRunState.load_state(resume_from)
+            current_fingerprint = self.adapter.fingerprint()
+            if state.adapter_fingerprint is not None and state.adapter_fingerprint != current_fingerprint:
+                raise ValueError(
+                    "Cannot resume optimization: adapter fingerprint does not match the saved run state."
+                )
         else:
             state = OptimizationRunState(save_dir=save_dir or "./")
+            state.adapter_fingerprint = self.adapter.fingerprint()
 
         # Seed the initial snapshot so propose() always has a valid source_snapshot_id,
         # including the first trial of a fresh run.
@@ -556,15 +837,94 @@ class Optimizer(abc.ABC):
             raise ValueError(f"`max_trials` must be a positive integer, got {max_trials}")
         return _validate_execution_config(execution_mode, max_workers)
 
+    @staticmethod
+    def _resolve_workspace_root(
+        state: OptimizationRunState,
+        save_dir: Optional[str],
+        resume_from: Optional[str],
+        workspace_root: Optional[str],
+    ) -> Optional[str]:
+        """
+        Resolve the trial workspace root.
+
+        Workspace isolation is enabled explicitly by `workspace_root`, or implicitly
+        when a persistent save/resume directory is used. Pure in-memory optimization
+        without save_dir keeps the historical no-filesystem behavior.
+        """
+        if workspace_root is not None:
+            return workspace_root
+        if save_dir is not None or resume_from is not None:
+            return os.path.join(state.save_dir or "./", "workspaces")
+        return None
+
+    def on_run_start(
+        self,
+        _state: OptimizationRunState,
+        _objective: Objective,
+        **_kwargs,
+    ) -> None:
+        """
+        Hook called after baseline evaluation and best syncing, before trial proposals.
+
+        Optimizers with persistent algorithm state can initialize
+        `state.optimizer_state` here without reimplementing `optimize`.
+        """
+        pass
+
+    async def async_on_run_start(
+        self,
+        state: OptimizationRunState,
+        objective: Objective,
+        **kwargs,
+    ) -> None:
+        """Async variant of `on_run_start`."""
+        self.on_run_start(state, objective, **kwargs)
+
+    def observe(
+        self,
+        _state: OptimizationRunState,
+        _trial_records: List[TrialRecord],
+        _objective: Objective,
+        **_kwargs,
+    ) -> None:
+        """
+        Hook called after a batch has been evaluated and merged into state.
+
+        Population, archive, Bayesian-search, or gradient-like optimizers can use
+        this to update `state.optimizer_state` before the next `propose` call.
+        """
+        pass
+
+    async def async_observe(
+        self,
+        state: OptimizationRunState,
+        trial_records: List[TrialRecord],
+        objective: Objective,
+        **kwargs,
+    ) -> None:
+        """Async variant of `observe`."""
+        self.observe(state, trial_records, objective, **kwargs)
+
+    def should_stop(
+        self,
+        _state: OptimizationRunState,
+        _objective: Objective,
+        **_kwargs,
+    ) -> bool:
+        """Return True to stop before exhausting `max_trials`."""
+        return False
+
     def optimize(
         self,
-        evaluate_fn: Callable[[ProgramAdapter], Dict[str, Any]],
+        evaluate_fn: Callable[[ProgramAdapter], EvaluationReturn],
         objective: Objective,
         max_trials: Optional[int] = 3,
         save_dir: Optional[str] = None,
         resume_from: Optional[str] = None,
         execution_mode: Literal["sequential", "concurrent"] = "sequential",
         max_workers: Optional[int] = None,
+        workspace_root: Optional[str] = None,
+        keep_trial_workspaces: bool = True,
         **kwargs
     ) -> ProgramAdapter:
 
@@ -572,23 +932,72 @@ class Optimizer(abc.ABC):
 
         # Initialize or load the optimization run state
         state = self._init_run_state(save_dir, resume_from)
+        trial_workspace_root = self._resolve_workspace_root(state, save_dir, resume_from, workspace_root)
 
         # Evaluate baseline once if not yet done; persists so resume skips this.
         baseline_record = state.get_baseline_record()
         if baseline_record is not None and baseline_record.metrics is None:
-            metrics = evaluate_fn(self.adapter)
-            _validate_metrics(metrics, BASELINE_TRIAL_ID)
-            baseline_record.metrics = metrics
-            state.save_state()
+            baseline_snapshot = state.get_snapshot_by_id(baseline_record.snapshot_id)
+            baseline_adapter = self.adapter.load_snapshot(baseline_snapshot) if baseline_snapshot is not None else self.adapter
+            baseline_workspace: Optional[TrialWorkspace] = None
+            baseline_validation_results: List[ValidationResult] = []
+            try:
+                if baseline_snapshot is None:
+                    raise RuntimeError("Baseline snapshot is missing from optimization state.")
+                baseline_workspace = _prepare_trial_workspace(
+                    baseline_adapter,
+                    baseline_snapshot,
+                    BASELINE_TRIAL_ID,
+                    trial_workspace_root,
+                    keep_trial_workspaces,
+                    metadata={"baseline": True},
+                    **kwargs,
+                )
+                baseline_validation_results = _normalize_validation_results(
+                    baseline_adapter.validate_trial(
+                        baseline_snapshot,
+                        [],
+                        workspace=baseline_workspace,
+                        **kwargs,
+                    ),
+                    BASELINE_TRIAL_ID,
+                )
+                validation_error = _validation_failure_message(baseline_validation_results)
+                if validation_error is not None:
+                    raise RuntimeError(validation_error)
+                evaluation = _normalize_evaluation_result(evaluate_fn(baseline_adapter), BASELINE_TRIAL_ID)
+                baseline_record.status = "completed"
+                baseline_record.metrics = evaluation.metrics
+                baseline_record.traces = evaluation.traces
+                baseline_record.artifacts = evaluation.artifacts
+                baseline_record.metadata = evaluation.metadata
+                baseline_record.validation_results = baseline_validation_results
+                baseline_record.workspace_dir = baseline_workspace.root_dir if baseline_workspace is not None else None
+                baseline_record.error = None
+                state.save_state()
+            except Exception as exc:
+                baseline_record.status = "failed"
+                baseline_record.validation_results = baseline_validation_results
+                baseline_record.workspace_dir = baseline_workspace.root_dir if baseline_workspace is not None else None
+                baseline_record.error = str(exc)
+                state.save_state()
+                raise
+            finally:
+                if baseline_workspace is not None:
+                    baseline_workspace.cleanup()
 
         # Sync best_snapshot_id / best_metrics from objective (covers both fresh and resume).
         _sync_best(state, objective)
+        self.on_run_start(state, objective, **kwargs)
 
         while state.current_step < max_trials:
+            if self.should_stop(state, objective, **kwargs):
+                break
             remaining = max_trials - state.current_step
-            proposals = self.batch_propose(state, objective, **kwargs)[:remaining]
+            proposals = self.batch_propose(state, objective, max_proposals=remaining, **kwargs)[:remaining]
             if not proposals:
                 break
+            record_count_before = len(state.trial_records)
             state = self.runtime.run_batch(
                 state=state,
                 proposals=proposals,
@@ -596,8 +1005,12 @@ class Optimizer(abc.ABC):
                 objective=objective,
                 execution_mode=execution_mode,
                 max_workers=max_workers,
+                workspace_root=trial_workspace_root,
+                keep_trial_workspaces=keep_trial_workspaces,
                 **kwargs
             )
+            new_records = state.trial_records[record_count_before:]
+            self.observe(state, new_records, objective, **kwargs)
             state.current_step += len(proposals)
             state.save_state()
 
@@ -616,20 +1029,22 @@ class Optimizer(abc.ABC):
 
     async def async_optimize(
         self,
-        evaluate_fn: Callable[[ProgramAdapter], Awaitable[Dict[str, Any]]],
+        evaluate_fn: Callable[[ProgramAdapter], Awaitable[EvaluationReturn]],
         objective: Objective,
         max_trials: Optional[int] = 3,
         save_dir: Optional[str] = None,
         resume_from: Optional[str] = None,
         execution_mode: Literal["sequential", "concurrent"] = "sequential",
         max_workers: Optional[int] = None,
+        workspace_root: Optional[str] = None,
+        keep_trial_workspaces: bool = True,
         **kwargs
     ) -> ProgramAdapter:
         """
         Async variant of `optimize`. Supports both sequential and concurrent trial execution.
 
         Args:
-            evaluate_fn: Async callable `(adapter) -> Awaitable[Dict[str, Any]]` returning metrics.
+            evaluate_fn: Async callable returning either metric dicts or EvaluationResult objects.
             objective: Optimization objective.
             max_trials: Total number of individual trials to run.
             save_dir: Directory to write per-trial state checkpoints.
@@ -648,23 +1063,72 @@ class Optimizer(abc.ABC):
         execution_mode, max_workers = self._validate_optimize_args(objective, max_trials, execution_mode, max_workers)
 
         state = self._init_run_state(save_dir, resume_from)
+        trial_workspace_root = self._resolve_workspace_root(state, save_dir, resume_from, workspace_root)
 
         # Evaluate baseline once if not yet done; persists so resume skips this.
         baseline_record = state.get_baseline_record()
         if baseline_record is not None and baseline_record.metrics is None:
-            metrics = await evaluate_fn(self.adapter)
-            _validate_metrics(metrics, BASELINE_TRIAL_ID)
-            baseline_record.metrics = metrics
-            state.save_state()
+            baseline_snapshot = state.get_snapshot_by_id(baseline_record.snapshot_id)
+            baseline_adapter = self.adapter.load_snapshot(baseline_snapshot) if baseline_snapshot is not None else self.adapter
+            baseline_workspace: Optional[TrialWorkspace] = None
+            baseline_validation_results: List[ValidationResult] = []
+            try:
+                if baseline_snapshot is None:
+                    raise RuntimeError("Baseline snapshot is missing from optimization state.")
+                baseline_workspace = _prepare_trial_workspace(
+                    baseline_adapter,
+                    baseline_snapshot,
+                    BASELINE_TRIAL_ID,
+                    trial_workspace_root,
+                    keep_trial_workspaces,
+                    metadata={"baseline": True},
+                    **kwargs,
+                )
+                baseline_validation_results = _normalize_validation_results(
+                    await baseline_adapter.async_validate_trial(
+                        baseline_snapshot,
+                        [],
+                        workspace=baseline_workspace,
+                        **kwargs,
+                    ),
+                    BASELINE_TRIAL_ID,
+                )
+                validation_error = _validation_failure_message(baseline_validation_results)
+                if validation_error is not None:
+                    raise RuntimeError(validation_error)
+                evaluation = _normalize_evaluation_result(await evaluate_fn(baseline_adapter), BASELINE_TRIAL_ID)
+                baseline_record.status = "completed"
+                baseline_record.metrics = evaluation.metrics
+                baseline_record.traces = evaluation.traces
+                baseline_record.artifacts = evaluation.artifacts
+                baseline_record.metadata = evaluation.metadata
+                baseline_record.validation_results = baseline_validation_results
+                baseline_record.workspace_dir = baseline_workspace.root_dir if baseline_workspace is not None else None
+                baseline_record.error = None
+                state.save_state()
+            except Exception as exc:
+                baseline_record.status = "failed"
+                baseline_record.validation_results = baseline_validation_results
+                baseline_record.workspace_dir = baseline_workspace.root_dir if baseline_workspace is not None else None
+                baseline_record.error = str(exc)
+                state.save_state()
+                raise
+            finally:
+                if baseline_workspace is not None:
+                    baseline_workspace.cleanup()
 
         # Sync best_snapshot_id / best_metrics from objective (covers both fresh and resume).
         _sync_best(state, objective)
+        await self.async_on_run_start(state, objective, **kwargs)
 
         while state.current_step < max_trials:
+            if self.should_stop(state, objective, **kwargs):
+                break
             remaining = max_trials - state.current_step
-            proposals = self.batch_propose(state, objective, **kwargs)[:remaining]
+            proposals = (await self.async_batch_propose(state, objective, max_proposals=remaining, **kwargs))[:remaining]
             if not proposals:
                 break
+            record_count_before = len(state.trial_records)
             state = await self.runtime.async_run_batch(
                 state=state,
                 proposals=proposals,
@@ -672,8 +1136,12 @@ class Optimizer(abc.ABC):
                 objective=objective,
                 execution_mode=execution_mode,
                 max_workers=max_workers,
+                workspace_root=trial_workspace_root,
+                keep_trial_workspaces=keep_trial_workspaces,
                 **kwargs
             )
+            new_records = state.trial_records[record_count_before:]
+            await self.async_observe(state, new_records, objective, **kwargs)
             state.current_step += len(proposals)
             state.save_state()
 
@@ -719,6 +1187,7 @@ class Optimizer(abc.ABC):
         self,
         state: OptimizationRunState,
         objective: Objective,
+        max_proposals: Optional[int] = None,
         **kwargs
     ) -> List[OptimizationProposal]:
         """
@@ -729,15 +1198,43 @@ class Optimizer(abc.ABC):
 
         Override to return multiple proposals when the algorithm naturally generates a
         population of candidates (e.g. evolutionary search, beam search, TPE with parallel
-        workers). The caller (`optimize` / `async_optimize`) will trim the list to the
-        remaining trial budget before passing it to the runtime.
+        workers). The caller (`optimize` / `async_optimize`) trims the returned list to
+        `max_proposals` as a safety net, but algorithms should respect `max_proposals`
+        directly to avoid generating wasted candidates.
 
         Args:
             state: Current optimization run state.
             objective: The objective the proposed changes should aim to improve.
+            max_proposals: Maximum number of proposals to return. None means unbounded.
+                           Population-based algorithms should use this to self-limit.
             **kwargs: Forwarded to `propose` (or used directly if overriding).
 
         Returns:
             A non-empty list of OptimizationProposal objects.
         """
-        return [self.propose(state, objective, **kwargs)]
+        proposals = [self.propose(state, objective, **kwargs)]
+        return proposals[:max_proposals] if max_proposals is not None else proposals
+
+    async def async_batch_propose(
+        self,
+        state: OptimizationRunState,
+        objective: Objective,
+        max_proposals: Optional[int] = None,
+        **kwargs
+    ) -> List[OptimizationProposal]:
+        """
+        Async variant of `batch_propose`. Default delegates to sync `batch_propose`.
+
+        Override when proposal generation involves async I/O (e.g. LLM calls to generate
+        the next candidate). The async optimization loop calls this instead of `batch_propose`.
+
+        Args:
+            state: Current optimization run state.
+            objective: The objective the proposed changes should aim to improve.
+            max_proposals: Maximum number of proposals to return. None means unbounded.
+            **kwargs: Forwarded to `batch_propose` (or used directly if overriding).
+
+        Returns:
+            A non-empty list of OptimizationProposal objects.
+        """
+        return self.batch_propose(state, objective, max_proposals=max_proposals, **kwargs)

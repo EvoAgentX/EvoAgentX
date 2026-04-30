@@ -1,12 +1,14 @@
 import abc
 import json
-from dataclasses import dataclass
+import os
+import shutil
+from dataclasses import dataclass, field
 from uuid import uuid4
 from pydantic import Field, field_validator
-from typing import final, List, Any, Optional, Dict, Literal
+from typing import final, List, Any, Optional, Dict, Literal, Iterable
 
 from ...core.module import BaseModule
-from .base import OptimizationUnit, UnitChange
+from .base import ChangeOperation, OptimizationUnit, OptimizationUnitType, UnitChange, ValidationResult
 
 
 class SnapShot(BaseModule):
@@ -55,6 +57,62 @@ class ApplyResult:
         return self.status == "success"
 
 
+@dataclass
+class TrialWorkspace:
+    """Filesystem sandbox for one optimization trial."""
+    root_dir: str
+    trial_id: int
+    source_snapshot_id: Optional[str] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    keep: bool = True
+
+    @classmethod
+    def create(
+        cls,
+        root_dir: str,
+        trial_id: int,
+        source_snapshot_id: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        keep: bool = True,
+    ) -> "TrialWorkspace":
+        workspace = cls(
+            root_dir=os.path.abspath(root_dir),
+            trial_id=trial_id,
+            source_snapshot_id=source_snapshot_id,
+            metadata=metadata or {},
+            keep=keep,
+        )
+        os.makedirs(workspace.root_dir, exist_ok=True)
+        return workspace
+
+    def path(self, *parts: str) -> str:
+        """Return an absolute path inside this workspace."""
+        path = os.path.abspath(os.path.join(self.root_dir, *parts))
+        if os.path.commonpath([self.root_dir, path]) != self.root_dir:
+            raise ValueError(f"Workspace path escapes root_dir: {path}")
+        return path
+
+    def ensure_dir(self, *parts: str) -> str:
+        """Create and return a directory inside the workspace."""
+        path = self.path(*parts)
+        os.makedirs(path, exist_ok=True)
+        return path
+
+    def cleanup(self) -> None:
+        """Remove the workspace when `keep` is False."""
+        if not self.keep and os.path.exists(self.root_dir):
+            shutil.rmtree(self.root_dir)
+
+    def as_artifact(self) -> Dict[str, Any]:
+        return {
+            "root_dir": self.root_dir,
+            "trial_id": self.trial_id,
+            "source_snapshot_id": self.source_snapshot_id,
+            "metadata": self.metadata,
+            "kept": self.keep,
+        }
+
+
 class ProgramAdapter(abc.ABC):
 
     def __init_subclass__(cls, **kwargs) -> None:
@@ -90,6 +148,58 @@ class ProgramAdapter(abc.ABC):
             self._units = self._validate_units(self.register_units())
         return self._units
 
+    def get_unit(self, uid: str) -> Optional[OptimizationUnit]:
+        """Return a registered optimization unit by uid, or None if it is unknown."""
+        for unit in self.units:
+            if unit.uid == uid:
+                return unit
+        return None
+
+    def select_units(
+        self,
+        *,
+        unit_types: Optional[Iterable[OptimizationUnitType]] = None,
+        uids: Optional[Iterable[str]] = None,
+    ) -> List[OptimizationUnit]:
+        """
+        Return registered units filtered by type and/or uid.
+
+        Args:
+            unit_types: Optional set of unit types to include.
+            uids: Optional set of unit uids to include.
+
+        Returns:
+            Matching units in adapter registration order.
+        """
+        unit_type_set = set(unit_types) if unit_types is not None else None
+        uid_set = set(uids) if uids is not None else None
+        return [
+            unit for unit in self.units
+            if (unit_type_set is None or unit.unit_type in unit_type_set)
+            and (uid_set is None or unit.uid in uid_set)
+        ]
+
+    def fingerprint(self) -> Dict[str, Any]:
+        """
+        Return a stable adapter compatibility fingerprint for persisted optimization runs.
+
+        Subclasses may override when reconstruction depends on additional adapter-level
+        contracts. The default intentionally avoids live object identity and includes only
+        declared optimization-unit shape.
+        """
+        return {
+            "adapter_class": f"{self.__class__.__module__}.{self.__class__.__name__}",
+            "units": [
+                {
+                    "uid": unit.uid,
+                    "name": unit.name,
+                    "unit_type": unit.unit_type.value,
+                    "allowed_operations": list(unit.allowed_operations),
+                }
+                for unit in self.units
+            ],
+        }
+
     def _validate_changes(self, changes: List[UnitChange]) -> None:
         if not isinstance(changes, list):
             raise TypeError("changes must be a list of UnitChange objects.")
@@ -106,7 +216,172 @@ class ProgramAdapter(abc.ABC):
 
         for change in changes:
             unit = units_by_uid[change.uid]
-            UnitChange.validate_value(change.value, unit)
+            UnitChange.validate_value(change.value, unit, operation=change.operation)
+
+    @property
+    def workspace(self) -> Optional[TrialWorkspace]:
+        """Workspace bound to this adapter for the current trial, if any."""
+        return getattr(self, "_workspace", None)
+
+    def bind_workspace(self, workspace: Optional[TrialWorkspace]) -> None:
+        """Attach a trial workspace to this adapter before validation/evaluation."""
+        self._workspace = workspace
+
+    def prepare_workspace(
+        self,
+        workspace: TrialWorkspace,
+        snapshot: SnapShot,
+        **kwargs,
+    ) -> None:
+        """
+        Optional hook to materialize file-backed state into a trial workspace.
+
+        File/code/skills adapters can override this to write snapshot contents into
+        `workspace` and then execute against those isolated files.
+        """
+        pass
+
+    def validate_trial(
+        self,
+        snapshot: SnapShot,
+        changes: List[UnitChange],
+        workspace: Optional[TrialWorkspace] = None,
+        **kwargs,
+    ) -> List[ValidationResult]:
+        """
+        Optional validation pipeline run after apply/workspace preparation and before evaluation.
+
+        Override this for static checks, import checks, smoke tests, schema checks, or
+        adapter-specific consistency validation. The engine records all returned results
+        and skips evaluation when any result has status="failed".
+        """
+        return []
+
+    async def async_validate_trial(
+        self,
+        snapshot: SnapShot,
+        changes: List[UnitChange],
+        workspace: Optional[TrialWorkspace] = None,
+        **kwargs,
+    ) -> List[ValidationResult]:
+        """Async variant of `validate_trial`."""
+        return self.validate_trial(snapshot, changes, workspace=workspace, **kwargs)
+
+    def on_task_begin(self, task: Any = None, **kwargs) -> Any:
+        """Optional per-task lifecycle hook used by evaluators/agents."""
+        return None
+
+    def on_step(self, step: Any = None, **kwargs) -> Any:
+        """Optional per-step lifecycle hook used by evaluators/agents."""
+        return None
+
+    def on_task_end(self, trajectory: Any = None, result: Any = None, **kwargs) -> Any:
+        """Optional per-task completion hook used by evaluators/agents."""
+        return None
+
+    async def async_on_task_begin(self, task: Any = None, **kwargs) -> Any:
+        return self.on_task_begin(task=task, **kwargs)
+
+    async def async_on_step(self, step: Any = None, **kwargs) -> Any:
+        return self.on_step(step=step, **kwargs)
+
+    async def async_on_task_end(self, trajectory: Any = None, result: Any = None, **kwargs) -> Any:
+        return self.on_task_end(trajectory=trajectory, result=result, **kwargs)
+
+    @staticmethod
+    def _recursive_merge(base: Dict[str, Any], patch: Dict[str, Any]) -> Dict[str, Any]:
+        merged = dict(base)
+        for key, value in patch.items():
+            if isinstance(merged.get(key), dict) and isinstance(value, dict):
+                merged[key] = ProgramAdapter._recursive_merge(merged[key], value)
+            else:
+                merged[key] = value
+        return merged
+
+    @staticmethod
+    def _append_text_block(current: str, value: str) -> str:
+        if not current:
+            return value
+        if current.endswith("\n") or value.startswith("\n"):
+            return f"{current}{value}"
+        return f"{current}\n{value}"
+
+    @staticmethod
+    def apply_change_to_value(current_value: Any, change: UnitChange) -> Any:
+        """
+        Apply one standard UnitChange operation to a single unit value.
+
+        Domain-specific operations should be handled by subclass `merge_changes`.
+        This helper intentionally covers only generic value/file/code semantics.
+        """
+        operation = change.operation
+        value = change.value
+
+        if operation in (ChangeOperation.REPLACE.value, ChangeOperation.WRITE_FILE.value, ChangeOperation.REPLACE_CONFIG.value):
+            return value
+        if operation in (ChangeOperation.NOOP.value, ChangeOperation.REINDEX.value):
+            return current_value
+        if operation in (ChangeOperation.PATCH.value, ChangeOperation.MERGE.value):
+            if not isinstance(current_value, dict) or not isinstance(value, dict):
+                raise ValueError(f"Operation '{operation}' requires dict current value and dict payload.")
+            return ProgramAdapter._recursive_merge(current_value, value)
+        if operation == ChangeOperation.APPEND.value:
+            if isinstance(current_value, list):
+                return [*current_value, value]
+            if isinstance(current_value, str) and isinstance(value, str):
+                return ProgramAdapter._append_text_block(current_value, value)
+            raise ValueError("Operation 'append' requires a list current value or string current value with string payload.")
+        if operation == ChangeOperation.EXTEND.value:
+            if isinstance(current_value, list) and isinstance(value, list):
+                return [*current_value, *value]
+            if isinstance(current_value, dict) and isinstance(value, dict):
+                return {**current_value, **value}
+            if isinstance(current_value, str) and isinstance(value, str):
+                return ProgramAdapter._append_text_block(current_value, value)
+            raise ValueError("Operation 'extend' requires matching list, dict, or string values.")
+        if operation in (ChangeOperation.APPEND_BLOCK.value, ChangeOperation.APPEND_FUNCTION.value):
+            if isinstance(current_value, str) and isinstance(value, str):
+                return ProgramAdapter._append_text_block(current_value, value)
+            if isinstance(current_value, dict) and isinstance(current_value.get("content"), str) and isinstance(value, str):
+                updated = dict(current_value)
+                updated["content"] = ProgramAdapter._append_text_block(updated["content"], value)
+                return updated
+            raise ValueError(f"Operation '{operation}' requires string content.")
+        if operation in (ChangeOperation.DELETE.value, ChangeOperation.REMOVE_BLOCK.value):
+            if isinstance(current_value, dict):
+                keys = value
+                if isinstance(value, dict):
+                    keys = value.get("keys", value.get("key"))
+                if not isinstance(keys, list):
+                    keys = [keys]
+                return {key: item for key, item in current_value.items() if key not in keys}
+            if isinstance(current_value, list):
+                if isinstance(value, int):
+                    return [item for idx, item in enumerate(current_value) if idx != value]
+                if isinstance(value, list) and all(isinstance(idx, int) for idx in value):
+                    indices = set(value)
+                    return [item for idx, item in enumerate(current_value) if idx not in indices]
+                return [item for item in current_value if item != value]
+            if isinstance(current_value, str) and isinstance(value, str):
+                return current_value.replace(value, "")
+            raise ValueError(f"Operation '{operation}' is not supported for {type(current_value).__name__} values.")
+
+        raise ValueError(
+            f"Operation '{operation}' has no default merge semantics. "
+            "Handle it in the adapter's merge_changes method."
+        )
+
+    def merge_unit_values(self, snapshot: SnapShot, changes: List[UnitChange]) -> Dict[str, Any]:
+        """
+        Apply standard change operations to snapshot.unit_values and return a new dict.
+
+        Subclasses can call this from `merge_changes` when their units use standard
+        value/file/code operations.
+        """
+        values = dict(snapshot.unit_values)
+        for change in changes:
+            values[change.uid] = self.apply_change_to_value(values.get(change.uid), change)
+        return values
 
     @final
     def apply(self, snapshot: SnapShot, changes: List[UnitChange], **kwargs) -> ApplyResult:
