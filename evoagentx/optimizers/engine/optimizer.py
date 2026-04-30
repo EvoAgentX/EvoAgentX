@@ -1,13 +1,15 @@
 import abc
 import asyncio
+import os
 from concurrent.futures import ThreadPoolExecutor
 from pydantic import Field
-from typing import Any, Awaitable, Callable, FrozenSet, Optional, List, Dict, Literal
+from typing import Any, Awaitable, Callable, FrozenSet, Optional, List, Dict, Literal, Tuple
 
 from ...core.module import BaseModule
 from .base import OptimizationUnitType, OptimizationUnit, UnitChange
 from .adapter import SnapShot, ProgramAdapter, ApplyResult
 
+BASELINE_TRIAL_ID = 0
 
 class OptimizationProposal(BaseModule):
     source_snapshot_id: str = Field(description="The snapshot_id of the base snapshot that the proposed changes will be applied on")
@@ -26,12 +28,60 @@ class TrialRecord(BaseModule):
     error: Optional[str] = Field(default=None, description="Error message if the trial failed")
 
 
-class Objective:
+class Objective(abc.ABC):
     """
-    Defines the optimization objective: which metric to track and in which direction.
+    Abstract base class for optimization objectives.
 
-    The default implementation compares a single named scalar metric. Subclass and
-    override `is_better` for multi-objective or custom comparison logic.
+    Subclass and implement `is_better` to define the comparison logic.
+    For single-metric scalar optimization use the concrete `ScalarObjective`.
+    """
+
+    @abc.abstractmethod
+    def is_better(self, metrics_a: Dict[str, Any], metrics_b: Dict[str, Any]) -> bool:
+        """
+        Return True if metrics_a represents a strictly better outcome than metrics_b.
+
+        Args:
+            metrics_a: Metrics dict from the candidate trial.
+            metrics_b: Metrics dict from the reference / current-best trial.
+
+        Returns:
+            True if metrics_a is strictly better than metrics_b, False otherwise.
+        """
+        raise NotImplementedError
+
+    def select_best_trial_record(self, trial_records: List["TrialRecord"]) -> Optional["TrialRecord"]:
+        """
+        Return the best completed TrialRecord, or None if no completed record with metrics exists.
+
+        The returned record gives callers direct access to snapshot_id, metrics, and all
+        other trial metadata without a secondary lookup.
+
+        Iterates over completed (status == "completed") trial records that have non-None
+        metrics and returns the one with the best metrics according to `is_better`.
+
+        Args:
+            trial_records: All trial records accumulated in the optimization run.
+
+        Returns:
+            The best completed TrialRecord, or None if none exist.
+        """
+        best: Optional[TrialRecord] = None
+        for record in trial_records:
+            if record.status != "completed" or record.metrics is None:
+                continue
+            if best is None or self.is_better(record.metrics, best.metrics):
+                best = record
+        return best
+
+
+class ScalarObjective(Objective):
+    """
+    Concrete objective that compares a single named scalar metric.
+
+    Args:
+        metric: Key to look up in the metrics dict (default "score").
+        direction: "maximize" (default) or "minimize".
     """
 
     def __init__(
@@ -43,49 +93,26 @@ class Objective:
         self.direction = direction
 
     def is_better(self, metrics_a: Dict[str, Any], metrics_b: Dict[str, Any]) -> bool:
-        """
-        Return True if metrics_a represents a strictly better outcome than metrics_b.
-
-        The default implementation compares `self.metric` as a scalar according to
-        `self.direction`. Returns False if either dict is missing the key.
-
-        Override for custom comparison logic (e.g. multi-objective, weighted scores).
-
-        Args:
-            metrics_a: Metrics dict from the candidate trial.
-            metrics_b: Metrics dict from the reference / current-best trial.
-
-        Returns:
-            True if metrics_a is strictly better than metrics_b, False otherwise.
-        """
-        pass
-
-    def select_best_snapshot_id(self, trial_records: List["TrialRecord"]) -> Optional[str]:
-        """
-        Return the snapshot_id of the best trial among all completed records.
-
-        Iterates over completed (status == "completed") trial records and returns
-        the snapshot_id of the one with the best metrics according to `is_better`.
-
-        Args:
-            trial_records: All trial records accumulated in the optimization run.
-
-        Returns:
-            The snapshot_id of the best completed trial, or None if none exist.
-        """
-        pass
+        val_a = metrics_a.get(self.metric) if metrics_a else None
+        val_b = metrics_b.get(self.metric) if metrics_b else None
+        if val_a is None:
+            return False
+        if val_b is None:
+            return True
+        return val_a > val_b if self.direction == "maximize" else val_a < val_b
 
 
 class OptimizationRunState(BaseModule):
-    
+
     snapshots: List[SnapShot] = Field(default_factory=list, description="List of snapshots for all completed trials in the optimization run")
     trial_records: List[TrialRecord] = Field(default_factory=list, description="List of records for all completed trials in the optimization run")
     best_snapshot_id: Optional[str] = Field(default=None, description="The snapshot_id of the best snapshot found so far in the optimization run, according to the defined objective and evaluation metrics")
-    
+    best_metrics: Optional[Dict[str, Any]] = Field(default=None, description="The evaluation metrics associated with best_snapshot_id; None until the baseline has been evaluated")
+
     current_step: int = Field(default=0, description="Current trial step (0-indexed, not started) in the optimization run")
     save_dir: Optional[str] = Field(default="./", description="Directory to save optimization state and results")
 
-    def get_snapshot(self, snapshot_id: str) -> Optional[SnapShot]:
+    def get_snapshot_by_id(self, snapshot_id: str) -> Optional[SnapShot]:
         """
         Look up a snapshot by its snapshot_id.
 
@@ -95,7 +122,34 @@ class OptimizationRunState(BaseModule):
         Returns:
             The matching SnapShot, or None if no snapshot with that ID exists.
         """
-        pass
+        for snapshot in self.snapshots:
+            if snapshot.snapshot_id == snapshot_id:
+                return snapshot
+        return None
+
+    def get_trial_record_by_id(self, trial_id: int) -> Optional[TrialRecord]:
+        """
+        Look up a TrialRecord by its trial_id.
+
+        Args:
+            trial_id: The unique identifier of the target trial.
+
+        Returns:
+            The matching TrialRecord, or None if no record with that ID exists.
+        """
+        for record in self.trial_records:
+            if record.trial_id == trial_id:
+                return record
+        return None
+
+    def get_baseline_record(self) -> Optional[TrialRecord]:
+        """
+        Return the baseline TrialRecord (trial_id == BASELINE_TRIAL_ID), or None if not present.
+        """
+        for record in self.trial_records:
+            if record.trial_id == BASELINE_TRIAL_ID:
+                return record
+        return None
 
     @staticmethod
     def load_state(path: str) -> "OptimizationRunState":
@@ -113,7 +167,10 @@ class OptimizationRunState(BaseModule):
             The restored OptimizationRunState, including all past snapshots,
             trial records, best_snapshot_id, and current_step.
         """
-        pass
+        if os.path.isdir(path):
+            path = os.path.join(path, "optimization_state.json")
+        with open(path, "r") as f:
+            return OptimizationRunState.model_validate_json(f.read())
 
     def save_state(self) -> str:
         """
@@ -124,15 +181,26 @@ class OptimizationRunState(BaseModule):
         Returns:
             The file path where the state was written.
         """
-        pass
+        os.makedirs(self.save_dir, exist_ok=True)
+        path = os.path.join(self.save_dir, "optimization_state.json")
+        with open(path, "w") as f:
+            f.write(self.model_dump_json(indent=2))
+        return path
 
+
+def _sync_best(state: OptimizationRunState, objective: Objective) -> None:
+    """Update state.best_snapshot_id and state.best_metrics from objective."""
+    best_record = objective.select_best_trial_record(state.trial_records)
+    if best_record is not None:
+        state.best_snapshot_id = best_record.snapshot_id
+        state.best_metrics = best_record.metrics
 
 
 class TrialRuntime:
 
     def __init__(self, adapter: ProgramAdapter) -> None:
         self.adapter = adapter
-    
+
     def run(
         self,
         state: OptimizationRunState,
@@ -145,7 +213,7 @@ class TrialRuntime:
         Execute a single optimization trial and return the updated run state.
 
         Pipeline:
-        1. Fetch `base_snapshot = state.get_snapshot(proposal.source_snapshot_id)`, then
+        1. Fetch `base_snapshot = state.get_snapshot_by_id(proposal.source_snapshot_id)`, then
            call `result = self.adapter.apply(base_snapshot, proposal.changes)`.
            `self.adapter` is never modified and remains the stable base for all trials.
            If `result.ok` is False, record the trial as status="failed" with `result.error`
@@ -175,8 +243,44 @@ class TrialRuntime:
             Updated OptimizationRunState with the new snapshot, trial record, and
             (if the trial succeeded) a potentially updated best_snapshot_id.
         """
-        # when calling self.adapter.apply, pass the copied base_snapshot, since the it might be modified in-place by the apply method
-        pass
+        # when calling self.adapter.apply, pass the copied base_snapshot, since it might be modified in-place by the apply method
+        base_snapshot = state.get_snapshot_by_id(proposal.source_snapshot_id)
+        result = self.adapter.apply(base_snapshot.model_copy(deep=True), proposal.changes, **kwargs)
+        trial_id = len(state.trial_records)
+
+        if not result.ok:
+            state.trial_records.append(TrialRecord(
+                trial_id=trial_id,
+                changes=proposal.changes,
+                source_snapshot_id=proposal.source_snapshot_id,
+                status="failed",
+                error=result.error,
+            ))
+            return state
+
+        try:
+            metrics = evaluate_fn(result.adapter)
+        except Exception as exc:
+            state.trial_records.append(TrialRecord(
+                trial_id=trial_id,
+                changes=proposal.changes,
+                source_snapshot_id=proposal.source_snapshot_id,
+                status="failed",
+                error=str(exc),
+            ))
+            return state
+
+        state.snapshots.append(result.snapshot)
+        state.trial_records.append(TrialRecord(
+            trial_id=trial_id,
+            changes=proposal.changes,
+            source_snapshot_id=proposal.source_snapshot_id,
+            status="completed",
+            snapshot_id=result.snapshot.snapshot_id,
+            metrics=metrics,
+        ))
+        _sync_best(state, objective)
+        return state
 
     async def async_run(
         self,
@@ -199,7 +303,43 @@ class TrialRuntime:
         Returns:
             Updated OptimizationRunState (see `run` for full pipeline description).
         """
-        pass
+        base_snapshot = state.get_snapshot_by_id(proposal.source_snapshot_id)
+        result = self.adapter.apply(base_snapshot.model_copy(deep=True), proposal.changes, **kwargs)
+        trial_id = len(state.trial_records)
+
+        if not result.ok:
+            state.trial_records.append(TrialRecord(
+                trial_id=trial_id,
+                changes=proposal.changes,
+                source_snapshot_id=proposal.source_snapshot_id,
+                status="failed",
+                error=result.error,
+            ))
+            return state
+
+        try:
+            metrics = await evaluate_fn(result.adapter)
+        except Exception as exc:
+            state.trial_records.append(TrialRecord(
+                trial_id=trial_id,
+                changes=proposal.changes,
+                source_snapshot_id=proposal.source_snapshot_id,
+                status="failed",
+                error=str(exc),
+            ))
+            return state
+
+        state.snapshots.append(result.snapshot)
+        state.trial_records.append(TrialRecord(
+            trial_id=trial_id,
+            changes=proposal.changes,
+            source_snapshot_id=proposal.source_snapshot_id,
+            status="completed",
+            snapshot_id=result.snapshot.snapshot_id,
+            metrics=metrics,
+        ))
+        _sync_best(state, objective)
+        return state
 
     def run_batch(
         self,
@@ -238,11 +378,52 @@ class TrialRuntime:
                 state = self.run(state, proposal, evaluate_fn, objective, **kwargs)
             return state
 
-        # concurrent: each thread runs one trial independently from the current state.
-        # Results are merged in submission order after all threads finish.
-        # TODO: implement _single_trial_outcome that returns (SnapShot, TrialRecord)
-        #   without modifying state, then submit all via ThreadPoolExecutor and merge.
-        pass
+        # concurrent: each thread runs one trial independently from a frozen copy of the
+        # current state; results are merged in submission order after all threads finish.
+        base_trial_count = len(state.trial_records)
+
+        def _single_outcome(idx_proposal: Tuple[int, OptimizationProposal]) -> Tuple[Optional[SnapShot], TrialRecord]:
+            idx, proposal = idx_proposal
+            base_snapshot = state.get_snapshot_by_id(proposal.source_snapshot_id)
+            result = self.adapter.apply(base_snapshot.model_copy(deep=True), proposal.changes, **kwargs)
+            trial_id = base_trial_count + idx
+            if not result.ok:
+                return None, TrialRecord(
+                    trial_id=trial_id,
+                    changes=proposal.changes,
+                    source_snapshot_id=proposal.source_snapshot_id,
+                    status="failed",
+                    error=result.error,
+                )
+            try:
+                metrics = evaluate_fn(result.adapter)
+            except Exception as exc:
+                return None, TrialRecord(
+                    trial_id=trial_id,
+                    changes=proposal.changes,
+                    source_snapshot_id=proposal.source_snapshot_id,
+                    status="failed",
+                    error=str(exc),
+                )
+            return result.snapshot, TrialRecord(
+                trial_id=trial_id,
+                changes=proposal.changes,
+                source_snapshot_id=proposal.source_snapshot_id,
+                status="completed",
+                snapshot_id=result.snapshot.snapshot_id,
+                metrics=metrics,
+            )
+
+        with ThreadPoolExecutor() as pool:
+            outcomes = list(pool.map(_single_outcome, enumerate(proposals)))
+
+        for snapshot, record in outcomes:
+            if snapshot is not None:
+                state.snapshots.append(snapshot)
+            state.trial_records.append(record)
+
+        _sync_best(state, objective)
+        return state
 
     async def async_run_batch(
         self,
@@ -282,27 +463,65 @@ class TrialRuntime:
             return state
 
         # concurrent: each trial reads the current state independently, results merged after
-        # TODO: implement _async_single_outcome helper that runs one trial without
-        #   modifying state, then gather all, append snapshots/records, and update
-        #   best_snapshot_id once at the end.
-        pass
+        base_trial_count = len(state.trial_records)
+
+        async def _single_outcome(idx: int, proposal: OptimizationProposal) -> Tuple[Optional[SnapShot], TrialRecord]:
+            base_snapshot = state.get_snapshot_by_id(proposal.source_snapshot_id)
+            result = self.adapter.apply(base_snapshot.model_copy(deep=True), proposal.changes, **kwargs)
+            trial_id = base_trial_count + idx
+            if not result.ok:
+                return None, TrialRecord(
+                    trial_id=trial_id,
+                    changes=proposal.changes,
+                    source_snapshot_id=proposal.source_snapshot_id,
+                    status="failed",
+                    error=result.error,
+                )
+            try:
+                metrics = await evaluate_fn(result.adapter)
+            except Exception as exc:
+                return None, TrialRecord(
+                    trial_id=trial_id,
+                    changes=proposal.changes,
+                    source_snapshot_id=proposal.source_snapshot_id,
+                    status="failed",
+                    error=str(exc),
+                )
+            return result.snapshot, TrialRecord(
+                trial_id=trial_id,
+                changes=proposal.changes,
+                source_snapshot_id=proposal.source_snapshot_id,
+                status="completed",
+                snapshot_id=result.snapshot.snapshot_id,
+                metrics=metrics,
+            )
+
+        outcomes = await asyncio.gather(*[_single_outcome(i, p) for i, p in enumerate(proposals)])
+
+        for snapshot, record in outcomes:
+            if snapshot is not None:
+                state.snapshots.append(snapshot)
+            state.trial_records.append(record)
+
+        _sync_best(state, objective)
+        return state
 
 
 class Optimizer(abc.ABC):
     """
-    Abstract base class for all optimizers. 
+    Abstract base class for all optimizers.
     """
 
     def __init__(
         self,
         adapter: ProgramAdapter,
-        **kwargs         
+        **kwargs
     ) -> None:
-        
-        self.adapter = adapter
+
         if not isinstance(adapter, ProgramAdapter):
             raise TypeError(f"Expected adapter to be an instance of ProgramAdapter, got {type(adapter)}")
-        
+
+        self.adapter = adapter
         self.runtime = TrialRuntime(adapter)
         self.kwargs = kwargs
 
@@ -310,10 +529,10 @@ class Optimizer(abc.ABC):
 
     def _init_run_state(
         self,
-        save_dir: Optional[str],
-        resume_from: Optional[str],
+        save_dir: Optional[str] = None,
+        resume_from: Optional[str] = None,
     ) -> OptimizationRunState:
-        """Load or create OptimizationRunState and seed the initial snapshot."""
+        """Load or create OptimizationRunState and seed the initial snapshot and baseline record."""
         if resume_from:
             state = OptimizationRunState.load_state(resume_from)
         else:
@@ -324,27 +543,42 @@ class Optimizer(abc.ABC):
         if not state.snapshots:
             initial_snapshot = self.adapter.take_snapshot()
             state.snapshots.append(initial_snapshot)
-            state.best_snapshot_id = initial_snapshot.snapshot_id
+            state.trial_records.append(TrialRecord(
+                trial_id=BASELINE_TRIAL_ID,
+                changes=[],
+                source_snapshot_id=initial_snapshot.snapshot_id,
+                status="completed",
+                snapshot_id=initial_snapshot.snapshot_id,
+                metrics=None,
+            ))
 
         return state
 
     def optimize(
         self,
         evaluate_fn: Callable[[ProgramAdapter], Dict[str, Any]],
-        objective: Optional[Objective] = None,
+        objective: Objective,
         max_trials: Optional[int] = 3,
         save_dir: Optional[str] = None,
         resume_from: Optional[str] = None,
+        execution_mode: Literal["sequential", "concurrent"] = "sequential",
         **kwargs
     ) -> ProgramAdapter:
 
         if not isinstance(max_trials, int) or max_trials <= 0:
             raise ValueError(f"`max_trials` must be a positive integer, got {max_trials}")
 
-        if objective is None:
-            objective = Objective()
-
+        # Initialize or load the optimization run state
         state = self._init_run_state(save_dir, resume_from)
+
+        # Evaluate baseline once if not yet done; persists so resume skips this.
+        baseline_record = state.get_baseline_record()
+        if baseline_record is not None and baseline_record.metrics is None:
+            baseline_record.metrics = evaluate_fn(self.adapter)
+            state.save_state()
+
+        # Sync best_snapshot_id / best_metrics from objective (covers both fresh and resume).
+        _sync_best(state, objective)
 
         while state.current_step < max_trials:
             remaining = max_trials - state.current_step
@@ -354,12 +588,13 @@ class Optimizer(abc.ABC):
                 proposals=proposals,
                 evaluate_fn=evaluate_fn,
                 objective=objective,
+                execution_mode=execution_mode,
                 **kwargs
             )
             state.current_step += len(proposals)
             state.save_state()
 
-        best_snapshot = state.get_snapshot(state.best_snapshot_id)
+        best_snapshot = state.get_snapshot_by_id(state.best_snapshot_id)
         return self.adapter.load_snapshot(best_snapshot)
 
     async def async_optimize(
@@ -369,7 +604,7 @@ class Optimizer(abc.ABC):
         max_trials: Optional[int] = 3,
         save_dir: Optional[str] = None,
         resume_from: Optional[str] = None,
-        execution_mode: Optional[Literal["sequential", "concurrent"]] = None,
+        execution_mode: Literal["sequential", "concurrent"] = "sequential",
         **kwargs
     ) -> ProgramAdapter:
         """
@@ -381,8 +616,9 @@ class Optimizer(abc.ABC):
             max_trials: Total number of individual trials to run.
             save_dir: Directory to write per-trial state checkpoints.
             resume_from: Path to a prior checkpoint to resume from.
-            execution_mode: "sequential" or "concurrent". Defaults to "concurrent" when
-                            `adapter.supports_concurrent_execution` is True, otherwise "sequential".
+            execution_mode: "sequential" (default) or "concurrent". Pass "concurrent" when the
+                            underlying program is stateless or safe to evaluate in parallel
+                            (e.g. pure API calls, read-only inference).
             **kwargs: Forwarded to `batch_propose` and `async_run_batch`.
 
         Returns:
@@ -391,13 +627,16 @@ class Optimizer(abc.ABC):
         if not isinstance(max_trials, int) or max_trials <= 0:
             raise ValueError(f"`max_trials` must be a positive integer, got {max_trials}")
 
-        if objective is None:
-            objective = Objective()
-
-        if execution_mode is None:
-            execution_mode = "concurrent" if self.adapter.supports_concurrent_execution else "sequential"
-
         state = self._init_run_state(save_dir, resume_from)
+
+        # Evaluate baseline once if not yet done; persists so resume skips this.
+        baseline_record = state.get_baseline_record()
+        if baseline_record is not None and baseline_record.metrics is None:
+            baseline_record.metrics = await evaluate_fn(self.adapter)
+            state.save_state()
+
+        # Sync best_snapshot_id / best_metrics from objective (covers both fresh and resume).
+        _sync_best(state, objective)
 
         while state.current_step < max_trials:
             remaining = max_trials - state.current_step
@@ -413,9 +652,9 @@ class Optimizer(abc.ABC):
             state.current_step += len(proposals)
             state.save_state()
 
-        best_snapshot = state.get_snapshot(state.best_snapshot_id)
+        best_snapshot = state.get_snapshot_by_id(state.best_snapshot_id)
         return self.adapter.load_snapshot(best_snapshot)
-    
+
     @property
     @abc.abstractmethod
     def supported_unit_types(self) -> FrozenSet[OptimizationUnitType]:

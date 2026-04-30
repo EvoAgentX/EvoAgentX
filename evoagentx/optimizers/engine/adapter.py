@@ -115,17 +115,6 @@ class ProgramAdapter(abc.ABC):
         except Exception as e:
             return ApplyResult(status="failed", error=str(e))
 
-    @property
-    def supports_concurrent_execution(self) -> bool:
-        """
-        Whether multiple concurrent evaluate calls are safe on adapters produced by this class.
-
-        Return True if the underlying program is stateless or otherwise safe to evaluate
-        concurrently (e.g. pure API calls, read-only inference). Defaults to False so the
-        optimizer runs trials sequentially unless the adapter explicitly opts in.
-        """
-        return False
-
     @final
     def load_snapshot(self, snapshot: SnapShot, **kwargs) -> "ProgramAdapter":
         """
