@@ -9,12 +9,22 @@ from .decorators import EntryPoint
 from .registry import ParamRegistry
 
 class OptimizationUnitType(str, Enum):
+    # Generic structured field or scalar parameter that has no more specific type.
     FIELD = "field"
+
+    # Prompt text or prompt template content used by an agent or workflow.
     PROMPT = "prompt"
+
+    # Model selection or model configuration exposed as an optimizable unit.
     MODEL = "model"
+
+    # Memory contents, retrieval policy, or memory-store configuration.
     MEMORY = "memory"
-    SKILLS = "skills"
+
+    # File-backed artifact whose semantics are adapter-defined.
     FILE = "file"
+
+    # Source-code artifact; use metadata to mark domain roles such as skills/tools.
     CODE = "code"
 
 
@@ -22,20 +32,25 @@ UnitChangeOperation = str
 
 
 class ChangeOperation(str, Enum):
-    """Standard change operations understood by the optimizer engine helpers."""
+    """Minimal standard value operations understood by optimizer engine helpers."""
+
+    # Replace the current unit value with the provided payload.
     REPLACE = "replace"
+
+    # Recursively update a dict/object-like value with fields from the payload.
     PATCH = "patch"
+
+    # Append one payload item to a list, or append a text block to a string.
     APPEND = "append"
+
+    # Extend a list/string with multiple payload values, or shallow-extend a dict.
     EXTEND = "extend"
-    MERGE = "merge"
+
+    # Delete an item/key/substring identified by the payload.
     DELETE = "delete"
+
+    # Leave the current value unchanged while still recording a proposed operation.
     NOOP = "noop"
-    WRITE_FILE = "write_file"
-    APPEND_BLOCK = "append_block"
-    REMOVE_BLOCK = "remove_block"
-    APPEND_FUNCTION = "append_function"
-    REPLACE_CONFIG = "replace_config"
-    REINDEX = "reindex"
 
 
 STANDARD_CHANGE_OPERATIONS = frozenset(operation.value for operation in ChangeOperation)
@@ -68,15 +83,13 @@ class FileOptimizationUnit(OptimizationUnit):
     allowed_operations: List[UnitChangeOperation] = Field(
         default_factory=lambda: [
             ChangeOperation.REPLACE.value,
-            ChangeOperation.WRITE_FILE.value,
             ChangeOperation.PATCH.value,
             ChangeOperation.APPEND.value,
-            ChangeOperation.APPEND_BLOCK.value,
+            ChangeOperation.EXTEND.value,
             ChangeOperation.DELETE.value,
-            ChangeOperation.REMOVE_BLOCK.value,
             ChangeOperation.NOOP.value,
         ],
-        description="File units accept replacement, write, patch, append, remove, and no-op updates by default.",
+        description="File units accept standard value replacement, patch, append, extend, delete, and no-op updates by default.",
     )
 
     @model_validator(mode="before")
@@ -105,16 +118,13 @@ class CodeOptimizationUnit(FileOptimizationUnit):
     allowed_operations: List[UnitChangeOperation] = Field(
         default_factory=lambda: [
             ChangeOperation.REPLACE.value,
-            ChangeOperation.WRITE_FILE.value,
             ChangeOperation.PATCH.value,
             ChangeOperation.APPEND.value,
-            ChangeOperation.APPEND_BLOCK.value,
-            ChangeOperation.APPEND_FUNCTION.value,
+            ChangeOperation.EXTEND.value,
             ChangeOperation.DELETE.value,
-            ChangeOperation.REMOVE_BLOCK.value,
             ChangeOperation.NOOP.value,
         ],
-        description="Code units accept replacement, write, patch, append, append-function, remove, and no-op updates by default.",
+        description="Code units accept standard value replacement, patch, append, extend, delete, and no-op updates by default.",
     )
 
 

@@ -317,11 +317,11 @@ class ProgramAdapter(abc.ABC):
         operation = change.operation
         value = change.value
 
-        if operation in (ChangeOperation.REPLACE.value, ChangeOperation.WRITE_FILE.value, ChangeOperation.REPLACE_CONFIG.value):
+        if operation == ChangeOperation.REPLACE.value:
             return value
-        if operation in (ChangeOperation.NOOP.value, ChangeOperation.REINDEX.value):
+        if operation == ChangeOperation.NOOP.value:
             return current_value
-        if operation in (ChangeOperation.PATCH.value, ChangeOperation.MERGE.value):
+        if operation == ChangeOperation.PATCH.value:
             if not isinstance(current_value, dict) or not isinstance(value, dict):
                 raise ValueError(f"Operation '{operation}' requires dict current value and dict payload.")
             return ProgramAdapter._recursive_merge(current_value, value)
@@ -339,15 +339,7 @@ class ProgramAdapter(abc.ABC):
             if isinstance(current_value, str) and isinstance(value, str):
                 return ProgramAdapter._append_text_block(current_value, value)
             raise ValueError("Operation 'extend' requires matching list, dict, or string values.")
-        if operation in (ChangeOperation.APPEND_BLOCK.value, ChangeOperation.APPEND_FUNCTION.value):
-            if isinstance(current_value, str) and isinstance(value, str):
-                return ProgramAdapter._append_text_block(current_value, value)
-            if isinstance(current_value, dict) and isinstance(current_value.get("content"), str) and isinstance(value, str):
-                updated = dict(current_value)
-                updated["content"] = ProgramAdapter._append_text_block(updated["content"], value)
-                return updated
-            raise ValueError(f"Operation '{operation}' requires string content.")
-        if operation in (ChangeOperation.DELETE.value, ChangeOperation.REMOVE_BLOCK.value):
+        if operation == ChangeOperation.DELETE.value:
             if isinstance(current_value, dict):
                 keys = value
                 if isinstance(value, dict):

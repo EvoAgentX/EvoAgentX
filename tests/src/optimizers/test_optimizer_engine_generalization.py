@@ -17,7 +17,6 @@ from evoagentx.optimizers.engine.base import (
     UnitChange,
     ValidationResult,
 )
-from evoagentx.optimizers.engine.memory import MemoryChangeOperation, MemoryOptimizationUnit, MemoryProgramAdapter
 from evoagentx.optimizers.engine.objective import ParetoObjective, ScalarObjective
 from evoagentx.optimizers.engine.optimizer import OptimizationRunState, Optimizer
 
@@ -73,6 +72,7 @@ class DummyAdapter(ProgramAdapter):
 
 
 class PromptOnlyOptimizer(Optimizer):
+    
     supported_unit_types: ClassVar[FrozenSet[OptimizationUnitType]] = frozenset({OptimizationUnitType.PROMPT})
 
     def propose(self, state: OptimizationRunState, objective: ScalarObjective, **kwargs) -> OptimizationProposal:
@@ -161,7 +161,7 @@ class SkillCodeOptimizer(Optimizer):
                 UnitChange.create(
                     unit,
                     "def new_skill():\n    return 'new'\n",
-                    operation="append_function",
+                    operation="append",
                 )
             ],
         )
@@ -198,50 +198,6 @@ class EpisodeAdapter(DummyAdapter):
         return EpisodeAdapter(
             prompt=snapshot.unit_values["prompt"],
             memories=list(snapshot.unit_values.get("memories", [])),
-        )
-
-
-class MemorySpecificAdapter(MemoryProgramAdapter):
-    def __init__(self, memories: List[str] | None = None):
-        self.memories = list(memories or [])
-
-    def execute(self, *args, **kwargs) -> Dict[str, Any]:
-        return {"memories": self.memories}
-
-    def register_units(self) -> List[OptimizationUnit]:
-        return [
-            MemoryOptimizationUnit(
-                name="episodic_memories",
-                uid="episodic_memories",
-                json_schema={"type": "array", "items": {"type": "string"}},
-            )
-        ]
-
-    def take_snapshot(self) -> SnapShot:
-        return SnapShot(unit_values={"episodic_memories": list(self.memories)})
-
-    def merge_changes(self, snapshot: SnapShot, changes: List[UnitChange], **kwargs) -> SnapShot:
-        return SnapShot(unit_values=self.merge_memory_values(snapshot, changes))
-
-    def from_snapshot(self, snapshot: SnapShot, **kwargs) -> ProgramAdapter:
-        return MemorySpecificAdapter(memories=list(snapshot.unit_values.get("episodic_memories", [])))
-
-
-class MemorySpecificOptimizer(Optimizer):
-    supported_unit_types: ClassVar[FrozenSet[OptimizationUnitType]] = frozenset({OptimizationUnitType.MEMORY})
-
-    def propose(self, state: OptimizationRunState, objective: ScalarObjective, **kwargs) -> OptimizationProposal:
-        unit = self.target_units_by_uid["episodic_memories"]
-        source_snapshot_id = state.best_snapshot_id or state.snapshots[-1].snapshot_id
-        return OptimizationProposal(
-            source_snapshot_id=source_snapshot_id,
-            changes=[
-                UnitChange.create(
-                    unit,
-                    "trajectory insight",
-                    operation=MemoryChangeOperation.APPEND_MEMORY.value,
-                )
-            ],
         )
 
 
@@ -386,19 +342,6 @@ def test_episode_lifecycle_hooks_can_feed_evaluation_traces(tmp_path):
     state = OptimizationRunState.load_state(str(tmp_path))
     trial = state.trial_records[-1]
     assert [event["event"] for event in trial.traces[0]["events"]] == ["task_begin", "step", "task_end"]
-
-
-def test_memory_specific_adapter_keeps_memory_operations_out_of_generic_units(tmp_path):
-    optimizer = MemorySpecificOptimizer(MemorySpecificAdapter())
-
-    best = optimizer.optimize(
-        evaluate_fn=lambda adapter: {"score": len(adapter.execute()["memories"])},
-        objective=ScalarObjective(metric="score", direction="maximize"),
-        max_trials=1,
-        save_dir=str(tmp_path),
-    )
-
-    assert best.execute()["memories"] == ["trajectory insight"]
 
 
 # ---------------------------------------------------------------------------
