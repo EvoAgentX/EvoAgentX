@@ -12,6 +12,36 @@ from .objective import Objective
 
 BASELINE_TRIAL_ID = 0
 
+
+def _validate_execution_config(
+    execution_mode: Any,
+    max_workers: Any,
+) -> Tuple[Literal["sequential", "concurrent"], Optional[int]]:
+    """Validate and normalize trial execution settings."""
+    if execution_mode not in ("sequential", "concurrent"):
+        raise ValueError(f"execution_mode must be 'sequential' or 'concurrent', got {execution_mode!r}")
+
+    if max_workers is not None and (
+        isinstance(max_workers, bool) or not isinstance(max_workers, int) or max_workers < 1
+    ):
+        raise ValueError(f"max_workers must be a positive integer or None, got {max_workers!r}")
+
+    if execution_mode == "sequential":
+        if max_workers not in (None, 1):
+            raise ValueError(
+                "max_workers is only valid with execution_mode='concurrent'; "
+                "use max_workers=None or 1 for sequential execution."
+            )
+        return "sequential", None
+
+    if max_workers is None:
+        raise ValueError("max_workers must be explicitly provided when execution_mode='concurrent'.")
+    if max_workers <= 1:
+        raise ValueError("max_workers must be greater than 1 when execution_mode='concurrent'.")
+
+    return "concurrent", max_workers
+
+
 class OptimizationRunState(BaseModule):
 
     snapshots: List[SnapShot] = Field(default_factory=list, description="List of snapshots for all completed trials in the optimization run")
@@ -330,24 +360,26 @@ class TrialRuntime:
             objective: Used to update `best_snapshot_id` after the batch.
             execution_mode: "sequential" (default) or "concurrent".
             max_workers: Maximum number of parallel threads in concurrent mode.
-                         None means no cap beyond the number of proposals.
+                         Required and must be greater than 1 in concurrent mode.
+                         Use None or 1 in sequential mode.
             **kwargs: Forwarded to each trial.
 
         Returns:
             Updated OptimizationRunState after all proposals have been evaluated.
         """
-        if max_workers is not None and max_workers <= 1:
-            execution_mode = "sequential"
+        execution_mode, max_workers = _validate_execution_config(execution_mode, max_workers)
 
         if execution_mode == "sequential":
             for proposal in proposals:
                 state = self.run(state, proposal, evaluate_fn, objective, **kwargs)
             return state
+        if not proposals:
+            return state
 
         # concurrent: each thread runs one trial independently from a frozen copy of
         # the current state; results are merged in submission order after all finish.
         base_trial_count = len(state.trial_records)
-        effective_workers = min(max_workers, len(proposals)) if max_workers is not None else len(proposals)
+        effective_workers = min(max_workers, len(proposals))
 
         def _single_outcome(idx_proposal: Tuple[int, OptimizationProposal]) -> Tuple[Optional[SnapShot], TrialRecord]:
             idx, proposal = idx_proposal
@@ -386,24 +418,26 @@ class TrialRuntime:
             objective: Used to update `best_snapshot_id` after the batch.
             execution_mode: "sequential" (default) or "concurrent".
             max_workers: Maximum number of coroutines running concurrently in concurrent mode.
-                         None means all proposals run at once (no semaphore).
+                         Required and must be greater than 1 in concurrent mode.
+                         Use None or 1 in sequential mode.
             **kwargs: Forwarded to each trial.
 
         Returns:
             Updated OptimizationRunState after all proposals have been evaluated.
         """
-        if max_workers is not None and max_workers <= 1:
-            execution_mode = "sequential"
+        execution_mode, max_workers = _validate_execution_config(execution_mode, max_workers)
 
         if execution_mode == "sequential":
             for proposal in proposals:
                 state = await self.async_run(state, proposal, evaluate_fn, objective, **kwargs)
             return state
+        if not proposals:
+            return state
 
         # concurrent: all trials launched together; semaphore throttles evaluate calls.
         base_trial_count = len(state.trial_records)
-        effective_workers = min(max_workers, len(proposals)) if max_workers is not None else None
-        sem = asyncio.Semaphore(effective_workers) if effective_workers is not None else None
+        effective_workers = min(max_workers, len(proposals))
+        sem = asyncio.Semaphore(effective_workers)
 
         outcomes = await asyncio.gather(*[
             _async_run_trial(
@@ -514,19 +548,13 @@ class Optimizer(abc.ABC):
         max_trials: Any,
         execution_mode: Any,
         max_workers: Any,
-    ) -> Literal["sequential", "concurrent"]:
-        """Validate optimize / async_optimize arguments and return the (possibly normalized) execution_mode."""
+    ) -> Tuple[Literal["sequential", "concurrent"], Optional[int]]:
+        """Validate optimize / async_optimize arguments and return normalized execution settings."""
         if not isinstance(objective, Objective):
             raise TypeError(f"`objective` must be an instance of Objective, got {type(objective).__name__!r}")
-        if not isinstance(max_trials, int) or max_trials <= 0:
+        if isinstance(max_trials, bool) or not isinstance(max_trials, int) or max_trials <= 0:
             raise ValueError(f"`max_trials` must be a positive integer, got {max_trials}")
-        if execution_mode not in ("sequential", "concurrent"):
-            raise ValueError(f"execution_mode must be 'sequential' or 'concurrent', got {execution_mode!r}")
-        if max_workers is not None and (not isinstance(max_workers, int) or max_workers < 1):
-            raise ValueError(f"max_workers must be a positive integer or None, got {max_workers!r}")
-        if max_workers is not None and max_workers <= 1:
-            return "sequential"
-        return execution_mode
+        return _validate_execution_config(execution_mode, max_workers)
 
     def optimize(
         self,
@@ -540,7 +568,7 @@ class Optimizer(abc.ABC):
         **kwargs
     ) -> ProgramAdapter:
 
-        execution_mode = self._validate_optimize_args(objective, max_trials, execution_mode, max_workers)
+        execution_mode, max_workers = self._validate_optimize_args(objective, max_trials, execution_mode, max_workers)
 
         # Initialize or load the optimization run state
         state = self._init_run_state(save_dir, resume_from)
@@ -610,13 +638,14 @@ class Optimizer(abc.ABC):
                             underlying program is stateless or safe to evaluate in parallel
                             (e.g. pure API calls, read-only inference).
             max_workers: Maximum number of coroutines running concurrently in concurrent mode.
-                         None means all proposals run at once (no semaphore).
+                         Required and must be greater than 1 in concurrent mode.
+                         Use None or 1 in sequential mode.
             **kwargs: Forwarded to `batch_propose` and `async_run_batch`.
 
         Returns:
             A new ProgramAdapter reflecting the best configuration found.
         """
-        execution_mode = self._validate_optimize_args(objective, max_trials, execution_mode, max_workers)
+        execution_mode, max_workers = self._validate_optimize_args(objective, max_trials, execution_mode, max_workers)
 
         state = self._init_run_state(save_dir, resume_from)
 
