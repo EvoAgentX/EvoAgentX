@@ -13,7 +13,7 @@ from .base import ChangeOperation, OptimizationUnit, OptimizationUnitType, UnitC
 
 class SnapShot(BaseModule):
     snapshot_id: str = Field(default_factory=lambda: uuid4().hex[:8], description="Unique identifier for the snapshot")
-    unit_values: Dict[str, Any] = Field(default_factory=dict, description="Mapping from unit uid to its current value; covers only the optimizable units declared by the adapter. All values must be JSON-serializable (str, int, float, bool, None, list, dict) so snapshots can be persisted and resumed without data loss.")
+    unit_values: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Mapping from unit uid to its current value; covers only the optimizable units declared by the adapter. All values must be JSON-serializable (str, int, float, bool, None, list, dict) so snapshots can be persisted and resumed without data loss.")
     program_config: Optional[Dict[str, Any]] = Field(default=None, description="Complete adapter-defined configuration required to fully reconstruct the underlying program (e.g. model settings, pipeline paths, non-optimizable params). Opaque to the framework; populated and consumed exclusively by the adapter's take_snapshot / from_snapshot. Set to None if unit_values alone is sufficient for reconstruction. Must be JSON-serializable (str, int, float, bool, None, list, dict) — non-serializable objects will be rejected at construction time.")
 
     @field_validator("unit_values", mode="before")
@@ -63,8 +63,8 @@ class TrialWorkspace:
     root_dir: str
     trial_id: int
     source_snapshot_id: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    keep: bool = True
+    metadata: Optional[Dict[str, Any]] = field(default_factory=dict)
+    keep: Optional[bool] = True
 
     @classmethod
     def create(
@@ -73,7 +73,7 @@ class TrialWorkspace:
         trial_id: int,
         source_snapshot_id: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
-        keep: bool = True,
+        keep: Optional[bool] = True,
     ) -> "TrialWorkspace":
         workspace = cls(
             root_dir=os.path.abspath(root_dir),

@@ -116,11 +116,11 @@ class SkillFileAdapter(ProgramAdapter):
     def register_units(self) -> List[OptimizationUnit]:
         return [
             CodeOptimizationUnit(
-                path="skills.py",
                 uid="skills.py",
                 name="skills.py",
                 language="python",
                 entrypoint="base_skill",
+                metadata={"path": "skills.py"},
             )
         ]
 

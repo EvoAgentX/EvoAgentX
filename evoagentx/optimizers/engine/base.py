@@ -28,9 +28,6 @@ class OptimizationUnitType(str, Enum):
     CODE = "code"
 
 
-UnitChangeOperation = str
-
-
 class ChangeOperation(str, Enum):
     """Minimal standard value operations understood by optimizer engine helpers."""
 
@@ -57,13 +54,53 @@ STANDARD_CHANGE_OPERATIONS = frozenset(operation.value for operation in ChangeOp
 
 
 class OptimizationUnit(BaseModule):
+    """
+    Declare an optimization unit that can be modified by optimizers.
+
+    Example 1: Register a model-name unit whose value must be one of a fixed set
+    ```
+    unit = OptimizationUnit(
+        name="assistant_model",
+        unit_type=OptimizationUnitType.MODEL,
+        json_schema={
+            "type": "string",
+            "enum": ["gpt-3.5", "gpt-4"]
+        }
+    )
+    ```
+
+    Example 2: Register a prompt unit that supports replacing the whole prompt or appending an additional instruction block:
+    ```
+    unit = OptimizationUnit(
+        name="system_prompt",
+        unit_type=OptimizationUnitType.PROMPT,
+        json_schema={
+            "type": "string",
+            "description": "The full prompt text"
+        },
+        allowed_operations=[ChangeOperation.REPLACE, ChangeOperation.APPEND],
+        operation_schemas={
+            "append": {
+                "type": "object",
+                "properties": {
+                    "text": {"type": "string", "description": "Prompt text to append."},
+                    "position_hint": {"type": "string", "enum": ["start", "end"], "description": "Optional hint for where to append the text."}
+                },
+            "required": ["text"],
+            "additionalProperties": False
+        }
+      }
+    )
+    ```
+    """
     name: str = Field(description="Name of the optimization unit; also serves as the default uid")
     unit_type: OptimizationUnitType = Field(description="Type of the optimization unit")
-    uid: str = Field(default="", description="Stable unique ID for this unit across adapter reconstructions; defaults to name if not set explicitly")
+
+    uid: Optional[str] = Field(default="", description="Stable unique ID for this unit across adapter reconstructions; defaults to name if not set explicitly")
     json_schema: Optional[dict] = Field(default=None, description="Optional schema for the optimization unit, used to validate the parameters associated with this unit")
-    allowed_operations: List[UnitChangeOperation] = Field(default_factory=lambda: ["replace"], description="Operations this unit accepts in UnitChange. Defaults to replacement updates for backward compatibility.")
-    operation_schemas: Dict[str, dict] = Field(default_factory=dict, description="Optional per-operation JSON schemas for UnitChange.value payloads. For replace operations, json_schema is used when no operation-specific schema is provided.")
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Adapter-defined unit metadata used by optimizers to understand semantics such as file path, prompt role, retrieval policy, constraints, or dependencies.")
+    allowed_operations: Optional[List[ChangeOperation]] = Field(default_factory=lambda: [ChangeOperation.REPLACE], description="Operations this unit accepts in UnitChange. Defaults to replacement updates for backward compatibility.")
+    operation_schemas: Optional[Dict[str, dict]] = Field(default_factory=dict, description="Optional per-operation JSON schemas for UnitChange.value payloads. For replace operations, json_schema is used when no operation-specific schema is provided.")
+    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Adapter-defined unit metadata used by optimizers to understand semantics such as file path, prompt role, retrieval policy, constraints, or dependencies.")
 
     @model_validator(mode="before")
     @classmethod
@@ -74,13 +111,35 @@ class OptimizationUnit(BaseModule):
 
 
 class FileOptimizationUnit(OptimizationUnit):
-    """Optimization unit for file-backed artifacts such as prompts, skills, or configs."""
-    unit_type: OptimizationUnitType = Field(default=OptimizationUnitType.FILE, description="File-backed optimization unit type")
+    """Optimization unit for file-backed artifacts such as prompts, skills, or configs.
+
+    ``path`` is the only required field; ``name`` and ``uid`` default to ``path`` automatically.
+
+    Example: A YAML config file whose content must be a valid YAML string
+    ```
+    unit = FileOptimizationUnit(
+        path="configs/agent.yaml",
+        content_type="yaml",
+        json_schema={"type": "string"},
+    )
+    ```
+
+    Example: A plain-text prompt file that allows any content (no schema validation)
+    ```
+    unit = FileOptimizationUnit(
+        path="prompts/system.txt",
+        content_type="text",
+        metadata={"role": "system", "max_tokens": 512},
+    )
+    ```
+    """
     path: str = Field(description="Adapter-relative or workspace-relative file path for this unit")
-    encoding: str = Field(default="utf-8", description="Text encoding used when materializing this file")
-    content_type: str = Field(default="text", description="Logical content type, e.g. text, json, yaml, python")
-    json_schema: Optional[dict] = Field(default_factory=lambda: {"type": "string"})
-    allowed_operations: List[UnitChangeOperation] = Field(
+
+    unit_type: Optional[OptimizationUnitType] = Field(default=OptimizationUnitType.FILE, description="File-backed optimization unit type")
+    encoding: Optional[str] = Field(default="utf-8", description="Text encoding used when materializing this file")
+    content_type: Optional[str] = Field(default="text", description="Logical content type, e.g. text, json, yaml, python")
+    json_schema: Optional[dict] = Field(default=None, description="Optional schema for validating file content. Defaults to None (no validation); set explicitly to enforce a specific content schema.")
+    allowed_operations: Optional[List[ChangeOperation]] = Field(
         default_factory=lambda: [
             ChangeOperation.REPLACE.value,
             ChangeOperation.PATCH.value,
@@ -106,16 +165,36 @@ class FileOptimizationUnit(OptimizationUnit):
         return data
 
 
-class CodeOptimizationUnit(FileOptimizationUnit):
-    """Optimization unit for source-code artifacts such as generated skills or providers."""
-    unit_type: OptimizationUnitType = Field(default=OptimizationUnitType.CODE, description="Code-backed optimization unit type")
-    language: str = Field(default="python", description="Programming language of the code artifact")
-    entrypoint: Optional[str] = Field(default=None, description="Optional callable/module entrypoint exposed by this code unit")
-    validation_commands: List[str] = Field(
-        default_factory=list,
-        description="Optional adapter-owned validation commands or labels. The engine records this metadata but does not execute commands automatically.",
+class CodeOptimizationUnit(OptimizationUnit):
+    """Optimization unit for code-as-string artifacts such as generated skills or tool implementations.
+
+    The unit *value* is the code string itself (stored in snapshots, proposed by optimizers).
+    For file-backed code that needs disk isolation, use ``FileOptimizationUnit`` with
+    ``content_type="python"`` (or the relevant language) instead.
+
+    Example: A generated Python skill whose body is optimized as a string
+    ```
+    unit = CodeOptimizationUnit(
+        name="search_skill",
+        language="python",
+        entrypoint="search",
+        metadata={"validation_commands": ["python -m pytest tests/test_search.py"]},
     )
-    allowed_operations: List[UnitChangeOperation] = Field(
+    ```
+
+    Example: A generated JavaScript tool (no fixed entrypoint)
+    ```
+    unit = CodeOptimizationUnit(
+        name="formatter_tool",
+        language="javascript",
+    )
+    ```
+    """
+    unit_type: Optional[OptimizationUnitType] = Field(default=OptimizationUnitType.CODE, description="Code optimization unit type")
+    language: Optional[str] = Field(default="python", description="Programming language of the code artifact")
+    entrypoint: Optional[str] = Field(default=None, description="Optional callable/module entrypoint exposed by this code unit")
+    json_schema: Optional[dict] = Field(default_factory=lambda: {"type": "string"}, description="Schema for the code string value. Defaults to a plain string schema; override to enforce structure if the optimizer produces JSON-wrapped code.")
+    allowed_operations: Optional[List[ChangeOperation]] = Field(
         default_factory=lambda: [
             ChangeOperation.REPLACE.value,
             ChangeOperation.PATCH.value,
@@ -124,19 +203,20 @@ class CodeOptimizationUnit(FileOptimizationUnit):
             ChangeOperation.DELETE.value,
             ChangeOperation.NOOP.value,
         ],
-        description="Code units accept standard value replacement, patch, append, extend, delete, and no-op updates by default.",
+        description="Code string units accept all standard operations by default.",
     )
 
 
 class UnitChange(BaseModule):
     uid: str = Field(description="Unique ID of the optimization unit to change")
     value: Any = Field(description="Payload for this change. For operation='replace', this is the new unit value. Other operations may interpret it as a patch, appended item, deletion selector, etc.")
+    
     old_value: Optional[Any] = Field(default=None, description="Previous value of the optimization unit before change (optional)")
-    operation: UnitChangeOperation = Field(default="replace", description="Operation to apply to the target unit. Adapters define the concrete merge semantics for non-replace operations.")
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Optimizer-defined metadata for provenance, rationale, confidence, or algorithm-specific bookkeeping.")
+    operation: Optional[ChangeOperation] = Field(default=ChangeOperation.REPLACE, description="Operation to apply to the target unit. Adapters define the concrete merge semantics for non-replace operations.")
+    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Optimizer-defined metadata for provenance, rationale, confidence, or algorithm-specific bookkeeping.")
 
     @staticmethod
-    def validate_value(value: Any, unit: OptimizationUnit, operation: UnitChangeOperation = "replace") -> None:
+    def validate_value(value: Any, unit: OptimizationUnit, operation: ChangeOperation = ChangeOperation.REPLACE) -> None:
         """
         Validate a value against the json_schema of the given OptimizationUnit.
 
@@ -155,7 +235,7 @@ class UnitChange(BaseModule):
             )
 
         schema = unit.operation_schemas.get(operation)
-        if schema is None and operation == "replace":
+        if schema is None and operation == ChangeOperation.REPLACE:
             schema = unit.json_schema
 
         if schema is None:
@@ -175,7 +255,7 @@ class UnitChange(BaseModule):
         unit: OptimizationUnit,
         new_value: Any = None,
         old_value: Optional[Any] = None,
-        operation: UnitChangeOperation = "replace",
+        operation: ChangeOperation = ChangeOperation.REPLACE,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> "UnitChange":
         """
@@ -199,15 +279,15 @@ class UnitChange(BaseModule):
 class OptimizationProposal(BaseModule):
     source_snapshot_id: str = Field(description="The snapshot_id of the base snapshot that the proposed changes will be applied on")
     changes: List[UnitChange] = Field(description="List of proposed changes to apply on the base snapshot for the next trial")
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Optimizer-defined metadata for the proposal, such as parent IDs, generation number, sampler params, or rationale.")
+    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Optimizer-defined metadata for the proposal, such as parent IDs, generation number, sampler params, or rationale.")
 
 
 class EvaluationResult(BaseModule):
     """Structured result returned by evaluation functions."""
     metrics: Dict[str, Any] = Field(description="Objective-facing metrics for this trial.")
-    traces: List[Any] = Field(default_factory=list, description="Optional execution traces or trajectory data collected during evaluation.")
-    artifacts: Dict[str, Any] = Field(default_factory=dict, description="Optional produced artifacts such as summaries, retrieved memories, file paths, generated skills, or debug payloads.")
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Optional evaluation metadata such as split name, cost, latency, seeds, or evaluator configuration.")
+    traces: Optional[List[Any]] = Field(default_factory=list, description="Optional execution traces or trajectory data collected during evaluation.")
+    artifacts: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Optional produced artifacts such as summaries, retrieved memories, file paths, generated skills, or debug payloads.")
+    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Optional evaluation metadata such as split name, cost, latency, seeds, or evaluator configuration.")
 
 
 ValidationStatus = Literal["passed", "failed", "skipped"]
@@ -217,9 +297,9 @@ class ValidationResult(BaseModule):
     """Result from one adapter-defined validation step before a trial is evaluated."""
     validator: str = Field(description="Name of the validation step")
     status: ValidationStatus = Field(description="Validation status")
-    message: Optional[str] = Field(default=None, description="Human-readable validation message")
-    details: Dict[str, Any] = Field(default_factory=dict, description="Structured validation details")
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Validator-owned metadata")
+    message: Optional[Optional[str]] = Field(default=None, description="Human-readable validation message")
+    details: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Structured validation details")
+    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Validator-owned metadata")
 
     @property
     def ok(self) -> bool:
@@ -235,9 +315,9 @@ class TrialRecord(BaseModule):
 
     snapshot_id: Optional[str] = Field(default=None, description="The snapshot_id of the program state after applying the changes in this trial")
     metrics: Optional[Dict[str, Any]] = Field(default=None, description="Evaluation metrics collected for this trial")
-    traces: List[Any] = Field(default_factory=list, description="Execution traces or trajectory data collected during evaluation.")
-    artifacts: Dict[str, Any] = Field(default_factory=dict, description="Artifacts produced or consumed during evaluation.")
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Trial-level metadata, including structured evaluator metadata or optimizer bookkeeping.")
+    traces: Optional[List[Any]] = Field(default_factory=list, description="Execution traces or trajectory data collected during evaluation.")
+    artifacts: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Artifacts produced or consumed during evaluation.")
+    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Trial-level metadata, including structured evaluator metadata or optimizer bookkeeping.")
     validation_results: List[ValidationResult] = Field(default_factory=list, description="Validation results collected before evaluation.")
     workspace_dir: Optional[str] = Field(default=None, description="Trial workspace directory used to isolate file-backed artifacts, if any.")
     error: Optional[str] = Field(default=None, description="Error message if the trial failed")
