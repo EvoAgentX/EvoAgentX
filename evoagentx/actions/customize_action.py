@@ -3,8 +3,6 @@ from typing import Optional, Any, Callable, List, Union
 import re
 import json
 import asyncio
-import inspect
-import concurrent.futures
 
 from ..core.logging import logger
 from ..models.base_model import BaseLLM
@@ -12,7 +10,7 @@ from .action import Action
 from ..core.message import Message
 from ..prompts.template import StringTemplate, ChatTemplate
 from ..prompts.tool_calling import OUTPUT_EXTRACTION_PROMPT, TOOL_CALLING_TEMPLATE, TOOL_CALLING_HISTORY_PROMPT, TOOL_CALLING_RETRY_PROMPT
-from ..tools.tool import Toolkit
+from ..tools.tool import Tool, Toolkit, ToolMetadata, ToolResult, ensure_tool_result
 from ..core.registry import MODULE_REGISTRY
 from ..models.base_model import LLMOutputParser
 from ..core.module_utils import parse_json_from_llm_output, parse_json_from_text
@@ -24,7 +22,7 @@ class CustomizeAction(Action):
     title_format: Optional[str] = Field(default="## {title}", exclude=True, description="the format of the title. It is used when the `parse_mode` is 'title'.")
     custom_output_format: Optional[str] = Field(default=None, exclude=True, description="the format of the output. It is used when the `prompt_template` is provided.")
 
-    tools: Optional[List[Toolkit]] = Field(default=None, description="The tools that the action can use")
+    tools: Optional[List[Union[Tool, Toolkit]]] = Field(default=None, description="The tools that the action can use")
     conversation: Optional[Message] = Field(default=None, description="Current conversation state")
 
     max_tool_try: int = Field(default=2, description="Maximum number of tool calling attempts allowed")
@@ -42,9 +40,11 @@ class CustomizeAction(Action):
         # Prioritize template and give warning if both are provided
         if self.prompt and self.prompt_template:
             logger.warning("Both `prompt` and `prompt_template` are provided for CustomizeAction action. Prioritizing `prompt_template` and ignoring `prompt`.")
-        if self.tools:
-            self.tools_caller = {}
-            self.add_tools(self.tools)
+        tools = self.tools
+        self.tools_caller = {}
+        self.tools = []
+        if tools:
+            self.add_tools(tools)
     
     def prepare_action_prompt(
         self, 
@@ -86,7 +86,7 @@ class CustomizeAction(Action):
         if self.prompt:
             prompt = self.prompt.format(**prompt_params_values) if prompt_params_values else self.prompt
             if self.tools:
-                tools_schemas = [j["function"] for i in [tool.get_tool_schemas() for tool in self.tools] for j in i]
+                tools_schemas = [schema["function"] for schema in self._get_tool_schemas()]
                 prompt += "\n\n" + TOOL_CALLING_TEMPLATE.format(tools_description = tools_schemas)
             return prompt
         else:
@@ -137,94 +137,84 @@ class CustomizeAction(Action):
             i += 1 
         return unique_name 
     
-    def add_tools(self, tools: Union[Toolkit, List[Toolkit]]):
+    def _get_tool_schemas(self) -> List[dict]:
+        schemas = []
+        for tool in self.tools or []:
+            if isinstance(tool, Tool):
+                schemas.append(tool.get_tool_schema())
+            elif isinstance(tool, Toolkit):
+                schemas.extend(tool.get_tool_schemas())
+        return schemas
+    
+    def add_tools(self, tools: Union[Tool, Toolkit, List[Union[Tool, Toolkit]]]):
         if not tools:
             return
-        if isinstance(tools,Toolkit):
+        if isinstance(tools, (Tool, Toolkit)):
             tools = [tools]
-        if not all(isinstance(tool, Toolkit) for tool in tools):
-            raise TypeError("`tools` must be a Toolkit or list of Toolkit instances.")
         if not self.tools:
             self.tools_caller = {}
             self.tools = []
-        # self.tools += tools
-        # tools_callers = [tool.get_tools() for tool in tools]
-        # tools_callers = [j for i in tools_callers for j in i]
-        # for tool_caller in tools_callers:
-        #     self.tools_caller[tool_caller.name] = tool_caller
 
         # avoid duplication & type checks 
-        for toolkit in tools:
+        for tool in tools:
             try:
-                tool_callers = toolkit.get_tools()
-                if not isinstance(tool_callers, list):
-                    logger.warning(f"Expected list of tool functions from '{toolkit.name}.get_tools()', got {type(tool_callers)}.")
-                    continue 
+                if isinstance(tool, Toolkit):
+                    tool_callers = tool.get_tools()
+                elif isinstance(tool, Tool):
+                    tool_callers = [tool]
+                else:
+                    raise TypeError("`tools` must be Tool, Toolkit, or a list of Tool/Toolkit instances.")
                 
-                # add tool callers to the tools_caller dictionary
-                valid_tools_count = 0 
-                valid_tools_names, valid_tool_callers = [], []
+                valid_tools_names = []
                 for tool_caller in tool_callers:
-                    tool_caller_name = getattr(tool_caller, "name", None)
-                    if not tool_caller_name or not callable(tool_caller):
-                        logger.warning(f"Invalid tool function in '{toolkit.name}': missing name or not callable.")
-                        continue
-                    if tool_caller_name in self.tools_caller:
-                        logger.warning(f"Duplicate tool function '{tool_caller_name}' detected. Overwriting previous function.")
-                    # self.tools_caller[tool_caller_name] = tool_caller
-                    valid_tools_count += 1
-                    valid_tools_names.append(tool_caller_name)
-                    valid_tool_callers.append(tool_caller)
-
-                if valid_tools_count == 0:
-                    logger.info(f"No valid tools found in toolkit '{toolkit.name}'. Skipping.")
-                    continue 
-
-                if valid_tools_count > 0 and all(name in self.tools_caller for name in valid_tools_names):
-                    logger.info(f"All tools from toolkit '{toolkit.name}' are already added. Skipping.")
-                    continue
+                    if not isinstance(tool_caller, Tool):
+                        raise TypeError(f"Invalid tool type in '{tool.name}': {type(tool_caller)}.")
+                    if not callable(tool_caller):
+                        raise TypeError(f"Invalid tool '{tool_caller.name}' in '{tool.name}': not callable.")
+                    if tool_caller.name in self.tools_caller:
+                        logger.warning(f"Duplicate tool function '{tool_caller.name}' detected. Overwriting previous function.")
+                    self.tools_caller[tool_caller.name] = tool_caller
+                    valid_tools_names.append(tool_caller.name)
                 
-                if valid_tools_count > 0:
-                    self.tools_caller.update({name: caller for name, caller in zip(valid_tools_names, valid_tool_callers)}) 
-                
-                # only add toolkit if at least one valid tool is added and toolkit is not already added 
-                existing_toolkit_names = {tkt.name for tkt in self.tools}
-                if valid_tools_count > 0 and toolkit.name not in existing_toolkit_names:
-                    self.tools.append(toolkit)
-                if valid_tools_count > 0:
-                    logger.info(f"Added toolkit '{toolkit.name}' with {valid_tools_count} valid tools in {self.name}: {valid_tools_names}.")
+                self.tools = [item for item in self.tools if item.name != tool.name]
+                self.tools.append(tool)
+                logger.info(f"Added '{tool.name}' with tools in {self.name}: {valid_tools_names}.")
             
             except Exception as e:
-                logger.error(f"Failed to load tools from toolkit '{toolkit.name}': {e}")
+                logger.error(f"Failed to load tools from '{getattr(tool, 'name', type(tool).__name__)}': {e}")
     
     
     def _extract_tool_calls(self, llm_output: str, llm: Optional[BaseLLM] = None) -> List[dict]:
-        pattern = r"<ToolCalling>\s*(.*?)\s*</ToolCalling>"
-    
-        
-        # Find all ToolCalling blocks in the output
-        matches = re.findall(pattern, llm_output, re.DOTALL)
+        patterns = [
+            r"<tool_call>\s*(.*?)\s*</tool_call>",
+            r"<ToolCalling>\s*(.*?)\s*</ToolCalling>",
+        ]
+        matches = []
+        for pattern in patterns:
+            matches = re.findall(pattern, llm_output, re.DOTALL)
+            if matches:
+                break
 
         if not matches:
+            return []
+        
+        def parse_tool_call_content(text: str) -> List[dict]:
+            json_list = parse_json_from_text(text.strip())
+            if not json_list:
+                logger.warning("No valid JSON found in tool call block")
+                return []
+            parsed_tool_call = json.loads(json_list[0])
+            if isinstance(parsed_tool_call, dict):
+                return [parsed_tool_call]
+            if isinstance(parsed_tool_call, list):
+                return parsed_tool_call
+            logger.warning(f"Invalid tool call format: {parsed_tool_call}")
             return []
         
         parsed_tool_calls = []
         for match_content in matches:
             try:
-                json_content = match_content.strip()
-                json_list = parse_json_from_text(json_content)
-                if not json_list:
-                    logger.warning("No valid JSON found in ToolCalling block")
-                    continue
-                # Only use the first JSON string from each block
-                parsed_tool_call = json.loads(json_list[0])
-                if isinstance(parsed_tool_call, dict):
-                    parsed_tool_calls.append(parsed_tool_call)
-                elif isinstance(parsed_tool_call, list):
-                    parsed_tool_calls.extend(parsed_tool_call)
-                else:
-                    logger.warning(f"Invalid tool call format: {parsed_tool_call}")
-                    continue
+                parsed_tool_calls.extend(parse_tool_call_content(match_content))
             except (json.JSONDecodeError, IndexError) as e:
                 logger.warning(f"Failed to parse tool calls from LLM output: {e}")
                 if llm is not None:
@@ -232,19 +222,10 @@ class CustomizeAction(Action):
                     try:
                         fixed_output = llm.generate(prompt=retry_prompt).content.strip()
                         logger.info(f"Retrying tool call parse with fixed output:\n{fixed_output}")
-                        
-                        fixed_list = parse_json_from_text(fixed_output)
-                        if fixed_list:
-                            parsed_tool_call = json.loads(fixed_list[0])
-                            if isinstance(parsed_tool_call, dict):
-                                parsed_tool_calls.append(parsed_tool_call)
-                        elif isinstance(parsed_tool_call, list):
-                            parsed_tool_calls.extend(parsed_tool_call)
+                        parsed_tool_calls.extend(parse_tool_call_content(fixed_output))
                     except Exception as retry_err:
                         logger.error(f"Retry failed: {retry_err}")
                         continue
-            else:
-                continue
 
         return parsed_tool_calls
     
@@ -338,80 +319,51 @@ class CustomizeAction(Action):
             # print(output)
             return output
     
-    def _call_single_tool(self, function_param: dict) -> tuple:
-        try:
-            function_name = function_param.get("function_name")
-            function_args = function_param.get("function_args") or {}
+    def _format_tool_results_for_history(self, tool_results: List[ToolResult]) -> str:
+        results = [result.result for result in tool_results]
+        return json.dumps(results, indent=4, ensure_ascii=False, default=str)
     
-            if not function_name:
-                return None, "No function name provided"
-
-            callable_fn = self.tools_caller.get(function_name)
-            if not callable(callable_fn):
-                return None, f"Function '{function_name}' not found or not callable"
-            
-            print("_____________________ Start Function Calling _____________________")
-            print(f"Executing function calling: {function_name} with parameters: {function_args}")
-            result = callable_fn(**function_args)
-            return result, None
-
-        except Exception as e:
-            logger.error(f"Error executing tool {function_name}: {e}")
-            return None, f"Error executing tool {function_name}: {str(e)}"
-
-    def _calling_tools(self, tool_call_args: List[dict]) -> dict:
-        ## ___________ Call the tools in parallel___________
-        errors = []
-        results = []
+    def _format_tool_results_for_log(self, tool_results: List[ToolResult]) -> str:
+        return json.dumps([result.to_dict() for result in tool_results], indent=4, ensure_ascii=False, default=str)
+    
+    async def _call_single_tool(self, function_param: dict) -> ToolResult:
+        function_name = function_param.get("function_name") or ""
+        function_args = function_param.get("function_args") or {}
+        tool_call_id = function_param.get("id")
+        metadata = ToolMetadata(tool_name=function_name, args=function_args)
         
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            future_to_tool = {executor.submit(self._call_single_tool, param): param for param in tool_call_args}
-            
-            for future in concurrent.futures.as_completed(future_to_tool):
-                result, error = future.result()
-                if error:
-                    errors.append(error)
-                if result is not None:
-                    results.append(result)
-
-        return {"result": results, "error": errors}
-
-    async def _async_call_single_tool(self, function_param: dict) -> tuple:
+        if not function_name:
+            return ToolResult(result={"error": "No tool name provided"}, metadata=metadata)
+        
+        callable_fn = self.tools_caller.get(function_name)
+        if callable_fn is None:
+            return ToolResult(result={"error": f"Tool '{function_name}' not found"}, metadata=metadata)
+        if not callable(callable_fn):
+            return ToolResult(result={"error": f"Tool '{function_name}' is not callable"}, metadata=metadata)
+        
         try:
-            function_name = function_param.get("function_name")
-            function_args = function_param.get("function_args") or {}
-
-            if not function_name:
-                return None, "No function name provided"
-
-            callable_fn = self.tools_caller.get(function_name)
-            if not callable(callable_fn):
-                return None, f"Function '{function_name}' not found or not callable"
-
-            print("_____________________ Start Function Calling _____________________")
-            print(f"Executing function calling: {function_name} with parameters: {function_args}")
-
-            if inspect.iscoroutinefunction(callable_fn):
+            tool_args_str = json.dumps(function_args, indent=4, ensure_ascii=False, default=str)
+            logger.info(f"[DISPLAY] Executing tool `{function_name}`")
+            logger.info(f"Executing tool `{function_name}` with parameters:\n{tool_args_str}")
+            
+            if asyncio.iscoroutinefunction(callable_fn.__call__):
                 result = await callable_fn(**function_args)
             else:
-                loop = asyncio.get_running_loop()
-                result = await loop.run_in_executor(None, lambda: callable_fn(**function_args))
+                result = await asyncio.to_thread(callable_fn, **function_args)
             
-            return result, None
+            result = ensure_tool_result(result, function_name, function_args)
+            if tool_call_id is not None:
+                result.id = tool_call_id
+            return result
         
         except Exception as e:
-            logger.error(f"Error executing tool {function_name}: {e}")
-            return None, f"Error executing tool {function_name}: {str(e)}"
+            logger.exception(f"Error executing tool '{function_name}': {e}")
+            return ToolResult(result={"error": str(e)}, metadata=metadata)
 
-    async def _async_calling_tools(self, tool_call_args: List[dict]) -> dict:
+    async def _calling_tools(self, tool_call_args: List[dict]) -> List[ToolResult]:
         ## ___________ Call the tools concurrently ___________
-        tasks = [self._async_call_single_tool(param) for param in tool_call_args]
-        results_with_errors = await asyncio.gather(*tasks)
-
-        results = [res for res, err in results_with_errors if err is None and res is not None]
-        errors = [err for _, err in results_with_errors if err is not None]
-
-        return {"result": results, "error": errors}
+        tasks = [self._call_single_tool(param) for param in tool_call_args]
+        return await asyncio.gather(*tasks)
     
     def execute(self, llm: Optional[BaseLLM] = None, inputs: Optional[dict] = None, sys_msg: Optional[str]=None, return_prompt: bool = False, time_out = 0, **kwargs):
         # Allow empty inputs if the action has no required input attributes
@@ -465,15 +417,15 @@ class CustomizeAction(Action):
             logger.info("Extracted tool call args:")
             logger.info(json.dumps(tool_call_args, indent=4))
             
-            results = self._calling_tools(tool_call_args)
+            results = asyncio.run(self._calling_tools(tool_call_args))
             
             logger.info("Tool call results:")
-            logger.info(json.dumps(results, indent=4))
+            logger.info(self._format_tool_results_for_log(results))
             
             conversation.append({"role": "assistant", "content": TOOL_CALLING_HISTORY_PROMPT.format(
                 iteration_number=time_out,
-                tool_call_args=f"{tool_call_args}",
-                results=f"{results}"
+                tool_call_args=json.dumps(tool_call_args, indent=4, ensure_ascii=False, default=str),
+                results=self._format_tool_results_for_history(results)
             )})
         
         # Get the appropriate prompt for return
@@ -536,18 +488,15 @@ class CustomizeAction(Action):
             logger.info("Extracted tool call args:")
             logger.info(json.dumps(tool_call_args, indent=4))
             
-            results = self._calling_tools(tool_call_args)
+            results = await self._calling_tools(tool_call_args)
             
             logger.info("Tool call results:")
-            try:
-                logger.info(json.dumps(results, indent=4))
-            except Exception:
-                logger.info(str(results))
+            logger.info(self._format_tool_results_for_log(results))
             
             conversation.append({"role": "assistant", "content": TOOL_CALLING_HISTORY_PROMPT.format(
                 iteration_number=time_out,
-                tool_call_args=f"{tool_call_args}",
-                results=f"{results}"
+                tool_call_args=json.dumps(tool_call_args, indent=4, ensure_ascii=False, default=str),
+                results=self._format_tool_results_for_history(results)
             )})
         
         # Get the appropriate prompt for return
