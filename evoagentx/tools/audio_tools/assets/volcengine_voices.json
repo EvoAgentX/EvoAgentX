@@ -1,0 +1,1249 @@
+[
+  {
+    "id": "zh_male_lengkugege_emo_v2_mars_bigtts",
+    "name": "冷酷哥哥（多情感）",
+    "gender": "male",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      }
+    ],
+    "support_mixed": false,
+    "support_emotion": true,
+    "supported_emotions": [
+      "angry",
+      "coldness",
+      "fear",
+      "happy",
+      "hate",
+      "neutral",
+      "sad",
+      "depressed"
+    ],
+    "default_emotion": "neutral",
+    "hint": "中文，男声，冷酷，像冷淡的年轻哥哥，支持多种情绪，适合剧情对话和配音。"
+  },
+  {
+    "id": "zh_female_tianxinxiaomei_emo_v2_mars_bigtts",
+    "name": "甜心小美（多情感）",
+    "gender": "female",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      }
+    ],
+    "support_mixed": false,
+    "support_emotion": true,
+    "supported_emotions": [
+      "sad",
+      "fear",
+      "hate",
+      "neutral"
+    ],
+    "default_emotion": "neutral",
+    "hint": "甜美可爱的女声，支持多种情感表达，适合演绎活泼、温柔或略带忧郁的角色。"
+  },
+  {
+    "id": "zh_female_gaolengyujie_emo_v2_mars_bigtts",
+    "name": "高冷御姐（多情感）",
+    "gender": "female",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      }
+    ],
+    "support_mixed": false,
+    "support_emotion": true,
+    "supported_emotions": [
+      "happy",
+      "sad",
+      "angry",
+      "surprised",
+      "fear",
+      "hate",
+      "excited",
+      "coldness",
+      "neutral"
+    ],
+    "default_emotion": "neutral",
+    "hint": "中文女声，高冷御姐音色，支持多种情感，适合演绎沉稳、知性的角色。"
+  },
+  {
+    "id": "zh_male_aojiaobazong_emo_v2_mars_bigtts",
+    "name": "傲娇霸总（多情感）",
+    "gender": "male",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      }
+    ],
+    "support_mixed": false,
+    "support_emotion": true,
+    "supported_emotions": [
+      "neutral",
+      "happy",
+      "angry",
+      "hate"
+    ],
+    "default_emotion": "neutral",
+    "hint": "中文男声，傲娇霸道，自带气场，支持多种情感，适合演绎高冷总裁或霸道角色。"
+  },
+  {
+    "id": "zh_male_guangzhoudege_emo_mars_bigtts",
+    "name": "广州德哥（多情感）",
+    "gender": "male",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": true,
+    "supported_emotions": [
+      "angry",
+      "fear",
+      "neutral"
+    ],
+    "default_emotion": "neutral",
+    "hint": "中文男声，带有广州口音，支持多种情感，适合演绎日常对话、剧情旁白等。"
+  },
+  {
+    "id": "zh_male_jingqiangkanye_emo_mars_bigtts",
+    "name": "京腔侃爷（多情感）",
+    "gender": "male",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": true,
+    "supported_emotions": [
+      "happy",
+      "angry",
+      "surprised",
+      "hate",
+      "neutral"
+    ],
+    "default_emotion": "neutral",
+    "hint": "中文，男声，地道京腔，语调自然，支持多种情绪，适合演绎市井生活和幽默对话。"
+  },
+  {
+    "id": "zh_female_linjuayi_emo_v2_mars_bigtts",
+    "name": "邻居阿姨（多情感）",
+    "gender": "female",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      }
+    ],
+    "support_mixed": false,
+    "support_emotion": true,
+    "supported_emotions": [
+      "neutral",
+      "angry",
+      "coldness",
+      "depressed",
+      "surprised"
+    ],
+    "default_emotion": "neutral",
+    "hint": "中文，女声，亲切热情的邻家阿姨，支持多种情感，适合生活化对话和剧情演绎。"
+  },
+  {
+    "id": "zh_male_yourougongzi_emo_v2_mars_bigtts",
+    "name": "优柔公子（多情感）",
+    "gender": "male",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      }
+    ],
+    "support_mixed": false,
+    "support_emotion": true,
+    "supported_emotions": [
+      "happy",
+      "angry",
+      "fear",
+      "hate",
+      "excited",
+      "neutral",
+      "depressed"
+    ],
+    "default_emotion": "neutral",
+    "hint": "中文，男声，音色温和，支持多种情感，适合演绎内心戏丰富的角色。"
+  },
+  {
+    "id": "zh_male_ruyayichen_emo_v2_mars_bigtts",
+    "name": "儒雅男友（多情感）",
+    "gender": "male",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      }
+    ],
+    "support_mixed": false,
+    "support_emotion": true,
+    "supported_emotions": [
+      "happy",
+      "sad",
+      "angry",
+      "fear",
+      "excited",
+      "coldness",
+      "neutral"
+    ],
+    "default_emotion": "neutral",
+    "hint": "中文，男声，儒雅温柔，支持多种情感，适合扮演体贴的男友角色，或用于剧情对话和配音。"
+  },
+  {
+    "id": "zh_male_junlangnanyou_emo_v2_mars_bigtts",
+    "name": "俊朗男友（多情感）",
+    "gender": "male",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      }
+    ],
+    "support_mixed": false,
+    "support_emotion": true,
+    "supported_emotions": [
+      "happy",
+      "sad",
+      "angry",
+      "surprised",
+      "fear",
+      "neutral"
+    ],
+    "default_emotion": "neutral",
+    "hint": "中文男声，声线俊朗，支持多种情感，适合演绎男友角色，或用于剧情对话、广告配音等。"
+  },
+  {
+    "id": "en_female_candice_emo_v2_mars_bigtts",
+    "name": "Candice",
+    "gender": "female",
+    "languages": [
+      {
+        "label": "美式英语",
+        "code": "en-US"
+      }
+    ],
+    "support_mixed": false,
+    "support_emotion": true,
+    "supported_emotions": [
+      "affectionate",
+      "angry",
+      "ASMR",
+      "chat",
+      "excited",
+      "happy",
+      "neutral",
+      "warm"
+    ],
+    "default_emotion": "neutral",
+    "hint": "American English, female, versatile and expressive, suitable for a wide range of applications from casual conversation to dramatic narration."
+  },
+  {
+    "id": "en_female_skye_emo_v2_mars_bigtts",
+    "name": "Serena",
+    "gender": "female",
+    "languages": [
+      {
+        "label": "美式英语",
+        "code": "en-US"
+      }
+    ],
+    "support_mixed": false,
+    "support_emotion": true,
+    "supported_emotions": [
+      "affectionate",
+      "angry",
+      "ASMR",
+      "chat",
+      "excited",
+      "happy",
+      "neutral",
+      "sad",
+      "warm"
+    ],
+    "default_emotion": "neutral",
+    "hint": "American English, female, versatile and expressive, suitable for a wide range of emotional narratives and conversations."
+  },
+  {
+    "id": "en_male_glen_emo_v2_mars_bigtts",
+    "name": "Glen",
+    "gender": "male",
+    "languages": [
+      {
+        "label": "美式英语",
+        "code": "en-US"
+      }
+    ],
+    "support_mixed": false,
+    "support_emotion": true,
+    "supported_emotions": [
+      "affectionate",
+      "angry",
+      "ASMR",
+      "chat",
+      "excited",
+      "happy",
+      "neutral",
+      "sad",
+      "warm"
+    ],
+    "default_emotion": "neutral",
+    "hint": "American English, male, versatile and expressive, suitable for a wide range of emotional narratives."
+  },
+  {
+    "id": "en_male_sylus_emo_v2_mars_bigtts",
+    "name": "Sylus",
+    "gender": "male",
+    "languages": [
+      {
+        "label": "美式英语",
+        "code": "en-US"
+      }
+    ],
+    "support_mixed": false,
+    "support_emotion": true,
+    "supported_emotions": [
+      "affectionate",
+      "angry",
+      "ASMR",
+      "authoritative",
+      "chat",
+      "excited",
+      "happy",
+      "neutral",
+      "sad",
+      "warm"
+    ],
+    "default_emotion": "neutral",
+    "hint": "American English, male, versatile and expressive, suitable for a wide range of narrative and conversational content."
+  },
+  {
+    "id": "zh_male_shenyeboke_emo_v2_mars_bigtts",
+    "name": "深夜播客",
+    "gender": "male",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      }
+    ],
+    "support_mixed": false,
+    "support_emotion": true,
+    "supported_emotions": [
+      "surprised",
+      "sad",
+      "neutral",
+      "hate",
+      "happy",
+      "fear",
+      "excited",
+      "depressed",
+      "coldness",
+      "angry"
+    ],
+    "default_emotion": "neutral",
+    "hint": "中文，男声，沉稳磁性，适合深夜电台、播客节目，支持多种情感表达。"
+  },
+  {
+    "id": "zh_female_yingyujiaoyu_mars_bigtts",
+    "name": "Tina老师",
+    "gender": "female",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      },
+      {
+        "label": "英式英语",
+        "code": "en-GB"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "中文女声，发音清晰，语速适中，适合教学、播报和日常对话场景。"
+  },
+  {
+    "id": "ICL_zh_female_wenrounvshen_239eff5e8ffa_tob",
+    "name": "温柔女神",
+    "gender": "female",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "中文，女声，音色温柔甜美，语调轻柔，适合情感表达、故事讲述和陪伴。"
+  },
+  {
+    "id": "ICL_zh_female_wuxi_tob",
+    "name": "元气甜妹",
+    "gender": "female",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "中文，女声，甜美活泼，充满元气，适合动漫配音、广告宣传和日常对话。"
+  },
+  {
+    "id": "zh_female_zhixingnvsheng_mars_bigtts",
+    "name": "知性女声",
+    "gender": "female",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "中文女声，知性优雅，语调沉稳，适合朗读、解说和知识分享等场景。"
+  },
+  {
+    "id": "zh_female_kailangjiejie_moon_bigtts",
+    "name": "开朗姐姐",
+    "gender": "female",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "中文女声，音色开朗活泼，充满活力，适合演绎积极向上的内容。"
+  },
+  {
+    "id": "zh_male_yangguangqingnian_moon_bigtts",
+    "name": "阳光青年",
+    "gender": "male",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "中文，男声，充满活力和朝气，适合播报、广告和日常对话。"
+  },
+  {
+    "id": "en_male_jason_conversation_wvae_bigtts",
+    "name": "开朗学长",
+    "gender": "male",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "中文，男声，开朗活泼，充满阳光，适合校园广播、青春剧配音等场景。"
+  },
+  {
+    "id": "zh_male_qingshuangnanda_mars_bigtts",
+    "name": "清爽男大",
+    "gender": "male",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "中文男声，音色清澈明亮，充满活力，适合演绎阳光开朗的年轻男性角色，如校园广播、青春剧旁白等。"
+  },
+  {
+    "id": "zh_male_yangguangqingnian_moon_bigtts",
+    "name": "阳光青年",
+    "gender": "male",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "中文，男声，充满活力和朝气，适合播报、广告和日常对话。"
+  },
+  {
+    "id": "zh_female_cancan_mars_bigtts",
+    "name": "灿灿/Shiny",
+    "gender": "female",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      },
+      {
+        "label": "美式英语",
+        "code": "en-US"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "Chinese female voice, sweet tone, clear pronunciation, suitable for daily conversation, audiobooks, and commercial narration."
+  },
+  {
+    "id": "zh_female_shuangkuaisisi_moon_bigtts",
+    "name": "爽快思思/Skye",
+    "gender": "female",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      },
+      {
+        "label": "美式英语",
+        "code": "en-US"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "Chinese female voice, cheerful tone, moderate pace, suitable for daily conversation, commercial narration, and audiobooks."
+  },
+  {
+    "id": "zh_male_wennuanahu_moon_bigtts",
+    "name": "温暖阿虎/Alvin",
+    "gender": "male",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      },
+      {
+        "label": "美式英语",
+        "code": "en-US"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "Chinese, male voice, warm and steady, suitable for narration, commentary, and emotional expression."
+  },
+  {
+    "id": "zh_male_shaonianzixin_moon_bigtts",
+    "name": "少年梓辛/Brayan",
+    "gender": "male",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      },
+      {
+        "label": "美式英语",
+        "code": "en-US"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "Chinese, male voice, youthful tone, clear and bright, suitable for playing lively and cheerful young characters."
+  },
+  {
+    "id": "zh_female_yueyunv_mars_bigtts",
+    "name": "粤语小溏",
+    "gender": "female",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "粤语女声，音色甜美，发音标准，适合日常对话、广播和广告配音。"
+  },
+  {
+    "id": "zh_female_daimengchuanmei_moon_bigtts",
+    "name": "呆萌川妹",
+    "gender": "female",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "甜美可爱的川妹子，声音呆萌，语调活泼，适合演绎轻松愉快的场景。"
+  },
+  {
+    "id": "zh_male_beijingxiaoye_moon_bigtts",
+    "name": "北京小爷",
+    "gender": "male",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "中文，男声，地道京腔，语调自然，适合演绎北京本地角色或生活化场景。"
+  },
+  {
+    "id": "zh_male_jingqiangkanye_moon_bigtts",
+    "name": "京腔侃爷/Harmony",
+    "gender": "male",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      },
+      {
+        "label": "美式英语",
+        "code": "en-US"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "京腔侃爷，男声，地道京味儿，语调自然，适合讲述故事、播报新闻或日常对话。"
+  },
+  {
+    "id": "ICL_zh_female_chunzhenshaonv_e588402fb8ad_tob",
+    "name": "纯真少女",
+    "gender": "female",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "中文，女声，纯真活泼，充满少女感，适合儿童故事、动漫配音和日常对话。"
+  },
+  {
+    "id": "ICL_zh_female_xiangliangya_v1_tob",
+    "name": "邪魅御姐",
+    "gender": "female",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "声线低沉，充满魅惑与自信，展现御姐的独特魅力，适合演绎神秘、高傲的角色。"
+  },
+  {
+    "id": "zh_female_popo_mars_bigtts",
+    "name": "婆婆",
+    "gender": "female",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "中文女声，音色慈祥和蔼，适合演绎长辈角色，如婆婆、奶奶等。"
+  },
+  {
+    "id": "ICL_zh_male_sajiaonianren_tob",
+    "name": "撒娇粘人",
+    "gender": "male",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "中文男声，声线温柔，略带撒娇，适合表达亲密、依赖的情感，如情侣对话、哄人等场景。"
+  },
+  {
+    "id": "ICL_zh_female_xnx_v1_tob",
+    "name": "贴心闺蜜",
+    "gender": "female",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "中文，女声，温柔体贴，像知心闺蜜般陪伴，适合日常对话和情感交流。"
+  },
+  {
+    "id": "ICL_zh_male_wenrounanyou_tob",
+    "name": "温柔男友",
+    "gender": "male",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "中文男声，温柔体贴，声线沉稳，适合情感交流、故事讲述等场景。"
+  },
+  {
+    "id": "ICL_zh_male_badaozongcai_v1_tob",
+    "name": "霸道总裁",
+    "gender": "male",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "中文，男声，磁性低沉，自带强大气场，适合演绎霸道总裁、商界精英等角色。"
+  },
+  {
+    "id": "ICL_zh_male_bingjiaoshaonian_tob",
+    "name": "病娇少年",
+    "gender": "male",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "中文，男声，声线略带病态的少年，适合演绎偏执、占有欲强的角色。"
+  },
+  {
+    "id": "ICL_zh_female_xiangliangya_v1_tob",
+    "name": "邪魅御姐",
+    "gender": "female",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "声线低沉，充满魅惑与自信，展现御姐的独特魅力，适合演绎神秘、高傲的角色。"
+  },
+  {
+    "id": "ICL_zh_male_you_tob",
+    "name": "油腻大叔",
+    "gender": "male",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "中文，男声，音色略显油腻，适合演绎中年男性角色，如市井小民、老板等。"
+  },
+  {
+    "id": "en_female_lauren_moon_bigtts",
+    "name": "Lauren",
+    "gender": "female",
+    "languages": [
+      {
+        "label": "美式英语",
+        "code": "en-US"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "American English, female, clear and natural, suitable for general narration and informational content."
+  },
+  {
+    "id": "en_male_michael_moon_bigtts",
+    "name": "Michael",
+    "gender": "male",
+    "languages": [
+      {
+        "label": "美式英语",
+        "code": "en-US"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "American English, male, clear and steady, suitable for general narration and informational content."
+  },
+  {
+    "id": "en_male_dave_moon_bigtts",
+    "name": "Dave",
+    "gender": "male",
+    "languages": [
+      {
+        "label": "英式英语",
+        "code": "en-GB"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "British English, male, clear and steady, suitable for narration and informational content."
+  },
+  {
+    "id": "en_female_anna_mars_bigtts",
+    "name": "Anna",
+    "gender": "female",
+    "languages": [
+      {
+        "label": "英式英语",
+        "code": "en-GB"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "British English, female, clear and articulate, suitable for news, documentaries, and general narration."
+  },
+  {
+    "id": "multi_zh_male_youyoujunzi_moon_bigtts",
+    "name": "ひかる（光）",
+    "gender": "male",
+    "languages": [
+      {
+        "label": "日语",
+        "code": "ja-JP"
+      }
+    ],
+    "support_mixed": false,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "日本語の男性声。若々しく、落ち着いたトーンが特徴で、物語の朗読や日常会話に適しています。"
+  },
+  {
+    "id": "multi_female_maomao_conversation_wvae_bigtts",
+    "name": "つき（月）",
+    "gender": "female",
+    "languages": [
+      {
+        "label": "日语",
+        "code": "ja-JP"
+      }
+    ],
+    "support_mixed": false,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "日本語、女声。落ち着いた声質で、物語の朗読や案内音声に適しています。"
+  },
+  {
+    "id": "ICL_en_male_aussie_v1_tob",
+    "name": "Ethan",
+    "gender": "male",
+    "languages": [
+      {
+        "label": "澳洲英语",
+        "code": "en-AU"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "Australian English, male, clear and natural, suitable for general narration and informational content."
+  },
+  {
+    "id": "en_female_sarah_mars_bigtts",
+    "name": "Sarah",
+    "gender": "female",
+    "languages": [
+      {
+        "label": "澳洲英语",
+        "code": "en-AU"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "Australian English, female, clear and natural, suitable for general narration and announcements."
+  },
+  {
+    "id": "multi_female_maomao_conversation_wvae_bigtts",
+    "name": "Diana",
+    "gender": "female",
+    "languages": [
+      {
+        "label": "西语",
+        "code": "es-ES"
+      }
+    ],
+    "support_mixed": false,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "Spanish, female voice, clear and natural, suitable for general narration and conversational content."
+  },
+  {
+    "id": "multi_male_M100_conversation_wvae_bigtts",
+    "name": "Lucía",
+    "gender": "male",
+    "languages": [
+      {
+        "label": "西语",
+        "code": "es-ES"
+      }
+    ],
+    "support_mixed": false,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "Español, voz masculina, clara y versátil, ideal para narraciones y anuncios."
+  },
+  {
+    "id": "ICL_zh_female_lixingyuanzi_cs_tob",
+    "name": "理性圆子",
+    "gender": "female",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "中文女声，音色理性沉稳，适合播报、解说等需要清晰传达信息的场景。"
+  },
+  {
+    "id": "ICL_zh_female_qingxixiaoxue_cs_tob",
+    "name": "清晰小雪",
+    "gender": "female",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "中文女声，音色清晰明亮，适合播报、客服等场景。"
+  },
+  {
+    "id": "ICL_zh_male_shuanglangxiaoyang_cs_tob",
+    "name": "爽朗小阳",
+    "gender": "male",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "中文男声，音色爽朗阳光，充满活力，适合播报、广告和日常对话等场景。"
+  },
+  {
+    "id": "zh_female_kefunvsheng_mars_bigtts",
+    "name": "暖阳女声",
+    "gender": "female",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "温柔甜美的女声，如冬日暖阳般抚慰人心，适合朗读、有声书和情感陪伴。"
+  },
+  {
+    "id": "zh_male_M100_conversation_wvae_bigtts",
+    "name": "悠悠君子",
+    "gender": "male",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "中文男声，音色沉稳，语速适中，适合朗读、旁白和知识分享等场景。"
+  },
+  {
+    "id": "zh_male_chunhui_mars_bigtts",
+    "name": "广告解说",
+    "gender": "male",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "中文男声，音色沉稳有力，适合广告宣传、产品介绍等场景。"
+  },
+  {
+    "id": "zh_male_sunwukong_mars_bigtts",
+    "name": "猴哥",
+    "gender": "male",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "中文，男声，声音洪亮，充满力量，适合演绎神话故事、儿童读物等。"
+  },
+  {
+    "id": "zh_male_xionger_mars_bigtts",
+    "name": "熊二",
+    "gender": "male",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "中文，男声，憨厚可爱，声音洪亮，适合动画片、儿童故事等场景。"
+  },
+  {
+    "id": "zh_male_jieshuonansheng_mars_bigtts",
+    "name": "磁性解说男声/Morgan",
+    "gender": "male",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      },
+      {
+        "label": "美式英语",
+        "code": "en-US"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "Chinese, male voice, magnetic and steady, suitable for documentaries, commercial narration, and audiobooks."
+  },
+  {
+    "id": "zh_female_jitangmeimei_mars_bigtts",
+    "name": "鸡汤妹妹/Hope",
+    "gender": "female",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      },
+      {
+        "label": "美式英语",
+        "code": "en-US"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "Chinese female voice, sweet and gentle, like a friendly neighbor sister, suitable for emotional companionship and daily conversation."
+  },
+  {
+    "id": "zh_female_tiexinnvsheng_mars_bigtts",
+    "name": "贴心女声/Candy",
+    "gender": "female",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      },
+      {
+        "label": "美式英语",
+        "code": "en-US"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "Sweet and gentle female voice, suitable for broadcasting, customer service, audiobooks, and other scenarios, providing a caring feeling."
+  },
+  {
+    "id": "zh_female_mengyatou_mars_bigtts",
+    "name": "萌丫头/Cutey",
+    "gender": "female",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      },
+      {
+        "label": "美式英语",
+        "code": "en-US"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "Cute girl, sweet and adorable young voice, suitable for playing lively and innocent characters, adding childlike charm to stories."
+  },
+  {
+    "id": "zh_male_changtianyi_mars_bigtts",
+    "name": "悬疑解说",
+    "gender": "male",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "中文男声，语速适中，声线沉稳，适合悬疑故事、案件分析、恐怖解说等场景。"
+  },
+  {
+    "id": "zh_male_ruyaqingnian_mars_bigtts",
+    "name": "儒雅青年",
+    "gender": "male",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "中文男声，儒雅沉稳，语调温和，适合朗读、旁白及各类文化内容。"
+  },
+  {
+    "id": "zh_female_wenroushunv_mars_bigtts",
+    "name": "温柔淑女",
+    "gender": "female",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "中文，女声，音色温柔甜美，语调优雅，适合朗读、客服、有声书等场景。"
+  },
+  {
+    "id": "zh_male_baqiqingshu_mars_bigtts",
+    "name": "霸气青叔",
+    "gender": "male",
+    "languages": [
+      {
+        "label": "中文",
+        "code": "zh-CN"
+      }
+    ],
+    "support_mixed": true,
+    "support_emotion": false,
+    "supported_emotions": [],
+    "default_emotion": null,
+    "hint": "中文，男声，声线沉稳有力，充满自信与威严，适合演绎成熟、有魄力的角色。"
+  }
+]

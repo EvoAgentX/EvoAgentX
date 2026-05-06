@@ -122,9 +122,9 @@
                             "required": true
                         }
                     ],
-                    "prompt": "### Objective\nSearch for 3 trending review papers related to the recommended PhD direction from the resume analysis on arXiv.\n\n### Instructions\n1. Use the goal provided: <input>{goal}</input> to understand the context of the search.\n2. Utilize the phd_direction gathered from the resume analysis: <input>{phd_direction}</input> as the main keyword for searching.\n3. Access the arxiv-mcp-server to search for papers based on the recommended PhD direction.\n4. Aim to find 3 trending review papers that match the criteria.\n5. Return the links to these papers. If no papers are found, respond with 'I cannot find the papers'.\n\n### Output Format\nYour final output should ALWAYS in the following format:\n\n## Thought\nBriefly explain the reasoning process for achieving the objective.\n\n## review_papers\nProvide the links to the 3 trending review papers.",
+                    "prompt": "### Objective\nSearch for 3 trending review papers related to the recommended PhD direction from the resume analysis on arXiv.\n\n### Instructions\n1. Use the goal provided: <input>{goal}</input> to understand the context of the search.\n2. Utilize the phd_direction gathered from the resume analysis: <input>{phd_direction}</input> as the main keyword for searching.\n3. Access the ArxivMcpServerToolkit to search for papers based on the recommended PhD direction.\n4. Aim to find 3 trending review papers that match the criteria.\n5. Return the links to these papers. If no papers are found, respond with 'I cannot find the papers'.\n\n### Output Format\nYour final output should ALWAYS in the following format:\n\n## Thought\nBriefly explain the reasoning process for achieving the objective.\n\n## review_papers\nProvide the links to the 3 trending review papers.",
                     "tool_names": [
-                        "arxiv-mcp-server"
+                        "ArxivMcpServerToolkit"
                     ]
                 }
             ],

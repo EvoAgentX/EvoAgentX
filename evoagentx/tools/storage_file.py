@@ -1,59 +1,89 @@
-from .tool import Tool, Toolkit
-from .storage_handler import FileStorageHandler, LocalStorageHandler
-from typing import Dict, Any, List, Optional
-from ..core.logging import logger
+import json
+from typing import Any, Dict, List, Optional
 
+from dotenv import load_dotenv
+
+from ..core.logging import logger
+from .storage_handler import FileStorageHandler, LocalStorageHandler
+from .tool import Tool, Toolkit, ToolMetadata, ToolResult
+
+load_dotenv()
+
+
+
+# Mapping table to normalize common file type synonyms to canonical extensions
+FILE_TYPE_ALIASES: Dict[str, str] = {
+    # Text
+    "text": "txt",
+    "txt": "txt",
+    # Markdown
+    "md": "md",
+    "markdown": "md",
+    # Structured data
+    "json": "json",
+    "yaml": "yaml",
+    "yml": "yaml",
+    "xml": "xml",
+    # Spreadsheets
+    "excel": "xlsx",
+    "xlsx": "xlsx",
+    # Serialization
+    "pickle": "pickle",
+    "pkl": "pickle",
+    # Images
+    "jpg": "jpg",
+    "jpeg": "jpeg",
+    "png": "png",
+    "gif": "gif",
+    "bmp": "bmp",
+    "tiff": "tiff",
+    "tif": "tiff",
+    # Documents
+    "pdf": "pdf",
+}
+
+
+def resolve_extension(file_type: str) -> str:
+    """Resolve a provided file_type (with or without leading dot) to a canonical extension with dot.
+    Accepts common synonyms via FILE_TYPE_ALIASES.
+    """
+    ft = (file_type or "").strip().lower()
+    if ft.startswith('.'):
+        ft = ft[1:]
+    canonical = FILE_TYPE_ALIASES.get(ft, ft)
+    return f".{canonical}"
 
 
 
 class SaveTool(Tool):
     name: str = "save"
-    description: str = "Save content to a file with automatic format detection and support for various file types including documents, data files, images, videos, and sound files"
-    inputs: Dict[str, Dict[str, str]] = {
-        "file_path": {
+    description: str = "Saves content to a local file. Returns the file URL/path. Supports `json`, `yaml`, `csv`, `pdf`, `md` and `txt` file types."
+    inputs: Dict[str, Dict[str, Any]] = {
+        "file_type": {
             "type": "string",
-            "description": "Path to the file to save"
+            "description": "File type/extension",
+            "enum": ["json", "yaml", "csv", "pdf", "md", "txt"]
         },
         "content": {
             "type": "string",
-            "description": "Content to save to the file (string for text, JSON string for structured data, or Python object for JSON files)"
-        },
-        "encoding": {
-            "type": "string",
-            "description": "Text encoding for text files (default: utf-8)"
-        },
-        "indent": {
-            "type": "integer",
-            "description": "Indentation for JSON files (default: 2)"
-        },
-        "sheet_name": {
-            "type": "string",
-            "description": "Sheet name for Excel files (default: Sheet1)"
-        },
-        "root_tag": {
-            "type": "string",
-            "description": "Root tag for XML files (default: root)"
+            "description": "Content to save to the file"
         }
     }
-    required: Optional[List[str]] = ["file_path", "content"]
+    required: Optional[List[str]] = ["file_type", "content"]
 
     def __init__(self, storage_handler: FileStorageHandler = None):
         super().__init__()
         self.storage_handler = storage_handler or LocalStorageHandler()
-    
-    @classmethod
-    def validate_attributes(cls):
-        # Skip validation for this tool to allow flexible content types
-        # This allows us to accept Python objects while maintaining JSON schema compatibility
-        pass
 
-    def __call__(self, file_path: str, content: Any, encoding: str = "utf-8", indent: int = 2, 
-                 sheet_name: str = "Sheet1", root_tag: str = "root") -> Dict[str, Any]:
+
+    def __call__(self, file_type: str, content: str, file_name: str = "saved_file", encoding: str = "utf-8", indent: int = 2, 
+                 sheet_name: str = "Sheet1", root_tag: str = "root") -> ToolResult:
         """
         Save content to a file with automatic format detection.
         
         Args:
-            file_path: Path to the file to save
+            file_type: File type/extension (e.g., json, txt, csv, yaml, xml, xlsx)
+            file_name: File name without extension
             content: Content to save to the file (string for text, dict/list for JSON, list for CSV/Excel)
             encoding: Text encoding for text files
             indent: Indentation for JSON files
@@ -63,7 +93,28 @@ class SaveTool(Tool):
         Returns:
             Dictionary containing the save operation result
         """
+        metadata = ToolMetadata(
+            tool_name=self.name,
+            args={
+                "file_type": file_type, 
+                "content": content
+            }
+        )
+
         try:
+            # Compose file path from type and name using normalization table
+            ext = resolve_extension(file_type)
+            file_path = f"{file_name}{ext}"
+            # Ensure unique name by appending a numeric suffix if needed
+            
+            # renamed = False
+            if self.storage_handler.exists(file_path):
+                counter = 1
+                while self.storage_handler.exists(f"{file_name}_{counter}{ext}"):
+                    counter += 1
+                file_path = f"{file_name}_{counter}{ext}"
+                # renamed = True
+            
             # Parse content based on file type
             file_extension = self.storage_handler.get_file_type(file_path)
             parsed_content = content
@@ -73,7 +124,6 @@ class SaveTool(Tool):
                 # If content is already a string, try to parse it as JSON
                 if isinstance(content, str):
                     try:
-                        import json
                         parsed_content = json.loads(content)
                     except json.JSONDecodeError:
                         # If not valid JSON, use as string
@@ -91,7 +141,6 @@ class SaveTool(Tool):
                 else:
                     # Try to parse as JSON first (for structured data)
                     try:
-                        import json
                         parsed_content = json.loads(content)
                         if not isinstance(parsed_content, list):
                             # If JSON parsing succeeded but it's not a list, treat as raw CSV
@@ -108,12 +157,13 @@ class SaveTool(Tool):
                 else:
                     # If content is a string, try to parse it as JSON
                     try:
-                        import json
                         parsed_content = json.loads(content)
                         if not isinstance(parsed_content, list):
-                            return {"success": False, "error": "Excel content must be a list of lists"}
+                            output = {"error": "Excel content must be a list of lists"}
+                            return ToolResult(result=output, metadata=metadata)
                     except json.JSONDecodeError:
-                        return {"success": False, "error": "Excel content must be valid JSON array"}
+                        output = {"error": "Excel content must be valid JSON array"}
+                        return ToolResult(result=output, metadata=metadata)
             
             kwargs = {
                 "encoding": encoding,
@@ -122,69 +172,65 @@ class SaveTool(Tool):
                 "root_tag": root_tag
             }
             
-            result = self.storage_handler.save(file_path, parsed_content, **kwargs)
+            result = self.storage_handler.save(file_path=file_path, content=parsed_content, **kwargs)
             
-            return result
+            # Add warning if the filename was auto-suffixed due to collision
+            # if renamed:
+            #     result["warnning"] = (
+            #         f"original name: {file_name}{ext}, is already in used, name changed to: {file_path}"
+            #     )
+            
+            return ToolResult(result=result, metadata=metadata)
             
         except Exception as e:
-            logger.error(f"Error in SaveTool: {str(e)}")
-            return {"success": False, "error": str(e), "file_path": file_path}
+            output = {"error": str(e)}
+            logger.error(f"Error in `{self.name}`: {str(e)}")
+            return ToolResult(result=output, metadata=metadata)
 
 
 class ReadTool(Tool):
     name: str = "read"
-    description: str = "Read content from a file with automatic format detection and support for various file types including documents, data files, images, videos, and sound files"
+    description: str = "Reads file content from a local file path or file URL. Supports `json`, `yaml`, `csv`, `pdf`, `md` and `txt` file types."
     inputs: Dict[str, Dict[str, str]] = {
         "file_path": {
             "type": "string",
-            "description": "Path to the file to read"
+            "description": "Local file path to read"
         },
-        "encoding": {
+        "url": {
             "type": "string",
-            "description": "Text encoding for text files (default: utf-8)"
-        },
-        "sheet_name": {
-            "type": "string",
-            "description": "Sheet name for Excel files (optional)"
-        },
-        "head": {
-            "type": "integer",
-            "description": "Number of characters to return from the beginning of the file (default: 0 means return everything)"
+            "description": "Optional URL of the file to read"
         }
     }
-    required: Optional[List[str]] = ["file_path"]
+    required: Optional[List[str]] = [] 
 
     def __init__(self, storage_handler: FileStorageHandler = None):
         super().__init__()
         self.storage_handler = storage_handler or LocalStorageHandler()
 
-    def __call__(self, file_path: str, encoding: str = "utf-8", sheet_name: str = None, head: int = 0) -> Dict[str, Any]:
+    def __call__(self, file_path: str = None, url: str = None) -> ToolResult:
         """
-        Read content from a file with automatic format detection.
+        Read content from a file at the given path.
         
         Args:
-            file_path: Path to the file to read
-            encoding: Text encoding for text files
-            sheet_name: Sheet name for Excel files
-            head: Number of characters to return from the beginning
+            file_path: Local file path to read
+            url: URL of the file to read
             
         Returns:
             Dictionary containing the read operation result
         """
+
+        metadata = ToolMetadata(
+            tool_name=self.name,
+            args={"file_path": file_path, "url": url}
+        )
+
         try:
-            kwargs = {
-                "encoding": encoding,
-                "sheet_name": sheet_name,
-                "head": head
-            }
-            
-            result = self.storage_handler.read(file_path, **kwargs)
-            
-            return result
-            
+            result = self.storage_handler.read(file_path=file_path, url=url)
         except Exception as e:
             logger.error(f"Error in ReadTool: {str(e)}")
-            return {"success": False, "error": str(e), "file_path": file_path}
+            result = {"error": str(e)}
+        
+        return ToolResult(result=result, metadata=metadata)
 
 
 class AppendTool(Tool):
@@ -235,7 +281,6 @@ class AppendTool(Tool):
             # Try to parse JSON content for appropriate file types
             if file_extension in ['.json', '.yaml', '.yml']:
                 try:
-                    import json
                     parsed_content = json.loads(content)
                 except json.JSONDecodeError:
                     # If not valid JSON, use as string
@@ -244,7 +289,6 @@ class AppendTool(Tool):
             # Handle CSV content
             elif file_extension == '.csv':
                 try:
-                    import json
                     parsed_content = json.loads(content)
                     if not isinstance(parsed_content, list):
                         # If JSON parsing succeeded but it's not a list, treat as raw CSV
@@ -256,7 +300,6 @@ class AppendTool(Tool):
             # Handle Excel content
             elif file_extension == '.xlsx':
                 try:
-                    import json
                     parsed_content = json.loads(content)
                     if not isinstance(parsed_content, list):
                         return {"success": False, "error": "Excel content must be a list of lists"}
@@ -494,14 +537,68 @@ class ExistsTool(Tool):
         """
         try:
             exists = self.storage_handler.exists(path)
-            return {
+            res = {
                 "success": True,
                 "path": path,
                 "exists": exists
             }
+            # If the underlying handler supports URL decoration, add it using the real path translation
+            try:
+                real_path = self.storage_handler.translate_in(path)
+                if getattr(self.storage_handler, "return_file_url", False):
+                    res["url"] = self.storage_handler._get_file_url(real_path)
+            except Exception:
+                pass
+            return res
             
         except Exception as e:
             logger.error(f"Error in ExistsTool: {str(e)}")
+            return {"success": False, "error": str(e), "path": path}
+
+class URLTool(Tool):
+    name: str = "get_file_url"
+    description: str = "Generate URL for a file on the given path for wider access"
+    inputs: Dict[str, Dict[str, str]] = {
+        "path": {
+            "type": "string",
+            "description": "Path to the file"
+        }
+    }
+    required: Optional[List[str]] = ["path"]
+
+    def __init__(self, storage_handler: FileStorageHandler = None):
+        super().__init__()
+        self.storage_handler = storage_handler or LocalStorageHandler()
+
+    def __call__(self, path: str) -> Dict[str, Any]:
+        """
+        Generate URL for a file path.
+        
+        Args:
+            path: Path to the file
+            
+        Returns:
+            Dictionary containing the URL result
+        """
+        try:
+            exists = self.storage_handler.exists(path)
+            res = {
+                "success": True,
+                "path": path,
+                "exists": exists,
+                "url": None
+            }
+            # If the underlying handler supports URL decoration, add it using the real path translation
+            try:
+                real_path = self.storage_handler.translate_in(path)
+                if getattr(self.storage_handler, "return_file_url", False):
+                    res["url"] = self.storage_handler._get_file_url(real_path)
+            except Exception:
+                pass
+            return res
+            
+        except Exception as e:
+            logger.error(f"Error in URLTool: {str(e)}")
             return {"success": False, "error": str(e), "path": path}
 
 
@@ -513,7 +610,7 @@ class StorageToolkit(Toolkit):
     creating directories, and listing files with support for various file formats.
     """
     
-    def __init__(self, name: str = "StorageToolkit", base_path: str = "./workplace/storage", storage_handler: LocalStorageHandler = None):
+    def __init__(self, name: str = "StorageToolkit", base_path: str = "./workplace/storage", storage_handler: LocalStorageHandler = None, **kwargs):
         """
         Initialize the storage toolkit.
         
@@ -522,21 +619,15 @@ class StorageToolkit(Toolkit):
             base_path: Base directory for storage operations (default: ./workplace/storage)
             storage_handler: Storage handler instance (defaults to LocalStorageHandler)
         """
-        if not storage_handler:
+        if storage_handler is None:
             storage_handler = LocalStorageHandler(base_path=base_path)
         
         # Create tools with the storage handler
         tools = [
             SaveTool(storage_handler=storage_handler),
             ReadTool(storage_handler=storage_handler),
-            AppendTool(storage_handler=storage_handler),
-            DeleteTool(storage_handler=storage_handler),
-            MoveTool(storage_handler=storage_handler),
-            CopyTool(storage_handler=storage_handler),
-            CreateDirectoryTool(storage_handler=storage_handler),
-            ListFileTool(storage_handler=storage_handler),
-            ExistsTool(storage_handler=storage_handler)
+            # URLTool(storage_handler=storage_handler),
         ]
         
-        super().__init__(name=name, tools=tools)
-        self.storage_handler = storage_handler 
+        super().__init__(name=name, tools=tools, **kwargs)
+        self.storage_handler = storage_handler

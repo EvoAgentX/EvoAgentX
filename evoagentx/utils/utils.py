@@ -1,10 +1,14 @@
 import os 
 import re 
 import time
+import contextvars
 import regex
 import requests
 from tqdm import tqdm
-from typing import Union, Any, List, Set
+from concurrent.futures import ThreadPoolExecutor
+from typing import Union, Any, List, Set, Dict, Optional, Type
+from pydantic import BaseModel
+from pydantic_core import PydanticUndefined
 
 from ..core.logging import logger
 
@@ -24,6 +28,89 @@ def safe_remove(data: Union[List[Any], Set[Any]], remove_value: Any):
         data.remove(remove_value)
     except ValueError:
         pass
+
+def compose_decorators(*decorators):
+    def combined(func):
+        wrapped = func
+        for decorator in decorators:
+            wrapped = decorator(wrapped)
+        return wrapped
+    return combined
+
+def add_dict(a: Dict[str, Union[float, int]], b: Dict[str, Union[float, int]]) -> Dict[str, Union[float, int]]:
+    """
+    Adds the values from two dict together if they share the same key.
+    Also keeps the values that don't share keys in the final output.
+    """
+    if not a:
+        return b
+    
+    if not b:
+        return a
+
+    dict_sum = a.copy()
+
+    for key, value in b.items():
+        dict_sum[key] = dict_sum.get(key, 0) + value
+
+    return dict_sum
+
+def get_cost_per_tool(cost_breakdown: Dict[str, Dict[str, float]]) -> Dict[str, float]:
+    """
+    Returns the total cost for each tool.
+    """
+    cost_per_tool = dict()
+    
+    for tool_name, costs in cost_breakdown.items():
+        cost_per_tool[tool_name] = sum(costs.values())
+
+    return cost_per_tool
+
+def get_total_tool_cost(cost_breakdown: Dict[str, Dict[str, float]]) -> float:
+    return sum(get_cost_per_tool(cost_breakdown).values())
+
+def get_provider_tool_cost(cost_breakdown: Dict[str, Dict[str, float]], provider: str) -> float:
+
+    provider_cost = 0.
+
+    for costs in cost_breakdown.values():
+        for key, value in costs.items():
+            if key.startswith(provider):
+                provider_cost += value
+
+    return provider_cost
+
+class ContextualThreadPoolExecutor(ThreadPoolExecutor):
+    """ThreadPoolExecutor that preserves context variables"""
+    
+    def submit(self, fn, *args, **kwargs):
+        current_context = contextvars.copy_context()
+        
+        def wrapped_fn(*args, **kwargs):
+            return current_context.run(fn, *args, **kwargs)
+            
+        return super().submit(wrapped_fn, *args, **kwargs)
+
+json_to_python_type = {
+    "string": str,
+    "integer": int,
+    "number": float,
+    "boolean": bool,
+    "object": dict,
+    "array": list,
+}
+
+def get_field_default(model: Type[BaseModel], field_name: str) -> Optional[Any]:
+    field = model.model_fields.get(field_name)
+
+    if field is not None:
+        if field.default is not PydanticUndefined:
+            return field.default
+
+        if field.default_factory is not None:
+            return field.default_factory()
+    
+    return None
 
 def generate_dynamic_class_name(base_name: str) -> str:
 
