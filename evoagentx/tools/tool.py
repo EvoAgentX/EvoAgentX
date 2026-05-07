@@ -9,8 +9,6 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import Any, Callable, DefaultDict, Dict, List, Optional, Type, TypeVar, overload
 
-_ToolT = TypeVar("_ToolT", bound="Tool")
-
 from jsonschema import Draft202012Validator
 from pydantic import Field
 
@@ -32,6 +30,8 @@ from .tool_utils import (
     is_valid_description,
     normalize_component_name,
 )
+
+_ToolT = TypeVar("_ToolT", bound="Tool")
 
 
 class ToolMetadata(Metadata):
