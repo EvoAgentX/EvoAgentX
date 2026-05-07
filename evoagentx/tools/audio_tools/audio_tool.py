@@ -866,7 +866,7 @@ class AudioGenerationTool(Tool):
         """Format voice candidates as a string for the LLM prompt."""
         formatted = []
         for i, voice in enumerate(candidates, 1):
-            lang_info = ", ".join([f"{l['label']}({l['code']})" for l in voice.get("languages", [])])
+            lang_info = ", ".join([f"{lang['label']}({lang['code']})" for lang in voice.get("languages", [])])
             emotions_info = ""
             if voice.get("support_emotion") and voice.get("supported_emotions"):
                 emotions_info = f"\n   Supported Emotions: {', '.join(voice['supported_emotions'])}"

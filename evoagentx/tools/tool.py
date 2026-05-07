@@ -3,11 +3,13 @@ import functools
 import inspect
 import threading
 import time
-from abc import ABC, abstractmethod
+from abc import ABC
 from collections import defaultdict
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import Any, Callable, DefaultDict, Dict, List, Optional
+from typing import Any, Callable, DefaultDict, Dict, List, Optional, Type, TypeVar, overload
+
+_ToolT = TypeVar("_ToolT", bound="Tool")
 
 from jsonschema import Draft202012Validator
 from pydantic import Field
@@ -53,6 +55,11 @@ class ToolMetadata(Metadata):
 class ToolResult(BaseModule):    
     result: Any
     metadata: ToolMetadata
+
+    def __await__(self):
+        async def _return_self():
+            return self
+        return _return_self().__await__()
 
 
 def _get_tool_name(func, args) -> str:
@@ -381,7 +388,6 @@ class Tool(BaseModule, ABC, metaclass=ToolMeta):
                 f"Tool '{self.name}' has invalid description (missing or < 10 chars)."
             )
 
-    @abstractmethod
     def __call__(self, **kwargs) -> ToolResult:
         raise NotImplementedError("All tools must implement __call__")
 
@@ -413,7 +419,11 @@ class Toolkit(BaseModule):
     def remove_tool(self, tool_name: str):
         self.tools = [tool for tool in self.tools if tool.name != tool_name]
 
-    def get_tool(self, tool_name: str) -> Tool:
+    @overload
+    def get_tool(self, tool_name: str) -> "Tool": ...
+    @overload
+    def get_tool(self, tool_name: str, tool_cls: Type[_ToolT]) -> _ToolT: ...
+    def get_tool(self, tool_name: str, tool_cls: Optional[Type["Tool"]] = None) -> "Tool":
         for tool in self.tools:
             if tool.name == tool_name:
                 return tool
@@ -454,10 +464,15 @@ class CustoimzeFunctionTool(Tool):
     def __name__(self):
         return self.name
     
-    def __call__(self, **kwargs):
+    async def __call__(self, **kwargs):
         if not self.function:
             raise ValueError("Function not set for MCPTool")
-        result = self.function(**kwargs)
+        if asyncio.iscoroutinefunction(self.function):
+            result = await self.function(**kwargs)
+        else:
+            result = self.function(**kwargs)
+            if inspect.isawaitable(result):
+                result = await result
         return result
 
 

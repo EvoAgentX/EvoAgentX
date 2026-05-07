@@ -1,8 +1,9 @@
 from pydantic import Field
-from typing import Optional, Any, Callable, List, Union
+from typing import Optional, Any, Callable, Coroutine, List, Union, cast
 import re
 import json
 import asyncio
+import inspect
 
 from ..core.logging import logger
 from ..models.base_model import BaseLLM
@@ -347,10 +348,12 @@ class CustomizeAction(Action):
             logger.info(f"Executing tool `{function_name}` with parameters:\n{tool_args_str}")
             
             if asyncio.iscoroutinefunction(callable_fn.__call__):
-                result = await callable_fn(**function_args)
+                result = await cast(Coroutine[Any, Any, ToolResult], callable_fn(**function_args))
             else:
                 result = await asyncio.to_thread(callable_fn, **function_args)
             
+            if inspect.isawaitable(result):
+                result = await result
             result = ensure_tool_result(result, function_name, function_args)
             if tool_call_id is not None:
                 result.id = tool_call_id
