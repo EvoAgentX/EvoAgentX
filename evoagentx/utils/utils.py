@@ -119,6 +119,30 @@ def download_file(url: str, save_file: str, max_retries=3, timeout=10):
         raise RuntimeError(error_message)
 
 
+def remove_none(obj):
+    """
+    Recursively removes all keys where the value is None.
+    """
+    if isinstance(obj, dict):
+        obj_without_none = dict()
+
+        for k, v in obj.items():
+            if v is not None:
+                if isinstance(v, dict):
+                    obj_without_none[k] = remove_none(v)
+                elif isinstance(v, list):
+                    obj_without_none[k] = [remove_none(item) for item in v]
+                else:
+                    obj_without_none[k] = v
+        return obj_without_none
+
+    elif isinstance(obj, list):
+        return [remove_none(item) for item in obj]
+
+    else:
+        return obj
+
+
 def extract_type(annotation: Type) -> Type:
     """
     If `annotation` is Optional/Union, return the first type in the union.
