@@ -29,6 +29,7 @@ from .file_tool import FileToolkit
 from .search_serperapi import SerperAPIToolkit
 from .search_serpapi import SerpAPIToolkit
 from .search_exa import ExaSearchToolkit
+from .audio_tools import AudioToolkit
 
 try:
     from .research_tools import ResearchToolkit
@@ -70,5 +71,6 @@ __all__ = [
     "SerperAPIToolkit",
     "SerpAPIToolkit",
     "ExaSearchToolkit",
+    "AudioToolkit",
     "ResearchToolkit",
 ]
