@@ -42,21 +42,22 @@ class WorkFlow(BaseModule):
 
     def execute(self, inputs: dict = {}, **kwargs) -> str:
         """
-        Synchronous wrapper for async_execute. Creates a new event loop and runs the async method.
-        
+        Synchronous wrapper for async_execute.
+
+        Uses asyncio.run() so pending tasks are cancelled and async
+        generators / the default executor are finalized before the event
+        loop closes. Raises RuntimeError if called from a running event
+        loop; callers already inside an async context should await
+        async_execute() directly.
+
         Args:
             inputs: Dictionary of inputs for workflow execution
             **kwargs (Any): Additional keyword arguments
-            
+
         Returns:
             str: The output of the workflow execution
         """
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            return loop.run_until_complete(self.async_execute(inputs, **kwargs))
-        finally:
-            loop.close()
+        return asyncio.run(self.async_execute(inputs, **kwargs))
 
     async def async_execute(self, inputs: dict = {}, **kwargs) -> str:
         """
