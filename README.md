@@ -520,6 +520,8 @@ Below is a running log of scheduled and completed talks:
 
 | Speaker | Topic | Date | Meeting Video |
 |---|---|---|---|
+| [Wang Hongru](https://hrwise-nlp.github.io/) | [EvoAgentX Talk] Second Half of Languages Agent | 2026-05-10 | [YouTube](https://www.youtube.com/watch?v=p8HU_lFtAM4)
+| [Zhou Huichi](https://scholar.google.com/citations?user=1IJyxpUAAAAJ&hl=en) | [EvoAgentX Talk] Momentum and Continual Learning Agent Systems | 2026-04-26 | [YouTube](https://www.youtube.com/watch?v=DHKBq4NYAxA&t=53s)
 | [Xi Zhang](https://x-izhang.github.io/) | [EvoAgentX Talk] EvoScientist | 2026-04-05 |  [YouTube](https://www.youtube.com/watch?v=EVrxBC99_1k&t=2745s)  |
 | [Guanting Dong](https://dongguanting.github.io/) | [EvoAgentX Talk] Agentic Reinforced Policy Optimization | 2025-10-30 |  [YouTube](https://www.youtube.com/watch?v=UB-FL5JFXJY)  |
 | [Guibin Zhang](https://www.guibinz.top/) | [EvoAgentX Talk] How Agentic RL Transforms LLMs into Automated Agents | 2025-09-28 | [YouTube](https://www.youtube.com/watch?v=xzqZsZWfabw&t=3s) |

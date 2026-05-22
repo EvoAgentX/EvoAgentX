@@ -84,14 +84,17 @@ class WorkFlowNode(BaseModule):
         return validated_agents
 
     @model_validator(mode="after")
-    @classmethod
-    def check_action_graph(cls, instance: "WorkFlowNode"):
+    def check_action_graph(self) -> "WorkFlowNode":
         """
         Validates that:
         1. All required parameters of execute/async_execute methods are included in inputs
         2. The execute/async_execute methods return dictionaries
         3. All output parameters are present in the returned dictionaries
         """
+
+        # alias to minimise diff from the pre-Pydantic-2.12 version
+        instance = self 
+
         if instance.action_graph is None:
             return instance
         

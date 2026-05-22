@@ -1,8 +1,16 @@
 import os
+import sys
+import io
 from loguru import logger
 
-# logger.remove()
-# logger.add(sys.stdout, level="INFO")
+if hasattr(sys.stdout, "buffer"):
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+
+# 清空默认 handler，避免重复输出
+logger.remove()
+
+# 控制台输出
+logger.add(sys.stdout, level="INFO")
 # file_handler_id = None 
 save_logging_file = None  
 

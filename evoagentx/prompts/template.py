@@ -1,21 +1,30 @@
+import json
+from copy import deepcopy
+from typing import Any, List, Optional, Tuple, Type, Union
+
 import regex
-from copy import deepcopy 
 from pydantic import Field
 from pydantic_core import PydanticUndefined
-from typing import Union, Optional, List, Any, Type
 
-from ..core.logging import logger 
-from ..core.module import BaseModule 
-from ..models.base_model import LLMOutputParser, PARSER_VALID_MODE 
-from ..tools import Toolkit
-from ..prompts.tool_calling import TOOL_CALLING_TEMPLATE
+from ..core.logging import logger
+from ..core.module import BaseModule
+from ..models.base_model import PARSER_VALID_MODE, LLMOutputParser
+from ..tools import Tool, Toolkit
+from ..utils.utils import compile_tool_schemas, extract_type, python_to_json_type
+from .output_format import (
+    JSON_SCHEMA_OUTPUT_FORMAT,
+    JSON_SCHEMA_OUTPUT_FORMAT_JSON,
+)
+from .tool_calling import TOOL_CALLING_TEMPLATE
+from .utils import JSONSchemaExampleGenerator
+
 
 class PromptTemplate(BaseModule):
 
     instruction: str = Field(description="The instruction that the LLM will follow.")
     context: Optional[str] = Field(default=None, description="Additional context that can help the LLM understand the instruction.")
     constraints: Optional[Union[List[str], str]] = Field(default=None, description="Constraints that the LLM must follow.")
-    tools: Optional[List[Toolkit]] = Field(default=None, description="Tools that the LLM can use.")
+    tools: Optional[List[Union[Tool, Toolkit]]] = Field(default=None, description="Tools that the LLM can use.")
     demonstrations: Optional[List[dict]] = Field(default=None, description="Examples of how to use the instruction.")
     history: Optional[List[Any]] = Field(default=None, description="History of the conversation between the user and the LLM.")
 
@@ -122,17 +131,61 @@ class PromptTemplate(BaseModule):
         if missing_required_inputs:
             logger.warning(f"Missing required inputs (without default values) for `{inputs_format.__name__}`: {missing_required_inputs}, will set them to empty strings.")
     
-    def render_input_example(self, inputs_format: Type[LLMOutputParser], values: dict, missing_field_value: str = "") -> str:
+    def render_input_example(
+        self,
+        inputs_format: Optional[Type[LLMOutputParser]] = None,
+        values: Optional[dict] = None,
+        missing_field_value: str = ""
+    ) -> str:
+        
         if inputs_format is None and values is None:
             return ""
+
         if inputs_format is not None:
             fields = inputs_format.get_attrs()
+            if values is None:
+                values = {}
             field_values = {field: values.get(field, missing_field_value) for field in fields}
-        else: 
+        else:
             field_values = values
-        return "\n".join(f"[[ **{field}** ]]:\n{value}" for field, value in field_values.items())
+
+        template = "**`{name}`** {description}\n{value}\n\n"
+        inputs_str = ""
+
+        for name, value in field_values.items():
+            description = ""
+
+            if inputs_format is not None:
+                field_description = inputs_format.model_fields[name].description
+                if field_description is not None:
+                    description = f"({field_description})"
+            
+            if isinstance(value, dict):
+                value = json.dumps(value, indent=2, ensure_ascii=False)
+            inputs_str += template.format(name=name, description=description, value=value)
+        return inputs_str
+
+    def render_inputs(
+        self,
+        inputs_format: Optional[Type[LLMOutputParser]] = None,
+        values: Optional[dict] = None
+    ) -> str:
+
+        if (inputs_format is None and values is None) or (inputs_format is not None and len(inputs_format.get_attrs()) == 0):
+            return "" 
+        # Check if all required fields are provided
+        self.check_required_inputs(inputs_format, values)
+        input_str = "### Inputs\n"
+        input_example = self.render_input_example(inputs_format, values, missing_field_value="Not provided")
+        
+        if len(input_example) == 0:
+            input_str += "No inputs provided.\n"
+        else:
+            input_str += "These are the input values provided by the user:\n\n" + input_example
+        
+        return input_str
     
-    def get_output_template(self, outputs_format: Type[LLMOutputParser], parse_mode: str="title", title_format: str="## {title}") -> str:
+    def get_output_template(self, outputs_format: Type[LLMOutputParser], parse_mode: str="title", title_format: str="## {title}") -> Tuple[str, List[str]]:
         
         if outputs_format is None:
             raise ValueError("`outputs_format` is required in `get_output_format`.")
@@ -146,7 +199,7 @@ class PromptTemplate(BaseModule):
             json_template = "{{\n"
             for field in fields: 
                 json_template += f"    \"{field}\""
-                json_template += f": \"{{{field}}}\",\n" if field in required_fields else f" (Optional): \"{{{field}}}\",\n"
+                json_template += f": {{{field}}},\n" if field in required_fields else f" (Optional): {{{field}}},\n"
             json_template = json_template.rstrip(",\n") + "\n}}"
             output_template, output_keys = json_template, fields
         elif parse_mode == "xml":
@@ -178,12 +231,14 @@ class PromptTemplate(BaseModule):
             return ""
         return f"### Context\nHere is some additional background information to help you understand the task:\n{self.context}\n"
 
-    def render_tools(self) -> str:
-        if not self.tools:
+    def render_tools(self, tools: Optional[List[Union[Tool, Toolkit]]] = None) -> str:
+        if not self.tools and not tools:
             return ""
-        tools_schemas = [tool.get_tool_schemas() for tool in self.tools]
-        tools_schemas = [j for i in tools_schemas for j in i]
-        return TOOL_CALLING_TEMPLATE.format(tools_description=tools_schemas)
+        
+        tools = tools or self.tools
+        tool_schemas = compile_tool_schemas(tools)
+        tool_schemas_str = json.dumps(tool_schemas, indent=4, ensure_ascii=False)
+        return TOOL_CALLING_TEMPLATE.format(tools_description=tool_schemas_str)
     
     def render_constraints(self) -> str:
         if not self.constraints:
@@ -194,7 +249,7 @@ class PromptTemplate(BaseModule):
             constraints_str = self.constraints
         return f"### Constraints\nYou must follow these rules or constraints when generating your output:\n{constraints_str}\n"
     
-    def _render_system_message(self, system_prompt: Optional[str] = None) -> str:
+    def _render_system_message(self, system_prompt: Optional[str] = None, tools: Optional[List[Union[Tool, Toolkit]]] = None) -> str:
         """
         Render the system message by combining system prompt, instruction, context, tools and constraints.
         """
@@ -204,11 +259,11 @@ class PromptTemplate(BaseModule):
         prompt_pieces.append(self.render_instruction())
         if self.context:
             prompt_pieces.append(self.render_context())
-        if self.tools:
-            prompt_pieces.append(self.render_tools())
+        if self.tools or tools:
+            prompt_pieces.append(self.render_tools(tools))
         if self.constraints:
             prompt_pieces.append(self.render_constraints())
-        
+
         return "\n".join(prompt_pieces)
     
     def render_outputs(self, outputs_format: Type[LLMOutputParser], parse_mode: str="title", title_format: str="## {title}") -> str:
@@ -216,29 +271,70 @@ class PromptTemplate(BaseModule):
         if outputs_format is None or parse_mode in [None, "str", "custom"] or len(outputs_format.get_attrs()) == 0:
             return "### Outputs Format\nPlease generate a response that best fits the task instruction.\n"
         
-        ouptut_template, output_keys = self.get_output_template(outputs_format, parse_mode=parse_mode, title_format=title_format)
-        output_str = "### Outputs Format\nYou MUST strictly follow the following format when generating your output:\n\n"
-        if parse_mode == "json":
-            output_str += "Format your output in json format, such as:\n"
-        elif parse_mode == "xml":
-            output_str += "Format your output in xml format, such as:\n"
-        elif parse_mode == "title":
-            output_str += "Format your output in sectioned title format, such as:\n"
+        required_outputs = self.get_required_inputs_or_outputs(outputs_format)
+        output_template, output_keys = self.get_output_template(outputs_format, parse_mode=parse_mode, title_format=title_format)
+        fields_str = ", ".join(f'"{field}"' for field in required_outputs)
         
         example_values = {} 
         for key in output_keys:
             field_info = outputs_format.model_fields.get(key)
-            if field_info and field_info.description:
-                example_values[key] = "[" + field_info.description + "]"
-            else:
-                example_values[key] = "[Your output here]"
-        output_str += ouptut_template.format(**example_values)
+            if field_info:
+                try:
+                    field_type = python_to_json_type[extract_type(field_info.annotation)]
+                except KeyError:
+                    field_type = "string"
 
-        if "(Optional)" in ouptut_template:
+                if field_info.description:
+                    template = "[Insert here: {description} {type_note}]"
+
+                    if field_type != "string":
+                        type_note = f"(Must be a valid JSON `{field_type}`. DO NOT add comments.)"
+                    else:
+                        type_note = "(Must be a string)"
+                    example_values[key] = template.format(description=field_info.description, type_note=type_note)
+                else:
+                    template = "[Insert your response for `{field}` here {type_note}]"
+                    if field_type != "string":
+                        type_note = f"(Must be a valid JSON `{field_type}`. DO NOT add comments.)"
+                    else:
+                        type_note = ""
+                    example_values[key] = template.format(field=key, type_note=type_note)
+            else:
+                example_values[key] = f"[Insert your response for '{key}' here]"        
+
+        output_example = output_template.format(**example_values)
+
+        json_schema = outputs_format.model_config.get("json_schema_extra")
+        if json_schema is not None:
+            return self._format_json_schema_output_prompt(json_schema=json_schema, parse_mode=parse_mode, example=output_example)
+
+        output_str = "### Outputs Format\nYou MUST strictly follow the following rules when generating your output.\n\n"
+        
+        if parse_mode == "json":
+            output_str += f"Your final response must be a valid JSON object with these fields: {fields_str}.\n\nExample:\n"
+        elif parse_mode == "xml":
+            output_str += f"Your final response must contain the following XML elements: {fields_str}.\n\nExample:\n"
+        elif parse_mode == "title":
+            output_str += f"Your final response must contain these sectioned titles: {fields_str}.\n\nExample:\n"
+        
+        output_str += output_example
+
+        if "(Optional)" in output_template:
             output_str += "\n\nNote: For optional fields, you can omit them in your output if they are not necessary."
         output_str += "\n"
         return output_str
-    
+
+    def _format_json_schema_output_prompt(self, json_schema: dict, parse_mode: str, example: str) -> str:
+        json_schema_str = json.dumps(json_schema, ensure_ascii=False, indent=4)
+        if parse_mode == "json":
+            example_generator = JSONSchemaExampleGenerator()
+            example = example_generator.generate(json_schema, to_str=True)
+            return JSON_SCHEMA_OUTPUT_FORMAT_JSON.format(json_schema=json_schema_str, example=example)
+        elif parse_mode == "xml":
+            return JSON_SCHEMA_OUTPUT_FORMAT.format(json_schema=json_schema_str, parse_mode="XML element", example=example)
+        elif parse_mode == "title":
+            return JSON_SCHEMA_OUTPUT_FORMAT.format(json_schema=json_schema_str, parse_mode="sectioned title", example=example)
+
     def format(
         self,
         inputs_format: Optional[Type[LLMOutputParser]] = None,
@@ -312,17 +408,6 @@ class StringTemplate(PromptTemplate):
     def render_history(self) -> str:
         result = "### History\n{history}".format(history=self.history)
         return result
-    
-    def render_inputs(self, inputs_format: Type[LLMOutputParser], values: dict) -> str:
-
-        if (inputs_format is None and values is None) or (inputs_format is not None and len(inputs_format.get_attrs()) == 0):
-            return "" 
-        # Check if all required fields are provided
-        self.check_required_inputs(inputs_format, values)
-        input_str = "### Inputs\nThese are the input values provided by the user (with input names emplasized):\n"
-        input_str += self.render_input_example(inputs_format, values, missing_field_value="Not provided")
-        input_str += "\n"
-        return input_str
 
     def format(
         self, 
@@ -333,6 +418,7 @@ class StringTemplate(PromptTemplate):
         parse_mode: Optional[str] = "title", 
         title_format: Optional[str] = "## {title}", 
         custom_output_format: Optional[str] = None, 
+        tools: Optional[List[Union[Tool, Toolkit]]] = None,
         **kwargs
     ) -> str:
         """
@@ -351,6 +437,7 @@ class StringTemplate(PromptTemplate):
                 Moreover, if `parse_mode` is "title", `title_format` will be used to format the title of the outputs. 
             title_format (Optional[str]): The format to format the title of the outputs. Default is "## {title}". Only used when `parse_mode` is "title".
             custom_output_format (Optional[str]): User-specified output format. If provided, it will be directly used in the `Outputs Format` section of the prompt. Otherwise, the output format will be constructed from `outputs_format` and `parse_mode`. 
+            tools (Optional[List[Union[Tool, Toolkit]]]): Tools that the LLM can use. Overrides `self.tools`.
             **kwargs: Additional keyword arguments. 
         
         Returns: 
@@ -361,7 +448,7 @@ class StringTemplate(PromptTemplate):
             raise ValueError(f"Invalid parse mode `{parse_mode}` for `{self.__class__.__name__}.format`. Valid modes are: {PARSER_VALID_MODE}.")
 
         prompt_pieces = []
-        prompt_pieces.append(self._render_system_message(system_prompt))
+        prompt_pieces.append(self._render_system_message(system_prompt, tools))
 
         if self.demonstrations:
             prompt_pieces.append(
@@ -442,36 +529,16 @@ class ChatTemplate(StringTemplate):
     #     """Render conversation history as alternating user and assistant messages."""
     #     raise NotImplementedError("`render_history` method is not supported for `{self.__class__.__name__}`. Returning empty list.") 
     
-    def render_inputs(self, inputs_format: Optional[Type[LLMOutputParser]], values: Optional[dict]) -> str:
-
-        if (inputs_format is None and values is None) or (inputs_format is not None and len(inputs_format.get_attrs()) == 0):
-            return ""
-        # check if all required inputs are provided
-        self.check_required_inputs(inputs_format, values)
-        input_str = "### Inputs\n"
-        input_str += self.render_input_example(inputs_format, values, missing_field_value="Not provided")
-        input_str += "\n"
-        return input_str
-    
     def render_current_user_message(
         self, 
         values: Optional[dict], 
-        inputs_format: Optional[Type[LLMOutputParser]], 
-        outputs_format: Optional[Type[LLMOutputParser]], 
-        parse_mode: str, 
-        title_format: str, 
-        custom_output_format: Optional[str] = None
+        inputs_format: Optional[Type[LLMOutputParser]],
     ) -> str:
         
         """Render the current user input message."""
         input_pieces = []
         if inputs_format or values:
             input_pieces.append(self.render_inputs(inputs_format, values))
-        
-        if custom_output_format:
-            input_pieces.append(f"### Outputs Format\n{custom_output_format}")
-        else:
-            input_pieces.append(self.render_outputs(outputs_format, parse_mode, title_format))
 
         input_pieces = [piece for piece in input_pieces if piece]
         user_message = "\n".join(input_pieces)
@@ -486,6 +553,7 @@ class ChatTemplate(StringTemplate):
         parse_mode: Optional[str] = "title", 
         title_format: Optional[str] = "## {title}", 
         custom_output_format: Optional[str] = None,
+        tools: Optional[List[Union[Tool, Toolkit]]] = None,
         **kwargs
     ) -> List[dict]:
         """
@@ -505,6 +573,7 @@ class ChatTemplate(StringTemplate):
             parse_mode (Optional[str]): The mode to parse the outputs.
             title_format (Optional[str]): The format to format the title of the outputs.
             custom_output_format (Optional[str]): User-specified output format.
+            tools (Optional[List[Union[Tool, Toolkit]]]): Tools that the LLM can use. Overrides `self.tools`.
             **kwargs: Additional keyword arguments.
             
         Returns:
@@ -525,7 +594,13 @@ class ChatTemplate(StringTemplate):
         messages = []
         
         # Add system message
-        system_content = self._render_system_message(system_prompt)
+        system_content = self._render_system_message(system_prompt, tools)
+
+        if custom_output_format:
+            system_content += f"### Outputs Format\n{custom_output_format}"
+        else:
+            system_content += self.render_outputs(outputs_format, parse_mode, title_format)
+
         messages.append(self._create_message("system", system_content))
         
         # Add few-shot examples
@@ -543,11 +618,7 @@ class ChatTemplate(StringTemplate):
         # Add current user input & output format requirements
         current_input = self.render_current_user_message(
             values=values, 
-            inputs_format=inputs_format, 
-            outputs_format=outputs_format, 
-            parse_mode=parse_mode, 
-            title_format=title_format,
-            custom_output_format=custom_output_format
+            inputs_format=inputs_format
         )
         messages.append(self._create_message("user", current_input))
         

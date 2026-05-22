@@ -532,6 +532,8 @@ EvoAgentX 定期邀请顶尖研究人员开展讲座，分享 AI 领域的前沿
 
 | 发言者 | 主题 | 日期 | 会议视频 |
 |---|---|---|---|
+| [王鸿儒](https://hrwise-nlp.github.io/) | [EvoAgentX 讲座] 语言智能体的下半场 | 2026-05-10 | [YouTube](https://www.youtube.com/watch?v=p8HU_lFtAM4) |
+| [周辉池](https://scholar.google.com/citations?user=1IJyxpUAAAAJ&hl=en) | [EvoAgentX 讲座] 通过状态反思进行学习的智能体框架 | 2026-04-26 | [YouTube](https://www.youtube.com/watch?v=DHKBq4NYAxA&t=53s) |
 | [张曦](https://x-izhang.github.io/) | [EvoAgentX 讲座] EvoScientist | 2026-04-05 |  [YouTube](https://www.youtube.com/watch?v=EVrxBC99_1k&t=2745s)  |
 | [董冠霖](https://dongguanting.github.io/) | [EvoAgentX 讲座] 基于智能体的强化策略优化 | 2025-10-30 |  [YouTube](https://www.youtube.com/watch?v=UB-FL5JFXJY)  |
 | [张桂彬](https://www.guibinz.top/) | [EvoAgentX 讲座] 智能体强化学习如何将大模型转化为自动化智能体 | 2025-09-28 | [YouTube](https://www.youtube.com/watch?v=xzqZsZWfabw&t=3s) |
