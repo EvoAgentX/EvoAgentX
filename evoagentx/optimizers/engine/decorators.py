@@ -1,5 +1,9 @@
-from typing import Any, Callable, List, Tuple, Optional
-from .registry import ParamRegistry
+from __future__ import annotations
+
+from typing import Any, Callable, List, Tuple, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .registry import ParamRegistry
 
 # --------- EntryPoint decorator ---------
 class EntryPoint:

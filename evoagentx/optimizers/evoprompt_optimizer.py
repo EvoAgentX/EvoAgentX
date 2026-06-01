@@ -12,6 +12,8 @@
 #   https://opensource.microsoft.com/codeofconduct/
 # -----------------------------------------------------------------------------
 
+from __future__ import annotations
+
 import asyncio
 import json
 import random
@@ -20,19 +22,19 @@ import os
 import csv
 import time
 import itertools
-from typing import Callable, Dict, List
+from typing import Callable, Dict, List, TYPE_CHECKING
 from datetime import datetime
 
 import numpy as np
 from tqdm.asyncio import tqdm as aio_tqdm
-import matplotlib.pyplot as plt
 
-from evoagentx.agents import CustomizeAgent
-from evoagentx.benchmark.bigbenchhard import BIGBenchHard
 from evoagentx.core.logging import logger
-from evoagentx.models import OpenAILLMConfig
 from evoagentx.optimizers.engine.base import BaseOptimizer
-from evoagentx.optimizers.engine.registry import ParamRegistry
+
+if TYPE_CHECKING:
+    from evoagentx.benchmark.bigbenchhard import BIGBenchHard
+    from evoagentx.models import OpenAILLMConfig
+    from evoagentx.optimizers.engine.registry import ParamRegistry
 
 
 class EvopromptOptimizer(BaseOptimizer):
@@ -77,6 +79,7 @@ class EvopromptOptimizer(BaseOptimizer):
         self.iterations = iterations
         self.llm_config = llm_config
         self.semaphore = asyncio.Semaphore(concurrency_limit)
+        self._program_config_lock = asyncio.Lock()
         self.combination_sample_size = combination_sample_size
 
         # Logging configuration
@@ -100,6 +103,7 @@ class EvopromptOptimizer(BaseOptimizer):
         self.avg_combo_scores_per_gen: Dict[str, float] = {}
         
         # Initialize paraphrase agent for prompt generation
+        from evoagentx.agents import CustomizeAgent
         self.paraphrase_agent = CustomizeAgent(
             name="ParaphraseAgent",
             description="An agent that paraphrases a given instruction.",
@@ -215,6 +219,8 @@ Please provide the paraphrased version in the following format:
     def _create_single_metric_plot(self, metric_name: str, generations: List[int],
                                    best_scores: List[float], avg_scores: List[float],
                                    algorithm_name: str, plot_dir: str):
+        import matplotlib.pyplot as plt
+
         fig, ax = plt.subplots(figsize=(12, 7))
         ax.plot(generations, best_scores, marker='o', linestyle='-', linewidth=2, markersize=8, label='Best Score')
         ax.plot(generations, avg_scores, marker='x', linestyle='--', linewidth=2, markersize=8, label='Average Score')
@@ -242,9 +248,12 @@ Please provide the paraphrased version in the following format:
             plt.close(fig)
 
     def _plot_and_save_performance_graph(self, algorithm_name: str):
-        if not self.enable_logging or plt is None:
-            if plt is None:
-                logger.warning("Matplotlib not found, skipping plot generation.")
+        if not self.enable_logging:
+            return
+        try:
+            import matplotlib.pyplot as plt
+        except ImportError:
+            logger.warning("Matplotlib not found, skipping plot generation.")
             return
         if not self.best_scores_per_gen and not self.best_combo_scores_per_gen:
             logger.warning("No performance data to plot.")
@@ -460,8 +469,7 @@ Please provide the paraphrased version in the following format:
         all_scores = []
         pbar = aio_tqdm(total=len(combinations), desc="Evaluating batch", leave=False)
         for combo in combinations:
-            tasks = [self._evaluate_combination_on_example(combo, benchmark, ex) for ex in eval_dev_set]
-            example_scores = await asyncio.gather(*tasks)
+            example_scores = await self._evaluate_combination_on_examples(combo, benchmark, eval_dev_set)
             avg_score = sum(example_scores) / len(example_scores) if example_scores else 0.0
             all_scores.append(avg_score)
             pbar.update(1)
@@ -507,37 +515,70 @@ Please provide the paraphrased version in the following format:
         logger.info(f"Generated {len(sampled_combinations)} unique combinations")
         return sampled_combinations
 
-    async def _evaluate_combination_on_example(self, combination: Dict[str, str],
-                                             benchmark: BIGBenchHard, example: Dict) -> float:
+    def _get_eval_cache_key(self, combination: Dict[str, str], example: Dict):
         combo_key = tuple(sorted(combination.items()))
         example_key = str(hash(str(example)))
-        cache_key = hash((combo_key, example_key))
+        return hash((combo_key, example_key))
 
-        if not hasattr(self, '_eval_cache'):
-            self._eval_cache = {}
+    def _cache_eval_score(self, cache_key, score: float):
+        self._eval_cache[cache_key] = score
+        if len(self._eval_cache) > 5000:
+            keys_to_del = list(self._eval_cache.keys())[:1000]
+            for key in keys_to_del:
+                del self._eval_cache[key]
 
-        if cache_key in self._eval_cache:
-            return self._eval_cache[cache_key]
-
+    async def _evaluate_current_config_on_example(self, benchmark: BIGBenchHard, example: Dict) -> float:
         async with self.semaphore:
             try:
-                original_config = self.get_current_cfg()
-                self.apply_cfg(combination)
                 inputs = {k: v for k, v in example.items() if k in benchmark.get_input_keys()}
                 prediction, _ = await asyncio.to_thread(self.program, **inputs)
                 label = benchmark.get_label(example)
                 score_dict = benchmark.evaluate(prediction, label)
-                score = score_dict.get("em", 0.0)
-                self.apply_cfg(original_config)
-                self._eval_cache[cache_key] = score
-                if len(self._eval_cache) > 5000:
-                    keys_to_del = list(self._eval_cache.keys())[:1000]
-                    for key in keys_to_del:
-                        del self._eval_cache[key]
-                return score
+                return score_dict.get("em", 0.0)
             except Exception as e:
                 logger.error(f"Error evaluating combination: {e}")
                 return 0.0
+
+    async def _evaluate_combination_on_examples(self, combination: Dict[str, str],
+                                                benchmark: BIGBenchHard, examples: List[Dict]) -> List[float]:
+        if not examples:
+            return []
+
+        if not hasattr(self, '_eval_cache'):
+            self._eval_cache = {}
+
+        scores = [0.0] * len(examples)
+        pending_examples = []
+        for idx, example in enumerate(examples):
+            cache_key = self._get_eval_cache_key(combination, example)
+            if cache_key in self._eval_cache:
+                scores[idx] = self._eval_cache[cache_key]
+            else:
+                pending_examples.append((idx, cache_key, example))
+
+        if pending_examples:
+            async with self._program_config_lock:
+                original_config = self.get_current_cfg()
+                try:
+                    self.apply_cfg(combination)
+                    tasks = [
+                        self._evaluate_current_config_on_example(benchmark, example)
+                        for _, _, example in pending_examples
+                    ]
+                    evaluated_scores = await asyncio.gather(*tasks)
+                finally:
+                    self.apply_cfg(original_config)
+
+            for (idx, cache_key, _), score in zip(pending_examples, evaluated_scores):
+                scores[idx] = score
+                self._cache_eval_score(cache_key, score)
+
+        return scores
+
+    async def _evaluate_combination_on_example(self, combination: Dict[str, str],
+                                             benchmark: BIGBenchHard, example: Dict) -> float:
+        scores = await self._evaluate_combination_on_examples(combination, benchmark, [example])
+        return scores[0] if scores else 0.0
 
     async def _evaluate_combinations_and_update_node_scores(self, combinations: List[Dict[str, str]],
                                                           benchmark: BIGBenchHard, dev_set: list) -> List[float]:
@@ -546,8 +587,7 @@ Please provide the paraphrased version in the following format:
         print(f"Evaluating {len(combinations)} combinations on {len(eval_dev_set)} examples...")
         combo_pbar = aio_tqdm(total=len(combinations), desc="Evaluating Combinations")
         for combination in combinations:
-            tasks = [self._evaluate_combination_on_example(combination, benchmark, ex) for ex in eval_dev_set]
-            example_scores = await asyncio.gather(*tasks)
+            example_scores = await self._evaluate_combination_on_examples(combination, benchmark, eval_dev_set)
             avg_score = sum(example_scores) / len(example_scores) if example_scores else 0.0
             combination_scores.append(avg_score)
             combo_pbar.update(1)
@@ -687,6 +727,7 @@ class GAOptimizer(EvopromptOptimizer):
         logger.info(f"GAOptimizer initialized with '{mode_str}' mode.")
         
         # Initialize genetic algorithm agent for prompt evolution
+        from evoagentx.agents import CustomizeAgent
         self.ga_agent = CustomizeAgent(
             name="ga_agent",
             description="An agent that evolves a new prompt from two parent prompts.",
@@ -961,6 +1002,7 @@ class DEOptimizer(EvopromptOptimizer):
         super().__init__(*args, **kwargs)
         
         # Initialize differential evolution agent for prompt mutation
+        from evoagentx.agents import CustomizeAgent
         self.de_agent = CustomizeAgent(
             name="DE_Agent",
             description="Generates a new trial prompt using the Differential Evolution strategy.",

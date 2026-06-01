@@ -1,7 +1,12 @@
-from typing import Any, Callable, Dict, List, Optional
+from __future__ import annotations
+
 import abc
+from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
+
 from .decorators import EntryPoint
-from .registry import ParamRegistry
+
+if TYPE_CHECKING:
+    from .registry import ParamRegistry
 
 class BaseOptimizer(abc.ABC):
     # def __init__(
