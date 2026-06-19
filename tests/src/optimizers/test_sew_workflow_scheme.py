@@ -1,7 +1,7 @@
 import unittest
 from evoagentx.models import OpenAILLMConfig, OpenAILLM 
 from evoagentx.workflow.workflow_graph import SEWWorkFlowGraph 
-from evoagentx.optimizers.sew_optimizer import SEWWorkFlowScheme
+from evoagentx.optimizers.legacy.sew_optimizer import SEWWorkFlowScheme
 
 
 

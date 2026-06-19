@@ -3,7 +3,7 @@ import asyncio
 from typing import Callable, Dict, Union, Awaitable
 from pydantic import Field
 import dspy
-from ...optimizers.engine.registry import ParamRegistry  # Replace with your own path
+from ...optimizers.legacy.engine.registry import ParamRegistry  # Replace with your own path
 from typing import List
 # import warnings
 from ...core.logging import logger

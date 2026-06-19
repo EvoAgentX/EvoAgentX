@@ -42,10 +42,10 @@ import re
 from collections import Counter
 from dotenv import load_dotenv
 
-from evoagentx.optimizers.evoprompt_optimizer import DEOptimizer, GAOptimizer
+from evoagentx.optimizers.legacy.evoprompt_optimizer import DEOptimizer, GAOptimizer
 from evoagentx.benchmark.bigbenchhard import BIGBenchHard
 from evoagentx.models import OpenAILLM, OpenAILLMConfig
-from evoagentx.optimizers.engine.registry import ParamRegistry
+from evoagentx.optimizers.legacy.engine.registry import ParamRegistry
 from evoagentx.core.logging import logger
 ```
 
@@ -293,10 +293,10 @@ node_evolution_logs_{ALGO}_{MODEL}_{TASK}_{TIMESTAMP}/
 import asyncio
 import os
 from dotenv import load_dotenv
-from evoagentx.optimizers.evoprompt_optimizer import DEOptimizer, GAOptimizer
+from evoagentx.optimizers.legacy.evoprompt_optimizer import DEOptimizer, GAOptimizer
 from evoagentx.benchmark.bigbenchhard import BIGBenchHard
 from evoagentx.models import OpenAILLM, OpenAILLMConfig
-from evoagentx.optimizers.engine.registry import ParamRegistry
+from evoagentx.optimizers.legacy.engine.registry import ParamRegistry
 
 async def main():
     # 环境设置

@@ -9,15 +9,15 @@ from tqdm import tqdm
 from typing import List, Any
 from pydantic import Field
 
-from ..core.logging import logger
-from ..core.module import BaseModule
-from ..models.base_model import BaseLLM, LLMOutputParser
-from ..benchmark.benchmark import Benchmark
-from ..utils.aflow_utils.data_utils import DataUtils
-from ..utils.aflow_utils.experience_utils import ExperienceUtils
-from ..utils.aflow_utils.evaluation_utils import EvaluationUtils
-from ..utils.aflow_utils.graph_utils import GraphUtils, OPERATOR_MAP
-from ..utils.aflow_utils.convergence_utils import ConvergenceUtils
+from ...core.logging import logger
+from ...core.module import BaseModule
+from ...models.base_model import BaseLLM, LLMOutputParser
+from ...benchmark.benchmark import Benchmark
+from ...utils.aflow_utils.data_utils import DataUtils
+from ...utils.aflow_utils.experience_utils import ExperienceUtils
+from ...utils.aflow_utils.evaluation_utils import EvaluationUtils
+from ...utils.aflow_utils.graph_utils import GraphUtils, OPERATOR_MAP
+from ...utils.aflow_utils.convergence_utils import ConvergenceUtils
 
 
 class GraphOptimizeOutput(LLMOutputParser):

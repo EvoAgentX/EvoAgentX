@@ -1,6 +1,6 @@
 import re
 from typing import Any, Callable, Dict, List
-from ...prompts.template import PromptTemplate
+from ....prompts.template import PromptTemplate
 import copy
 import warnings
 _INDEX_RE = re.compile(r'^(.*?)\[(.*?)\]$')

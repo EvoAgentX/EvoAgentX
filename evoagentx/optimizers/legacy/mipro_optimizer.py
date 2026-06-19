@@ -38,20 +38,20 @@ from dspy.teleprompt.utils import (
     get_program_with_highest_avg_score
 ) 
 
-from ..core.logging import logger 
-from ..core.callbacks import suppress_cost_logging, suppress_logger_info
-from ..models.base_model import BaseLLM 
-from ..benchmark.benchmark import Benchmark 
+from ...core.logging import logger 
+from ...core.callbacks import suppress_cost_logging, suppress_logger_info
+from ...models.base_model import BaseLLM 
+from ...benchmark.benchmark import Benchmark 
 from .engine.base import BaseOptimizer
 from .engine.registry import ParamRegistry
-from ..utils.mipro_utils.register_utils import MiproRegistry
-from ..agents.agent_manager import AgentManager 
-from ..workflow.workflow_graph import WorkFlowGraph
-from ..workflow.workflow import WorkFlow 
-from ..evaluators.evaluator import Evaluator 
-from ..prompts.template import PromptTemplate, MiproPromptTemplate
+from ...utils.mipro_utils.register_utils import MiproRegistry
+from ...agents.agent_manager import AgentManager 
+from ...workflow.workflow_graph import WorkFlowGraph
+from ...workflow.workflow import WorkFlow 
+from ...evaluators.evaluator import Evaluator 
+from ...prompts.template import PromptTemplate, MiproPromptTemplate
 # from ..utils.mipro_utils.signature_utils import signature_from_registry
-from ..utils.mipro_utils.module_utils import PromptTuningModule
+from ...utils.mipro_utils.module_utils import PromptTuningModule
 
 # Constants
 BOOTSTRAPPED_FEWSHOT_EXAMPLES_IN_CONTEXT = 3
@@ -226,7 +226,7 @@ class MiproEvaluator:
         tqdm.tqdm._instances.clear()
         
         # Get the current suppress_cost_logs value
-        from ..core.callbacks import suppress_cost_logs
+        from ...core.callbacks import suppress_cost_logs
         current_suppress_cost = suppress_cost_logs.get()
         
         if self.num_threads and self.num_threads > 1: 

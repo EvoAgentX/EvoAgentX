@@ -1,6 +1,6 @@
 from dspy import Signature, InputField, OutputField
 from ...prompts.template import PromptTemplate
-from ...optimizers.engine.registry import ParamRegistry
+from ...optimizers.legacy.engine.registry import ParamRegistry
 from ...utils.mipro_utils.register_utils import MiproRegistry
 # from dspy.signatures.signature import make_signature
 import keyword

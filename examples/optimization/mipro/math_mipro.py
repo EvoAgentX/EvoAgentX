@@ -8,7 +8,7 @@ from evoagentx.core.callbacks import suppress_logger_info
 from evoagentx.evaluators import Evaluator
 from evoagentx.core.logging import logger
 from evoagentx.prompts import MiproPromptTemplate 
-from evoagentx.optimizers.mipro_optimizer import WorkFlowMiproOptimizer 
+from evoagentx.optimizers.legacy.mipro_optimizer import WorkFlowMiproOptimizer 
 
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")

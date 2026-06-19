@@ -8,15 +8,15 @@ from copy import deepcopy
 import xml.etree.ElementTree as ET
 from typing import Literal, Union, Optional, List
 
-from ..core.logging import logger
-from ..core.module import BaseModule
-from ..models.base_model import BaseLLM 
-from ..benchmark.benchmark import Benchmark
-from ..evaluators.evaluator import Evaluator
-from ..workflow.action_graph import ActionGraph
-from ..core.callbacks import suppress_logger_info
-from ..workflow.workflow_graph import WorkFlowGraph, SequentialWorkFlowGraph
-from ..prompts.workflow.sew_optimizer import mutation_prompts, thinking_styles
+from ...core.logging import logger
+from ...core.module import BaseModule
+from ...models.base_model import BaseLLM 
+from ...benchmark.benchmark import Benchmark
+from ...evaluators.evaluator import Evaluator
+from ...workflow.action_graph import ActionGraph
+from ...core.callbacks import suppress_logger_info
+from ...workflow.workflow_graph import WorkFlowGraph, SequentialWorkFlowGraph
+from ...prompts.workflow.sew_optimizer import mutation_prompts, thinking_styles
 
 VALID_SCHEMES = ["python", "yaml", "code", "core", "bpmn"]
 

@@ -31,8 +31,8 @@ from evoagentx.agents import CustomizeAgent
 from evoagentx.benchmark.bigbenchhard import BIGBenchHard
 from evoagentx.core.logging import logger
 from evoagentx.models import OpenAILLMConfig
-from evoagentx.optimizers.engine.base import BaseOptimizer
-from evoagentx.optimizers.engine.registry import ParamRegistry
+from evoagentx.optimizers.legacy.engine.base import BaseOptimizer
+from evoagentx.optimizers.legacy.engine.registry import ParamRegistry
 
 
 class EvopromptOptimizer(BaseOptimizer):

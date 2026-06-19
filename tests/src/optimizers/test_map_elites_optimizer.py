@@ -3,9 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict
 
-from evoagentx.optimizers.engine.decorators import EntryPoint
-from evoagentx.optimizers.engine.registry import ParamRegistry
-from evoagentx.optimizers.map_elites_optimizer import MapElitesOptimizer
+from evoagentx.optimizers.legacy.engine.decorators import EntryPoint
+from evoagentx.optimizers.legacy.engine.registry import ParamRegistry
+from evoagentx.optimizers.legacy.map_elites_optimizer import MapElitesOptimizer
 
 
 @dataclass

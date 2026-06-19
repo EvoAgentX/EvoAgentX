@@ -1,5 +1,5 @@
 
-from ...optimizers.engine.registry import ParamRegistry
+from ...optimizers.legacy.engine.registry import ParamRegistry
 from typing import Any, Optional, List, Dict
 # from ...optimizers.engine.registry import OptimizableField
 

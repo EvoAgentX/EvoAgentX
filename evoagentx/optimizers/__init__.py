@@ -1,5 +1,13 @@
 from __future__ import annotations
 from importlib import import_module
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .legacy.aflow_optimizer import AFlowOptimizer
+    from .legacy.map_elites_optimizer import MapElitesOptimizer
+    from .legacy.mipro_optimizer import MiproOptimizer, WorkFlowMiproOptimizer
+    from .legacy.sew_optimizer import SEWOptimizer
+    from .legacy.textgrad_optimizer import TextGradOptimizer
 
 __all__ = [
     "SEWOptimizer",
@@ -11,12 +19,12 @@ __all__ = [
 ]
 
 _EXPORTS = {
-    "SEWOptimizer": ".sew_optimizer",
-    "AFlowOptimizer": ".aflow_optimizer",
-    "TextGradOptimizer": ".textgrad_optimizer",
-    "MiproOptimizer": ".mipro_optimizer",
-    "WorkFlowMiproOptimizer": ".mipro_optimizer",
-    "MapElitesOptimizer": ".map_elites_optimizer",
+    "SEWOptimizer": ".legacy.sew_optimizer",
+    "AFlowOptimizer": ".legacy.aflow_optimizer",
+    "TextGradOptimizer": ".legacy.textgrad_optimizer",
+    "MiproOptimizer": ".legacy.mipro_optimizer",
+    "WorkFlowMiproOptimizer": ".legacy.mipro_optimizer",
+    "MapElitesOptimizer": ".legacy.map_elites_optimizer",
 }
 
 

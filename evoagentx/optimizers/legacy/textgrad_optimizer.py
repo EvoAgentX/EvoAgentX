@@ -21,15 +21,15 @@ import numpy as np
 from pydantic import Field, PositiveInt
 from tqdm import tqdm
 
-from ..agents import Agent, CustomizeAgent
-from ..benchmark.benchmark import Benchmark, CodingBenchmark
-from ..core.callbacks import suppress_logger_info
-from ..core.logging import logger
-from ..core.module import BaseModule
-from ..evaluators import Evaluator
-from ..models.base_model import BaseLLM
-from ..prompts import PromptTemplate
-from ..workflow.workflow_graph import WorkFlowGraph, WorkFlowNode
+from ...agents import Agent, CustomizeAgent
+from ...benchmark.benchmark import Benchmark, CodingBenchmark
+from ...core.callbacks import suppress_logger_info
+from ...core.logging import logger
+from ...core.module import BaseModule
+from ...evaluators import Evaluator
+from ...models.base_model import BaseLLM
+from ...prompts import PromptTemplate
+from ...workflow.workflow_graph import WorkFlowGraph, WorkFlowNode
 
 # Check if logs folder exists before importing textgrad
 log_folder_exists = os.path.exists("./logs")
@@ -42,7 +42,7 @@ from textgrad.autograd import StringBasedFunction
 from textgrad.loss import MultiFieldEvaluation, TextLoss
 from textgrad.optimizer import TextualGradientDescent
 
-from ..prompts.optimizers.textgrad_optimizer import (
+from ...prompts.optimizers.textgrad_optimizer import (
     CODE_LOSS_PROMPT,
     GENERAL_LOSS_PROMPT,
     NO_ANSWER_LOSS_PROMPT,

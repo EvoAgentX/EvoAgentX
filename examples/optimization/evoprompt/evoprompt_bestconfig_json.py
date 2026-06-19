@@ -21,10 +21,10 @@ from collections import Counter
 from dotenv import load_dotenv
 from evoagentx.core.logging import logger
 
-from evoagentx.optimizers.evoprompt_optimizer import DEOptimizer
+from evoagentx.optimizers.legacy.evoprompt_optimizer import DEOptimizer
 from evoagentx.benchmark.bigbenchhard import BIGBenchHard
 from evoagentx.models import OpenAILLM, OpenAILLMConfig
-from evoagentx.optimizers.engine.registry import ParamRegistry
+from evoagentx.optimizers.legacy.engine.registry import ParamRegistry
 
 
 class SarcasmClassifierProgram:
