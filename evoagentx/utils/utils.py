@@ -1,12 +1,27 @@
-import os 
-import re 
+import os
+import re
 import time
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    List,
+    Set,
+    Type,
+    Union,
+    get_args,
+    get_origin,
+)
+
 import regex
 import requests
 from tqdm import tqdm
-from typing import Union, Any, List, Set
 
 from ..core.logging import logger
+
+# Import for type hints (avoiding circular imports with TYPE_CHECKING)
+if TYPE_CHECKING:
+    from ..tools.tool import Tool, Toolkit
+
 
 def make_parent_folder(path: str):
     """Checks if the parent folder of a given path exists, and creates it if not.
@@ -15,7 +30,7 @@ def make_parent_folder(path: str):
         path (str): The file path for which to create the parent folder.
     """
     dir_folder = os.path.dirname(path)
-    if dir_folder and not os.path.exists(dir_folder):
+    if not os.path.exists(dir_folder):
         logger.info(f"creating folder {dir_folder} ...")
         os.makedirs(dir_folder, exist_ok=True)
 
@@ -102,3 +117,113 @@ def download_file(url: str, save_file: str, max_retries=3, timeout=10):
         error_message = "Exceeded maximum retries. Download failed."
         logger.error(error_message)
         raise RuntimeError(error_message)
+
+
+def remove_none(obj):
+    """
+    Recursively removes all keys where the value is None.
+    """
+    if isinstance(obj, dict):
+        obj_without_none = dict()
+
+        for k, v in obj.items():
+            if v is not None:
+                if isinstance(v, dict):
+                    obj_without_none[k] = remove_none(v)
+                elif isinstance(v, list):
+                    obj_without_none[k] = [remove_none(item) for item in v]
+                else:
+                    obj_without_none[k] = v
+        return obj_without_none
+
+    elif isinstance(obj, list):
+        return [remove_none(item) for item in obj]
+
+    else:
+        return obj
+
+
+def extract_type(annotation: Type) -> Type:
+    """
+    If `annotation` is Optional/Union, return the first type in the union.
+    """
+    if get_origin(annotation) is Union:
+        return get_args(annotation)[0]
+    return annotation
+
+
+def compile_tool_schemas(tools: List[Union['Tool', 'Toolkit']]) -> List[dict]:
+    """
+    Compiles the schemas of a list of tools or toolkits.
+    
+    Args:
+        tools: A list of tools or toolkits
+        extra_description: Whether to include extra description in the schema
+        
+    Returns:
+        A list of dictionaries containing the schemas of the tools or toolkits
+    """
+    from ..tools.tool import Tool, Toolkit
+
+    if len(tools) == 0:
+        return []
+
+    schemas = []
+    for tool in tools:
+        if isinstance(tool, Tool):
+            schemas.append(tool.get_tool_schema())
+        elif isinstance(tool, Toolkit):
+            schemas.extend(tool.get_tool_schemas())
+        else:
+            raise ValueError(f"Unknown tool type: {type(tool)}")
+    return schemas
+
+
+string_to_python_type = {
+    "string": str,
+    "integer": int,
+    "number": float,
+    "boolean": bool,
+    "object": dict,
+    "array": list,
+
+    "str": str,
+    "int": int,
+    "float": float,
+    "bool": bool,
+    "dict": dict,
+    "list": list,
+}
+
+json_to_python_type = {
+    "string": str,
+    "integer": int,
+    "number": float,
+    "boolean": bool,
+    "object": dict,
+    "array": list,
+}
+
+python_to_json_type = {
+    str: "string",
+    int: "integer",
+    float: "number",
+    bool: "boolean",
+    dict: "object",
+    list: "array",
+}
+
+string_to_json_schema_type = {
+    "string": "string",
+    "integer": "integer",
+    "number": "number",
+    "boolean": "boolean",
+    "object": "object",
+    "array": "array", 
+    "str": "string",
+    "int": "integer",
+    "float": "number",
+    "bool": "boolean",
+    "dict": "object",
+    "list": "array",
+}

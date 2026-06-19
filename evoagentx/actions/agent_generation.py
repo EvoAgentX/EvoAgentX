@@ -50,8 +50,7 @@ class GeneratedAgent(BaseModule):
         return outputs[similarities.index(max_sim)]
 
     @model_validator(mode="after")
-    @classmethod
-    def validate_prompt(cls, agent: 'GeneratedAgent'):
+    def validate_prompt(self) -> 'GeneratedAgent':
         """Validate and fix the agent's prompt template.
         
         This validator ensures that:
@@ -62,15 +61,16 @@ class GeneratedAgent(BaseModule):
         If there are mismatches in the output sections, it attempts to
         fix them by finding the most similar output name.
         
-        Args:
-            agent: The GeneratedAgent instance to validate.
-            
         Returns:
             The validated and potentially modified GeneratedAgent.
             
         Raises:
             ValueError: If inputs are missing from the prompt or output sections don't match the defined outputs.
         """
+
+        # alias to minimise diff from the pre-Pydantic-2.12 version
+        agent = self
+
         # check whether all the inputs are present in the prompt 
         input_names = [inp.name for inp in agent.inputs]
         prompt_has_inputs = [name in agent.prompt for name in input_names]
@@ -106,7 +106,7 @@ class GeneratedAgent(BaseModule):
             # check whether the generated output names are the same as agent outputs 
             for generated_output in generated_outputs:
                 if generated_output not in outputs_names:
-                    most_similar_output_name = cls.find_output_name(text=generated_output, outputs=outputs_names)
+                    most_similar_output_name = type(agent).find_output_name(text=generated_output, outputs=outputs_names)
                     output_format = output_format.replace(generated_output, most_similar_output_name)
                     logger.warning(f"Couldn't find output name in prompt ('{generated_output}') in agent's outputs. Replace it with the most similar agent output: '{most_similar_output_name}'")
             return "### Output Format" + output_format

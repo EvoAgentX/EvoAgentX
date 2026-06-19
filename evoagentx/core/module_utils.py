@@ -1,15 +1,16 @@
-import os 
-import re
-import yaml
 import json
-import regex
+import os
+from datetime import date, datetime
+from typing import Any, Dict, List, Optional, Type, Union, get_args, get_origin
 from uuid import uuid4
-from datetime import datetime, date 
+
+import regex
+import yaml
 from pydantic import BaseModel
 from pydantic_core import PydanticUndefined, ValidationError
-from typing import Union, Type, Any, List, Dict, Tuple, get_origin, get_args
 
-from .logging import logger 
+from .logging import logger
+
 
 def make_parent_folder(path: str):
 
@@ -83,25 +84,27 @@ def save_json(data, path: str, type: str="json", use_indent: bool=True) -> str:
     return path
 
 
-def _extract_fenced_blocks(text: str) -> Tuple[List[str], List[str]]:
+def extract_fenced_blocks(text: str, labels: Optional[List[str]] = None) -> List[str]:
     """
     Extract fenced code blocks from the given text.
 
-    Returns:
-        preferred (List[str]): Code blocks explicitly labeled as json/yaml/yml.
-        others (List[str]): Code blocks with other or missing language labels.
-    """
-    _FENCE_RE = re.compile(r"```(\w+)?\r?\n(.*?)```", re.DOTALL)
+    Args:
+        text (str): The text to extract fenced code blocks from.
+        labels (List[str]): The labels to extract fenced code blocks for.
 
-    preferred, others = [], []
-    for m in _FENCE_RE.finditer(text):
-        lang = (m.group(1) or "").lower().strip()
-        code = m.group(2)
-        if lang in ("json", "yaml", "yml"):
-            preferred.append(code)
-        else:
-            others.append(code)
-    return preferred, others
+    Returns:
+        List[str]: Code blocks with specified labels.
+    """
+    # Pattern to match fenced blocks: ```label\ncode\n```
+    pattern = r"```([a-zA-Z0-9_\-\+]*)\s*\n*(.*?)\n*```"
+    matches = regex.findall(pattern, text, regex.DOTALL)
+    
+    if labels:
+        # Normalize labels for case-insensitive matching
+        labels_lower = {label.lower() for label in labels}
+        return [code.strip() for lang, code in matches if lang.strip().lower() in labels_lower]
+    
+    return [code.strip() for _, code in matches]
 
 
 def escape_json_values(string: str) -> str:
@@ -111,7 +114,7 @@ def escape_json_values(string: str) -> str:
         raw_value = raw_value.replace('\n', '\\n')
         return f'"{raw_value}"'
     
-    def fix_json(match):
+    def escape_nested_json(match):
         raw_key = match.group(1)
         raw_value = match.group(2)
         raw_value = raw_value.replace("\n", "\\n")
@@ -126,18 +129,20 @@ def escape_json_values(string: str) -> str:
 
     try:
         string = regex.sub(r'(?<!\\)"', '\\\"', string) # replace " with \"
-        pattern_key = r'\\"([^"]+)\\"(?=\s*:\s*)'
+        # pattern_key = r'\\"([^"]+)\\"(?=\s*:\s*)'
+        pattern_key = r'(?:(?<=^)|(?<=[{,]))\s*\\"([^"]+)\\"(?=\s*:)'
         string = regex.sub(pattern_key, r'"\1"', string) # replace \\"key\\" with "key"
         pattern_value = r'(?<=:\s*)\\"((?:\\.|[^"\\])*)\\"'
         string = regex.sub(pattern_value, escape_value, string, flags=regex.DOTALL) # replace \\"value\\" with "value"and change \n to \\n
         pattern_nested_json = r'"([^"]+)"\s*:\s*\\"([^"]*\{+[\S\s]*?\}+)[\r\n\\n]*"' # handle nested json in value
-        string = regex.sub(pattern_nested_json, fix_json, string, flags=regex.DOTALL)
+        string = regex.sub(pattern_nested_json, escape_nested_json, string, flags=regex.DOTALL)
         json.loads(string)
         return string
     except json.JSONDecodeError:
         pass
     
     return string
+
 
 def fix_json_booleans(string: str) -> str:
     """
@@ -159,7 +164,38 @@ def fix_json_booleans(string: str) -> str:
     return modified_string
 
 
+def remove_json_comments(json_str: str) -> str:
+    """
+    Remove // and /* */ comments from a JSON-like string and preserving text inside quotes.
+
+    Args:
+        json_str (str): The JSON-like input string that may contain comments.
+
+    Returns:
+        str: The same string with comments removed.
+    """
+    pattern = regex.compile(
+        r"""
+        ("(?:\\.|[^"\\])*")   |  # group 1: double-quoted string
+        ('(?:\\.|[^'\\])*')   |  # group 2: single-quoted string
+        (//[^\n\r]*)          |  # group 3: single-line comment
+        (/\*.*?\*/)              # group 4: multi-line comment
+        """,
+        regex.VERBOSE | regex.DOTALL | regex.MULTILINE
+    )
+
+    def _replacer(match) -> str:
+        # If group 3 (//...) or group 4 (/*...*/) matched, remove it
+        if match.group(3) or match.group(4):
+            return ""
+        # Otherwise it's a quoted string (group 1 or 2) — keep it unchanged
+        return match.group(0)
+
+    return pattern.sub(_replacer, json_str).strip()
+
+
 def fix_json(string: str) -> str:
+    string = remove_json_comments(string)
     string = fix_json_booleans(string)
     string = escape_json_values(string)
     return string
@@ -175,25 +211,14 @@ def parse_json_from_text(text: str) -> List[str]:
     Returns:
         List[str]: a list of parsed JSON data
     """
-    preferred, others = _extract_fenced_blocks(text)
+    fenced_blocks = extract_fenced_blocks(text)
+    if fenced_blocks:
+        matches = fenced_blocks
+    else:
+        json_pattern = r"""(?:\{(?:[^{}]*|(?R))*\}|\[(?:[^\[\]]*|(?R))*\])"""
+        pattern = regex.compile(json_pattern, regex.VERBOSE)
+        matches = pattern.findall(text)
 
-    # Candidate search order: JSON/YAML fenced > other fenced > full original text
-    blocks = preferred or others or [text]
-    
-    json_pattern = r"""(?:\{(?:[^{}]*|(?R))*\}|\[(?:[^\[\]]*|(?R))*\])"""
-    pattern = regex.compile(json_pattern, regex.VERBOSE)
-    matches: List[str] = []
-    for block in blocks:
-        found = pattern.findall(block)
-        if found:
-            matches.extend(found)
-
-    # If no match within fenced blocks, fall back to full content (only if we didn't already scan it)
-    if not matches:
-        found = pattern.findall(text)
-        matches.extend(found)
-
-    # Normalize/repair using your existing function.
     matches = [fix_json(m) for m in matches]
     return matches
 
@@ -278,7 +303,6 @@ def remove_repr_quotes(json_string):
     return result
 
 def custom_serializer(obj: Any): 
-
     if isinstance(obj, (bytes, bytearray)):
         return obj.decode()
     if isinstance(obj, (datetime, date)):
@@ -288,7 +312,14 @@ def custom_serializer(obj: Any):
     if hasattr(obj, "read") and hasattr(obj, "name"):
         return f"<FileObject name={getattr(obj, 'name', 'unknown')}>"
     if callable(obj):
-        return obj.__name__
+        if hasattr(obj, "__name__"):
+            return obj.__name__
+        elif hasattr(obj, "name"):
+            return obj.name
+        elif hasattr(obj, "__class__"):
+            return obj.__repr__() if hasattr(obj, "__repr__") else obj.__class__.__name__
+        else:
+            return str(obj)
     if hasattr(obj, "__class__"):
         return obj.__repr__() if hasattr(obj, "__repr__") else obj.__class__.__name__
     
@@ -398,3 +429,40 @@ def get_base_module_init_error_message(cls, data: Dict[str, Any], errors: List[U
     message += "\n\n" + get_error_message(errors)
     return message
 
+def recursive_to_dict(object: Any, exclude_none: bool = True, ignore: List[str] = []) -> Any:
+    """
+    Recursively convert a BaseModule to a dictionary until all BaseModules are converted.
+    """
+    from .module import BaseModule
+    if isinstance(object, BaseModule):
+        data = dict()
+        for field_name, _ in type(object).model_fields.items():
+            if field_name in ignore:
+                continue
+            field_value = getattr(object, field_name, None)
+            if exclude_none and field_value is None:
+                continue
+            if isinstance(field_value, BaseModule):
+                data[field_name] = field_value.to_dict(exclude_none=exclude_none, ignore=ignore)
+            else:
+                data[field_name] = recursive_to_dict(field_value, exclude_none=exclude_none, ignore=ignore)
+        return data
+
+    elif isinstance(object, list):
+        data = []
+        for item in object:
+            if isinstance(item, BaseModule):
+                data.append(item.to_dict(exclude_none=exclude_none, ignore=ignore))
+            else:
+                data.append(recursive_to_dict(item, exclude_none=exclude_none, ignore=ignore))
+        return data
+    elif isinstance(object, dict):
+        data = dict()
+        for key, value in object.items():
+            if isinstance(value, BaseModule):
+                data[key] = value.to_dict(exclude_none=exclude_none, ignore=ignore)
+            else:
+                data[key] = recursive_to_dict(value, exclude_none=exclude_none, ignore=ignore)
+        return data
+    else:
+        return object

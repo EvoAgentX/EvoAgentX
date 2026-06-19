@@ -532,6 +532,8 @@ EvoAgentX 定期邀請頂尖研究者舉辦講座，分享 AI 領域的前沿主
 
 | 發言者 | 主題 | 日期 | 會議影片 |
 |---|---|---|---|
+| [王鴻儒](https://hrwise-nlp.github.io/) | [EvoAgentX 講座] 語言智能體的下半場 | 2026-05-10 | [YouTube](https://www.youtube.com/watch?v=p8HU_lFtAM4) |
+| [周輝池](https://scholar.google.com/citations?user=1IJyxpUAAAAJ&hl=en) | [EvoAgentX 講座] 通過狀態反思進行學習的智能體框架 | 2026-04-26 | [YouTube](https://www.youtube.com/watch?v=DHKBq4NYAxA&t=53s) |
 | [張曦](https://x-izhang.github.io/) | [EvoAgentX 講座] EvoScientist | 2026-04-05 |  [YouTube](https://www.youtube.com/watch?v=EVrxBC99_1k&t=2745s)  |
 | [董冠霖](https://dongguanting.github.io/) | [EvoAgentX 講座] 基於智能體的強化策略優化 | 2025-10-30 |  [YouTube](https://www.youtube.com/watch?v=UB-FL5JFXJY)  |
 | [張桂彬](https://www.guibinz.top/) | [EvoAgentX 講座] 智能體強化學習如何將大模型轉化為自動化智能體 | 2025-09-28 | [YouTube](https://www.youtube.com/watch?v=xzqZsZWfabw&t=3s) |

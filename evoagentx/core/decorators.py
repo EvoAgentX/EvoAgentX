@@ -27,9 +27,27 @@ def atomic_method(func):
     """
     @wraps(func)
     def wrapper(self, *args, **kwargs):
-        context = getattr(self, "_lock", nullcontext())
+        lock = getattr(self, "_lock", None)
+        context = lock if lock is not None else nullcontext()
         with context:
             return func(self, *args, **kwargs)
+    return wrapper
+
+
+def async_atomic_method(func):
+    """
+    Async version of atomic_method for async class methods.
+    If there is self._async_lock (asyncio.Lock) in the instance, it will use the lock.
+    Otherwise, use async nullcontext for execution.
+    """
+    @wraps(func)
+    async def wrapper(self, *args, **kwargs):
+        lock = getattr(self, "_async_lock", None)
+        if lock is not None:
+            async with lock:
+                return await func(self, *args, **kwargs)
+        else:
+            return await func(self, *args, **kwargs)
     return wrapper
 
 
