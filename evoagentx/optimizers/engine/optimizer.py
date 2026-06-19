@@ -3,7 +3,7 @@ import asyncio
 import os
 from concurrent.futures import ThreadPoolExecutor
 from pydantic import Field
-from typing import Any, Awaitable, Callable, ClassVar, FrozenSet, Optional, List, Dict, Literal, Tuple, Iterable, Union
+from typing import Any, Awaitable, Callable, ClassVar, FrozenSet, Optional, List, Dict, Literal, Set, Tuple, Iterable, Union
 
 from ...core.module import BaseModule
 from .base import EvaluationResult, OptimizationUnit, OptimizationUnitType, OptimizationProposal, TrialRecord, ValidationResult
@@ -70,6 +70,28 @@ class OptimizationRunState(BaseModule):
             if snapshot.snapshot_id == snapshot_id:
                 return snapshot
         return None
+
+    def prune_snapshots(self, keep_ids: Iterable[str]) -> int:
+        """
+        Drop stored snapshots whose snapshot_id is not in `keep_ids`.
+
+        Bounds the memory/disk footprint of long online-accumulation runs, where every
+        trial would otherwise retain a full copy of the (growing) program state. Trial
+        records are left untouched; a record whose snapshot was pruned simply has no
+        materializable snapshot (`get_snapshot_by_id` returns None for it). Callers must
+        include every snapshot they still need (best, baseline, branch heads, the sources
+        of any future proposals) in `keep_ids`.
+
+        Args:
+            keep_ids: snapshot_ids to retain; all others are discarded.
+
+        Returns:
+            The number of snapshots removed.
+        """
+        keep = set(keep_ids)
+        before = len(self.snapshots)
+        self.snapshots = [snapshot for snapshot in self.snapshots if snapshot.snapshot_id in keep]
+        return before - len(self.snapshots)
 
     def get_trial_record_by_id(self, trial_id: int) -> Optional[TrialRecord]:
         """
@@ -230,6 +252,7 @@ def _run_trial(
     evaluate_fn: Callable[[ProgramAdapter], EvaluationReturn],
     workspace_root: Optional[str] = None,
     keep_trial_workspaces: bool = True,
+    isolate_snapshots: bool = True,
     **kwargs,
 ) -> Tuple[Optional[SnapShot], TrialRecord]:
     """
@@ -246,7 +269,8 @@ def _run_trial(
             status="failed",
             error=f"source_snapshot_id '{proposal.source_snapshot_id}' not found in run state",
         )
-    result: ApplyResult = adapter.apply(base_snapshot.model_copy(deep=True), proposal.changes, **kwargs)
+    base = base_snapshot if not isolate_snapshots else base_snapshot.model_copy(deep=True)
+    result: ApplyResult = adapter.apply(base, proposal.changes, **kwargs)
     if not result.ok:
         return None, TrialRecord(
             trial_id=trial_id,
@@ -288,6 +312,13 @@ def _run_trial(
                 error=validation_error,
             )
         evaluation = _normalize_evaluation_result(evaluate_fn(result.adapter), trial_id)
+        captured_snapshot = result.adapter.capture_after_eval(
+            snapshot=result.snapshot,
+            evaluation=evaluation,
+            changes=proposal.changes,
+            workspace=workspace,
+            **kwargs,
+        )
     except Exception as exc:
         return None, TrialRecord(
             trial_id=trial_id,
@@ -301,12 +332,13 @@ def _run_trial(
     finally:
         if workspace is not None:
             workspace.cleanup()
-    return result.snapshot, TrialRecord(
+    final_snapshot = captured_snapshot if captured_snapshot is not None else result.snapshot
+    return final_snapshot, TrialRecord(
         trial_id=trial_id,
         changes=proposal.changes,
         source_snapshot_id=proposal.source_snapshot_id,
         status="completed",
-        snapshot_id=result.snapshot.snapshot_id,
+        snapshot_id=final_snapshot.snapshot_id,
         metrics=evaluation.metrics,
         traces=evaluation.traces,
         artifacts=evaluation.artifacts,
@@ -325,6 +357,7 @@ async def _async_run_trial(
     sem: Optional[asyncio.Semaphore] = None,
     workspace_root: Optional[str] = None,
     keep_trial_workspaces: bool = True,
+    isolate_snapshots: bool = True,
     **kwargs,
 ) -> Tuple[Optional[SnapShot], TrialRecord]:
     """
@@ -342,7 +375,8 @@ async def _async_run_trial(
             status="failed",
             error=f"source_snapshot_id '{proposal.source_snapshot_id}' not found in run state",
         )
-    result: ApplyResult = adapter.apply(base_snapshot.model_copy(deep=True), proposal.changes, **kwargs)
+    base = base_snapshot if not isolate_snapshots else base_snapshot.model_copy(deep=True)
+    result: ApplyResult = adapter.apply(base, proposal.changes, **kwargs)
     if not result.ok:
         return None, TrialRecord(
             trial_id=trial_id,
@@ -388,6 +422,13 @@ async def _async_run_trial(
                 evaluation = _normalize_evaluation_result(await evaluate_fn(result.adapter), trial_id)
         else:
             evaluation = _normalize_evaluation_result(await evaluate_fn(result.adapter), trial_id)
+        captured_snapshot = await result.adapter.async_capture_after_eval(
+            snapshot=result.snapshot,
+            evaluation=evaluation,
+            changes=proposal.changes,
+            workspace=workspace,
+            **kwargs,
+        )
     except Exception as exc:
         return None, TrialRecord(
             trial_id=trial_id,
@@ -401,12 +442,13 @@ async def _async_run_trial(
     finally:
         if workspace is not None:
             workspace.cleanup()
-    return result.snapshot, TrialRecord(
+    final_snapshot = captured_snapshot if captured_snapshot is not None else result.snapshot
+    return final_snapshot, TrialRecord(
         trial_id=trial_id,
         changes=proposal.changes,
         source_snapshot_id=proposal.source_snapshot_id,
         status="completed",
-        snapshot_id=result.snapshot.snapshot_id,
+        snapshot_id=final_snapshot.snapshot_id,
         metrics=evaluation.metrics,
         traces=evaluation.traces,
         artifacts=evaluation.artifacts,
@@ -443,6 +485,7 @@ class TrialRuntime:
         objective: Objective,
         workspace_root: Optional[str] = None,
         keep_trial_workspaces: bool = True,
+        isolate_snapshots: bool = True,
         **kwargs
     ) -> OptimizationRunState:
         """
@@ -473,6 +516,7 @@ class TrialRuntime:
             evaluate_fn,
             workspace_root=workspace_root,
             keep_trial_workspaces=keep_trial_workspaces,
+            isolate_snapshots=isolate_snapshots,
             **kwargs,
         )
         return _merge_outcomes(state, [outcome], objective)
@@ -485,6 +529,7 @@ class TrialRuntime:
         objective: Objective,
         workspace_root: Optional[str] = None,
         keep_trial_workspaces: bool = True,
+        isolate_snapshots: bool = True,
         **kwargs
     ) -> OptimizationRunState:
         """
@@ -510,6 +555,7 @@ class TrialRuntime:
             evaluate_fn,
             workspace_root=workspace_root,
             keep_trial_workspaces=keep_trial_workspaces,
+            isolate_snapshots=isolate_snapshots,
             **kwargs,
         )
         return _merge_outcomes(state, [outcome], objective)
@@ -524,6 +570,7 @@ class TrialRuntime:
         max_workers: Optional[int] = None,
         workspace_root: Optional[str] = None,
         keep_trial_workspaces: bool = True,
+        isolate_snapshots: bool = True,
         **kwargs
     ) -> OptimizationRunState:
         """
@@ -562,6 +609,7 @@ class TrialRuntime:
                     objective,
                     workspace_root=workspace_root,
                     keep_trial_workspaces=keep_trial_workspaces,
+                    isolate_snapshots=isolate_snapshots,
                     **kwargs,
                 )
             return state
@@ -584,6 +632,7 @@ class TrialRuntime:
                 evaluate_fn,
                 workspace_root=workspace_root,
                 keep_trial_workspaces=keep_trial_workspaces,
+                isolate_snapshots=isolate_snapshots,
                 **kwargs,
             )
 
@@ -602,6 +651,7 @@ class TrialRuntime:
         max_workers: Optional[int] = None,
         workspace_root: Optional[str] = None,
         keep_trial_workspaces: bool = True,
+        isolate_snapshots: bool = True,
         **kwargs
     ) -> OptimizationRunState:
         """
@@ -639,6 +689,7 @@ class TrialRuntime:
                     objective,
                     workspace_root=workspace_root,
                     keep_trial_workspaces=keep_trial_workspaces,
+                    isolate_snapshots=isolate_snapshots,
                     **kwargs,
                 )
             return state
@@ -660,6 +711,7 @@ class TrialRuntime:
                 sem,
                 workspace_root=workspace_root,
                 keep_trial_workspaces=keep_trial_workspaces,
+                isolate_snapshots=isolate_snapshots,
                 **kwargs,
             )
             for idx, proposal in enumerate(proposals)
@@ -766,7 +818,7 @@ class Optimizer(abc.ABC):
         Passing explicit `target_unit_uids` and/or `target_unit_types` narrows that
         set further.
         """
-        requested_types = self._coerce_unit_types(target_unit_types)
+        requested_types: Optional[FrozenSet[OptimizationUnitType]] = self._coerce_unit_types(target_unit_types)
         if requested_types is None and target_unit_uids is None:
             requested_types = self.supported_unit_types
         requested_uids = set(target_unit_uids) if target_unit_uids is not None else None
@@ -914,24 +966,175 @@ class Optimizer(abc.ABC):
         """Return True to stop before exhausting `max_trials`."""
         return False
 
+    def retained_snapshot_ids(
+        self,
+        _state: OptimizationRunState,
+        _objective: Objective,
+        **_kwargs,
+    ) -> Optional[Set[str]]:
+        """Return the set of snapshot_ids to keep after each batch, or None to keep all.
+
+        Default returns None: every snapshot produced during the run is retained (the
+        historical behavior). Online-accumulation optimizers, whose program state grows
+        each trial and whose product is the *latest* snapshot rather than a search tree,
+        can override this to bound memory/disk. For a linear online run, `return set()`
+        keeps only the engine floor (baseline, current best, latest snapshot), which is all
+        such a run needs. The engine always preserves that floor, so returning a set can
+        never strand the best result or the branch head. Pair this with
+        `optimize(..., isolate_snapshots=False)` to also skip the per-trial deep copy of
+        the (growing) source snapshot.
+        """
+        return None
+
+    def serialize_optimizer_state(self, state: OptimizationRunState) -> Dict[str, Any]:
+        """
+        Return a JSON-serializable snapshot of this optimizer's persistent state.
+
+        `state.optimizer_state` is written to disk on every checkpoint, so anything an
+        algorithm wants to survive a resume must be JSON-serializable (str, int, float,
+        bool, None, list, dict). Many real optimizers keep *live* non-serializable
+        objects — an optuna study, a dspy module, a sampler, a vector index, RNG state.
+        Keep those as instance attributes on the optimizer and override this hook to
+        reduce them to plain data (e.g. the study's trial history, the RNG seed/state)
+        right before each checkpoint. Pair it with `load_optimizer_state` to rebuild the
+        live objects on resume.
+
+        The returned dict replaces `state.optimizer_state` prior to saving. The default
+        persists `state.optimizer_state` unchanged, so optimizers that only ever store
+        plain data in `state.optimizer_state` need not override this.
+
+        Args:
+            state: The current optimization run state.
+
+        Returns:
+            A JSON-serializable dict to persist as `state.optimizer_state`.
+        """
+        return state.optimizer_state
+
+    def load_optimizer_state(self, state: OptimizationRunState) -> None:
+        """
+        Rebuild live optimizer state from the persisted `state.optimizer_state`.
+
+        Called once at the start of `optimize` / `async_optimize`, after the run state
+        is created or resumed and before baseline evaluation. On a fresh run
+        `state.optimizer_state` is empty; on a resumed run it holds whatever
+        `serialize_optimizer_state` last wrote. Override to reconstruct non-serializable
+        instance attributes (samplers, studies, indices, RNG state) from that dict so the
+        algorithm continues exactly where it left off. The default is a no-op.
+
+        Args:
+            state: The freshly created or resumed optimization run state.
+        """
+        return None
+
+    def _checkpoint(self, state: OptimizationRunState) -> None:
+        """Serialize optimizer state into the run state and persist it to disk."""
+        serialized = self.serialize_optimizer_state(state)
+        if serialized is not None:
+            state.optimizer_state = serialized
+        state.save_state()
+
+    def _prune_retained_snapshots(self, state: OptimizationRunState, objective: Objective, **kwargs) -> None:
+        """Apply the optimizer's snapshot-retention policy, if any, after a batch.
+
+        Calls `retained_snapshot_ids`; when it returns a set, prunes `state.snapshots`
+        down to that set unioned with an engine-guaranteed floor (baseline, current best,
+        and the latest snapshot) so the run can always resolve its best result and branch
+        from a valid head. When it returns None (the default) all snapshots are kept.
+        """
+        keep = self.retained_snapshot_ids(state, objective, **kwargs)
+        if keep is None:
+            return
+        mandatory: Set[str] = set()
+        baseline_record = state.get_baseline_record()
+        if baseline_record is not None and baseline_record.snapshot_id:
+            mandatory.add(baseline_record.snapshot_id)
+        if state.best_snapshot_id:
+            mandatory.add(state.best_snapshot_id)
+        if state.snapshots:
+            mandatory.add(state.snapshots[-1].snapshot_id)
+        state.prune_snapshots(set(keep) | mandatory)
+
+    def finalize(
+        self,
+        state: OptimizationRunState,
+        objective: Objective,
+        best_adapter: Optional[ProgramAdapter],
+    ) -> Any:
+        """
+        Produce the value returned by `optimize` / `async_optimize`.
+
+        The engine drives a "propose candidate -> evaluate -> keep best single snapshot"
+        loop, so by default it returns the adapter reconstructed from the best snapshot.
+        That single-best view is lossy for algorithms whose real product is something
+        else: a quality-diversity archive (MAP-Elites), a Pareto front, an evolved
+        population or skill library, or the final *accumulated* state of an online memory
+        run (where you want the latest snapshot, not the highest-scoring one). Override
+        this hook to assemble and return that product instead — typically from
+        `state.optimizer_state`, `state.snapshots`, `state.trial_records`, and/or
+        `best_adapter`.
+
+        `best_adapter` is the adapter loaded from `state.best_snapshot_id`, or None when
+        no completed trial produced metrics (e.g. every trial failed). The default raises
+        in that None case to preserve the historical strict behavior; an overriding
+        optimizer may instead return a valid product built from its own state.
+
+        Args:
+            state: The final optimization run state.
+            objective: The objective used to rank trials.
+            best_adapter: Adapter for the best snapshot, or None if there is no best.
+
+        Returns:
+            The object to hand back to the caller of `optimize` / `async_optimize`.
+        """
+        if best_adapter is None:
+            raise RuntimeError(
+                "Optimization finished but no best snapshot was recorded. "
+                "This usually means all trials failed or the run state is corrupted."
+            )
+        return best_adapter
+
+    async def async_finalize(
+        self,
+        state: OptimizationRunState,
+        objective: Objective,
+        best_adapter: Optional[ProgramAdapter],
+    ) -> Any:
+        """Async variant of `finalize`."""
+        return self.finalize(state, objective, best_adapter)
+
+    def _resolve_best_adapter(self, state: OptimizationRunState) -> Optional[ProgramAdapter]:
+        """Load the adapter for `state.best_snapshot_id`, or None if there is no best."""
+        if state.best_snapshot_id is None:
+            return None
+        best_snapshot = state.get_snapshot_by_id(state.best_snapshot_id)
+        if best_snapshot is None:
+            raise RuntimeError(
+                f"best_snapshot_id '{state.best_snapshot_id}' not found in run state. "
+                "The saved state may be incomplete or corrupted."
+            )
+        return self.adapter.load_snapshot(best_snapshot)
+
     def optimize(
         self,
         evaluate_fn: Callable[[ProgramAdapter], EvaluationReturn],
         objective: Objective,
-        max_trials: Optional[int] = 3,
+        max_trials: int = 3,
         save_dir: Optional[str] = None,
         resume_from: Optional[str] = None,
         execution_mode: Literal["sequential", "concurrent"] = "sequential",
         max_workers: Optional[int] = None,
         workspace_root: Optional[str] = None,
         keep_trial_workspaces: bool = True,
+        isolate_snapshots: bool = True,
         **kwargs
-    ) -> ProgramAdapter:
+    ) -> Any:
 
         execution_mode, max_workers = self._validate_optimize_args(objective, max_trials, execution_mode, max_workers)
 
         # Initialize or load the optimization run state
         state = self._init_run_state(save_dir, resume_from)
+        self.load_optimizer_state(state)
         trial_workspace_root = self._resolve_workspace_root(state, save_dir, resume_from, workspace_root)
 
         # Evaluate baseline once if not yet done; persists so resume skips this.
@@ -965,7 +1168,17 @@ class Optimizer(abc.ABC):
                 validation_error = _validation_failure_message(baseline_validation_results)
                 if validation_error is not None:
                     raise RuntimeError(validation_error)
-                evaluation = _normalize_evaluation_result(evaluate_fn(baseline_adapter), BASELINE_TRIAL_ID)
+                evaluation: EvaluationResult = _normalize_evaluation_result(evaluate_fn(baseline_adapter), BASELINE_TRIAL_ID)
+                captured_baseline = baseline_adapter.capture_after_eval(
+                    snapshot=baseline_snapshot,
+                    evaluation=evaluation,
+                    changes=[],
+                    workspace=baseline_workspace,
+                    **kwargs,
+                )
+                if captured_baseline is not None:
+                    state.snapshots.append(captured_baseline)
+                    baseline_record.snapshot_id = captured_baseline.snapshot_id
                 baseline_record.status = "completed"
                 baseline_record.metrics = evaluation.metrics
                 baseline_record.traces = evaluation.traces
@@ -974,13 +1187,13 @@ class Optimizer(abc.ABC):
                 baseline_record.validation_results = baseline_validation_results
                 baseline_record.workspace_dir = baseline_workspace.root_dir if baseline_workspace is not None else None
                 baseline_record.error = None
-                state.save_state()
+                self._checkpoint(state)
             except Exception as exc:
                 baseline_record.status = "failed"
                 baseline_record.validation_results = baseline_validation_results
                 baseline_record.workspace_dir = baseline_workspace.root_dir if baseline_workspace is not None else None
                 baseline_record.error = str(exc)
-                state.save_state()
+                self._checkpoint(state)
                 raise
             finally:
                 if baseline_workspace is not None:
@@ -992,10 +1205,12 @@ class Optimizer(abc.ABC):
 
         while state.current_step < max_trials:
             if self.should_stop(state, objective, **kwargs):
+                self._checkpoint(state)
                 break
             remaining = max_trials - state.current_step
             proposals = self.batch_propose(state, objective, max_proposals=remaining, **kwargs)[:remaining]
             if not proposals:
+                self._checkpoint(state)
                 break
             record_count_before = len(state.trial_records)
             state = self.runtime.run_batch(
@@ -1007,39 +1222,32 @@ class Optimizer(abc.ABC):
                 max_workers=max_workers,
                 workspace_root=trial_workspace_root,
                 keep_trial_workspaces=keep_trial_workspaces,
+                isolate_snapshots=isolate_snapshots,
                 **kwargs
             )
             new_records = state.trial_records[record_count_before:]
             self.observe(state, new_records, objective, **kwargs)
             state.current_step += len(proposals)
-            state.save_state()
+            self._prune_retained_snapshots(state, objective, **kwargs)
+            self._checkpoint(state)
 
-        if state.best_snapshot_id is None:
-            raise RuntimeError(
-                "Optimization finished but no best snapshot was recorded. "
-                "This usually means all trials failed or the run state is corrupted."
-            )
-        best_snapshot = state.get_snapshot_by_id(state.best_snapshot_id)
-        if best_snapshot is None:
-            raise RuntimeError(
-                f"best_snapshot_id '{state.best_snapshot_id}' not found in run state. "
-                "The saved state may be incomplete or corrupted."
-            )
-        return self.adapter.load_snapshot(best_snapshot)
+        best_adapter = self._resolve_best_adapter(state)
+        return self.finalize(state, objective, best_adapter)
 
     async def async_optimize(
         self,
         evaluate_fn: Callable[[ProgramAdapter], Awaitable[EvaluationReturn]],
         objective: Objective,
-        max_trials: Optional[int] = 3,
+        max_trials: int = 3,
         save_dir: Optional[str] = None,
         resume_from: Optional[str] = None,
         execution_mode: Literal["sequential", "concurrent"] = "sequential",
         max_workers: Optional[int] = None,
         workspace_root: Optional[str] = None,
         keep_trial_workspaces: bool = True,
+        isolate_snapshots: bool = True,
         **kwargs
-    ) -> ProgramAdapter:
+    ) -> Any:
         """
         Async variant of `optimize`. Supports both sequential and concurrent trial execution.
 
@@ -1063,6 +1271,7 @@ class Optimizer(abc.ABC):
         execution_mode, max_workers = self._validate_optimize_args(objective, max_trials, execution_mode, max_workers)
 
         state = self._init_run_state(save_dir, resume_from)
+        self.load_optimizer_state(state)
         trial_workspace_root = self._resolve_workspace_root(state, save_dir, resume_from, workspace_root)
 
         # Evaluate baseline once if not yet done; persists so resume skips this.
@@ -1097,6 +1306,16 @@ class Optimizer(abc.ABC):
                 if validation_error is not None:
                     raise RuntimeError(validation_error)
                 evaluation = _normalize_evaluation_result(await evaluate_fn(baseline_adapter), BASELINE_TRIAL_ID)
+                captured_baseline = await baseline_adapter.async_capture_after_eval(
+                    snapshot=baseline_snapshot,
+                    evaluation=evaluation,
+                    changes=[],
+                    workspace=baseline_workspace,
+                    **kwargs,
+                )
+                if captured_baseline is not None:
+                    state.snapshots.append(captured_baseline)
+                    baseline_record.snapshot_id = captured_baseline.snapshot_id
                 baseline_record.status = "completed"
                 baseline_record.metrics = evaluation.metrics
                 baseline_record.traces = evaluation.traces
@@ -1105,13 +1324,13 @@ class Optimizer(abc.ABC):
                 baseline_record.validation_results = baseline_validation_results
                 baseline_record.workspace_dir = baseline_workspace.root_dir if baseline_workspace is not None else None
                 baseline_record.error = None
-                state.save_state()
+                self._checkpoint(state)
             except Exception as exc:
                 baseline_record.status = "failed"
                 baseline_record.validation_results = baseline_validation_results
                 baseline_record.workspace_dir = baseline_workspace.root_dir if baseline_workspace is not None else None
                 baseline_record.error = str(exc)
-                state.save_state()
+                self._checkpoint(state)
                 raise
             finally:
                 if baseline_workspace is not None:
@@ -1123,10 +1342,12 @@ class Optimizer(abc.ABC):
 
         while state.current_step < max_trials:
             if self.should_stop(state, objective, **kwargs):
+                self._checkpoint(state)
                 break
             remaining = max_trials - state.current_step
             proposals = (await self.async_batch_propose(state, objective, max_proposals=remaining, **kwargs))[:remaining]
             if not proposals:
+                self._checkpoint(state)
                 break
             record_count_before = len(state.trial_records)
             state = await self.runtime.async_run_batch(
@@ -1138,25 +1359,17 @@ class Optimizer(abc.ABC):
                 max_workers=max_workers,
                 workspace_root=trial_workspace_root,
                 keep_trial_workspaces=keep_trial_workspaces,
+                isolate_snapshots=isolate_snapshots,
                 **kwargs
             )
             new_records = state.trial_records[record_count_before:]
             await self.async_observe(state, new_records, objective, **kwargs)
             state.current_step += len(proposals)
-            state.save_state()
+            self._prune_retained_snapshots(state, objective, **kwargs)
+            self._checkpoint(state)
 
-        if state.best_snapshot_id is None:
-            raise RuntimeError(
-                "Optimization finished but no best snapshot was recorded. "
-                "This usually means all trials failed or the run state is corrupted."
-            )
-        best_snapshot = state.get_snapshot_by_id(state.best_snapshot_id)
-        if best_snapshot is None:
-            raise RuntimeError(
-                f"best_snapshot_id '{state.best_snapshot_id}' not found in run state. "
-                "The saved state may be incomplete or corrupted."
-            )
-        return self.adapter.load_snapshot(best_snapshot)
+        best_adapter = self._resolve_best_adapter(state)
+        return await self.async_finalize(state, objective, best_adapter)
 
     @abc.abstractmethod
     def propose(

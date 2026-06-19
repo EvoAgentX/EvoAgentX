@@ -1,12 +1,9 @@
-import abc
 from enum import Enum
 from pydantic import Field, model_validator
 from jsonschema import validate, ValidationError
-from typing import Any, Callable, Dict, List, Optional, Literal
+from typing import Any, Dict, List, Optional, Literal, Union
 
 from ...core.module import BaseModule
-from .decorators import EntryPoint
-from .registry import ParamRegistry
 
 class OptimizationUnitType(str, Enum):
     # Generic structured field or scalar parameter that has no more specific type.
@@ -29,7 +26,15 @@ class OptimizationUnitType(str, Enum):
 
 
 class ChangeOperation(str, Enum):
-    """Minimal standard value operations understood by optimizer engine helpers."""
+    """Common operation labels for adapter-defined merge semantics.
+
+    The optimizer engine validates that each ``UnitChange.operation`` is allow-listed by
+    the target unit, but the adapter's ``merge_changes`` method owns the concrete
+    semantics. Adapters are NOT limited to these labels: a ``UnitChange.operation`` may
+    also be an arbitrary string (e.g. ``"diff"``, ``"consolidate"``, ``"forget"``,
+    ``"refine"``) as long as the target unit allow-lists it and ``merge_changes`` knows
+    how to apply it.
+    """
 
     # Replace the current unit value with the provided payload.
     REPLACE = "replace"
@@ -98,8 +103,8 @@ class OptimizationUnit(BaseModule):
 
     uid: Optional[str] = Field(default="", description="Stable unique ID for this unit across adapter reconstructions; defaults to name if not set explicitly")
     json_schema: Optional[dict] = Field(default=None, description="Optional schema for the optimization unit, used to validate the parameters associated with this unit")
-    allowed_operations: Optional[List[ChangeOperation]] = Field(default_factory=lambda: [ChangeOperation.REPLACE], description="Operations this unit accepts in UnitChange. Defaults to replacement updates for backward compatibility.")
-    operation_schemas: Optional[Dict[str, dict]] = Field(default_factory=dict, description="Optional per-operation JSON schemas for UnitChange.value payloads. For replace operations, json_schema is used when no operation-specific schema is provided.")
+    allowed_operations: Optional[List[Union[ChangeOperation, str]]] = Field(default_factory=lambda: [ChangeOperation.REPLACE], description="Operations this unit accepts in UnitChange. May contain standard ChangeOperation members and/or adapter-defined operation strings (e.g. 'diff', 'consolidate'). Defaults to replacement updates for backward compatibility.")
+    operation_schemas: Optional[Dict[str, dict]] = Field(default_factory=dict, description="Optional per-operation JSON schemas for UnitChange.value payloads, keyed by operation name (standard or adapter-defined). For replace operations, json_schema is used when no operation-specific schema is provided.")
     metadata: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Adapter-defined unit metadata used by optimizers to understand semantics such as file path, prompt role, retrieval policy, constraints, or dependencies.")
 
     @model_validator(mode="before")
@@ -110,113 +115,16 @@ class OptimizationUnit(BaseModule):
         return data
 
 
-class FileOptimizationUnit(OptimizationUnit):
-    """Optimization unit for file-backed artifacts such as prompts, skills, or configs.
-
-    ``path`` is the only required field; ``name`` and ``uid`` default to ``path`` automatically.
-
-    Example: A YAML config file whose content must be a valid YAML string
-    ```
-    unit = FileOptimizationUnit(
-        path="configs/agent.yaml",
-        content_type="yaml",
-        json_schema={"type": "string"},
-    )
-    ```
-
-    Example: A plain-text prompt file that allows any content (no schema validation)
-    ```
-    unit = FileOptimizationUnit(
-        path="prompts/system.txt",
-        content_type="text",
-        metadata={"role": "system", "max_tokens": 512},
-    )
-    ```
-    """
-    path: str = Field(description="Adapter-relative or workspace-relative file path for this unit")
-
-    unit_type: Optional[OptimizationUnitType] = Field(default=OptimizationUnitType.FILE, description="File-backed optimization unit type")
-    encoding: Optional[str] = Field(default="utf-8", description="Text encoding used when materializing this file")
-    content_type: Optional[str] = Field(default="text", description="Logical content type, e.g. text, json, yaml, python")
-    json_schema: Optional[dict] = Field(default=None, description="Optional schema for validating file content. Defaults to None (no validation); set explicitly to enforce a specific content schema.")
-    allowed_operations: Optional[List[ChangeOperation]] = Field(
-        default_factory=lambda: [
-            ChangeOperation.REPLACE.value,
-            ChangeOperation.PATCH.value,
-            ChangeOperation.APPEND.value,
-            ChangeOperation.EXTEND.value,
-            ChangeOperation.DELETE.value,
-            ChangeOperation.NOOP.value,
-        ],
-        description="File units accept standard value replacement, patch, append, extend, delete, and no-op updates by default.",
-    )
-
-    @model_validator(mode="before")
-    @classmethod
-    def _default_file_identity(cls, data: Any) -> Any:
-        if isinstance(data, dict):
-            path = data.get("path", "")
-            if path:
-                data = {
-                    **data,
-                    "name": data.get("name") or path,
-                    "uid": data.get("uid") or path,
-                }
-        return data
-
-
-class CodeOptimizationUnit(OptimizationUnit):
-    """Optimization unit for code-as-string artifacts such as generated skills or tool implementations.
-
-    The unit *value* is the code string itself (stored in snapshots, proposed by optimizers).
-    For file-backed code that needs disk isolation, use ``FileOptimizationUnit`` with
-    ``content_type="python"`` (or the relevant language) instead.
-
-    Example: A generated Python skill whose body is optimized as a string
-    ```
-    unit = CodeOptimizationUnit(
-        name="search_skill",
-        language="python",
-        entrypoint="search",
-        metadata={"validation_commands": ["python -m pytest tests/test_search.py"]},
-    )
-    ```
-
-    Example: A generated JavaScript tool (no fixed entrypoint)
-    ```
-    unit = CodeOptimizationUnit(
-        name="formatter_tool",
-        language="javascript",
-    )
-    ```
-    """
-    unit_type: Optional[OptimizationUnitType] = Field(default=OptimizationUnitType.CODE, description="Code optimization unit type")
-    language: Optional[str] = Field(default="python", description="Programming language of the code artifact")
-    entrypoint: Optional[str] = Field(default=None, description="Optional callable/module entrypoint exposed by this code unit")
-    json_schema: Optional[dict] = Field(default_factory=lambda: {"type": "string"}, description="Schema for the code string value. Defaults to a plain string schema; override to enforce structure if the optimizer produces JSON-wrapped code.")
-    allowed_operations: Optional[List[ChangeOperation]] = Field(
-        default_factory=lambda: [
-            ChangeOperation.REPLACE.value,
-            ChangeOperation.PATCH.value,
-            ChangeOperation.APPEND.value,
-            ChangeOperation.EXTEND.value,
-            ChangeOperation.DELETE.value,
-            ChangeOperation.NOOP.value,
-        ],
-        description="Code string units accept all standard operations by default.",
-    )
-
-
 class UnitChange(BaseModule):
     uid: str = Field(description="Unique ID of the optimization unit to change")
-    value: Any = Field(description="Payload for this change. For operation='replace', this is the new unit value. Other operations may interpret it as a patch, appended item, deletion selector, etc.")
+    value: Optional[Any] = Field(default=None, description="Payload for this change. For operation='replace', this is the new unit value. Other operations may interpret it as a patch, appended item, deletion selector, etc. Defaults to None for payload-less operations such as NOOP or adapter-defined operations that carry no value (e.g. 'consolidate'); a missing value round-trips through save/resume instead of failing validation.")
     
     old_value: Optional[Any] = Field(default=None, description="Previous value of the optimization unit before change (optional)")
-    operation: Optional[ChangeOperation] = Field(default=ChangeOperation.REPLACE, description="Operation to apply to the target unit. Adapters define the concrete merge semantics for non-replace operations.")
+    operation: Optional[Union[ChangeOperation, str]] = Field(default=ChangeOperation.REPLACE, description="Operation to apply to the target unit. May be a standard ChangeOperation or an adapter-defined operation string. Adapters define the concrete merge semantics for non-replace and custom operations in merge_changes.")
     metadata: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Optimizer-defined metadata for provenance, rationale, confidence, or algorithm-specific bookkeeping.")
 
     @staticmethod
-    def validate_value(value: Any, unit: OptimizationUnit, operation: ChangeOperation = ChangeOperation.REPLACE) -> None:
+    def validate_value(value: Any, unit: OptimizationUnit, operation: Union[ChangeOperation, str] = ChangeOperation.REPLACE) -> None:
         """
         Validate a value against the json_schema of the given OptimizationUnit.
 
@@ -255,7 +163,7 @@ class UnitChange(BaseModule):
         unit: OptimizationUnit,
         new_value: Any = None,
         old_value: Optional[Any] = None,
-        operation: ChangeOperation = ChangeOperation.REPLACE,
+        operation: Union[ChangeOperation, str] = ChangeOperation.REPLACE,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> "UnitChange":
         """
@@ -297,7 +205,7 @@ class ValidationResult(BaseModule):
     """Result from one adapter-defined validation step before a trial is evaluated."""
     validator: str = Field(description="Name of the validation step")
     status: ValidationStatus = Field(description="Validation status")
-    message: Optional[Optional[str]] = Field(default=None, description="Human-readable validation message")
+    message: Optional[str] = Field(default=None, description="Human-readable validation message")
     details: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Structured validation details")
     metadata: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Validator-owned metadata")
 
@@ -321,70 +229,3 @@ class TrialRecord(BaseModule):
     validation_results: List[ValidationResult] = Field(default_factory=list, description="Validation results collected before evaluation.")
     workspace_dir: Optional[str] = Field(default=None, description="Trial workspace directory used to isolate file-backed artifacts, if any.")
     error: Optional[str] = Field(default=None, description="Error message if the trial failed")
-
-
-class BaseOptimizer(abc.ABC):
-    # def __init__(
-    #     self,
-    #     registry: ParamRegistry,
-    #     program: Callable, 
-    #     evaluator: Callable[[Dict[str, Any]], float],
-    #     **kwargs
-
-    def __init__(
-        self,
-        registry: ParamRegistry,
-        program: Callable[..., Dict[str, Any]] = None,
-        evaluator: Optional[Callable[..., Any]] = None,
-    ):
-        """
-        Abstract base class for optimization routines.
-
-        Parameters:
-        - registry (ParamRegistry): parameter access layer
-        - evaluator (Callable): function that evaluates the result dict and returns a float
-        """
-        self.program = program
-        self.registry = registry
-        self.program = program
-        self.evaluator = evaluator
-        
-    def get_param(self, name: str) -> Any:
-        """Retrieve the current value of a parameter by name."""
-        return self.registry.get(name)
-
-    def set_param(self, name: str, value: Any):
-        """Set the value of a parameter by name."""
-        self.registry.set(name, value)
-
-    def param_names(self) -> List[str]:
-        """Return the list of all registered parameter names."""
-        return self.registry.names()
-    
-    def get_current_cfg(self) -> Dict[str, Any]:
-        """Return current config as a dictionary."""
-        return {name: self.get_param(name) for name in self.param_names()}
-
-    def apply_cfg(self, cfg: Dict[str, Any]):
-        """Apply a configuration dictionary to the registered parameters."""
-        for k, v in cfg.items():
-            if k in self.registry.fields:
-                self.registry.set(k, v)
-
-    @abc.abstractmethod
-    def optimize(self):
-        """
-        Abstract optimization loop. Should be implemented by subclasses.
-
-        Parameters:
-        - program_entry: callable that runs the program and returns output dict
-
-        Returns:
-        - (best_cfg, history): best config found and full search history
-        """
-        if self.program is None:
-            self.program = EntryPoint.get_entry()
-        if self.program is None:
-            raise RuntimeError("No entry function provided or registered.")
-        print(f"Starting optimization from entry: {self.program.__name__}")
-        raise NotImplementedError

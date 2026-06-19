@@ -8,7 +8,7 @@ from pydantic import Field, field_validator
 from typing import final, List, Any, Optional, Dict, Literal, Iterable
 
 from ...core.module import BaseModule
-from .base import ChangeOperation, OptimizationUnit, OptimizationUnitType, UnitChange, ValidationResult
+from .base import ChangeOperation, EvaluationResult, OptimizationUnit, OptimizationUnitType, UnitChange, ValidationResult
 
 
 class SnapShot(BaseModule):
@@ -194,7 +194,10 @@ class ProgramAdapter(abc.ABC):
                     "uid": unit.uid,
                     "name": unit.name,
                     "unit_type": unit.unit_type.value,
-                    "allowed_operations": list(unit.allowed_operations),
+                    "allowed_operations": [
+                        op.value if isinstance(op, ChangeOperation) else str(op)
+                        for op in unit.allowed_operations
+                    ],
                 }
                 for unit in self.units
             ],
@@ -251,6 +254,10 @@ class ProgramAdapter(abc.ABC):
         """
         Optional validation pipeline run after apply/workspace preparation and before evaluation.
 
+        For proposed trials, `snapshot` is the post-apply snapshot produced after
+        `changes` have already been merged. For baseline evaluation, `changes` is
+        empty and `snapshot` is the baseline snapshot.
+
         Override this for static checks, import checks, smoke tests, schema checks, or
         adapter-specific consistency validation. The engine records all returned results
         and skips evaluation when any result has status="failed".
@@ -266,6 +273,56 @@ class ProgramAdapter(abc.ABC):
     ) -> List[ValidationResult]:
         """Async variant of `validate_trial`."""
         return self.validate_trial(snapshot, changes, workspace=workspace, **kwargs)
+
+    def capture_after_eval(
+        self,
+        snapshot: SnapShot,
+        evaluation: EvaluationResult,
+        changes: List[UnitChange],
+        workspace: Optional[TrialWorkspace] = None,
+        **kwargs,
+    ) -> Optional[SnapShot]:
+        """
+        Optional hook to capture program state that changed *during* evaluation.
+
+        The engine normally records the snapshot produced by `merge_changes` as the
+        trial result. That snapshot reflects the state *before* `evaluate_fn` ran, so
+        any mutation the program performs on itself while being evaluated — online
+        memory growth, accumulated experience, learned counters, a skill library that
+        self-extends during a rollout — would otherwise be lost.
+
+        Override this to return a fresh SnapShot reflecting the post-evaluation state.
+        When a SnapShot is returned, the engine records *it* as the trial's result
+        snapshot (and therefore as the candidate the objective may select as best, and
+        the snapshot future proposals can branch from). Returning ``None`` keeps the
+        default behavior (the pre-evaluation snapshot is recorded).
+
+        This runs before the trial workspace is cleaned up, so workspace files written
+        during evaluation are still readable here. Keep it lightweight and avoid raising:
+        an exception here fails the trial even though evaluation itself succeeded.
+
+        Args:
+            snapshot: The pre-evaluation snapshot produced by `merge_changes`.
+            evaluation: The normalized EvaluationResult returned by the evaluator.
+            changes: The changes that were applied to produce `snapshot`.
+            workspace: The trial workspace, if workspace isolation is enabled.
+            **kwargs: Subclass-specific arguments forwarded from the trial runner.
+
+        Returns:
+            A new SnapShot to record instead of `snapshot`, or None to keep `snapshot`.
+        """
+        return None
+
+    async def async_capture_after_eval(
+        self,
+        snapshot: SnapShot,
+        evaluation: EvaluationResult,
+        changes: List[UnitChange],
+        workspace: Optional[TrialWorkspace] = None,
+        **kwargs,
+    ) -> Optional[SnapShot]:
+        """Async variant of `capture_after_eval`."""
+        return self.capture_after_eval(snapshot, evaluation, changes, workspace=workspace, **kwargs)
 
     def on_task_begin(self, task: Any = None, **kwargs) -> Any:
         """Optional per-task lifecycle hook used by evaluators/agents."""
@@ -287,93 +344,6 @@ class ProgramAdapter(abc.ABC):
 
     async def async_on_task_end(self, trajectory: Any = None, result: Any = None, **kwargs) -> Any:
         return self.on_task_end(trajectory=trajectory, result=result, **kwargs)
-
-    @staticmethod
-    def _recursive_merge(base: Dict[str, Any], patch: Dict[str, Any]) -> Dict[str, Any]:
-        merged = dict(base)
-        for key, value in patch.items():
-            if isinstance(merged.get(key), dict) and isinstance(value, dict):
-                merged[key] = ProgramAdapter._recursive_merge(merged[key], value)
-            else:
-                merged[key] = value
-        return merged
-
-    @staticmethod
-    def _append_text_block(current: str, value: str) -> str:
-        if not current:
-            return value
-        if current.endswith("\n") or value.startswith("\n"):
-            return f"{current}{value}"
-        return f"{current}\n{value}"
-
-    @staticmethod
-    def apply_change_to_value(current_value: Any, change: UnitChange) -> Any:
-        """
-        Apply one standard UnitChange operation to a single unit value.
-
-        Domain-specific operations should be handled by subclass `merge_changes`.
-        This helper intentionally covers only generic value/file/code semantics.
-        """
-        operation = change.operation
-        value = change.value
-
-        if operation == ChangeOperation.REPLACE.value:
-            return value
-        if operation == ChangeOperation.NOOP.value:
-            return current_value
-        if operation == ChangeOperation.PATCH.value:
-            if not isinstance(current_value, dict) or not isinstance(value, dict):
-                raise ValueError(f"Operation '{operation}' requires dict current value and dict payload.")
-            return ProgramAdapter._recursive_merge(current_value, value)
-        if operation == ChangeOperation.APPEND.value:
-            if isinstance(current_value, list):
-                return [*current_value, value]
-            if isinstance(current_value, str) and isinstance(value, str):
-                return ProgramAdapter._append_text_block(current_value, value)
-            raise ValueError("Operation 'append' requires a list current value or string current value with string payload.")
-        if operation == ChangeOperation.EXTEND.value:
-            if isinstance(current_value, list) and isinstance(value, list):
-                return [*current_value, *value]
-            if isinstance(current_value, dict) and isinstance(value, dict):
-                return {**current_value, **value}
-            if isinstance(current_value, str) and isinstance(value, str):
-                return ProgramAdapter._append_text_block(current_value, value)
-            raise ValueError("Operation 'extend' requires matching list, dict, or string values.")
-        if operation == ChangeOperation.DELETE.value:
-            if isinstance(current_value, dict):
-                keys = value
-                if isinstance(value, dict):
-                    keys = value.get("keys", value.get("key"))
-                if not isinstance(keys, list):
-                    keys = [keys]
-                return {key: item for key, item in current_value.items() if key not in keys}
-            if isinstance(current_value, list):
-                if isinstance(value, int):
-                    return [item for idx, item in enumerate(current_value) if idx != value]
-                if isinstance(value, list) and all(isinstance(idx, int) for idx in value):
-                    indices = set(value)
-                    return [item for idx, item in enumerate(current_value) if idx not in indices]
-                return [item for item in current_value if item != value]
-            if isinstance(current_value, str) and isinstance(value, str):
-                return current_value.replace(value, "")
-            raise ValueError(f"Operation '{operation}' is not supported for {type(current_value).__name__} values.")
-
-        raise ValueError(
-            f"Operation '{operation}' has no default merge semantics. "
-            "Handle it in the adapter's merge_changes method."
-        )
-
-    def merge_unit_values(self, snapshot: SnapShot, changes: List[UnitChange]) -> Dict[str, Any]:
-        """
-        Apply standard change operations to snapshot.unit_values and return a new dict.
-
-        Subclasses can call this from `merge_changes` when their units use standard
-        value/file/code operations.
-        """
-        values = dict(snapshot.unit_values)
-        for change in changes:
-            values[change.uid] = self.apply_change_to_value(values.get(change.uid), change)
-        return values
 
     @final
     def apply(self, snapshot: SnapShot, changes: List[UnitChange], **kwargs) -> ApplyResult:
@@ -525,12 +495,19 @@ class ProgramAdapter(abc.ABC):
         The current adapter must remain unmodified. Create and return a fresh instance
         initialized from `snapshot.unit_values` (and `snapshot.program_config` if needed).
 
+        IMPORTANT: return an instance of *your own* adapter subclass, not a base class.
+        Every trial (and the baseline) is evaluated against the adapter produced here, so
+        if a subclass returns its parent type, all of the subclass's overrides —
+        `validate_trial`, `prepare_workspace`, `execute`, lifecycle and `capture_after_eval`
+        hooks — are silently lost at evaluation time. When subclassing an existing adapter,
+        override `from_snapshot` to construct the subclass.
+
         Args:
             snapshot: A SnapShot previously produced by `take_snapshot`.
             **kwargs: Optional subclass-specific arguments.
 
         Returns:
-            A new ProgramAdapter instance whose state matches the given snapshot.
+            A new instance of this adapter's concrete type whose state matches the snapshot.
         """
         raise NotImplementedError
 
