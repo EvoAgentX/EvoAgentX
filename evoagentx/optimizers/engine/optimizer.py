@@ -1215,7 +1215,7 @@ class Optimizer(abc.ABC):
                 self._checkpoint(state)
                 break
             remaining = max_trials - state.current_step
-            proposals = self.batch_propose(state, objective, max_proposals=remaining, **kwargs)[:remaining]
+            proposals = self.batch_propose(state, objective, budget_remaining=remaining, **kwargs)[:remaining]
             if not proposals:
                 self._checkpoint(state)
                 break
@@ -1354,7 +1354,7 @@ class Optimizer(abc.ABC):
                 self._checkpoint(state)
                 break
             remaining = max_trials - state.current_step
-            proposals = (await self.async_batch_propose(state, objective, max_proposals=remaining, **kwargs))[:remaining]
+            proposals = (await self.async_batch_propose(state, objective, budget_remaining=remaining, **kwargs))[:remaining]
             if not proposals:
                 self._checkpoint(state)
                 break
@@ -1409,7 +1409,7 @@ class Optimizer(abc.ABC):
         self,
         state: OptimizationRunState,
         objective: Objective,
-        max_proposals: Optional[int] = None,
+        budget_remaining: Optional[int] = None,
         **kwargs
     ) -> List[OptimizationProposal]:
         """
@@ -1420,28 +1420,35 @@ class Optimizer(abc.ABC):
 
         Override to return multiple proposals when the algorithm naturally generates a
         population of candidates (e.g. evolutionary search, beam search, TPE with parallel
-        workers). The caller (`optimize` / `async_optimize`) trims the returned list to
-        `max_proposals` as a safety net, but algorithms should respect `max_proposals`
-        directly to avoid generating wasted candidates.
+        workers). `budget_remaining` is a *ceiling*, not a *target*: it is the number of
+        trials left before `max_trials` is reached, not the number you should produce this
+        round. The per-round batch size (population size, beam width, ...) is the
+        algorithm's own property; an override should pick its natural batch size and cap it
+        with `budget_remaining`, e.g. `n = min(self.population_size, budget_remaining)`.
+        The caller (`optimize` / `async_optimize`) also trims the returned list to
+        `budget_remaining` as a safety net, but relying on that trim wastes the generation
+        cost (often LLM calls) of the discarded candidates, so algorithms should self-limit.
 
         Args:
             state: Current optimization run state.
             objective: The objective the proposed changes should aim to improve.
-            max_proposals: Maximum number of proposals to return. None means unbounded.
-                           Population-based algorithms should use this to self-limit.
+            budget_remaining: Upper bound on how many proposals may be returned, i.e. the
+                              trials left before `max_trials`. None means unbounded.
+                              Population-based algorithms should `min()` their batch size
+                              against this rather than treating it as the count to generate.
             **kwargs: Forwarded to `propose` (or used directly if overriding).
 
         Returns:
             A non-empty list of OptimizationProposal objects.
         """
         proposals = [self.propose(state, objective, **kwargs)]
-        return proposals[:max_proposals] if max_proposals is not None else proposals
+        return proposals[:budget_remaining] if budget_remaining is not None else proposals
 
     async def async_batch_propose(
         self,
         state: OptimizationRunState,
         objective: Objective,
-        max_proposals: Optional[int] = None,
+        budget_remaining: Optional[int] = None,
         **kwargs
     ) -> List[OptimizationProposal]:
         """
@@ -1453,10 +1460,13 @@ class Optimizer(abc.ABC):
         Args:
             state: Current optimization run state.
             objective: The objective the proposed changes should aim to improve.
-            max_proposals: Maximum number of proposals to return. None means unbounded.
+            budget_remaining: Upper bound on how many proposals may be returned, i.e. the
+                              trials left before `max_trials`. None means unbounded.
+                              See `batch_propose` for how population-based algorithms should
+                              use it (a ceiling to `min()` against, not a target count).
             **kwargs: Forwarded to `batch_propose` (or used directly if overriding).
 
         Returns:
             A non-empty list of OptimizationProposal objects.
         """
-        return self.batch_propose(state, objective, max_proposals=max_proposals, **kwargs)
+        return self.batch_propose(state, objective, budget_remaining=budget_remaining, **kwargs)
