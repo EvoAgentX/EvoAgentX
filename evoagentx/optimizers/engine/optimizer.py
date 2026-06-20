@@ -319,6 +319,8 @@ def _run_trial(
             workspace=workspace,
             **kwargs,
         )
+        if captured_snapshot is not None:
+            result.adapter._validate_snapshot(captured_snapshot, context="captured trial snapshot")
     except Exception as exc:
         return None, TrialRecord(
             trial_id=trial_id,
@@ -429,6 +431,8 @@ async def _async_run_trial(
             workspace=workspace,
             **kwargs,
         )
+        if captured_snapshot is not None:
+            result.adapter._validate_snapshot(captured_snapshot, context="captured trial snapshot")
     except Exception as exc:
         return None, TrialRecord(
             trial_id=trial_id,
@@ -863,6 +867,7 @@ class Optimizer(abc.ABC):
         # including the first trial of a fresh run.
         if not state.snapshots:
             initial_snapshot = self.adapter.take_snapshot()
+            self.adapter._validate_snapshot(initial_snapshot, context="initial snapshot")
             state.snapshots.append(initial_snapshot)
             state.trial_records.append(TrialRecord(
                 trial_id=BASELINE_TRIAL_ID,
@@ -1147,6 +1152,7 @@ class Optimizer(abc.ABC):
             try:
                 if baseline_snapshot is None:
                     raise RuntimeError("Baseline snapshot is missing from optimization state.")
+                baseline_adapter._validate_snapshot(baseline_snapshot, context="baseline snapshot")
                 baseline_workspace = _prepare_trial_workspace(
                     baseline_adapter,
                     baseline_snapshot,
@@ -1177,6 +1183,7 @@ class Optimizer(abc.ABC):
                     **kwargs,
                 )
                 if captured_baseline is not None:
+                    baseline_adapter._validate_snapshot(captured_baseline, context="captured baseline snapshot")
                     state.snapshots.append(captured_baseline)
                     baseline_record.snapshot_id = captured_baseline.snapshot_id
                 baseline_record.status = "completed"
@@ -1284,6 +1291,7 @@ class Optimizer(abc.ABC):
             try:
                 if baseline_snapshot is None:
                     raise RuntimeError("Baseline snapshot is missing from optimization state.")
+                baseline_adapter._validate_snapshot(baseline_snapshot, context="baseline snapshot")
                 baseline_workspace = _prepare_trial_workspace(
                     baseline_adapter,
                     baseline_snapshot,
@@ -1314,6 +1322,7 @@ class Optimizer(abc.ABC):
                     **kwargs,
                 )
                 if captured_baseline is not None:
+                    baseline_adapter._validate_snapshot(captured_baseline, context="captured baseline snapshot")
                     state.snapshots.append(captured_baseline)
                     baseline_record.snapshot_id = captured_baseline.snapshot_id
                 baseline_record.status = "completed"

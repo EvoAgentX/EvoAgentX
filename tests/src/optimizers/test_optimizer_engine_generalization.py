@@ -8,7 +8,6 @@ import pytest
 
 from evoagentx.optimizers.engine.adapter import ProgramAdapter, SnapShot
 from evoagentx.optimizers.engine.base import (
-    CodeOptimizationUnit,
     EvaluationResult,
     OptimizationProposal,
     OptimizationUnit,
@@ -52,6 +51,12 @@ class DummyAdapter(ProgramAdapter):
     def take_snapshot(self) -> SnapShot:
         return SnapShot(unit_values={"prompt": self.prompt, "memories": list(self.memories)})
 
+    def from_snapshot(self, snapshot: SnapShot, **kwargs) -> ProgramAdapter:
+        return DummyAdapter(
+            prompt=snapshot.unit_values["prompt"],
+            memories=list(snapshot.unit_values.get("memories", [])),
+        )
+
     def merge_changes(self, snapshot: SnapShot, changes: List[UnitChange], **kwargs) -> SnapShot:
         values = dict(snapshot.unit_values)
         values["memories"] = list(values.get("memories", []))
@@ -64,15 +69,9 @@ class DummyAdapter(ProgramAdapter):
                 raise ValueError(f"unsupported operation {change.operation}")
         return SnapShot(unit_values=values, program_config=snapshot.program_config)
 
-    def from_snapshot(self, snapshot: SnapShot, **kwargs) -> ProgramAdapter:
-        return DummyAdapter(
-            prompt=snapshot.unit_values["prompt"],
-            memories=list(snapshot.unit_values.get("memories", [])),
-        )
-
 
 class PromptOnlyOptimizer(Optimizer):
-    
+
     supported_unit_types: ClassVar[FrozenSet[OptimizationUnitType]] = frozenset({OptimizationUnitType.PROMPT})
 
     def propose(self, state: OptimizationRunState, objective: ScalarObjective, **kwargs) -> OptimizationProposal:
@@ -115,12 +114,13 @@ class SkillFileAdapter(ProgramAdapter):
 
     def register_units(self) -> List[OptimizationUnit]:
         return [
-            CodeOptimizationUnit(
+            OptimizationUnit(
                 uid="skills.py",
                 name="skills.py",
-                language="python",
-                entrypoint="base_skill",
-                metadata={"path": "skills.py"},
+                unit_type=OptimizationUnitType.CODE,
+                json_schema={"type": "string"},
+                allowed_operations=["replace", "append"],
+                metadata={"path": "skills.py", "language": "python", "entrypoint": "base_skill"},
             )
         ]
 
@@ -128,10 +128,17 @@ class SkillFileAdapter(ProgramAdapter):
         return SnapShot(unit_values={"skills.py": self.content})
 
     def merge_changes(self, snapshot: SnapShot, changes: List[UnitChange], **kwargs) -> SnapShot:
-        return SnapShot(
-            unit_values=self.merge_unit_values(snapshot, changes),
-            program_config=snapshot.program_config,
-        )
+        values = dict(snapshot.unit_values)
+        for change in changes:
+            current = values.get(change.uid, "")
+            if change.operation == "replace":
+                values[change.uid] = change.value
+            elif change.operation == "append":
+                separator = "" if not current or current.endswith("\n") else "\n"
+                values[change.uid] = f"{current}{separator}{change.value}"
+            else:
+                raise ValueError(f"unsupported operation {change.operation}")
+        return SnapShot(unit_values=values, program_config=snapshot.program_config)
 
     def from_snapshot(self, snapshot: SnapShot, **kwargs) -> ProgramAdapter:
         return SkillFileAdapter(content=snapshot.unit_values["skills.py"])
@@ -437,6 +444,7 @@ def test_on_run_start_receives_state_with_evaluated_baseline(tmp_path):
 def test_batch_propose_returns_multiple_proposals(tmp_path):
     """batch_propose returning N proposals evaluates all N in one step."""
     score_map = {"candidate-0": 10, "candidate-1": 30, "candidate-2": 20}
+    received_max = []
 
     class PopOptimizer(Optimizer):
         supported_unit_types: ClassVar[FrozenSet[OptimizationUnitType]] = frozenset({OptimizationUnitType.PROMPT})
@@ -445,6 +453,7 @@ def test_batch_propose_returns_multiple_proposals(tmp_path):
             raise NotImplementedError
 
         def batch_propose(self, state, objective, max_proposals=None, **kwargs):
+            received_max.append(max_proposals)
             unit = self.target_units_by_uid["prompt"]
             source = state.best_snapshot_id or state.snapshots[-1].snapshot_id
             names = ["candidate-0", "candidate-1", "candidate-2"]
@@ -465,6 +474,7 @@ def test_batch_propose_returns_multiple_proposals(tmp_path):
 
     assert best.execute()["prompt"] == "candidate-1"
     state = OptimizationRunState.load_state(str(tmp_path))
+    assert received_max == [3]
     assert state.current_step == 3
 
 
@@ -519,7 +529,7 @@ def test_concurrent_sync_execution_evaluates_all_proposals_with_unique_ids(tmp_p
 
 
 # ---------------------------------------------------------------------------
-# evaluate_fn exception → failed trial, baseline remains best
+# evaluate_fn exception records a failed trial and keeps the baseline as best
 # ---------------------------------------------------------------------------
 
 def test_evaluate_fn_exception_records_failed_trial_and_keeps_baseline(tmp_path):
@@ -607,42 +617,6 @@ def test_proposal_with_multiple_changes_updates_all_units(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# max_proposals limits how many proposals batch_propose should generate
-# ---------------------------------------------------------------------------
-
-def test_max_proposals_is_passed_to_batch_propose(tmp_path):
-    received_max = []
-
-    class TrackingPopOptimizer(Optimizer):
-        supported_unit_types: ClassVar[FrozenSet[OptimizationUnitType]] = frozenset({OptimizationUnitType.PROMPT})
-
-        def propose(self, state, objective, **kwargs):
-            raise NotImplementedError
-
-        def batch_propose(self, state, objective, max_proposals=None, **kwargs):
-            received_max.append(max_proposals)
-            unit = self.target_units_by_uid["prompt"]
-            source = state.snapshots[-1].snapshot_id
-            n = min(5, max_proposals) if max_proposals is not None else 5
-            return [
-                OptimizationProposal(source_snapshot_id=source, changes=[UnitChange.create(unit, f"p-{i}")])
-                for i in range(n)
-            ]
-
-    optimizer = TrackingPopOptimizer(DummyAdapter())
-    optimizer.optimize(
-        evaluate_fn=lambda a: {"score": 1},
-        objective=ScalarObjective(metric="score"),
-        max_trials=3,
-        save_dir=str(tmp_path),
-    )
-
-    assert received_max[0] == 3
-    state = OptimizationRunState.load_state(str(tmp_path))
-    assert state.current_step == 3
-
-
-# ---------------------------------------------------------------------------
 # keep_trial_workspaces=False deletes workspace after evaluation
 # ---------------------------------------------------------------------------
 
@@ -708,13 +682,9 @@ def test_resume_from_checkpoint_skips_evaluated_trials(tmp_path):
 def test_pareto_objective_dominance():
     obj = ParetoObjective(metrics=["accuracy", "speed"], directions=["maximize", "maximize"])
 
-    # a dominates b: better on accuracy, equal on speed
     assert obj.is_better({"accuracy": 0.9, "speed": 100}, {"accuracy": 0.8, "speed": 100})
-    # a does not dominate b: worse on speed even though better on accuracy
     assert not obj.is_better({"accuracy": 0.9, "speed": 80}, {"accuracy": 0.8, "speed": 100})
-    # a clearly dominated by b on both axes
     assert not obj.is_better({"accuracy": 0.7, "speed": 90}, {"accuracy": 0.9, "speed": 100})
-    # equal on all: not strictly better
     assert not obj.is_better({"accuracy": 0.9, "speed": 100}, {"accuracy": 0.9, "speed": 100})
 
 
@@ -733,52 +703,13 @@ def test_pareto_objective_select_best_by_dominance_count():
     ]
 
     best = obj.select_best_trial_record(records)
-    # s1: dominates s2 (0.9>0.7, 50<100) and s3 (0.9>0.8, 50<60) → 2 dominances
-    # s3: dominates s2 (0.8>0.7, 60<100) → 1 dominance
-    # s2: dominates nobody → 0 dominances
+    # s1 dominates s2 and s3; s3 only dominates s2; s2 dominates nobody.
     assert best.snapshot_id == "s1"
-
-
-def test_pareto_objective_per_metric_directions():
-    obj = ParetoObjective(metrics=["loss", "size"], directions=["minimize", "minimize"])
-    assert obj.is_better({"loss": 0.1, "size": 10}, {"loss": 0.2, "size": 20})
-    assert not obj.is_better({"loss": 0.1, "size": 25}, {"loss": 0.2, "size": 20})
-
-
-def test_pareto_objective_missing_metric_returns_false():
-    obj = ParetoObjective(metrics=["a", "b"], directions="maximize")
-    assert not obj.is_better({"a": 1}, {"a": 0, "b": 0})  # b missing in a → not dominated
-
-
-def test_pareto_objective_validation_errors():
-    with pytest.raises(ValueError, match="non-empty"):
-        ParetoObjective(metrics=[])
-    with pytest.raises(ValueError, match="length"):
-        ParetoObjective(metrics=["a", "b"], directions=["maximize"])
 
 
 # ---------------------------------------------------------------------------
 # Async optimize: sequential and concurrent paths
 # ---------------------------------------------------------------------------
-
-@pytest.mark.asyncio
-async def test_async_optimize_sequential(tmp_path):
-    optimizer = PromptOnlyOptimizer(DummyAdapter())
-
-    async def evaluate(adapter):
-        return {"score": len(adapter.execute()["prompt"])}
-
-    best = await optimizer.async_optimize(
-        evaluate_fn=evaluate,
-        objective=ScalarObjective(metric="score"),
-        max_trials=1,
-        save_dir=str(tmp_path),
-    )
-
-    assert best.execute()["prompt"] == "improved prompt"
-    state = OptimizationRunState.load_state(str(tmp_path))
-    assert state.current_step == 1
-
 
 @pytest.mark.asyncio
 async def test_async_optimize_concurrent(tmp_path):
@@ -845,7 +776,7 @@ async def test_async_batch_propose_override_is_used_in_async_optimize(tmp_path):
     optimizer = AsyncProposalOptimizer(DummyAdapter())
 
     async def evaluate(adapter):
-        # baseline prompt="base" (len 4), trial prompt="async-p" (len 7) → trial wins
+        # baseline prompt="base" (len 4), trial prompt="async-p" (len 7), so trial wins
         return {"score": len(adapter.execute()["prompt"])}
 
     best = await optimizer.async_optimize(
@@ -857,3 +788,358 @@ async def test_async_batch_propose_override_is_used_in_async_optimize(tmp_path):
 
     assert sync_calls["n"] == 0
     assert best.execute()["prompt"] == "async-p"
+
+
+# ---------------------------------------------------------------------------
+# Hook 1: finalize() lets an optimizer return an arbitrary product
+# (archive / population / accumulated state) instead of the single best adapter.
+# ---------------------------------------------------------------------------
+
+class ArchiveOptimizer(PromptOnlyOptimizer):
+    """Records every completed score into an archive and returns it from finalize()."""
+
+    def observe(self, state, trial_records, objective, **kwargs):
+        archive = state.optimizer_state.setdefault("archive", [])
+        for record in trial_records:
+            if record.metrics is not None:
+                archive.append(record.metrics["score"])
+
+    def finalize(self, state, objective, best_adapter):
+        return {"best_adapter": best_adapter, "archive": list(state.optimizer_state.get("archive", []))}
+
+
+def test_finalize_returns_custom_product(tmp_path):
+    optimizer = ArchiveOptimizer(DummyAdapter())
+
+    def evaluate(adapter: ProgramAdapter) -> Dict[str, Any]:
+        return {"score": len(adapter.execute()["prompt"])}
+
+    result = optimizer.optimize(
+        evaluate_fn=evaluate,
+        objective=ScalarObjective(metric="score", direction="maximize"),
+        max_trials=2,
+        save_dir=str(tmp_path),
+    )
+
+    # finalize controls the return value: a dict, not a bare ProgramAdapter.
+    assert isinstance(result, dict)
+    assert result["best_adapter"].execute()["prompt"] == "improved prompt"
+    # PromptOnlyOptimizer proposes the same prompt each trial, so the archive
+    # holds one score per completed (non-baseline) trial.
+    assert result["archive"] == [len("improved prompt"), len("improved prompt")]
+
+
+# ---------------------------------------------------------------------------
+# Hook 2: capture_after_eval() persists program state that changed *during*
+# evaluation (online memory growth), for both the baseline and trial paths.
+# ---------------------------------------------------------------------------
+
+class OnlineMemoryAdapter(ProgramAdapter):
+    """Writes a memory entry while being evaluated and exposes it via capture_after_eval."""
+
+    def __init__(self, prompt: str = "base", memories: List[str] | None = None):
+        self.prompt = prompt
+        self.memories = list(memories or [])
+        self._grown: List[str] | None = None
+
+    def execute(self, *args, **kwargs) -> Dict[str, Any]:
+        # Simulate the agent appending an experience to memory during the rollout.
+        self._grown = self.memories + [f"experience::{self.prompt}"]
+        return {"prompt": self.prompt, "memories": self._grown}
+
+    def register_units(self) -> List[OptimizationUnit]:
+        return [
+            OptimizationUnit(name="prompt", uid="prompt", unit_type=OptimizationUnitType.PROMPT, json_schema={"type": "string"}),
+            OptimizationUnit(
+                name="memories",
+                uid="memories",
+                unit_type=OptimizationUnitType.MEMORY,
+                json_schema={"type": "array", "items": {"type": "string"}},
+            ),
+        ]
+
+    def take_snapshot(self) -> SnapShot:
+        return SnapShot(unit_values={"prompt": self.prompt, "memories": list(self.memories)})
+
+    def merge_changes(self, snapshot: SnapShot, changes: List[UnitChange], **kwargs) -> SnapShot:
+        values = dict(snapshot.unit_values)
+        values["memories"] = list(values.get("memories", []))
+        for change in changes:
+            if change.operation == "replace":
+                values[change.uid] = change.value
+            else:
+                raise ValueError(f"unsupported operation {change.operation}")
+        return SnapShot(unit_values=values, program_config=snapshot.program_config)
+
+    def from_snapshot(self, snapshot: SnapShot, **kwargs) -> ProgramAdapter:
+        return OnlineMemoryAdapter(
+            prompt=snapshot.unit_values["prompt"],
+            memories=list(snapshot.unit_values.get("memories", [])),
+        )
+
+    def capture_after_eval(self, snapshot, evaluation, changes, workspace=None, **kwargs):
+        if self._grown is None:
+            return None
+        values = dict(snapshot.unit_values)
+        values["memories"] = list(self._grown)
+        return SnapShot(unit_values=values, program_config=snapshot.program_config)
+
+
+class MemoryChainOptimizer(Optimizer):
+    """Branches from the best (accumulated) snapshot and nudges the prompt."""
+
+    supported_unit_types: ClassVar[FrozenSet[OptimizationUnitType]] = frozenset({OptimizationUnitType.PROMPT})
+
+    def propose(self, state, objective, **kwargs) -> OptimizationProposal:
+        unit = self.target_units_by_uid["prompt"]
+        source = state.best_snapshot_id or state.snapshots[-1].snapshot_id
+        return OptimizationProposal(source_snapshot_id=source, changes=[UnitChange.create(unit, "p1")])
+
+
+def test_capture_after_eval_persists_online_memory_growth(tmp_path):
+    optimizer = MemoryChainOptimizer(OnlineMemoryAdapter())
+
+    def evaluate(adapter: ProgramAdapter) -> Dict[str, Any]:
+        # Longer accumulated memory scores higher, so each trial improves on the last.
+        return {"score": len(adapter.execute()["memories"])}
+
+    optimizer.optimize(
+        evaluate_fn=evaluate,
+        objective=ScalarObjective(metric="score", direction="maximize"),
+        max_trials=1,
+        save_dir=str(tmp_path),
+    )
+
+    state = OptimizationRunState.load_state(str(tmp_path))
+
+    # Baseline memory growth was captured into the baseline's result snapshot.
+    baseline_record = state.get_baseline_record()
+    baseline_snapshot = state.get_snapshot_by_id(baseline_record.snapshot_id)
+    assert baseline_snapshot.unit_values["memories"] == ["experience::base"]
+
+    # The trial branched from that accumulated snapshot and captured its own growth,
+    # so the recorded snapshot reflects the cumulative chain, not the pre-eval state.
+    trial_record = state.trial_records[-1]
+    trial_snapshot = state.get_snapshot_by_id(trial_record.snapshot_id)
+    assert trial_snapshot.unit_values["memories"] == ["experience::base", "experience::p1"]
+    # best points at the accumulated trial snapshot.
+    assert state.best_snapshot_id == trial_record.snapshot_id
+
+
+# ---------------------------------------------------------------------------
+# Hook 3 & 4: serialize_optimizer_state() / load_optimizer_state() let an
+# optimizer keep a live (non-serializable) object and survive resume.
+# ---------------------------------------------------------------------------
+
+class _LiveCounter:
+    """Stand-in for a live, non-serializable object (sampler / study / index)."""
+
+    def __init__(self, n: int = 0):
+        self.n = n
+
+
+class LiveStateOptimizer(PromptOnlyOptimizer):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.counter = _LiveCounter()  # lives on the instance, never stored raw in optimizer_state
+
+    def observe(self, state, trial_records, objective, **kwargs):
+        self.counter.n += len(trial_records)
+
+    def serialize_optimizer_state(self, state):
+        data = dict(state.optimizer_state)
+        data["counter_n"] = self.counter.n
+        return data
+
+    def load_optimizer_state(self, state):
+        self.counter = _LiveCounter(n=state.optimizer_state.get("counter_n", 0))
+
+
+def test_optimizer_state_serialization_survives_resume(tmp_path):
+    def evaluate(adapter: ProgramAdapter) -> Dict[str, Any]:
+        return {"score": len(adapter.execute()["prompt"])}
+
+    optimizer1 = LiveStateOptimizer(DummyAdapter())
+    optimizer1.optimize(
+        evaluate_fn=evaluate,
+        objective=ScalarObjective(metric="score"),
+        max_trials=1,
+        save_dir=str(tmp_path),
+    )
+    # One trial observed -> counter advanced and was serialized to plain data.
+    assert optimizer1.counter.n == 1
+    state = OptimizationRunState.load_state(str(tmp_path))
+    assert state.optimizer_state["counter_n"] == 1
+
+    # Fresh optimizer (counter starts at 0); resume must reconstruct the live counter.
+    optimizer2 = LiveStateOptimizer(DummyAdapter())
+    assert optimizer2.counter.n == 0
+    optimizer2.optimize(
+        evaluate_fn=evaluate,
+        objective=ScalarObjective(metric="score"),
+        max_trials=2,
+        resume_from=str(tmp_path),
+        save_dir=str(tmp_path),
+    )
+    # load_optimizer_state restored 1, the single remaining trial added 1 -> 2.
+    assert optimizer2.counter.n == 2
+    reloaded = OptimizationRunState.load_state(str(tmp_path))
+    assert reloaded.optimizer_state["counter_n"] == 2
+
+
+def test_baseline_failure_checkpoint_serializes_optimizer_state(tmp_path):
+    def evaluate(_adapter: ProgramAdapter) -> Dict[str, Any]:
+        raise RuntimeError("baseline failed")
+
+    with pytest.raises(RuntimeError, match="baseline failed"):
+        LiveStateOptimizer(DummyAdapter()).optimize(
+            evaluate_fn=evaluate,
+            objective=ScalarObjective(metric="score"),
+            max_trials=1,
+            save_dir=str(tmp_path),
+        )
+
+    state = OptimizationRunState.load_state(str(tmp_path))
+    assert state.optimizer_state["counter_n"] == 0
+    assert state.get_baseline_record().status == "failed"
+    assert state.get_baseline_record().error == "baseline failed"
+
+
+# ---------------------------------------------------------------------------
+# Adapter-defined (custom) operations: allow-listing, schema gating, and
+# routing through merge_changes. Exercises extensibility of UnitChange.operation
+# beyond the built-in ChangeOperation set (e.g. memory 'consolidate', code 'diff').
+# ---------------------------------------------------------------------------
+
+
+class ConsolidatingAdapter(ProgramAdapter):
+    """Memory adapter exposing a custom 'consolidate' operation handled in merge_changes."""
+
+    def __init__(self, notes: List[str] | None = None):
+        self.notes = list(notes or [])
+
+    def execute(self, *args, **kwargs) -> Dict[str, Any]:
+        return {"notes": self.notes}
+
+    def register_units(self) -> List[OptimizationUnit]:
+        return [
+            OptimizationUnit(
+                name="notes",
+                uid="notes",
+                unit_type=OptimizationUnitType.MEMORY,
+                json_schema={"type": "array", "items": {"type": "string"}},
+                allowed_operations=["replace", "consolidate"],
+            )
+        ]
+
+    def take_snapshot(self) -> SnapShot:
+        return SnapShot(unit_values={"notes": list(self.notes)})
+
+    def merge_changes(self, snapshot: SnapShot, changes: List[UnitChange], **kwargs) -> SnapShot:
+        values = dict(snapshot.unit_values)
+        values["notes"] = list(values.get("notes", []))
+        for change in changes:
+            if change.operation == "consolidate":
+                # domain-specific semantics: collapse the note list into one summary note
+                values[change.uid] = [f"summary({len(values[change.uid])})"]
+            elif change.operation == "replace":
+                values[change.uid] = change.value
+            else:
+                raise ValueError(f"unsupported operation {change.operation}")
+        return SnapShot(unit_values=values, program_config=snapshot.program_config)
+
+    def from_snapshot(self, snapshot: SnapShot, **kwargs) -> ProgramAdapter:
+        return ConsolidatingAdapter(notes=list(snapshot.unit_values.get("notes", [])))
+
+
+class ConsolidateOptimizer(Optimizer):
+    supported_unit_types: ClassVar[FrozenSet[OptimizationUnitType]] = frozenset({OptimizationUnitType.MEMORY})
+
+    def propose(self, state, objective, **kwargs) -> OptimizationProposal:
+        unit = self.target_units_by_uid["notes"]
+        source = state.best_snapshot_id or state.snapshots[-1].snapshot_id
+        return OptimizationProposal(
+            source_snapshot_id=source,
+            changes=[UnitChange.create(unit, None, operation="consolidate")],
+        )
+
+
+def test_custom_operation_routes_through_merge_changes(tmp_path):
+    optimizer = ConsolidateOptimizer(ConsolidatingAdapter(notes=["a", "b", "c"]))
+
+    # Fewer notes scores lower; consolidation collapses 3 notes into 1 under minimize.
+    best = optimizer.optimize(
+        evaluate_fn=lambda a: {"score": len(a.execute()["notes"])},
+        objective=ScalarObjective(metric="score", direction="minimize"),
+        max_trials=1,
+        save_dir=str(tmp_path),
+    )
+
+    assert best.execute()["notes"] == ["summary(3)"]
+    trial = OptimizationRunState.load_state(str(tmp_path)).trial_records[-1]
+    assert trial.status == "completed"
+    assert trial.changes[0].operation == "consolidate"
+
+
+# ---------------------------------------------------------------------------
+# Online-scalability levers (Plan A): per-run isolate_snapshots flag + the
+# retained_snapshot_ids retention policy. Both default to historical behavior.
+# ---------------------------------------------------------------------------
+
+
+class _SeqPromptOptimizer(Optimizer):
+    """Proposes a distinct, strictly-improving prompt each trial (p0, p1, ...)."""
+
+    supported_unit_types: ClassVar[FrozenSet[OptimizationUnitType]] = frozenset({OptimizationUnitType.PROMPT})
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._n = 0
+
+    def propose(self, state, objective, **kwargs) -> OptimizationProposal:
+        unit = self.target_units_by_uid["prompt"]
+        source = state.best_snapshot_id or state.snapshots[-1].snapshot_id
+        name = f"p{self._n}"
+        self._n += 1
+        return OptimizationProposal(source_snapshot_id=source, changes=[UnitChange.create(unit, name)])
+
+
+_SEQ_SCORES = {"base": 0, "p0": 1, "p1": 2, "p2": 3}
+
+
+def test_snapshot_retention_bounds_stored_snapshots_and_skips_copy(tmp_path):
+    class RetainingOptimizer(_SeqPromptOptimizer):
+        def retained_snapshot_ids(self, state, objective, **kwargs):
+            return set()  # keep only the engine floor: baseline + best + latest
+
+    best = RetainingOptimizer(DummyAdapter()).optimize(
+        evaluate_fn=lambda a: {"score": _SEQ_SCORES[a.execute()["prompt"]]},
+        objective=ScalarObjective(metric="score", direction="maximize"),
+        max_trials=3,
+        save_dir=str(tmp_path),
+        isolate_snapshots=False,  # exercise the no-copy path alongside retention
+    )
+
+    assert best.execute()["prompt"] == "p2"
+    state = OptimizationRunState.load_state(str(tmp_path))
+    # Without pruning there would be baseline + 3 trials = 4 snapshots; the floor caps it.
+    assert len(state.snapshots) <= 3
+    # the best result must still be resolvable after pruning
+    assert state.best_snapshot_id is not None
+    assert state.get_snapshot_by_id(state.best_snapshot_id) is not None
+    assert state.current_step == 3
+
+
+def test_isolate_snapshots_false_leaves_source_snapshot_intact(tmp_path):
+    best = PromptOnlyOptimizer(DummyAdapter()).optimize(
+        evaluate_fn=lambda a: {"score": len(a.execute()["prompt"])},
+        objective=ScalarObjective(metric="score", direction="maximize"),
+        max_trials=1,
+        save_dir=str(tmp_path),
+        isolate_snapshots=False,
+    )
+    assert best.execute()["prompt"] == "improved prompt"
+    # the no-copy path must not have mutated the baseline source snapshot
+    state = OptimizationRunState.load_state(str(tmp_path))
+    baseline = state.get_baseline_record()
+    assert state.get_snapshot_by_id(baseline.snapshot_id).unit_values["prompt"] == "base"

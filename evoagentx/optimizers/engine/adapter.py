@@ -194,10 +194,12 @@ class ProgramAdapter(abc.ABC):
                     "uid": unit.uid,
                     "name": unit.name,
                     "unit_type": unit.unit_type.value,
+                    "json_schema": unit.json_schema,
                     "allowed_operations": [
                         op.value if isinstance(op, ChangeOperation) else str(op)
                         for op in unit.allowed_operations
                     ],
+                    "operation_schemas": unit.operation_schemas,
                 }
                 for unit in self.units
             ],
@@ -220,6 +222,23 @@ class ProgramAdapter(abc.ABC):
         for change in changes:
             unit = units_by_uid[change.uid]
             UnitChange.validate_value(change.value, unit, operation=change.operation)
+
+    def _validate_snapshot(self, snapshot: SnapShot, context: str = "snapshot") -> None:
+        """Validate registered unit values in a snapshot against their json_schema."""
+        if not isinstance(snapshot, SnapShot):
+            raise TypeError(f"{context} must be a SnapShot instance, got {type(snapshot).__name__}.")
+        if not isinstance(snapshot.unit_values, dict):
+            raise TypeError(f"{context}.unit_values must be a dict.")
+
+        missing_uids = [unit.uid for unit in self.units if unit.uid not in snapshot.unit_values]
+        if missing_uids:
+            raise ValueError(
+                f"{context} is missing value(s) for OptimizationUnit uid(s): "
+                f"{', '.join(missing_uids)}."
+            )
+
+        for unit in self.units:
+            unit.validate_value(snapshot.unit_values[unit.uid], context=context)
 
     @property
     def workspace(self) -> Optional[TrialWorkspace]:
@@ -374,6 +393,7 @@ class ProgramAdapter(abc.ABC):
                     f"merge_changes() must return a SnapShot instance, "
                     f"got {type(new_snapshot).__name__}."
                 )
+            self._validate_snapshot(new_snapshot, context="post-merge snapshot")
             new_adapter = self.from_snapshot(new_snapshot, **kwargs)
             if not isinstance(new_adapter, ProgramAdapter):
                 raise TypeError(

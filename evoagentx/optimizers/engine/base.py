@@ -114,6 +114,27 @@ class OptimizationUnit(BaseModule):
             data = {**data, "uid": data.get("name", "")}
         return data
 
+    def validate_value(self, value: Any, context: str = "value") -> None:
+        """
+        Validate a complete optimization-unit value against this unit's json_schema.
+
+        Args:
+            value: The full unit value to validate.
+            context: Human-readable validation context for error messages.
+
+        Raises:
+            ValueError: If the value does not conform to this unit's json_schema.
+        """
+        if self.json_schema is None:
+            return
+        try:
+            validate(instance=value, schema=self.json_schema)
+        except ValidationError as e:
+            raise ValueError(
+                f"Value for unit '{self.name}' (uid={self.uid}) in {context} "
+                f"does not conform to json_schema: {e.message}"
+            )
+
 
 class UnitChange(BaseModule):
     uid: str = Field(description="Unique ID of the optimization unit to change")
@@ -142,9 +163,11 @@ class UnitChange(BaseModule):
                 f"(uid={unit.uid}). Allowed operations: {unit.allowed_operations}"
             )
 
-        schema = unit.operation_schemas.get(operation)
-        if schema is None and operation == ChangeOperation.REPLACE:
-            schema = unit.json_schema
+        operation_key = operation.value if isinstance(operation, ChangeOperation) else str(operation)
+        schema = unit.operation_schemas.get(operation_key)
+        if schema is None and operation_key == ChangeOperation.REPLACE.value:
+            unit.validate_value(value, context=f"operation '{operation_key}'")
+            return
 
         if schema is None:
             return # No schema means no validation needed
