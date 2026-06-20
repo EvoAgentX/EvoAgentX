@@ -343,27 +343,6 @@ class ProgramAdapter(abc.ABC):
         """Async variant of `capture_after_eval`."""
         return self.capture_after_eval(snapshot, evaluation, changes, workspace=workspace, **kwargs)
 
-    def on_task_begin(self, task: Any = None, **kwargs) -> Any:
-        """Optional per-task lifecycle hook used by evaluators/agents."""
-        return None
-
-    def on_step(self, step: Any = None, **kwargs) -> Any:
-        """Optional per-step lifecycle hook used by evaluators/agents."""
-        return None
-
-    def on_task_end(self, trajectory: Any = None, result: Any = None, **kwargs) -> Any:
-        """Optional per-task completion hook used by evaluators/agents."""
-        return None
-
-    async def async_on_task_begin(self, task: Any = None, **kwargs) -> Any:
-        return self.on_task_begin(task=task, **kwargs)
-
-    async def async_on_step(self, step: Any = None, **kwargs) -> Any:
-        return self.on_step(step=step, **kwargs)
-
-    async def async_on_task_end(self, trajectory: Any = None, result: Any = None, **kwargs) -> Any:
-        return self.on_task_end(trajectory=trajectory, result=result, **kwargs)
-
     @final
     def apply(self, snapshot: SnapShot, changes: List[UnitChange], **kwargs) -> ApplyResult:
         """
