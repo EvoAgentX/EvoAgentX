@@ -774,6 +774,17 @@ class Optimizer(abc.ABC):
                 f"frozenset[OptimizationUnitType] class attribute"
             )
 
+        cls = type(self)
+        if (
+            cls.propose is Optimizer.propose
+            and cls.batch_propose is Optimizer.batch_propose
+            and cls.async_batch_propose is Optimizer.async_batch_propose
+        ):
+            raise TypeError(
+                f"{cls.__name__} must override at least one of propose(), batch_propose(), "
+                f"or async_batch_propose(); none was provided."
+            )
+
         self.target_units = self._select_target_units(
             target_unit_uids=target_unit_uids,
             target_unit_types=target_unit_types,
@@ -1380,7 +1391,6 @@ class Optimizer(abc.ABC):
         best_adapter = self._resolve_best_adapter(state)
         return await self.async_finalize(state, objective, best_adapter)
 
-    @abc.abstractmethod
     def propose(
         self,
         state: OptimizationRunState,
@@ -1391,9 +1401,14 @@ class Optimizer(abc.ABC):
         Propose a single changeset for the next trial.
 
         Select a source snapshot from `state`, propose changes to optimization units,
-        and return them as an OptimizationProposal. Called by the default `batch_propose`;
-        algorithms that natively generate multiple candidates should override `batch_propose`
-        directly instead.
+        and return them as an OptimizationProposal. Called by the default `batch_propose`,
+        so sequential algorithms only need to implement this method.
+
+        A subclass must override **either** `propose` or `batch_propose` (or, for async
+        proposal generation, `async_batch_propose`); the constructor enforces that at least
+        one is provided. Algorithms that natively generate multiple candidates should
+        override `batch_propose` and may leave `propose` unimplemented — this default raises
+        when called.
 
         Args:
             state: Current optimization run state (past snapshots, trial records, best id).
@@ -1403,7 +1418,10 @@ class Optimizer(abc.ABC):
         Returns:
             An OptimizationProposal carrying the source snapshot id and the list of changes.
         """
-        raise NotImplementedError
+        raise NotImplementedError(
+            f"{type(self).__name__} does not implement propose(). Override either propose() "
+            f"for single-candidate algorithms or batch_propose() for population-based ones."
+        )
 
     def batch_propose(
         self,
