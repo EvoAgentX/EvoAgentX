@@ -112,6 +112,8 @@ ENV/
 
 # Misc
 .DS_Store
+/AGENTS.md
+/CLAUDE.md
 
 # result or debug files
 outputs/

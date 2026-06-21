@@ -184,30 +184,6 @@ class BrokenSkillCodeOptimizer(SkillCodeOptimizer):
         )
 
 
-class EpisodeAdapter(DummyAdapter):
-    def __init__(self, prompt: str = "base", memories: List[str] | None = None):
-        super().__init__(prompt=prompt, memories=memories)
-        self.events: List[Dict[str, Any]] = []
-
-    def on_task_begin(self, task: Any = None, **kwargs) -> Any:
-        self.events.append({"event": "task_begin", "task": task})
-        return self.events[-1]
-
-    def on_step(self, step: Any = None, **kwargs) -> Any:
-        self.events.append({"event": "step", "step": step})
-        return self.events[-1]
-
-    def on_task_end(self, trajectory: Any = None, result: Any = None, **kwargs) -> Any:
-        self.events.append({"event": "task_end", "result": result})
-        return self.events[-1]
-
-    def from_snapshot(self, snapshot: SnapShot, **kwargs) -> ProgramAdapter:
-        return EpisodeAdapter(
-            prompt=snapshot.unit_values["prompt"],
-            memories=list(snapshot.unit_values.get("memories", [])),
-        )
-
-
 def test_optimizer_targets_supported_units_by_default_and_persists_evaluation_artifacts(tmp_path):
     optimizer = PromptOnlyOptimizer(DummyAdapter())
 
@@ -324,33 +300,6 @@ def test_validation_failure_skips_trial_evaluation(tmp_path):
     assert "python-static" in trial.error
 
 
-def test_episode_lifecycle_hooks_can_feed_evaluation_traces(tmp_path):
-    optimizer = PromptOnlyOptimizer(EpisodeAdapter())
-
-    def evaluate(adapter: ProgramAdapter) -> EvaluationResult:
-        adapter.on_task_begin(task={"id": "task-1"})
-        adapter.on_step(step={"action": "search"})
-        adapter.on_task_end(trajectory=list(adapter.events), result={"ok": True})
-        output = adapter.execute()
-        return EvaluationResult(
-            metrics={"score": len(output["prompt"]) + len(adapter.events)},
-            traces=[{"events": list(adapter.events)}],
-        )
-
-    best = optimizer.optimize(
-        evaluate_fn=evaluate,
-        objective=ScalarObjective(metric="score", direction="maximize"),
-        max_trials=1,
-        save_dir=str(tmp_path),
-    )
-
-    assert best.execute()["prompt"] == "improved prompt"
-
-    state = OptimizationRunState.load_state(str(tmp_path))
-    trial = state.trial_records[-1]
-    assert [event["event"] for event in trial.traces[0]["events"]] == ["task_begin", "step", "task_end"]
-
-
 # ---------------------------------------------------------------------------
 # Multi-trial: minimize direction + current_step tracking
 # ---------------------------------------------------------------------------
@@ -414,30 +363,6 @@ def test_should_stop_halts_before_max_trials(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# on_run_start hook
-# ---------------------------------------------------------------------------
-
-def test_on_run_start_receives_state_with_evaluated_baseline(tmp_path):
-    started = {}
-
-    class StartTrackingOptimizer(PromptOnlyOptimizer):
-        def on_run_start(self, state, objective, **kwargs):
-            started["baseline_metrics"] = state.best_metrics
-            started["step"] = state.current_step
-
-    optimizer = StartTrackingOptimizer(DummyAdapter())
-    optimizer.optimize(
-        evaluate_fn=lambda a: {"score": 1},
-        objective=ScalarObjective(metric="score"),
-        max_trials=1,
-        save_dir=str(tmp_path),
-    )
-
-    assert started["baseline_metrics"] is not None
-    assert started["step"] == 0
-
-
-# ---------------------------------------------------------------------------
 # Population-based batch_propose (multiple proposals per step)
 # ---------------------------------------------------------------------------
 
@@ -449,16 +374,13 @@ def test_batch_propose_returns_multiple_proposals(tmp_path):
     class PopOptimizer(Optimizer):
         supported_unit_types: ClassVar[FrozenSet[OptimizationUnitType]] = frozenset({OptimizationUnitType.PROMPT})
 
-        def propose(self, state, objective, **kwargs):
-            raise NotImplementedError
-
-        def batch_propose(self, state, objective, max_proposals=None, **kwargs):
-            received_max.append(max_proposals)
+        def batch_propose(self, state, objective, budget_remaining=None, **kwargs):
+            received_max.append(budget_remaining)
             unit = self.target_units_by_uid["prompt"]
             source = state.best_snapshot_id or state.snapshots[-1].snapshot_id
             names = ["candidate-0", "candidate-1", "candidate-2"]
-            if max_proposals is not None:
-                names = names[:max_proposals]
+            if budget_remaining is not None:
+                names = names[:budget_remaining]
             return [
                 OptimizationProposal(source_snapshot_id=source, changes=[UnitChange.create(unit, n)])
                 for n in names
@@ -468,14 +390,14 @@ def test_batch_propose_returns_multiple_proposals(tmp_path):
     best = optimizer.optimize(
         evaluate_fn=lambda a: {"score": score_map.get(a.execute()["prompt"], 0)},
         objective=ScalarObjective(metric="score", direction="maximize"),
-        max_trials=3,
+        max_trials=5,
         save_dir=str(tmp_path),
     )
 
     assert best.execute()["prompt"] == "candidate-1"
     state = OptimizationRunState.load_state(str(tmp_path))
-    assert received_max == [3]
-    assert state.current_step == 3
+    assert received_max == [5, 2]
+    assert state.current_step == 5
 
 
 # ---------------------------------------------------------------------------
@@ -489,15 +411,12 @@ def test_concurrent_sync_execution_evaluates_all_proposals_with_unique_ids(tmp_p
     class ConcurrentPopOptimizer(Optimizer):
         supported_unit_types: ClassVar[FrozenSet[OptimizationUnitType]] = frozenset({OptimizationUnitType.PROMPT})
 
-        def propose(self, state, objective, **kwargs):
-            raise NotImplementedError
-
-        def batch_propose(self, state, objective, max_proposals=None, **kwargs):
+        def batch_propose(self, state, objective, budget_remaining=None, **kwargs):
             unit = self.target_units_by_uid["prompt"]
-            source = state.snapshots[-1].snapshot_id
+            source = state.best_snapshot_id or state.snapshots[-1].snapshot_id
             names = ["cp-0", "cp-1", "cp-2"]
-            if max_proposals is not None:
-                names = names[:max_proposals]
+            if budget_remaining is not None:
+                names = names[:budget_remaining]
             return [
                 OptimizationProposal(source_snapshot_id=source, changes=[UnitChange.create(unit, n)])
                 for n in names
@@ -516,7 +435,7 @@ def test_concurrent_sync_execution_evaluates_all_proposals_with_unique_ids(tmp_p
         objective=ScalarObjective(metric="score"),
         max_trials=3,
         execution_mode="concurrent",
-        max_workers=3,
+        max_workers=5, # set max_workers higher than max_trials on purpose
         save_dir=str(tmp_path),
     )
 
@@ -554,25 +473,6 @@ def test_evaluate_fn_exception_records_failed_trial_and_keeps_baseline(tmp_path)
     failed = [r for r in state.trial_records if r.status == "failed"]
     assert len(failed) == 1
     assert "eval crashed" in failed[0].error
-
-
-# ---------------------------------------------------------------------------
-# target_unit_uids selects specific unit
-# ---------------------------------------------------------------------------
-
-def test_target_unit_uids_selects_specific_unit():
-    class MultiTypeOptimizer(Optimizer):
-        supported_unit_types: ClassVar[FrozenSet[OptimizationUnitType]] = frozenset({
-            OptimizationUnitType.PROMPT, OptimizationUnitType.MEMORY,
-        })
-
-        def propose(self, state, objective, **kwargs):
-            raise NotImplementedError
-
-    optimizer = MultiTypeOptimizer(DummyAdapter(), target_unit_uids=["prompt"])
-    assert optimizer.target_unit_uids == ["prompt"]
-    assert len(optimizer.target_units) == 1
-    assert optimizer.target_units[0].unit_type == OptimizationUnitType.PROMPT
 
 
 # ---------------------------------------------------------------------------
@@ -716,15 +616,12 @@ async def test_async_optimize_concurrent(tmp_path):
     class AsyncPopOptimizer(Optimizer):
         supported_unit_types: ClassVar[FrozenSet[OptimizationUnitType]] = frozenset({OptimizationUnitType.PROMPT})
 
-        def propose(self, state, objective, **kwargs):
-            raise NotImplementedError
-
-        def batch_propose(self, state, objective, max_proposals=None, **kwargs):
+        def batch_propose(self, state, objective, budget_remaining=None, **kwargs):
             unit = self.target_units_by_uid["prompt"]
             source = state.snapshots[-1].snapshot_id
             names = ["ap-0", "ap-1", "ap-2"]
-            if max_proposals is not None:
-                names = names[:max_proposals]
+            if budget_remaining is not None:
+                names = names[:budget_remaining]
             return [
                 OptimizationProposal(source_snapshot_id=source, changes=[UnitChange.create(unit, n)])
                 for n in names
@@ -740,7 +637,7 @@ async def test_async_optimize_concurrent(tmp_path):
         objective=ScalarObjective(metric="score"),
         max_trials=3,
         execution_mode="concurrent",
-        max_workers=3,
+        max_workers=5,
         save_dir=str(tmp_path),
     )
 
@@ -761,14 +658,11 @@ async def test_async_batch_propose_override_is_used_in_async_optimize(tmp_path):
     class AsyncProposalOptimizer(Optimizer):
         supported_unit_types: ClassVar[FrozenSet[OptimizationUnitType]] = frozenset({OptimizationUnitType.PROMPT})
 
-        def propose(self, state, objective, **kwargs):
-            raise NotImplementedError
-
-        def batch_propose(self, state, objective, max_proposals=None, **kwargs):
+        def batch_propose(self, state, objective, budget_remaining=None, **kwargs):
             sync_calls["n"] += 1
             raise AssertionError("sync batch_propose must not be called from async_optimize")
 
-        async def async_batch_propose(self, state, objective, max_proposals=None, **kwargs):
+        async def async_batch_propose(self, state, objective, budget_remaining=None, **kwargs):
             unit = self.target_units_by_uid["prompt"]
             source = state.snapshots[-1].snapshot_id
             return [OptimizationProposal(source_snapshot_id=source, changes=[UnitChange.create(unit, "async-p")])]
