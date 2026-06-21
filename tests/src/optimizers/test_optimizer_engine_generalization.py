@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import threading
 from typing import Any, ClassVar, Dict, FrozenSet, List
 
 import pytest
@@ -403,13 +402,10 @@ def test_batch_propose_returns_multiple_proposals(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# Concurrent (sync) execution + unique monotonic trial IDs
+# Sync concurrent execution is rejected
 # ---------------------------------------------------------------------------
 
-def test_concurrent_sync_execution_evaluates_all_proposals_with_unique_ids(tmp_path):
-    evaluated = []
-    lock = threading.Lock()
-
+def test_sync_optimize_rejects_concurrent_execution(tmp_path):
     class ConcurrentPopOptimizer(Optimizer):
         supported_unit_types: ClassVar[FrozenSet[OptimizationUnitType]] = frozenset({OptimizationUnitType.PROMPT})
 
@@ -427,26 +423,34 @@ def test_concurrent_sync_execution_evaluates_all_proposals_with_unique_ids(tmp_p
     optimizer = ConcurrentPopOptimizer(DummyAdapter())
 
     def evaluate(adapter):
-        prompt = adapter.execute()["prompt"]
-        with lock:
-            evaluated.append(prompt)
         return {"score": 1}
 
-    optimizer.optimize(
-        evaluate_fn=evaluate,
-        objective=ScalarObjective(metric="score"),
-        max_trials=3,
-        execution_mode="concurrent",
-        max_workers=5, # set max_workers higher than max_trials on purpose
-        save_dir=str(tmp_path),
-    )
+    with pytest.raises(ValueError, match="Synchronous optimize/run_batch does not support"):
+        optimizer.optimize(
+            evaluate_fn=evaluate,
+            objective=ScalarObjective(metric="score"),
+            max_trials=3,
+            execution_mode="concurrent",
+            max_workers=5,
+            save_dir=str(tmp_path),
+        )
 
-    assert set(evaluated) >= {"cp-0", "cp-1", "cp-2"}
 
-    state = OptimizationRunState.load_state(str(tmp_path))
-    trial_ids = [r.trial_id for r in state.trial_records]
-    assert len(set(trial_ids)) == len(trial_ids), "all trial IDs must be unique"
-    assert sorted(trial_ids) == list(range(len(trial_ids))), "trial IDs must be a contiguous range starting at 0"
+def test_sync_run_batch_rejects_concurrent_execution(tmp_path):
+    optimizer = PromptOnlyOptimizer(DummyAdapter())
+    objective = ScalarObjective(metric="score")
+    state = optimizer._init_run_state(save_dir=str(tmp_path))
+    proposal = optimizer.propose(state, objective)
+
+    with pytest.raises(ValueError, match="Synchronous optimize/run_batch does not support"):
+        optimizer.runtime.run_batch(
+            state=state,
+            proposals=[proposal],
+            evaluate_fn=lambda adapter: {"score": len(adapter.execute()["prompt"])},
+            objective=objective,
+            execution_mode="concurrent",
+            max_workers=2,
+        )
 
 
 # ---------------------------------------------------------------------------

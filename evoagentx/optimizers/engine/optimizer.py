@@ -2,7 +2,6 @@ import abc
 import asyncio
 import os
 import time
-from concurrent.futures import ThreadPoolExecutor
 from pydantic import Field
 from typing import Any, Awaitable, Callable, ClassVar, FrozenSet, Optional, List, Dict, Literal, Set, Tuple, Iterable, Union
 
@@ -17,34 +16,11 @@ from .utils import OptimizationProgress, format_optimization_report, format_tria
 BASELINE_TRIAL_ID = 0
 EvaluationReturn = Union[Dict[str, Any], EvaluationResult]
 
-
-def _validate_execution_config(
-    execution_mode: Any,
-    max_workers: Any,
-) -> Tuple[Literal["sequential", "concurrent"], Optional[int]]:
-    """Validate and normalize trial execution settings."""
-    if execution_mode not in ("sequential", "concurrent"):
-        raise ValueError(f"execution_mode must be 'sequential' or 'concurrent', got {execution_mode!r}")
-
-    if max_workers is not None and (
-        isinstance(max_workers, bool) or not isinstance(max_workers, int) or max_workers < 1
-    ):
-        raise ValueError(f"max_workers must be a positive integer or None, got {max_workers!r}")
-
-    if execution_mode == "sequential":
-        if max_workers not in (None, 1):
-            raise ValueError(
-                "max_workers is only valid with execution_mode='concurrent'; "
-                "use max_workers=None or 1 for sequential execution."
-            )
-        return "sequential", None
-
-    if max_workers is None:
-        raise ValueError("max_workers must be explicitly provided when execution_mode='concurrent'.")
-    if max_workers <= 1:
-        raise ValueError("max_workers must be greater than 1 when execution_mode='concurrent'.")
-
-    return "concurrent", max_workers
+_SYNC_CONCURRENT_ERROR = (
+    "Synchronous optimize/run_batch does not support execution_mode='concurrent'. "
+    "Use execution_mode='sequential' with optimize(), or use "
+    "async_optimize(..., execution_mode='concurrent') for concurrent evaluations."
+)
 
 
 class OptimizationRunState(BaseModule):
@@ -587,67 +563,37 @@ class TrialRuntime:
         Sequential mode evaluates proposals one after another; each trial sees the
         state already updated by its predecessors.
 
-        Concurrent mode submits all trials to a ThreadPoolExecutor so that
-        I/O-bound evaluate calls (e.g. LLM API requests) run in parallel. All
-        trials start from the same read-only snapshot of the current state;
-        results are merged in submission order after all threads finish.
+        Synchronous batch execution is intentionally sequential. Use
+        `async_run_batch(..., execution_mode="concurrent")` when proposals should
+        be evaluated concurrently.
 
         Args:
             state: Current optimization run state.
             proposals: List of proposals to evaluate.
             evaluate_fn: Sync callable returning evaluation metrics.
             objective: Used to update `best_snapshot_id` after the batch.
-            execution_mode: "sequential" (default) or "concurrent".
-            max_workers: Maximum number of parallel threads in concurrent mode.
-                         Required and must be greater than 1 in concurrent mode.
-                         Use None or 1 in sequential mode.
+            execution_mode: Must be "sequential" for synchronous execution.
+            max_workers: Use None or 1 in sequential mode.
             **kwargs: Forwarded to each trial.
 
         Returns:
             Updated OptimizationRunState after all proposals have been evaluated.
         """
-        execution_mode, max_workers = _validate_execution_config(execution_mode, max_workers)
+        if execution_mode == "concurrent":
+            raise ValueError(_SYNC_CONCURRENT_ERROR)
 
-        if execution_mode == "sequential":
-            for proposal in proposals:
-                state = self.run(
-                    state,
-                    proposal,
-                    evaluate_fn,
-                    objective,
-                    workspace_root=workspace_root,
-                    keep_trial_workspaces=keep_trial_workspaces,
-                    isolate_snapshots=isolate_snapshots,
-                    **kwargs,
-                )
-            return state
-        if not proposals:
-            return state
-
-        # concurrent: each thread runs one trial independently from a frozen copy of
-        # the current state; results are merged in submission order after all finish.
-        base_trial_id = max((r.trial_id for r in state.trial_records), default=-1) + 1
-        effective_workers = min(max_workers, len(proposals))
-
-        def _single_outcome(idx_proposal: Tuple[int, OptimizationProposal]) -> Tuple[Optional[SnapShot], TrialRecord]:
-            idx, proposal = idx_proposal
-            base_snapshot = state.get_snapshot_by_id(proposal.source_snapshot_id)
-            return _run_trial(
-                self.adapter,
-                base_snapshot,
+        for proposal in proposals:
+            state = self.run(
+                state,
                 proposal,
-                base_trial_id + idx,
                 evaluate_fn,
+                objective,
                 workspace_root=workspace_root,
                 keep_trial_workspaces=keep_trial_workspaces,
                 isolate_snapshots=isolate_snapshots,
                 **kwargs,
             )
-
-        with ThreadPoolExecutor(max_workers=effective_workers) as pool:
-            outcomes = list(pool.map(_single_outcome, enumerate(proposals)))
-
-        return _merge_outcomes(state, outcomes, objective)
+        return state
 
     async def async_run_batch(
         self,
@@ -686,8 +632,6 @@ class TrialRuntime:
         Returns:
             Updated OptimizationRunState after all proposals have been evaluated.
         """
-        execution_mode, max_workers = _validate_execution_config(execution_mode, max_workers)
-
         if execution_mode == "sequential":
             for proposal in proposals:
                 state = await self.async_run(
@@ -901,13 +845,38 @@ class Optimizer(abc.ABC):
         max_trials: Any,
         execution_mode: Any,
         max_workers: Any,
+        allow_concurrent: bool,
     ) -> Tuple[Literal["sequential", "concurrent"], Optional[int]]:
         """Validate optimize / async_optimize arguments and return normalized execution settings."""
         if not isinstance(objective, Objective):
             raise TypeError(f"`objective` must be an instance of Objective, got {type(objective).__name__!r}")
         if isinstance(max_trials, bool) or not isinstance(max_trials, int) or max_trials <= 0:
             raise ValueError(f"`max_trials` must be a positive integer, got {max_trials}")
-        return _validate_execution_config(execution_mode, max_workers)
+
+        if execution_mode not in ("sequential", "concurrent"):
+            raise ValueError(f"execution_mode must be 'sequential' or 'concurrent', got {execution_mode!r}")
+
+        if max_workers is not None and (
+            isinstance(max_workers, bool) or not isinstance(max_workers, int) or max_workers < 1
+        ):
+            raise ValueError(f"max_workers must be a positive integer or None, got {max_workers!r}")
+
+        if execution_mode == "sequential":
+            if max_workers not in (None, 1):
+                raise ValueError(
+                    "max_workers is only valid with execution_mode='concurrent'; "
+                    "use max_workers=None or 1 for sequential execution."
+                )
+            return "sequential", None
+
+        if not allow_concurrent:
+            raise ValueError(_SYNC_CONCURRENT_ERROR)
+        if max_workers is None:
+            raise ValueError("max_workers must be explicitly provided when execution_mode='concurrent'.")
+        if max_workers <= 1:
+            raise ValueError("max_workers must be greater than 1 when execution_mode='concurrent'.")
+
+        return "concurrent", max_workers
 
     def _resolve_workspace_root(
         self,
@@ -1242,7 +1211,13 @@ class Optimizer(abc.ABC):
         **kwargs
     ) -> Any:
 
-        execution_mode, max_workers = self._validate_optimize_args(objective, max_trials, execution_mode, max_workers)
+        execution_mode, max_workers = self._validate_optimize_args(
+            objective,
+            max_trials,
+            execution_mode,
+            max_workers,
+            allow_concurrent=False,
+        )
         run_started_at = time.perf_counter()
         cost_at_start = cost_manager.get_total_cost()
 
@@ -1406,7 +1381,13 @@ class Optimizer(abc.ABC):
         Returns:
             A new ProgramAdapter reflecting the best configuration found.
         """
-        execution_mode, max_workers = self._validate_optimize_args(objective, max_trials, execution_mode, max_workers)
+        execution_mode, max_workers = self._validate_optimize_args(
+            objective,
+            max_trials,
+            execution_mode,
+            max_workers,
+            allow_concurrent=True,
+        )
         run_started_at = time.perf_counter()
         cost_at_start = cost_manager.get_total_cost()
 
