@@ -4,7 +4,7 @@ import sys
 import textwrap
 from typing import Any, Dict, Optional
 
-from .base import TrialRecord
+from .base import OptimizationRunState, SnapShot, TrialRecord
 from .objective import Objective, ScalarObjective
 
 try:
@@ -15,6 +15,58 @@ except ImportError:  # pragma: no cover - exercised only when tqdm is absent.
 GREEN = "\033[32m"
 ENDC = "\033[0m"
 REPORT_WIDTH = 56
+
+
+def get_best_snapshot_id(state: OptimizationRunState) -> str:
+    """
+    Resolve the snapshot_id to seed the next proposal from: the best snapshot so far.
+
+    Many optimizers branch each round from the current best configuration, falling back
+    gracefully before the objective has selected a best (e.g. on the very first round, or
+    while the baseline is still being evaluated). The resolution order is:
+
+    1. `state.best_snapshot_id` — the best snapshot the objective has selected so far;
+    2. the baseline snapshot — if no best has been recorded yet;
+    3. the latest snapshot — final fallback so a seed always exists.
+
+    Args:
+        state: The current optimization run state.
+
+    Returns:
+        The snapshot_id to branch from.
+
+    Raises:
+        RuntimeError: If `state` holds no snapshots at all (nothing to seed from).
+    """
+    if state.best_snapshot_id is not None:
+        return state.best_snapshot_id
+    baseline = state.get_baseline_record()
+    if baseline is not None and baseline.snapshot_id is not None:
+        return baseline.snapshot_id
+    if not state.snapshots:
+        raise RuntimeError("Cannot resolve a seed snapshot: the run state has no snapshots.")
+    return state.snapshots[-1].snapshot_id
+
+
+def get_best_snapshot(state: OptimizationRunState) -> SnapShot:
+    """
+    Return the best snapshot so far as a `SnapShot` (see `get_best_snapshot_id` for the
+    best -> baseline -> latest resolution order). The id is available as `snapshot.snapshot_id`.
+
+    Args:
+        state: The current optimization run state.
+
+    Returns:
+        The resolved best `SnapShot`.
+
+    Raises:
+        RuntimeError: If no snapshot can be resolved, or the resolved id is missing from state.
+    """
+    snapshot_id = get_best_snapshot_id(state)
+    snapshot = state.get_snapshot_by_id(snapshot_id)
+    if snapshot is None:
+        raise RuntimeError(f"Resolved snapshot '{snapshot_id}' is not present in the run state.")
+    return snapshot
 
 
 class OptimizationProgress:
@@ -201,7 +253,7 @@ def _box_rule(left: str, fill: str, right: str, width: int = REPORT_WIDTH) -> st
 
 
 def format_optimization_report(
-    state: Any,
+    state: OptimizationRunState,
     objective: Objective,
     baseline_record: Optional[TrialRecord],
     elapsed_seconds: float,

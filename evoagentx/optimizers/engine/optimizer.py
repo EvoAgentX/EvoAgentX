@@ -2,18 +2,25 @@ import abc
 import asyncio
 import os
 import time
-from pydantic import Field
 from typing import Any, Awaitable, Callable, ClassVar, FrozenSet, Optional, List, Dict, Literal, Set, Tuple, Iterable, Union
 
-from ...core.module import BaseModule
 from ...core.callbacks import silence_cost_logs
 from ...models.model_utils import cost_manager
-from .base import EvaluationResult, OptimizationUnit, OptimizationUnitType, OptimizationProposal, TrialRecord, ValidationResult
-from .adapter import SnapShot, ProgramAdapter, ApplyResult, TrialWorkspace
+from .base import (
+    BASELINE_TRIAL_ID,
+    EvaluationResult,
+    OptimizationProposal,
+    OptimizationRunState,
+    OptimizationUnit,
+    OptimizationUnitType,
+    SnapShot,
+    TrialRecord,
+    ValidationResult,
+)
+from .adapter import ProgramAdapter, ApplyResult, TrialWorkspace
 from .objective import Objective
 from .utils import OptimizationProgress, format_optimization_report, format_trial_progress_message
 
-BASELINE_TRIAL_ID = 0
 EvaluationReturn = Union[Dict[str, Any], EvaluationResult]
 
 _SYNC_CONCURRENT_ERROR = (
@@ -21,118 +28,6 @@ _SYNC_CONCURRENT_ERROR = (
     "Use execution_mode='sequential' with optimize(), or use "
     "async_optimize(..., execution_mode='concurrent') for concurrent evaluations."
 )
-
-
-class OptimizationRunState(BaseModule):
-
-    snapshots: List[SnapShot] = Field(default_factory=list, description="List of snapshots for all completed trials in the optimization run")
-    trial_records: List[TrialRecord] = Field(default_factory=list, description="List of records for all completed trials in the optimization run")
-    best_snapshot_id: Optional[str] = Field(default=None, description="The snapshot_id of the best snapshot found so far in the optimization run, according to the defined objective and evaluation metrics")
-    best_metrics: Optional[Dict[str, Any]] = Field(default=None, description="The evaluation metrics associated with best_snapshot_id; None until the baseline has been evaluated")
-    optimizer_state: Dict[str, Any] = Field(default_factory=dict, description="Optimizer-owned persistent state, such as sampler state, populations, archives, generated candidate pools, or minibatch cursors.")
-    adapter_fingerprint: Optional[Dict[str, Any]] = Field(default=None, description="Adapter compatibility fingerprint captured at run initialization.")
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Run-level metadata.")
-
-    current_step: int = Field(default=0, description="Number of proposals attempted so far (not successful evaluations). Incremented by len(proposals) each batch, including failed trials.")
-    save_dir: Optional[str] = Field(default="./", description="Directory to save optimization state and results")
-
-    def get_snapshot_by_id(self, snapshot_id: str) -> Optional[SnapShot]:
-        """
-        Look up a snapshot by its snapshot_id.
-
-        Args:
-            snapshot_id: The unique identifier of the target snapshot.
-
-        Returns:
-            The matching SnapShot, or None if no snapshot with that ID exists.
-        """
-        for snapshot in self.snapshots:
-            if snapshot.snapshot_id == snapshot_id:
-                return snapshot
-        return None
-
-    def prune_snapshots(self, keep_ids: Iterable[str]) -> int:
-        """
-        Drop stored snapshots whose snapshot_id is not in `keep_ids`.
-
-        Bounds the memory/disk footprint of long online-accumulation runs, where every
-        trial would otherwise retain a full copy of the (growing) program state. Trial
-        records are left untouched; a record whose snapshot was pruned simply has no
-        materializable snapshot (`get_snapshot_by_id` returns None for it). Callers must
-        include every snapshot they still need (best, baseline, branch heads, the sources
-        of any future proposals) in `keep_ids`.
-
-        Args:
-            keep_ids: snapshot_ids to retain; all others are discarded.
-
-        Returns:
-            The number of snapshots removed.
-        """
-        keep = set(keep_ids)
-        before = len(self.snapshots)
-        self.snapshots = [snapshot for snapshot in self.snapshots if snapshot.snapshot_id in keep]
-        return before - len(self.snapshots)
-
-    def get_trial_record_by_id(self, trial_id: int) -> Optional[TrialRecord]:
-        """
-        Look up a TrialRecord by its trial_id.
-
-        Args:
-            trial_id: The unique identifier of the target trial.
-
-        Returns:
-            The matching TrialRecord, or None if no record with that ID exists.
-        """
-        for record in self.trial_records:
-            if record.trial_id == trial_id:
-                return record
-        return None
-
-    def get_baseline_record(self) -> Optional[TrialRecord]:
-        """
-        Return the baseline TrialRecord (trial_id == BASELINE_TRIAL_ID), or None if not present.
-        """
-        for record in self.trial_records:
-            if record.trial_id == BASELINE_TRIAL_ID:
-                return record
-        return None
-
-    @staticmethod
-    def load_state(path: str) -> "OptimizationRunState":
-        """
-        Deserialize and return an OptimizationRunState from a previously saved file.
-
-        Used by `Optimizer.optimize` when `resume_from` is provided, so that
-        already-completed trials are skipped and the run continues from where it
-        left off.
-
-        Args:
-            path: File path (or directory) written by a prior `save_state` call.
-
-        Returns:
-            The restored OptimizationRunState, including all past snapshots,
-            trial records, best_snapshot_id, and current_step.
-        """
-        if not os.path.exists(path):
-            raise FileNotFoundError(f"{path} does not exist, cannot load optimization state")
-        
-        if os.path.isdir(path):
-            path = os.path.join(path, "optimization_state.json")
-        return OptimizationRunState.from_file(path=path)
-
-    def save_state(self) -> str:
-        """
-        Serialize the current OptimizationRunState to disk under `self.save_dir`.
-
-        Called after every completed trial so the run can be resumed if interrupted.
-
-        Returns:
-            The file path where the state was written.
-        """
-        os.makedirs(self.save_dir, exist_ok=True)
-        path = os.path.join(self.save_dir, "optimization_state.json")
-        self.save_module(path=path)
-        return path
 
 
 def _sync_best(state: OptimizationRunState, objective: Objective) -> None:

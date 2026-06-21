@@ -50,6 +50,7 @@ from .engine.base import (
 )
 from .engine.objective import Objective
 from .engine.optimizer import Optimizer, OptimizationRunState
+from .engine.utils import get_best_snapshot
 
 
 # ---------------------------------------------------------------------------
@@ -124,15 +125,6 @@ class PromptVariantOptimizer(Optimizer):
         return OpenRouterLLM(config=config)
 
     # -- helpers ------------------------------------------------------------
-    def _source_snapshot_id(self, state: OptimizationRunState) -> str:
-        """Seed new variants from the best snapshot so far, falling back to baseline."""
-        if state.best_snapshot_id is not None:
-            return state.best_snapshot_id
-        baseline = state.get_baseline_record()
-        if baseline is not None and baseline.snapshot_id is not None:
-            return baseline.snapshot_id
-        return state.snapshots[-1].snapshot_id
-
     def _build_meta_prompt(self, unit: OptimizationUnit, current_prompt: str) -> str:
         return (
             f"Here is the current prompt named '{unit.name}'.\n"
@@ -175,18 +167,6 @@ class PromptVariantOptimizer(Optimizer):
             metadata={"source": "PromptVariantOptimizer", "target_uid": unit.uid},
         )
 
-    def _plan_round(
-        self, state: OptimizationRunState, budget_remaining: Optional[int]
-    ) -> Tuple[str, SnapShot, int]:
-        source_id = self._source_snapshot_id(state)
-        snapshot = state.get_snapshot_by_id(source_id)
-        if snapshot is None:
-            raise RuntimeError(f"source snapshot '{source_id}' not found in run state")
-        n = self.num_variants_per_step
-        if budget_remaining is not None:
-            n = min(n, budget_remaining)
-        return source_id, snapshot, max(n, 0)
-
     def _pick_target(self, snapshot: SnapShot) -> Tuple[OptimizationUnit, str]:
         unit = self._rng.choice(self.target_units)
         return unit, snapshot.unit_values[unit.uid]
@@ -199,7 +179,9 @@ class PromptVariantOptimizer(Optimizer):
         budget_remaining: Optional[int] = None,
         **kwargs,
     ) -> List[OptimizationProposal]:
-        source_id, snapshot, n = self._plan_round(state, budget_remaining)
+        snapshot = get_best_snapshot(state)
+        source_id = snapshot.snapshot_id
+        n = max(0, min(self.num_variants_per_step, budget_remaining) if budget_remaining is not None else self.num_variants_per_step)
         proposals: List[OptimizationProposal] = []
         for i in range(n):
             unit, current_prompt = self._pick_target(snapshot)
@@ -222,7 +204,9 @@ class PromptVariantOptimizer(Optimizer):
         budget_remaining: Optional[int] = None,
         **kwargs,
     ) -> List[OptimizationProposal]:
-        source_id, snapshot, n = self._plan_round(state, budget_remaining)
+        snapshot = get_best_snapshot(state)
+        source_id = snapshot.snapshot_id
+        n = max(0, min(self.num_variants_per_step, budget_remaining) if budget_remaining is not None else self.num_variants_per_step)
         targets = [self._pick_target(snapshot) for _ in range(n)]
 
         async def _gen(unit: OptimizationUnit, current_prompt: str) -> str:
