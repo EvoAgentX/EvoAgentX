@@ -105,6 +105,8 @@ class MemoryAppendOptimizer(Optimizer):
 
 
 class SkillFileAdapter(ProgramAdapter):
+    uses_workspace = True
+
     def __init__(self, content: str = "def base_skill():\n    return 'base'\n"):
         self.content = content
 

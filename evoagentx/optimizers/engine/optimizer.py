@@ -905,8 +905,8 @@ class Optimizer(abc.ABC):
             raise ValueError(f"`max_trials` must be a positive integer, got {max_trials}")
         return _validate_execution_config(execution_mode, max_workers)
 
-    @staticmethod
     def _resolve_workspace_root(
+        self,
         state: OptimizationRunState,
         save_dir: Optional[str],
         resume_from: Optional[str],
@@ -915,12 +915,17 @@ class Optimizer(abc.ABC):
         """
         Resolve the trial workspace root.
 
-        Workspace isolation is enabled explicitly by `workspace_root`, or implicitly
-        when a persistent save/resume directory is used. Pure in-memory optimization
-        without save_dir keeps the historical no-filesystem behavior.
+        An explicit `workspace_root` always forces workspace creation. Otherwise
+        workspaces are only enabled when the adapter declares `uses_workspace` AND a
+        persistent save/resume directory is in use — file/code/skills adapters that
+        materialize per-trial files. In-memory adapters (prompts, model names, config)
+        set `uses_workspace=False` (the default), so the engine never spawns empty
+        per-trial directories for them, even when `save_dir` is set for checkpointing.
         """
         if workspace_root is not None:
             return workspace_root
+        if not self.adapter.uses_workspace:
+            return None
         if save_dir is not None or resume_from is not None:
             return os.path.join(state.save_dir or "./", "workspaces")
         return None

@@ -115,6 +115,17 @@ class TrialWorkspace:
 
 class ProgramAdapter(abc.ABC):
 
+    #: Whether trials need an isolated, per-trial filesystem workspace.
+    #:
+    #: A trial workspace is only meaningful for adapters that materialize file-backed
+    #: state (file/code/skills adapters that override `prepare_workspace`). Purely
+    #: in-memory adapters — prompts, model names, config scalars — have nothing to
+    #: write into it, so the engine skips workspace creation for them and never spawns
+    #: empty per-trial directories. File-backed adapters should set this to True (or
+    #: override the `uses_workspace` property). An explicit `workspace_root` passed to
+    #: `optimize()` always forces workspace creation regardless of this flag.
+    uses_workspace: bool = False
+
     def __init_subclass__(cls, **kwargs) -> None:
         super().__init_subclass__(**kwargs)
 
@@ -188,7 +199,7 @@ class ProgramAdapter(abc.ABC):
         declared optimization-unit shape.
         """
         return {
-            "adapter_class": f"{self.__class__.__module__}.{self.__class__.__name__}",
+            "adapter_class": self.__class__.__qualname__,
             "units": [
                 {
                     "uid": unit.uid,
