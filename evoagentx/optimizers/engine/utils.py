@@ -207,6 +207,7 @@ def format_optimization_report(
     elapsed_seconds: float,
     start_step: int,
     max_trials: int,
+    total_cost: Optional[float] = None,
 ) -> str:
     """Format the final optimization report."""
     trial_records = [record for record in state.trial_records if record.trial_id != 0]
@@ -229,6 +230,9 @@ def format_optimization_report(
         _box_line("Failed trials", len(failed_trials)),
         _box_line("Elapsed time", _format_duration(elapsed_seconds)),
     ]
+
+    if total_cost is not None:
+        lines.append(_box_line("Total cost (USD)", f"${total_cost:.4f}"))
 
     if baseline_record is not None and baseline_record.metrics is not None:
         baseline_score = _scalar_score(baseline_record, objective)

@@ -7,6 +7,8 @@ from pydantic import Field
 from typing import Any, Awaitable, Callable, ClassVar, FrozenSet, Optional, List, Dict, Literal, Set, Tuple, Iterable, Union
 
 from ...core.module import BaseModule
+from ...core.callbacks import silence_cost_logs
+from ...models.model_utils import cost_manager
 from .base import EvaluationResult, OptimizationUnit, OptimizationUnitType, OptimizationProposal, TrialRecord, ValidationResult
 from .adapter import SnapShot, ProgramAdapter, ApplyResult, TrialWorkspace
 from .objective import Objective
@@ -997,6 +999,7 @@ class Optimizer(abc.ABC):
         elapsed_seconds: float,
         start_step: int,
         max_trials: int,
+        total_cost: Optional[float] = None,
         **_kwargs,
     ) -> Optional[str]:
         """
@@ -1012,6 +1015,7 @@ class Optimizer(abc.ABC):
             elapsed_seconds=elapsed_seconds,
             start_step=start_step,
             max_trials=max_trials,
+            total_cost=total_cost,
         )
 
     def _report_optimization_summary(
@@ -1023,6 +1027,7 @@ class Optimizer(abc.ABC):
         elapsed_seconds: float,
         start_step: int,
         max_trials: int,
+        total_cost: Optional[float] = None,
         **kwargs,
     ) -> None:
         message = self.format_optimization_report(
@@ -1032,6 +1037,7 @@ class Optimizer(abc.ABC):
             elapsed_seconds,
             start_step,
             max_trials,
+            total_cost=total_cost,
             **kwargs,
         )
         if message is not None:
@@ -1220,6 +1226,7 @@ class Optimizer(abc.ABC):
             )
         return self.adapter.load_snapshot(best_snapshot)
 
+    @silence_cost_logs
     def optimize(
         self,
         evaluate_fn: Callable[[ProgramAdapter], EvaluationReturn],
@@ -1237,6 +1244,7 @@ class Optimizer(abc.ABC):
 
         execution_mode, max_workers = self._validate_optimize_args(objective, max_trials, execution_mode, max_workers)
         run_started_at = time.perf_counter()
+        cost_at_start = cost_manager.get_total_cost()
 
         # Initialize or load the optimization run state
         state = self._init_run_state(save_dir, resume_from)
@@ -1357,11 +1365,13 @@ class Optimizer(abc.ABC):
             elapsed_seconds=time.perf_counter() - run_started_at,
             start_step=start_step,
             max_trials=max_trials,
+            total_cost=cost_manager.get_total_cost() - cost_at_start,
             **kwargs,
         )
         best_adapter = self._resolve_best_adapter(state)
         return self.finalize(state, objective, best_adapter)
 
+    @silence_cost_logs
     async def async_optimize(
         self,
         evaluate_fn: Callable[[ProgramAdapter], Awaitable[EvaluationReturn]],
@@ -1398,6 +1408,7 @@ class Optimizer(abc.ABC):
         """
         execution_mode, max_workers = self._validate_optimize_args(objective, max_trials, execution_mode, max_workers)
         run_started_at = time.perf_counter()
+        cost_at_start = cost_manager.get_total_cost()
 
         state = self._init_run_state(save_dir, resume_from)
         start_step = state.current_step
@@ -1517,6 +1528,7 @@ class Optimizer(abc.ABC):
             elapsed_seconds=time.perf_counter() - run_started_at,
             start_step=start_step,
             max_trials=max_trials,
+            total_cost=cost_manager.get_total_cost() - cost_at_start,
             **kwargs,
         )
         best_adapter = self._resolve_best_adapter(state)

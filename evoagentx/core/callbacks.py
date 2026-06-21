@@ -1,9 +1,11 @@
-import sys 
+import sys
 # import stopit
-from overdue import timeout_set_to 
+from overdue import timeout_set_to
+import asyncio
+import functools
 import threading
 import contextvars
-from typing import Union
+from typing import Callable, Union
 from contextlib import contextmanager
 from .logging import logger, get_log_file
 
@@ -94,6 +96,28 @@ def suppress_cost_logging():
         yield
     finally:
         suppress_cost_logs.reset(token)  # Restore the previous value
+
+
+def silence_cost_logs(func: Callable) -> Callable:
+    """Decorator: suppress per-call LLM cost logs for the duration of the wrapped function.
+
+    Works for both sync and async functions. Inside the wrapped call (and any LLM
+    calls it triggers in the same thread/task), `CostManager.update_cost` will not
+    emit its per-call cost log line. Costs are still accumulated in the
+    CostManager, so totals remain available afterwards.
+    """
+    if asyncio.iscoroutinefunction(func):
+        @functools.wraps(func)
+        async def async_wrapper(*args, **kwargs):
+            with suppress_cost_logging():
+                return await func(*args, **kwargs)
+        return async_wrapper
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        with suppress_cost_logging():
+            return func(*args, **kwargs)
+    return wrapper
 
 
 silence_nesting = contextvars.ContextVar("silence_nesting", default=0)
