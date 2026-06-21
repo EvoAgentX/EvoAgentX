@@ -1,6 +1,7 @@
 import abc
 import asyncio
 import os
+import time
 from concurrent.futures import ThreadPoolExecutor
 from pydantic import Field
 from typing import Any, Awaitable, Callable, ClassVar, FrozenSet, Optional, List, Dict, Literal, Set, Tuple, Iterable, Union
@@ -9,6 +10,7 @@ from ...core.module import BaseModule
 from .base import EvaluationResult, OptimizationUnit, OptimizationUnitType, OptimizationProposal, TrialRecord, ValidationResult
 from .adapter import SnapShot, ProgramAdapter, ApplyResult, TrialWorkspace
 from .objective import Objective
+from .utils import OptimizationProgress, format_optimization_report, format_trial_progress_message
 
 BASELINE_TRIAL_ID = 0
 EvaluationReturn = Union[Dict[str, Any], EvaluationResult]
@@ -953,6 +955,88 @@ class Optimizer(abc.ABC):
         """Async variant of `on_run_start`."""
         self.on_run_start(state, objective, **kwargs)
 
+    def format_trial_progress(
+        self,
+        state: OptimizationRunState,
+        record: TrialRecord,
+        objective: Objective,
+        baseline_record: Optional[TrialRecord],
+        **_kwargs,
+    ) -> Optional[str]:
+        """
+        Return the progress message for a completed baseline/trial record.
+
+        Subclasses can override this to customize optimizer-specific progress output.
+        Return None to suppress output for a record.
+        """
+        return format_trial_progress_message(
+            record=record,
+            objective=objective,
+            baseline_record=baseline_record,
+            best_snapshot_id=state.best_snapshot_id,
+        )
+
+    def _report_trial_progress(
+        self,
+        progress: OptimizationProgress,
+        state: OptimizationRunState,
+        record: TrialRecord,
+        objective: Objective,
+        baseline_record: Optional[TrialRecord],
+        **kwargs,
+    ) -> None:
+        message = self.format_trial_progress(state, record, objective, baseline_record, **kwargs)
+        if message is not None:
+            progress.write(message)
+
+    def format_optimization_report(
+        self,
+        state: OptimizationRunState,
+        objective: Objective,
+        baseline_record: Optional[TrialRecord],
+        elapsed_seconds: float,
+        start_step: int,
+        max_trials: int,
+        **_kwargs,
+    ) -> Optional[str]:
+        """
+        Return the final optimization report emitted after optimize finishes.
+
+        Subclasses can override this to customize report content. Return None to
+        suppress the final report.
+        """
+        return format_optimization_report(
+            state=state,
+            objective=objective,
+            baseline_record=baseline_record,
+            elapsed_seconds=elapsed_seconds,
+            start_step=start_step,
+            max_trials=max_trials,
+        )
+
+    def _report_optimization_summary(
+        self,
+        progress: OptimizationProgress,
+        state: OptimizationRunState,
+        objective: Objective,
+        baseline_record: Optional[TrialRecord],
+        elapsed_seconds: float,
+        start_step: int,
+        max_trials: int,
+        **kwargs,
+    ) -> None:
+        message = self.format_optimization_report(
+            state,
+            objective,
+            baseline_record,
+            elapsed_seconds,
+            start_step,
+            max_trials,
+            **kwargs,
+        )
+        if message is not None:
+            progress.write(message)
+
     def observe(
         self,
         _state: OptimizationRunState,
@@ -1152,11 +1236,14 @@ class Optimizer(abc.ABC):
     ) -> Any:
 
         execution_mode, max_workers = self._validate_optimize_args(objective, max_trials, execution_mode, max_workers)
+        run_started_at = time.perf_counter()
 
         # Initialize or load the optimization run state
         state = self._init_run_state(save_dir, resume_from)
+        start_step = state.current_step
         self.load_optimizer_state(state)
         trial_workspace_root = self._resolve_workspace_root(state, save_dir, resume_from, workspace_root)
+        progress = OptimizationProgress(total=max_trials, initial=state.current_step)
 
         # Evaluate baseline once if not yet done; persists so resume skips this.
         baseline_record = state.get_baseline_record()
@@ -1217,6 +1304,7 @@ class Optimizer(abc.ABC):
                 baseline_record.workspace_dir = baseline_workspace.root_dir if baseline_workspace is not None else None
                 baseline_record.error = str(exc)
                 self._checkpoint(state)
+                progress.close()
                 raise
             finally:
                 if baseline_workspace is not None:
@@ -1224,6 +1312,9 @@ class Optimizer(abc.ABC):
 
         # Sync best_snapshot_id / best_metrics from objective (covers both fresh and resume).
         _sync_best(state, objective)
+        baseline_record = state.get_baseline_record()
+        if baseline_record is not None and baseline_record.metrics is not None:
+            self._report_trial_progress(progress, state, baseline_record, objective, baseline_record, **kwargs)
         self.on_run_start(state, objective, **kwargs)
 
         while state.current_step < max_trials:
@@ -1249,11 +1340,25 @@ class Optimizer(abc.ABC):
                 **kwargs
             )
             new_records = state.trial_records[record_count_before:]
+            for record in new_records:
+                self._report_trial_progress(progress, state, record, objective, baseline_record, **kwargs)
+                progress.update(1)
             self.observe(state, new_records, objective, **kwargs)
             state.current_step += len(proposals)
             self._prune_retained_snapshots(state, objective, **kwargs)
             self._checkpoint(state)
 
+        progress.close()
+        self._report_optimization_summary(
+            progress=progress,
+            state=state,
+            objective=objective,
+            baseline_record=baseline_record,
+            elapsed_seconds=time.perf_counter() - run_started_at,
+            start_step=start_step,
+            max_trials=max_trials,
+            **kwargs,
+        )
         best_adapter = self._resolve_best_adapter(state)
         return self.finalize(state, objective, best_adapter)
 
@@ -1292,10 +1397,13 @@ class Optimizer(abc.ABC):
             A new ProgramAdapter reflecting the best configuration found.
         """
         execution_mode, max_workers = self._validate_optimize_args(objective, max_trials, execution_mode, max_workers)
+        run_started_at = time.perf_counter()
 
         state = self._init_run_state(save_dir, resume_from)
+        start_step = state.current_step
         self.load_optimizer_state(state)
         trial_workspace_root = self._resolve_workspace_root(state, save_dir, resume_from, workspace_root)
+        progress = OptimizationProgress(total=max_trials, initial=state.current_step)
 
         # Evaluate baseline once if not yet done; persists so resume skips this.
         baseline_record = state.get_baseline_record()
@@ -1356,6 +1464,7 @@ class Optimizer(abc.ABC):
                 baseline_record.workspace_dir = baseline_workspace.root_dir if baseline_workspace is not None else None
                 baseline_record.error = str(exc)
                 self._checkpoint(state)
+                progress.close()
                 raise
             finally:
                 if baseline_workspace is not None:
@@ -1363,6 +1472,9 @@ class Optimizer(abc.ABC):
 
         # Sync best_snapshot_id / best_metrics from objective (covers both fresh and resume).
         _sync_best(state, objective)
+        baseline_record = state.get_baseline_record()
+        if baseline_record is not None and baseline_record.metrics is not None:
+            self._report_trial_progress(progress, state, baseline_record, objective, baseline_record, **kwargs)
         await self.async_on_run_start(state, objective, **kwargs)
 
         while state.current_step < max_trials:
@@ -1388,11 +1500,25 @@ class Optimizer(abc.ABC):
                 **kwargs
             )
             new_records = state.trial_records[record_count_before:]
+            for record in new_records:
+                self._report_trial_progress(progress, state, record, objective, baseline_record, **kwargs)
+                progress.update(1)
             await self.async_observe(state, new_records, objective, **kwargs)
             state.current_step += len(proposals)
             self._prune_retained_snapshots(state, objective, **kwargs)
             self._checkpoint(state)
 
+        progress.close()
+        self._report_optimization_summary(
+            progress=progress,
+            state=state,
+            objective=objective,
+            baseline_record=baseline_record,
+            elapsed_seconds=time.perf_counter() - run_started_at,
+            start_step=start_step,
+            max_trials=max_trials,
+            **kwargs,
+        )
         best_adapter = self._resolve_best_adapter(state)
         return await self.async_finalize(state, objective, best_adapter)
 
