@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, Dict, FrozenSet, List, Literal,
 if TYPE_CHECKING:
     from ..workflow.workflow_graph import WorkFlowGraph, WorkFlowNode
 
+from ..core.logging import logger
 from ..models.model_configs import OpenRouterConfig
 from ..models.openrouter_model import OpenRouterLLM
 from ..prompts.workflow.sew_optimizer import mutation_prompts, thinking_styles
@@ -399,9 +400,10 @@ class SEWProgramAdapter(ProgramAdapter):
 
     # -- run the program ----------------------------------------------------
     def execute(self, *args, **kwargs) -> Any:
+        """Run the program using ``self.prompts``; subclasses must implement this."""
         raise NotImplementedError(
             "Subclass SEWProgramAdapter and implement execute() to run your program "
-            "using self.prompts."
+            "using self.prompts. See ProgramAdapter.execute for the reentrancy contract."
         )
 
 
@@ -423,12 +425,21 @@ class SEWWorkFlowAdapter(SEWProgramAdapter):
     end-to-end: they build a fresh ``AgentManager`` + ``WorkFlow`` and call
     ``workflow.execute`` / ``workflow.async_execute`` (cf. ``examples/workflow``).
 
+    Concurrency: each call runs on its own copy of the graph (and fresh agents), so a
+    single adapter instance is safe to execute concurrently — e.g. an ``evaluate_fn``
+    that gathers ``async_execute`` over a dataset, or fans ``execute`` out across a
+    thread pool. The ``llm``, ``tools``, and ``llm_config`` dependencies are still
+    shared by reference across those concurrent runs (deep-copying LLM clients /
+    toolkits is undesirable), so they must themselves be safe for concurrent use.
+    Evaluators that bypass ``execute`` and run ``adapter.graph`` directly must copy the
+    graph first; workflow execution mutates node status.
+
     Args:
         graph: The ``WorkFlowGraph`` to optimize. Its nodes' agent prompts become the
             optimizable units.
         tools: Optional list of toolkits passed to the ``AgentManager`` at execution time.
         llm: The ``BaseLLM`` instance driving the ``WorkFlow`` (scheduling / output
-            extraction). Required to actually run the workflow.
+            extraction).
         llm_config: The ``LLMConfig`` used to instantiate each node's agent.
         max_execution_steps: Forwarded to ``WorkFlow.max_execution_steps``.
     """
@@ -448,8 +459,7 @@ class SEWWorkFlowAdapter(SEWProgramAdapter):
             raise TypeError(f"`graph` must be a WorkFlowGraph instance, got {type(graph).__name__}.")
         self.graph = graph
         self.tools = tools
-        self.llm = llm
-        self.llm_config = llm_config
+        self.llm, self.llm_config = self._reconcile_llm(llm, llm_config)
         self.max_execution_steps = max_execution_steps
 
         prompts, roles = self._extract_prompts_and_roles(graph)
@@ -459,6 +469,29 @@ class SEWWorkFlowAdapter(SEWProgramAdapter):
                 "carry an editable `prompt` or `prompt_template` instruction."
             )
         super().__init__(prompts=prompts, roles=roles)
+
+    @staticmethod
+    def _reconcile_llm(llm: Optional[Any], llm_config: Optional[Any]) -> Tuple[Any, Any]:
+        """Return a consistent ``(llm, llm_config)`` pair, deriving whichever is missing.
+
+        Both are used when running the workflow, so they must agree. ``llm`` wins when
+        both are supplied; ``llm_config`` is then taken from ``llm.config``.
+        """
+        from ..models.base_model import BaseLLM
+        from ..models.model_utils import create_llm_instance
+
+        if llm is None and llm_config is None:
+            raise ValueError("Provide at least one of `llm` or `llm_config`.")
+        if llm is not None:
+            if not isinstance(llm, BaseLLM):
+                raise TypeError(f"`llm` must be a BaseLLM instance, got {type(llm).__name__}.")
+            if llm_config is not None and llm_config is not llm.config:
+                logger.warning(
+                    "Both `llm` and `llm_config` were provided to SEWWorkFlowAdapter; "
+                    "using `llm` and ignoring the passed `llm_config` (taking llm.config)."
+                )
+            return llm, llm.config
+        return create_llm_instance(llm_config), llm_config
 
     # -- prompt extraction --------------------------------------------------
     @staticmethod
@@ -562,15 +595,10 @@ class SEWWorkFlowAdapter(SEWProgramAdapter):
         return new_graph
 
     # -- snapshot / reconstruct --------------------------------------------
-    def take_snapshot(self) -> SnapShot:
-        # Only the prompts are optimizable; everything needed to rebuild the graph (its
-        # structure, the non-optimizable agent config, tools, llm) is carried on the live
-        # adapter and re-applied in `from_snapshot`, so the snapshot stays prompt-only.
-        # Roles are non-optimizable config; persist them so they survive reconstruction.
-        return SnapShot(
-            unit_values=dict(self.prompts),
-            program_config={"roles": self.roles} if self.roles else None,
-        )
+    # take_snapshot is inherited from SEWProgramAdapter: only the prompts are
+    # optimizable and everything needed to rebuild the graph (structure, non-optimizable
+    # agent config, tools, llm) is carried on the live adapter and re-applied in
+    # `from_snapshot`, so the generic prompts-only snapshot is correct here too.
 
     def from_snapshot(self, snapshot: SnapShot, **kwargs) -> "SEWWorkFlowAdapter":
         # Reconstruct the graph by injecting the snapshot's prompts into a copy of the
@@ -587,16 +615,21 @@ class SEWWorkFlowAdapter(SEWProgramAdapter):
 
     # -- run the workflow ---------------------------------------------------
     def _build_workflow(self):
-        """Reset the graph and assemble a fresh AgentManager + WorkFlow to run it."""
+        """Assemble a fresh AgentManager + WorkFlow over a per-call graph copy."""
         from ..agents import AgentManager
         from ..workflow import WorkFlow
 
-        # Clear any execution state on the graph so a prior run can't corrupt this one.
-        self.graph.reset_graph()
+        # Run each execution on its own graph copy (not the shared self.graph), so
+        # concurrent execute() / async_execute() calls on a single adapter — e.g. an
+        # evaluate_fn that gathers over a dataset — never share mutable node-status
+        # state. WorkFlow.execute_task mutates the graph (step()/completed()), so a
+        # shared graph would let parallel runs clobber each other.
+        graph = self._copy_graph()
+        graph.reset_graph()
         agent_manager = AgentManager(tools=self.tools)
-        agent_manager.add_agents_from_workflow(self.graph, llm_config=self.llm_config)
+        agent_manager.add_agents_from_workflow(graph, llm_config=self.llm_config)
         return WorkFlow(
-            graph=self.graph,
+            graph=graph,
             agent_manager=agent_manager,
             llm=self.llm,
             max_execution_steps=self.max_execution_steps,
@@ -604,11 +637,11 @@ class SEWWorkFlowAdapter(SEWProgramAdapter):
 
     def execute(self, inputs: Optional[dict] = None, **kwargs) -> Any:
         workflow = self._build_workflow()
-        return workflow.execute(inputs=inputs or {}, **kwargs)
+        return workflow.execute(inputs=dict(inputs or {}), **kwargs)
 
     async def async_execute(self, inputs: Optional[dict] = None, **kwargs) -> Any:
         workflow = self._build_workflow()
-        return await workflow.async_execute(inputs=inputs or {}, **kwargs)
+        return await workflow.async_execute(inputs=dict(inputs or {}), **kwargs)
 
 
 __all__ = ["SEWOptimizer", "SEWProgramAdapter", "SEWWorkFlowAdapter"]

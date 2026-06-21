@@ -376,9 +376,25 @@ class ProgramAdapter(abc.ABC):
         return self.from_snapshot(snapshot, **kwargs)
 
     def execute(self, *args, **kwargs) -> Any:
+        """Run the adapted program synchronously.
+
+        Reentrancy contract: the engine passes one trial adapter instance to
+        ``evaluate_fn``. Evaluators may call this method or ``async_execute``
+        concurrently on that same instance when they fan out over a dataset, and may
+        also run directly against adapter-owned execution state. Adapter
+        implementations that support such evaluators must keep per-run state local to
+        the call, or isolate it with copies/workspaces/locks. If an adapter
+        intentionally mutates shared runtime state, its evaluator should run it serially
+        or capture the resulting state through ``capture_after_eval``.
+        """
         raise NotImplementedError(f"{self.__class__.__name__} does not implement execute().")
 
     async def async_execute(self, *args, **kwargs) -> Any:
+        """Run the adapted program asynchronously.
+
+        The same reentrancy contract as ``execute`` applies. The default implementation
+        delegates to ``execute`` for adapters that only implement a synchronous runner.
+        """
         return self.execute(*args, **kwargs)
 
     @abc.abstractmethod
