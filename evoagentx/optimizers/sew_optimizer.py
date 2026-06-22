@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, Dict, FrozenSet, List, Literal,
 if TYPE_CHECKING:
     from ..workflow.workflow_graph import WorkFlowGraph, WorkFlowNode
 
+from ..core.callbacks import suppress_logger_info
 from ..core.logging import logger
 from ..models.model_configs import OpenRouterConfig
 from ..models.openrouter_model import OpenRouterLLM
@@ -636,12 +637,17 @@ class SEWWorkFlowAdapter(SEWProgramAdapter):
         )
 
     def execute(self, inputs: Optional[dict] = None, **kwargs) -> Any:
+        # Suppress the workflow's per-step INFO logs so an evaluate_fn running many
+        # executions doesn't flood the console. suppress_logger_info is contextvar-scoped
+        # to this thread / asyncio-task, so it stays correct under concurrent execution.
         workflow = self._build_workflow()
-        return workflow.execute(inputs=dict(inputs or {}), **kwargs)
+        with suppress_logger_info():
+            return workflow.execute(inputs=dict(inputs or {}), **kwargs)
 
     async def async_execute(self, inputs: Optional[dict] = None, **kwargs) -> Any:
         workflow = self._build_workflow()
-        return await workflow.async_execute(inputs=dict(inputs or {}), **kwargs)
+        with suppress_logger_info():
+            return await workflow.async_execute(inputs=dict(inputs or {}), **kwargs)
 
 
 __all__ = ["SEWOptimizer", "SEWProgramAdapter", "SEWWorkFlowAdapter"]

@@ -28,7 +28,6 @@ import numpy as np
 from dotenv import load_dotenv
 
 from evoagentx.benchmark import HumanEval
-from evoagentx.core.callbacks import suppress_logger_info
 from evoagentx.core.logging import logger
 from evoagentx.models import OpenRouterConfig, OpenRouterLLM
 from evoagentx.optimizers.engine.objective import ScalarObjective
@@ -102,8 +101,9 @@ def make_evaluate_fn(benchmark: HumanEval, dataset: list, concurrency: int):
             return await _score_one(adapter, benchmark, example)
 
     async def evaluate_fn(adapter: SEWWorkFlowAdapter) -> dict:
-        with suppress_logger_info():
-            scores = await asyncio.gather(*[_bounded(adapter, ex) for ex in dataset])
+        # No suppress_logger_info() needed: SEWWorkFlowAdapter.async_execute suppresses
+        # the workflow's per-step logs itself (contextvar-scoped, so it's concurrency-safe).
+        scores = await asyncio.gather(*[_bounded(adapter, ex) for ex in dataset])
         return {"pass@1": float(np.mean(scores)) if scores else 0.0}
 
     return evaluate_fn
@@ -147,8 +147,7 @@ async def main():
     )
 
     # Evaluate the un-optimized workflow on the held-out test split.
-    with suppress_logger_info():
-        before = await test_evaluate_fn(adapter)
+    before = await test_evaluate_fn(adapter)
     logger.info(f"Test pass@1 BEFORE optimization: {before['pass@1']:.4f}")
 
     # 5) Optimize. Returns the adapter rebuilt from the best-scoring snapshot.
@@ -160,8 +159,7 @@ async def main():
     )
 
     # Evaluate the optimized workflow on the same test split.
-    with suppress_logger_info():
-        after = await test_evaluate_fn(best_adapter)
+    after = await test_evaluate_fn(best_adapter)
     logger.info(f"Test pass@1 AFTER optimization:  {after['pass@1']:.4f}")
 
     logger.info("Optimized prompts:")

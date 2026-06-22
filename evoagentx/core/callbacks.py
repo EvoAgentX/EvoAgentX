@@ -1,4 +1,3 @@
-import sys
 # import stopit
 from overdue import timeout_set_to
 import asyncio
@@ -7,7 +6,7 @@ import threading
 import contextvars
 from typing import Callable, Union
 from contextlib import contextmanager
-from .logging import logger, get_log_file
+from .logging import suppress_info
 
 class Callback:
 
@@ -120,44 +119,21 @@ def silence_cost_logs(func: Callable) -> Callable:
     return wrapper
 
 
-silence_nesting = contextvars.ContextVar("silence_nesting", default=0)
-
 @contextmanager
 def suppress_logger_info():
-    token = None
+    """Suppress sub-WARNING logs for the current thread / asyncio-task only.
+
+    Concurrency-safe: rather than swapping the process-global loguru sinks, this
+    flips a contextvar that the sinks' filter consults (see core/logging.py).
+    contextvars are isolated per-thread and copied per-asyncio-task, so suppressing
+    inside one concurrent run never affects sibling runs, and the manager is safe to
+    hold across an ``await`` or to nest (``reset`` restores the prior value).
+    """
+    token = suppress_info.set(True)
     try:
-        current_level = silence_nesting.get()
-        token = silence_nesting.set(current_level + 1)
-        
-        if current_level == 0:
-            logger.remove()
-            logger.add(sys.stdout, level="WARNING")
-            log_file = get_log_file()
-            if log_file is not None:
-                logger.add(
-                    log_file,
-                    encoding="utf-8",
-                    level="WARNING", 
-                    format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}"
-                )
         yield
     finally:
-        new_level = silence_nesting.get() - 1
-        silence_nesting.set(new_level)
-        
-        if new_level == 0:
-            logger.remove()
-            logger.add(sys.stdout, level="INFO")
-            log_file = get_log_file()
-            if log_file is not None:
-                logger.add(
-                    log_file,
-                    encoding="utf-8",
-                    level="INFO", 
-                    format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}"
-                )
-        if token:
-            silence_nesting.reset(token)
+        suppress_info.reset(token)
 
 
 class TimeoutException(Exception):
