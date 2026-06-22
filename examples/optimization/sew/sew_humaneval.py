@@ -45,6 +45,7 @@ NUM_VARIANTS_PER_STEP = 2  # variants generated per round (the "λ" in (1 + λ))
 EVAL_CONCURRENCY = 10      # how many dev examples to run concurrently per evaluation
 EXECUTION_MODEL = "openai/gpt-4o-mini" # OpenRouter model used to run the workflow (the program being optimized)
 OPTIMIZER_MODEL = "anthropic/claude-sonnet-4.6"  # OpenRouter model id used to mutate the prompts
+SAVE_DIR = "debug/sew_humaneval_final" # where to save the intermediate variants and final best state (SEWOptimizer.async_optimize's save_dir)
 
 
 # A single-node coding workflow defined as a SequentialWorkFlowGraph. Its one prompt is kept
@@ -155,8 +156,11 @@ async def main():
         evaluate_fn=dev_evaluate_fn,
         objective=objective,
         max_trials=MAX_TRIALS,
-        save_dir="debug/sew_humaneval_final",
+        save_dir=SAVE_DIR,
     )
+
+    # (Optional) load optimized adapter from a saved state 
+    # best_adapter = optimizer.load_optimized(SAVE_DIR)
 
     # Evaluate the optimized workflow on the same test split.
     after = await test_evaluate_fn(best_adapter)

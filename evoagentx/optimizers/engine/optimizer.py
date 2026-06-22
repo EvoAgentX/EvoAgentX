@@ -1090,6 +1090,38 @@ class Optimizer(abc.ABC):
             )
         return self.adapter.load_snapshot(best_snapshot)
 
+    def load_optimized(self, save_dir: str) -> ProgramAdapter:
+        """
+        Load the best program from a saved run for inference, without re-optimizing.
+
+        Pass the same `save_dir` given to a prior `optimize` / `async_optimize` call, and
+        get back the optimized adapter — the best snapshot loaded into an adapter, exactly
+        what the original run produced — at zero evaluation cost.
+
+        Args:
+            save_dir: The directory a prior run wrote its `optimization_state.json` into.
+
+        Returns:
+            A ProgramAdapter reflecting the best configuration found in the saved run.
+        """
+        if not os.path.isdir(save_dir):
+            raise FileNotFoundError(f"save_dir '{save_dir}' does not exist or is not a directory.")
+        state_path = os.path.join(save_dir, "optimization_state.json")
+        if not os.path.isfile(state_path):
+            raise FileNotFoundError(
+                f"No 'optimization_state.json' found under save_dir '{save_dir}'; "
+                "there is no saved run to load."
+            )
+
+        state = OptimizationRunState.load_state(state_path)
+        best_adapter = self._resolve_best_adapter(state)
+        if best_adapter is None:
+            raise RuntimeError(
+                f"Saved run at '{save_dir}' has no best snapshot recorded; there is no "
+                "optimized program to load. The run may have failed or not completed any trial."
+            )
+        return best_adapter
+
     @silence_cost_logs
     def optimize(
         self,
