@@ -3,7 +3,7 @@ from evoagentx.workflow import SEWWorkFlowGraph
 from evoagentx.agents import AgentManager
 from evoagentx.benchmark import HumanEval 
 from evoagentx.evaluators import Evaluator 
-from evoagentx.optimizers import SEWOptimizer 
+from evoagentx.optimizers.legacy.sew_optimizer import SEWOptimizer 
 from evoagentx.core.callbacks import suppress_logger_info
 
 

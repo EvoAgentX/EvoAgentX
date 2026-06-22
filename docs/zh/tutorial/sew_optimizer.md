@@ -124,4 +124,4 @@ print("Evaluation metrics: ", metrics)
 optimizer.save("debug/optimized_sew_workflow.json")
 ```
 
-有关完整的工作示例，请参阅[sew_optimizer.py](https://github.com/EvoAgentX/EvoAgentX/blob/main/examples/sew_optimizer.py)。
+有关完整的工作示例，请参阅[sew_optimizer.py](https://github.com/EvoAgentX/EvoAgentX/blob/main/examples/optimization/legacy/sew_optimizer.py)。
