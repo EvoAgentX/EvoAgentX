@@ -1,16 +1,15 @@
 import json
 import os
-from typing import Any, Dict, List, Optional
+import uuid
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional
 
 from ..core.logging import logger
-from ..models.model_configs import LLMConfig
-from ..agents import CustomizeAgent
 
 from .tool import Tool, Toolkit
-from .storage_file import StorageToolkit
-from .search_serpapi import SerpAPIToolkit
-from .interpreter_docker import DockerInterpreterToolkit
-from .interpreter_python import PythonInterpreterToolkit
+
+if TYPE_CHECKING:
+    from ..agents import CustomizeAgent
+    from ..models.model_configs import LLMConfig
 
 
 class GeneratedCodeTool(Tool):
@@ -43,6 +42,8 @@ class GeneratedCodeTool(Tool):
         }
     }
     required: Optional[List[str]] = []
+    _RESULT_MARKER_PREFIX: ClassVar[str] = "__ALITA_GENERATED_TOOL_RESULT__"
+    _RESULT_MARKER: ClassVar[str] = "__ALITA_GENERATED_TOOL_RESULT__="
 
     def __init__(
         self,
@@ -77,12 +78,17 @@ class GeneratedCodeTool(Tool):
 
         # Inject payload and user code into a small wrapper that expects the
         # user to set `result` and prints it as JSON.
+        result_marker = f"{self._RESULT_MARKER_PREFIX}_{uuid.uuid4().hex}="
         wrapper_code = (
-            "import json\n\n"
-            f"payload = json.loads({json.dumps(payload_json)})\n\n"
+            "import json as __alita_json\n\n"
+            f"payload = __alita_json.loads({json.dumps(payload_json)})\n\n"
             "result = None\n\n"
             f"{self._source_code}\n\n"
-            "print(json.dumps(result, ensure_ascii=False))\n"
+            "import json as __alita_json\n"
+            "print("
+            f"{json.dumps(result_marker)} + "
+            "__alita_json.dumps(result, ensure_ascii=False)"
+            ")\n"
         )
 
         try:
@@ -101,7 +107,49 @@ class GeneratedCodeTool(Tool):
                 "error": "Code executor returned no output for generated tool.",
             }
 
-        # Try to parse the output as JSON; if that fails, return raw text.
+        # Parse the wrapper's marked result while preserving user stdout logs.
+        return self._parse_execution_output(output, marker=result_marker)
+
+    @classmethod
+    def _parse_execution_output(
+        cls, output: str, marker: Optional[str] = None
+    ) -> Dict[str, Any]:
+        result_marker = marker or cls._RESULT_MARKER
+        marker_index = output.rfind(result_marker)
+        failed_result_text = None
+        while marker_index != -1:
+            result_start = marker_index + len(result_marker)
+            line_end = output.find("\n", result_start)
+            if line_end == -1:
+                line_end = len(output)
+                after_result = ""
+            else:
+                after_result = output[line_end + 1 :]
+
+            result_text = output[result_start:line_end].strip()
+            try:
+                parsed = json.loads(result_text)
+            except Exception:
+                failed_result_text = result_text
+            else:
+                result = {
+                    "success": True,
+                    "result": parsed,
+                    "raw_output": output,
+                }
+                logs = (output[:marker_index] + after_result).strip()
+                if logs:
+                    result["logs"] = logs
+                return result
+            marker_index = output.rfind(result_marker, 0, marker_index)
+
+        if failed_result_text is not None:
+            logger.warning(
+                "Failed to parse marked generated tool result as JSON: {}",
+                failed_result_text,
+            )
+
+        # Backward-compatible fallback for unmarked executor output.
         try:
             parsed = json.loads(output)
             return {
@@ -110,10 +158,12 @@ class GeneratedCodeTool(Tool):
                 "raw_output": output,
             }
         except Exception:
-            return {
-                "success": True,
-                "result": output,
-            }
+            pass
+
+        return {
+            "success": True,
+            "result": output,
+        }
 
 
 class AlitaDynamicToolkit(Toolkit):
@@ -509,13 +559,13 @@ class ReloadDynamicTools(Tool):
 
 
 def create_alita_agent(
-    llm_config: LLMConfig,
+    llm_config: "LLMConfig",
     persist_dynamic_tools: bool = True,
     load_existing_dynamic_tools: bool = True,
     dynamic_tools_path: str = "./workplace/alita/dynamic_tools.json",
     use_docker: bool = True,
     serpapi_api_key: Optional[str] = None,
-) -> CustomizeAgent:
+) -> "CustomizeAgent":
     """
     Build the Alita agent with search, storage, code execution, and dynamic tools.
 
@@ -543,6 +593,12 @@ def create_alita_agent(
             the SerpAPIToolkit will fall back to the SERPAPI_KEY environment
             variable.
     """
+
+    from ..agents import CustomizeAgent
+    from .interpreter_docker import DockerInterpreterToolkit
+    from .interpreter_python import PythonInterpreterToolkit
+    from .search_serpapi import SerpAPIToolkit
+    from .storage_file import StorageToolkit
 
     # Search toolkit (SerpAPI)
     serp_toolkit = SerpAPIToolkit(
@@ -638,7 +694,7 @@ def create_alita_agent(
     return agent
 
 
-def alita_agent(*args, **kwargs) -> CustomizeAgent:
+def alita_agent(*args, **kwargs) -> "CustomizeAgent":
     """
     Convenience wrapper for :func:`create_alita_agent`.
 
