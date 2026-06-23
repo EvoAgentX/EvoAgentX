@@ -1,4 +1,4 @@
-import json
+import math
 import os
 from enum import Enum
 from uuid import uuid4
@@ -59,6 +59,65 @@ class ChangeOperation(str, Enum):
 
 
 STANDARD_CHANGE_OPERATIONS = frozenset(operation.value for operation in ChangeOperation)
+
+
+def assert_pure_json(value: Any, path: str = "<root>") -> None:
+    """
+    Validate that ``value`` is a pure, round-trip-safe JSON data tree.
+
+    This is intentionally stricter than ``json.dumps``: it rejects values that *serialize*
+    but do not survive a save/load round-trip unchanged, which would silently corrupt a
+    resumed run. Only ``str`` / ``int`` / ``float`` / ``bool`` / ``None`` / ``list`` /
+    ``dict`` (with ``str`` keys) are allowed; specifically rejected are:
+
+    * non-``str`` dict keys — JSON coerces them to strings, so ``{1: "a"}`` reloads as
+      ``{"1": "a"}``;
+    * tuples and other non-``list`` sequences — they reload as lists;
+    * ``NaN`` / ``Infinity`` floats — not valid JSON, and reload depends on the parser;
+    * arbitrary objects — ``BaseModule.save_module`` writes them as ``null``; and
+    * any dict carrying a ``"class_name"`` key — ``BaseModule`` revives it into a live
+      instance on load (see ``core/module.py``) instead of returning the plain dict, so
+      the payload changes type (or fails) on resume.
+
+    Args:
+        value: The payload value to validate.
+        path: Human-readable location used in error messages.
+
+    Raises:
+        ValueError: If ``value`` is not a pure, round-trip-safe JSON data tree.
+    """
+    # NB: bool is a subclass of int; both are valid JSON scalars.
+    if value is None or isinstance(value, (str, bool, int)):
+        return
+    if isinstance(value, float):
+        if math.isnan(value) or math.isinf(value):
+            raise ValueError(
+                f"{path}: NaN/Infinity floats are not valid JSON and may not round-trip on resume"
+            )
+        return
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if not isinstance(key, str):
+                raise ValueError(
+                    f"{path}: dict key {key!r} is not a str; JSON coerces non-str keys to "
+                    f"strings, so the value would change on resume"
+                )
+            if key == "class_name":
+                raise ValueError(
+                    f"{path}.{key}: payload contains a 'class_name' key, which BaseModule "
+                    f"revives into a live instance on resume instead of a plain dict"
+                )
+            assert_pure_json(item, f"{path}.{key}")
+        return
+    if isinstance(value, list):
+        for idx, item in enumerate(value):
+            assert_pure_json(item, f"{path}[{idx}]")
+        return
+    raise ValueError(
+        f"{path}: value of type {type(value).__name__!r} cannot be persisted; only "
+        f"str/int/float/bool/None/list/dict are allowed (tuples reload as lists, and "
+        f"non-serializable objects are written as null)"
+    )
 
 
 class OptimizationUnit(BaseModule):
@@ -267,13 +326,7 @@ class SnapShot(BaseModule):
     def _require_unit_values_json_safe(cls, v: Any) -> Any:
         if not isinstance(v, dict):
             return v  # let pydantic's type check handle non-dict
-        for uid, value in v.items():
-            try:
-                json.dumps(value)
-            except (TypeError, ValueError) as exc:
-                raise ValueError(
-                    f"unit_values[{uid!r}] must be JSON-serializable; serialization failed: {exc}"
-                ) from exc
+        assert_pure_json(v, "unit_values")
         return v
 
     @field_validator("program_config", mode="before")
@@ -281,42 +334,37 @@ class SnapShot(BaseModule):
     def _require_program_config_json_safe(cls, v: Any) -> Any:
         if v is None:
             return v
-        try:
-            json.dumps(v)
-        except (TypeError, ValueError) as exc:
-            raise ValueError(
-                f"program_config must be JSON-serializable; serialization failed: {exc}"
-            ) from exc
+        assert_pure_json(v, "program_config")
         return v
 
 
 BASELINE_TRIAL_ID = 0
 
 
-def _locate_json_error(data: Any, path: str = "") -> str:
-    """Best-effort: return the path to the first value that breaks strict JSON serialization.
-
-    Used only to build a helpful error message after a full ``json.dumps`` has already
-    failed, so the cost of walking the structure is paid on the error path only.
+def _assert_payload_fields_pure_json(obj: Any, path: str) -> None:
     """
-    try:
-        json.dumps(data, allow_nan=False)
-        return path or "<root>"
-    except (TypeError, ValueError):
-        pass
-    if isinstance(data, dict):
-        for key, value in data.items():
-            try:
-                json.dumps(value, allow_nan=False)
-            except (TypeError, ValueError):
-                return _locate_json_error(value, f"{path}.{key}" if path else str(key))
-    elif isinstance(data, (list, tuple)):
-        for idx, item in enumerate(data):
-            try:
-                json.dumps(item, allow_nan=False)
-            except (TypeError, ValueError):
-                return _locate_json_error(item, f"{path}[{idx}]")
-    return path or "<root>"
+    Walk a run-state object graph and require every opaque payload field to be pure JSON.
+
+    Structural composition in this engine always flows through ``BaseModule`` instances and
+    typed lists of them (snapshots, trial records, changes, validation results); the only
+    *raw* dicts/scalars reachable are the ``Any``-typed user payloads (optimizer_state,
+    metrics, traces, artifacts, metadata, unit_values, program_config, change values,
+    validation details, adapter fingerprint, ...). So recursing through ``BaseModule``
+    fields and lists, and handing everything else to :func:`assert_pure_json`, validates
+    exactly those payloads — and only those — without enumerating each field by hand.
+
+    The framework-level ``"class_name"`` keys that drive revival live on serialized
+    ``BaseModule`` dicts, which this walk reaches as model *fields* (never as raw dicts),
+    so they are not mistaken for payload ``class_name`` keys.
+    """
+    if isinstance(obj, BaseModule):
+        for field_name in type(obj).model_fields:
+            _assert_payload_fields_pure_json(getattr(obj, field_name, None), f"{path}.{field_name}")
+    elif isinstance(obj, list):
+        for idx, item in enumerate(obj):
+            _assert_payload_fields_pure_json(item, f"{path}[{idx}]")
+    else:
+        assert_pure_json(obj, path)
 
 
 class OptimizationRunState(BaseModule):
@@ -416,32 +464,33 @@ class OptimizationRunState(BaseModule):
             path = os.path.join(path, "optimization_state.json")
         return OptimizationRunState.from_file(path=path)
 
-    def _assert_json_serializable(self) -> None:
+    def _assert_persistable(self) -> None:
         """
-        Reject a run state that cannot be losslessly persisted, before it is written.
+        Reject a run state that would not survive a save/load round-trip, before it is written.
 
         ``SnapShot.unit_values`` / ``program_config`` are validated at construction, but the
-        remaining ``Any``-typed fields (``optimizer_state`` and each ``TrialRecord``'s
-        ``artifacts`` / ``traces`` / ``metadata``) are not. ``BaseModule.save_module`` writes
-        non-serializable objects as ``null`` instead of failing, and ``BaseModule`` revives any
-        dict carrying a ``"class_name"`` key into a live instance on load — so without this
-        guard, a checkpoint can silently drop or type-drift data on resume. We serialize the
-        exact dict ``save_module`` would write and require it to round-trip through strict
-        ``json.dumps(..., allow_nan=False)``, raising with the offending path otherwise.
+        remaining opaque ``Any`` payloads — ``optimizer_state`` and each ``TrialRecord``'s
+        ``metrics`` / ``traces`` / ``artifacts`` / ``metadata`` (plus change values,
+        validation details, and the adapter fingerprint) — are mutated in place after
+        construction, so they need a checkpoint-time guard. ``BaseModule.save_module`` writes
+        non-serializable objects as ``null`` instead of failing, ``BaseModule`` revives any
+        dict carrying a ``"class_name"`` key into a live instance on load, and plain
+        ``json.dumps`` would silently turn tuples into lists and non-``str`` keys into
+        strings — each a way for a resumed run to drift from the saved one. This validates
+        every payload as a pure JSON data tree and raises with the offending path otherwise.
+
+        Raises:
+            ValueError: If any payload is not a pure, round-trip-safe JSON data tree.
         """
-        data = self.to_dict(exclude_none=True)
         try:
-            json.dumps(data, allow_nan=False)
-        except (TypeError, ValueError) as exc:
-            location = _locate_json_error(data)
+            _assert_payload_fields_pure_json(self, "OptimizationRunState")
+        except ValueError as exc:
             raise ValueError(
-                f"OptimizationRunState cannot be checkpointed: value at '{location}' is not "
-                f"JSON-serializable ({exc}). Persisting it would silently corrupt the run "
-                f"(non-serializable objects are written as null, and dicts containing a "
-                f"'class_name' key are revived as live instances on resume). Reduce live "
-                f"objects in optimizer_state via serialize_optimizer_state(), and keep each "
-                f"TrialRecord's artifacts/traces/metadata JSON-serializable (str, int, float "
-                f"without NaN/Infinity, bool, None, list, dict)."
+                f"OptimizationRunState cannot be checkpointed without data loss: {exc}. "
+                f"Keep optimizer_state (reduce live objects via serialize_optimizer_state()) "
+                f"and each TrialRecord's metrics/traces/artifacts/metadata as pure JSON data: "
+                f"str/int/float (no NaN/Infinity)/bool/None/list/dict with str keys, and no "
+                f"'class_name' keys."
             ) from exc
 
     def save_state(self) -> str:
@@ -453,7 +502,7 @@ class OptimizationRunState(BaseModule):
         Returns:
             The file path where the state was written.
         """
-        self._assert_json_serializable()
+        self._assert_persistable()
         os.makedirs(self.save_dir, exist_ok=True)
         path = os.path.join(self.save_dir, "optimization_state.json")
         self.save_module(path=path)
