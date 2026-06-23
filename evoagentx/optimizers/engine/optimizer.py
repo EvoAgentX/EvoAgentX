@@ -5,6 +5,7 @@ import time
 from typing import Any, Awaitable, Callable, ClassVar, FrozenSet, Optional, List, Dict, Literal, Set, Tuple, Iterable, Union
 
 from ...core.callbacks import silence_cost_logs
+from ...core.logging import logger
 from ...models.model_utils import cost_manager
 from .base import (
     BASELINE_TRIAL_ID,
@@ -700,6 +701,14 @@ class Optimizer(abc.ABC):
         """Return target unit uids in adapter registration order."""
         return [unit.uid for unit in self.target_units]
 
+    def _check_adapter_fingerprint(self, state: OptimizationRunState, context: str) -> None:
+        """Raise if the saved run's adapter fingerprint does not match the current adapter."""
+        current_fingerprint = self.adapter.fingerprint()
+        if state.adapter_fingerprint is not None and state.adapter_fingerprint != current_fingerprint:
+            raise ValueError(
+                f"Cannot {context}: adapter fingerprint does not match the saved run state."
+            )
+
     def _init_run_state(
         self,
         save_dir: Optional[str] = None,
@@ -708,11 +717,24 @@ class Optimizer(abc.ABC):
         """Load or create OptimizationRunState and seed the initial snapshot and baseline record."""
         if resume_from:
             state = OptimizationRunState.load_state(resume_from)
-            current_fingerprint = self.adapter.fingerprint()
-            if state.adapter_fingerprint is not None and state.adapter_fingerprint != current_fingerprint:
-                raise ValueError(
-                    "Cannot resume optimization: adapter fingerprint does not match the saved run state."
+            self._check_adapter_fingerprint(state, context="resume optimization")
+            # When both resume_from and save_dir are given and differ, read the state
+            # from resume_from but redirect all subsequent checkpoints to save_dir,
+            # leaving the original run untouched.
+            #
+            # Note: only the serialized run state (snapshots, trial records, optimizer
+            # state) is relocated. On-disk artifacts that records merely reference by
+            # path — `TrialRecord.workspace_dir` and any file paths stored in
+            # `artifacts` — still live under the original run's directory and are NOT
+            # copied into save_dir. For file-backed adapters this means the relocated
+            # state.json points at files outside save_dir.
+            if save_dir is not None and save_dir != state.save_dir:
+                logger.warning(
+                    f"resume_from ('{state.save_dir}') and save_dir ('{save_dir}') differ; "
+                    f"resuming from the saved state but writing future checkpoints to save_dir."
                 )
+                state.save_dir = save_dir
+                state.save_state()
         else:
             state = OptimizationRunState(save_dir=save_dir or "./")
             state.adapter_fingerprint = self.adapter.fingerprint()
@@ -1088,6 +1110,7 @@ class Optimizer(abc.ABC):
                 f"best_snapshot_id '{state.best_snapshot_id}' not found in run state. "
                 "The saved state may be incomplete or corrupted."
             )
+        self.adapter._validate_snapshot(best_snapshot, context="best snapshot")
         return self.adapter.load_snapshot(best_snapshot)
 
     def load_optimized(self, save_dir: str) -> ProgramAdapter:
@@ -1114,6 +1137,7 @@ class Optimizer(abc.ABC):
             )
 
         state = OptimizationRunState.load_state(state_path)
+        self._check_adapter_fingerprint(state, context="load optimized program")
         best_adapter = self._resolve_best_adapter(state)
         if best_adapter is None:
             raise RuntimeError(
