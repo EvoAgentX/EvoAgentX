@@ -37,6 +37,7 @@ class TrialWorkspace:
         source_snapshot_id: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
         keep: Optional[bool] = True,
+        clean: bool = True,
     ) -> "TrialWorkspace":
         workspace = cls(
             root_dir=os.path.abspath(root_dir),
@@ -45,6 +46,14 @@ class TrialWorkspace:
             metadata=metadata or {},
             keep=keep,
         )
+        # A trial workspace is a fresh per-trial sandbox. When `keep=True` the
+        # directory survives across runs, and trial paths can repeat (a baseline
+        # retried after a failure, or a resumed run that recomputes the same
+        # trial_id+snapshot_id). Reusing the path with `exist_ok=True` alone would
+        # leak stale files from the prior attempt into a file-backed adapter, so we
+        # remove any existing directory first unless the caller opts out.
+        if clean and os.path.exists(workspace.root_dir):
+            shutil.rmtree(workspace.root_dir)
         os.makedirs(workspace.root_dir, exist_ok=True)
         return workspace
 

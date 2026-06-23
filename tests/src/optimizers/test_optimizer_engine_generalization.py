@@ -547,6 +547,28 @@ def test_keep_trial_workspaces_false_deletes_workspace(tmp_path):
         assert not os.path.exists(record.workspace_dir), "workspace should be deleted when keep=False"
 
 
+def test_trial_workspace_create_clears_stale_files(tmp_path):
+    from evoagentx.optimizers.engine.adapter import TrialWorkspace
+
+    root = str(tmp_path / "trial_0001_abcd")
+    first = TrialWorkspace.create(root, trial_id=1)
+    stale = first.path("stale.txt")
+    with open(stale, "w") as f:
+        f.write("old")
+    assert os.path.exists(stale)
+
+    # Reusing the same path (baseline retry / resumed same trial_id) must start fresh.
+    second = TrialWorkspace.create(root, trial_id=1)
+    assert second.root_dir == first.root_dir
+    assert not os.path.exists(stale), "stale file from prior attempt must be cleared"
+
+    # Opt-out preserves existing contents.
+    with open(stale, "w") as f:
+        f.write("keep")
+    TrialWorkspace.create(root, trial_id=1, clean=False)
+    assert os.path.exists(stale)
+
+
 # ---------------------------------------------------------------------------
 # Resume from checkpoint skips already-evaluated trials
 # ---------------------------------------------------------------------------

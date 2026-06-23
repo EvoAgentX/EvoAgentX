@@ -293,6 +293,32 @@ class SnapShot(BaseModule):
 BASELINE_TRIAL_ID = 0
 
 
+def _locate_json_error(data: Any, path: str = "") -> str:
+    """Best-effort: return the path to the first value that breaks strict JSON serialization.
+
+    Used only to build a helpful error message after a full ``json.dumps`` has already
+    failed, so the cost of walking the structure is paid on the error path only.
+    """
+    try:
+        json.dumps(data, allow_nan=False)
+        return path or "<root>"
+    except (TypeError, ValueError):
+        pass
+    if isinstance(data, dict):
+        for key, value in data.items():
+            try:
+                json.dumps(value, allow_nan=False)
+            except (TypeError, ValueError):
+                return _locate_json_error(value, f"{path}.{key}" if path else str(key))
+    elif isinstance(data, (list, tuple)):
+        for idx, item in enumerate(data):
+            try:
+                json.dumps(item, allow_nan=False)
+            except (TypeError, ValueError):
+                return _locate_json_error(item, f"{path}[{idx}]")
+    return path or "<root>"
+
+
 class OptimizationRunState(BaseModule):
 
     snapshots: List[SnapShot] = Field(default_factory=list, description="List of snapshots for all completed trials in the optimization run")
@@ -390,6 +416,34 @@ class OptimizationRunState(BaseModule):
             path = os.path.join(path, "optimization_state.json")
         return OptimizationRunState.from_file(path=path)
 
+    def _assert_json_serializable(self) -> None:
+        """
+        Reject a run state that cannot be losslessly persisted, before it is written.
+
+        ``SnapShot.unit_values`` / ``program_config`` are validated at construction, but the
+        remaining ``Any``-typed fields (``optimizer_state`` and each ``TrialRecord``'s
+        ``artifacts`` / ``traces`` / ``metadata``) are not. ``BaseModule.save_module`` writes
+        non-serializable objects as ``null`` instead of failing, and ``BaseModule`` revives any
+        dict carrying a ``"class_name"`` key into a live instance on load — so without this
+        guard, a checkpoint can silently drop or type-drift data on resume. We serialize the
+        exact dict ``save_module`` would write and require it to round-trip through strict
+        ``json.dumps(..., allow_nan=False)``, raising with the offending path otherwise.
+        """
+        data = self.to_dict(exclude_none=True)
+        try:
+            json.dumps(data, allow_nan=False)
+        except (TypeError, ValueError) as exc:
+            location = _locate_json_error(data)
+            raise ValueError(
+                f"OptimizationRunState cannot be checkpointed: value at '{location}' is not "
+                f"JSON-serializable ({exc}). Persisting it would silently corrupt the run "
+                f"(non-serializable objects are written as null, and dicts containing a "
+                f"'class_name' key are revived as live instances on resume). Reduce live "
+                f"objects in optimizer_state via serialize_optimizer_state(), and keep each "
+                f"TrialRecord's artifacts/traces/metadata JSON-serializable (str, int, float "
+                f"without NaN/Infinity, bool, None, list, dict)."
+            ) from exc
+
     def save_state(self) -> str:
         """
         Serialize the current OptimizationRunState to disk under `self.save_dir`.
@@ -399,6 +453,7 @@ class OptimizationRunState(BaseModule):
         Returns:
             The file path where the state was written.
         """
+        self._assert_json_serializable()
         os.makedirs(self.save_dir, exist_ok=True)
         path = os.path.join(self.save_dir, "optimization_state.json")
         self.save_module(path=path)

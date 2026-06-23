@@ -1,26 +1,3 @@
-"""
-SEW prompt optimization on HumanEval (new optimizer engine).
-
-This example optimizes the prompts of the built-in SEW coding workflow with
-:class:`~evoagentx.optimizers.sew_optimizer.SEWOptimizer`. SEW is a PromptBreeder-style,
-mutation-only ``(1 + λ)`` loop: each round it seeds from the current best snapshot and
-re-mutates *every* target prompt at once, evaluates the variants, and keeps the best.
-
-Pieces involved:
-  * ``SEWWorkFlowGraph``   - a two-agent (task_parsing -> code_generation) coding workflow
-                             whose agent prompts are the things we optimize.
-  * ``SEWWorkFlowAdapter``  - wraps the graph so the engine can snapshot / mutate / run it.
-                             It auto-derives one PROMPT unit per agent and runs the graph
-                             end-to-end in ``execute`` / ``async_execute``.
-  * ``SEWOptimizer``        - mutates the prompts each round (uses an OpenRouter model).
-  * ``evaluate_fn``         - runs the (mutated) workflow over a dev split of HumanEval and
-                             returns ``{"pass@1": <mean>}`` for the objective to rank.
-
-Environment variables:
-  * ``OPENAI_API_KEY``      - drives the workflow itself (the program being optimized).
-  * ``OPENROUTER_API_KEY``  - drives the SEW mutation model that rewrites the prompts.
-"""
-
 import asyncio
 import os
 
