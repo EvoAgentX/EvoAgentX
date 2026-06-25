@@ -1,21 +1,35 @@
-from pydantic import Field
-from typing import Optional, Any, Callable, List, Union
-import re
-import json
 import asyncio
-import inspect
-import concurrent.futures
+import json
+import re
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
+from typing import List, Optional, Union
 
+from pydantic import Field, PositiveInt
+
+from ..core.exception import NoAnswerError
 from ..core.logging import logger
-from ..models.base_model import BaseLLM
-from .action import Action
 from ..core.message import Message
-from ..prompts.template import StringTemplate, ChatTemplate
-from ..prompts.tool_calling import OUTPUT_EXTRACTION_PROMPT, TOOL_CALLING_TEMPLATE, TOOL_CALLING_HISTORY_PROMPT, TOOL_CALLING_RETRY_PROMPT
-from ..tools.tool import Toolkit
-from ..core.registry import MODULE_REGISTRY
-from ..models.base_model import LLMOutputParser
 from ..core.module_utils import parse_json_from_llm_output, parse_json_from_text
+from ..memory.context_manager import ContextManager
+from ..models import BaseLLM, LLMOutputParser, OpenRouterLLM
+from ..prompts.customize_agent import (
+    ANSWER_HINT,
+    ANSWER_PROMPT,
+    LAST_ATTEMPT_PROMPT,
+    NO_TOOL_CALL_PROMPT,
+    RETRY_TOOL_PROMPT,
+)
+from ..prompts.output_extraction import OUTPUT_EXTRACTION_PROMPT
+from ..prompts.tool_calling import (
+    TOOL_CALLING_RETRY_PROMPT,
+    TOOL_CALLING_TEMPLATE,
+)
+from ..prompts.utils import DEFAULT_SYSTEM_PROMPT
+from ..tools.tool import Tool, Toolkit, ToolMetadata, ToolResult
+from ..utils.utils import compile_tool_schemas, pydantic_to_parameters
+from .action import Action
+
 
 class CustomizeAction(Action):
 
@@ -23,79 +37,407 @@ class CustomizeAction(Action):
     parse_func: Optional[Callable] = Field(default=None, exclude=True, description="the function to parse the LLM output. It receives the LLM output and returns a dict.")
     title_format: Optional[str] = Field(default="## {title}", exclude=True, description="the format of the title. It is used when the `parse_mode` is 'title'.")
     custom_output_format: Optional[str] = Field(default=None, exclude=True, description="the format of the output. It is used when the `prompt_template` is provided.")
-
-    tools: Optional[List[Toolkit]] = Field(default=None, description="The tools that the action can use")
+    tools: Optional[List[Union[Tool, Toolkit]]] = Field(default=None, description="The tools that the action can use")
     conversation: Optional[Message] = Field(default=None, description="Current conversation state")
+    max_steps: PositiveInt = Field(default=20, description="The maximum number of LLM calls allowed")
+    max_tool_call_concurrency: PositiveInt = Field(default=5, description="The maximum number of tool calls that can be executed concurrently")
 
-    max_tool_try: int = Field(default=2, description="Maximum number of tool calling attempts allowed")
-    
     def __init__(self, **kwargs):
 
         name = kwargs.pop("name", "CustomizeAction")
         description = kwargs.pop("description", "Customized action that can use tools to accomplish its task")
+        tools = kwargs.pop("tools", None)
 
         super().__init__(name=name, description=description, **kwargs)
-        
+
         # Validate that at least one of prompt or prompt_template is provided
         if not self.prompt and not self.prompt_template:
             raise ValueError("`prompt` or `prompt_template` is required when creating CustomizeAction action")
         # Prioritize template and give warning if both are provided
         if self.prompt and self.prompt_template:
             logger.warning("Both `prompt` and `prompt_template` are provided for CustomizeAction action. Prioritizing `prompt_template` and ignoring `prompt`.")
-        if self.tools:
-            self.tools_caller = {}
-            self.add_tools(self.tools)
-    
-    def prepare_action_prompt(
-        self, 
-        inputs: Optional[dict] = None, 
-        system_prompt: Optional[str] = None, 
-        **kwargs
-    ) -> Union[str, List[dict]]:
-        """Prepare prompt for action execution.
-        
-        This helper function transforms the input dictionary into a formatted prompt
-        for the language model, handling different prompting modes.
-        
+
+        self.tools_caller = dict()
+        self.tools = []
+        if tools:
+            self.add_tools(tools)
+        self.tool_schemas: List[dict] = compile_tool_schemas(self.tools)
+
+        self.semaphore = asyncio.Semaphore(self.max_tool_call_concurrency)
+
+    def prepare_extraction_prompt(self, llm_output_content: str) -> str:
+        """Prepare extraction prompt for fallback extraction when parsing fails.
+
         Args:
-            inputs: Dictionary of input parameters
-            system_prompt: Optional system prompt to include
-            
+            self: The action instance
+            llm_output_content: Raw output content from LLM
+
         Returns:
-            Union[str, List[dict]]: Formatted prompt ready for LLM (string or chat messages)
-            
-        Raises:
-            TypeError: If an input value type is not supported
-            ValueError: If neither prompt nor prompt_template is available
+            str: Formatted extraction prompt
         """
-        # Process inputs into prompt parameter values
-        if inputs is None:
-            inputs = {}
-            
-        prompt_params_names = self.inputs_format.get_attrs()
-        prompt_params_values = {}
-        for param in prompt_params_names:
-            value = inputs.get(param, "")
-            if isinstance(value, str):
-                prompt_params_values[param] = value
-            elif isinstance(value, (dict, list)):
-                prompt_params_values[param] = json.dumps(value, indent=4)
+        ignore = ["class_name"]
+
+        if not self.outputs_format._is_content_defined_in_subclass():
+            ignore.append("content")
+
+        output_params = pydantic_to_parameters(self.outputs_format, ignore=ignore)
+        output_params = [param.to_dict(ignore=["class_name"]) for param in output_params]
+        output_params_json = json.dumps(output_params, indent=4, ensure_ascii=False)
+        prompt = OUTPUT_EXTRACTION_PROMPT.format(text=llm_output_content, output_description=output_params_json)
+        return prompt
+
+    def add_tools(self, tools: List[Union[Tool, Toolkit]]):
+        if not tools:
+            return
+
+        duplicate = False
+        # avoid duplication & type checks
+        for tool in tools:
+            new_tools: List[Tool] = []
+
+            if isinstance(tool, Toolkit):
+                new_tools = tool.get_tools()
+            elif isinstance(tool, Tool):
+                new_tools = [tool]
             else:
-                raise TypeError(f"The input type {type(value)} is invalid! Valid types: [str, dict, list].")
+                raise ValueError(f"Invalid tool type: {type(tool)}")
+
+            for new_tool in new_tools:
+                if not isinstance(new_tool, Tool):
+                    raise ValueError(f"Invalid tool type: {type(new_tool)}")
+
+                if not callable(new_tool):
+                    raise ValueError(f"Invalid tool '{new_tool.name}' in '{tool.name}': not callable.")
+
+                if new_tool.name in self.tools_caller:
+                    logger.warning(f"Duplicate tool '{new_tool.name}' detected. Overwriting previous tool.")
+                    duplicate = True
+
+                # update tools caller
+                self.tools_caller[new_tool.name] = new_tool
+
+            logger.info(f"Added '{tool.name}' to '{self.name}'")
+
+            if duplicate:
+                self.tools = [t for t in self.tools if t.name != tool.name]
+                duplicate = False
+
+            self.tools.append(tool)
+            # update tool schemas
+            self.tool_schemas = compile_tool_schemas(self.tools)
+
+    def _extract_tool_calls(self, llm_output: str, llm: Optional[BaseLLM] = None) -> List[dict]:
+        pattern = r"<tool_call>\s*(.*?)\s*</tool_call>"
+
+        # Find all tool call blocks in the output
+        matches = re.findall(pattern, llm_output, re.DOTALL)
+        if not matches:
+            return []
+
+        # NOTE: This is a temporary workaround to address an issue where models
+        # sometimes include an extra <tool_call> block in the response,
+        # in addition to the native tool calls, which results in duplicated tool calls.
+        matches = [matches[-1]]
+
+        def _parse_tool_calls(text: str) -> List[dict]:
+            text = text.strip()
+            json_list = parse_json_from_text(text)
+            if not json_list:
+                logger.warning("No valid JSON found in tool call block")
+                return []
+            # Only use the first JSON string from each block
+            parsed_tool_call = json.loads(json_list[0])
+            if isinstance(parsed_tool_call, dict):
+                return [parsed_tool_call]
+            elif isinstance(parsed_tool_call, list):
+                return parsed_tool_call
+            else:
+                logger.warning(f"Invalid tool call format: {parsed_tool_call}")
+                return []
+
+        parsed_tool_calls = []
+        for match_content in matches:
+            try:
+                parsed_tool_calls.extend(_parse_tool_calls(match_content))
+            except (json.JSONDecodeError, IndexError) as e:
+                logger.warning(f"Failed to parse tool calls from LLM output: {e}")
+                if llm is not None:
+                    retry_prompt = TOOL_CALLING_RETRY_PROMPT.format(text=match_content)
+                    try:
+                        logger.info("Fixing tool call with LLM...")
+                        fixed_output = llm.generate(prompt=retry_prompt).content
+                        logger.info(f"Retrying with fixed tool call:\n{fixed_output}")
+                        parsed_tool_calls.extend(_parse_tool_calls(fixed_output))
+                    except Exception as retry_err:
+                        logger.error(f"Retry failed: {retry_err}")
+
+        return parsed_tool_calls
+
+    @staticmethod
+    def _extract_answer(llm_output: str) -> Union[str, None]:
+        pattern = r"<answer>\s*(.*?)\s*</answer>"
+        matches = re.findall(pattern, llm_output, re.DOTALL)
+        if matches:
+            final_answer = matches[0].strip()
+            return final_answer
+        return None
+
+    def _extract_no_answer(self, llm_output: str) -> Union[str, None]:
+        pattern = r"<no_answer>\s*(.*?)\s*</no_answer>"
+        matches = re.findall(pattern, llm_output, re.DOTALL)
+        if matches:
+            final_answer = matches[0].strip()
+            return final_answer
+        return None
+
+    async def _async_extract_output(self, llm_output: Union[str, LLMOutputParser], llm: BaseLLM = None, **kwargs) -> LLMOutputParser:
+        # Get the raw output content
+        llm_output_content = getattr(llm_output, "content", str(llm_output))
+
+        # Check if there are any defined output fields
+        output_attrs = self.outputs_format.get_attrs()
+
+        # If no output fields are defined, create a simple content-only output
+        if not output_attrs:
+            # Create output with just the content field
+            output = self.outputs_format.parse(content=llm_output_content)
+            return output
+
+        # Use the action's parse_mode and parse_func for parsing
+        try:
+            # Use the outputs_format's parse method with the action's parse settings
+            parsed_output = self.outputs_format.parse(
+                content=llm_output_content,
+                parse_mode=self.parse_mode,
+                parse_func=getattr(self, 'parse_func', None),
+                title_format=getattr(self, 'title_format', "## {title}")
+            )
+            return parsed_output
+
+        except Exception as e:
+            logger.info(f"Failed to parse with action's parse settings: {e}")
+            logger.info("Falling back to using LLM to extract outputs...")
+
+            # Fall back to extraction prompt if direct parsing fails
+            extraction_prompt = self.prepare_extraction_prompt(llm_output_content)
+
+            llm_extracted_output = await llm.async_generate(prompt=extraction_prompt)
+            llm_extracted_data: dict = parse_json_from_llm_output(llm_extracted_output.content)
+            output = self.outputs_format(**llm_extracted_data)
+            return output
+
+    async def _call_single_tool(self, function_param: dict) -> ToolResult:
+        tool_call_id = function_param.get("id")
+        function_name = function_param.get("function_name") or ""
+        function_args = function_param.get("function_args") or {}
+
+        metadata = ToolMetadata(
+            tool_name=function_name,
+            args=function_args
+        )
+
+        if not function_name:
+            output = {"error": "No tool name provided"}
+            return ToolResult(result=output, metadata=metadata, id=tool_call_id)
+
+        tool = self.tools_caller.get(function_name, None)
+        if tool is None:
+            output = {"error": f"Tool '{function_name}' not found"}
+            return ToolResult(result=output, metadata=metadata, id=tool_call_id)
+
+        if not callable(tool):
+            output = {"error": f"Tool '{function_name}' is not callable"}
+            return ToolResult(result=output, metadata=metadata, id=tool_call_id)
+
+        try:
+            async with self.semaphore:
+                tool_args_str = json.dumps(function_args, indent=4, ensure_ascii=False)
+                logger.info(f"[Tool Call] Executing tool `{function_name}` with parameters:\n{tool_args_str}")
+
+                if asyncio.iscoroutinefunction(tool.__call__):
+                    result = await tool(**function_args)
+                else:
+                    result = await asyncio.to_thread(tool, **function_args)
+
+                # Adapter: tools may return a `ToolResult` directly, or a raw value.
+                # Wrap raw values into a `ToolResult` so the agent loop is uniform.
+                if isinstance(result, ToolResult):
+                    result.id = tool_call_id
+                    return result
+                return ToolResult(result=result, metadata=metadata, id=tool_call_id)
+
+        except Exception as e:
+            logger.exception(f"Error calling tool '{function_name}': {e}")
+            return ToolResult(result={"error": str(e)}, metadata=metadata, id=tool_call_id)
+
+    async def _calling_tools(self, tool_call_args: List[dict]) -> List[ToolResult]:
+        tasks = [
+            self._call_single_tool(args)
+            for args in tool_call_args
+        ]
+
+        results = await asyncio.gather(*tasks)
+        return results
+
+    def execute(
+        self,
+        llm: Optional[BaseLLM] = None,
+        inputs: Optional[dict] = None,
+        sys_msg: Optional[str] = None,
+        return_prompt: bool = False,
+        **kwargs
+    ):
+
+        coro = self.async_execute(
+            llm=llm,
+            inputs=inputs,
+            sys_msg=sys_msg,
+            return_prompt=return_prompt,
+            **kwargs
+        )
+
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            # No event loop is running in this thread: drive the coroutine directly.
+            return asyncio.run(coro)
+
+        # We are already inside a running event loop (e.g. `execute` was called from
+        # async code). `asyncio.run()` would raise `RuntimeError` here, so run the
+        # coroutine to completion on a dedicated thread that owns its own event loop.
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            return pool.submit(asyncio.run, coro).result()
+
+    async def async_execute(
+        self,
+        llm: Optional[BaseLLM] = None,
+        inputs: Optional[dict] = None,
+        sys_msg: Optional[str] = None,
+        return_prompt: bool = False,
+        context_manager: Optional[ContextManager] = None,
+        **kwargs
+    ):
+        if llm is None:
+            raise ValueError(f"LLM is required for CustomizeAction '{self.name}'.")
+
+        inputs = inputs or {}
+        self.inputs_format(**inputs)
+
+        context_manager = await self.prepare_context(llm, inputs, sys_msg, context_manager)
+
+        final_answer = None
+        tool_calls = 0
+        no_tool_call_answer = 0
+        failed_tool_calls = 0
+        iter = 0
+
+        is_anthropic = llm.config.model.startswith("anthropic/")
+        is_openrouter = isinstance(llm, OpenRouterLLM)
+        has_many_tools = self.tools and len(self.tools) > 1
+
+        llm_extra_kwargs = {}
+        if is_openrouter and is_anthropic and has_many_tools:
+            # Enable prompt caching
+            llm_extra_kwargs = {"cache_control": {"type": "ephemeral"}}
         
-        if self.prompt:
-            prompt = self.prompt.format(**prompt_params_values) if prompt_params_values else self.prompt
-            if self.tools:
-                tools_schemas = [j["function"] for i in [tool.get_tool_schemas() for tool in self.tools] for j in i]
-                prompt += "\n\n" + TOOL_CALLING_TEMPLATE.format(tools_description = tools_schemas)
-            return prompt
-        else:
-            # Use goal-based tool calling mode
-            if self.tools:
-                self.prompt_template.set_tools(self.tools)
-            return self.prompt_template.format(
-                system_prompt=system_prompt,
-                values=prompt_params_values,
+        while True:
+            if iter >= self.max_steps:
+                logger.error(f"{self.name} exceeded maximum number of steps ({self.max_steps}).")
+                logger.info(f"[Final Output] `{self.name}` failed to produce the requested output within the maximum number of allowed attempts.")
+                raise NoAnswerError("Failed to produce the requested output within the maximum number of allowed attempts.")
+
+            if iter == self.max_steps - 1:
+                context_manager.add_user_prompt(LAST_ATTEMPT_PROMPT)
+
+            # todo: tools and extra_body might be OpenRouter specific, should be adapted for other LLMs
+            llm_response = await llm.async_generate(
+                messages=context_manager.context,
+                tools=self.tool_schemas if context_manager.mode == "openrouter" else None,
+                extra_body=llm_extra_kwargs
+            )
+
+            logger.info(f"[Raw LLM Response]: {llm_response.content}")
+            iter += 1
+
+            if no_tool_call_answer == 1 and "yes" in llm_response.content.lower():
+                break
+
+            tool_call_args = self._extract_tool_calls(llm_response.content, llm=llm)
+
+            if not tool_call_args:
+                context_manager.add_llm_response(llm_response.content)
+                final_answer = CustomizeAction._extract_answer(llm_response.content)
+                if final_answer is not None:
+                    if self.tools and tool_calls == 0 and no_tool_call_answer == 0:
+                        # if tools are provided but no tool call has been made,
+                        # ask to confirm no tool is needed for final answer (only ask once)
+                        context_manager.add_user_prompt(NO_TOOL_CALL_PROMPT)
+                        no_tool_call_answer += 1
+                        continue
+                    break
+
+                no_answer = self._extract_no_answer(llm_response.content)
+                if no_answer is not None:
+                    logger.error(f"{self.name} was unable to produce requested output: {no_answer}")
+                    raise NoAnswerError(no_answer)
+
+                context_manager.add_user_prompt(ANSWER_HINT)
+                continue
+
+            non_tool_call_response = llm_response.content.split("<tool_call>", 1)[0].strip() or None
+            context_manager.add_llm_response(non_tool_call_response, tool_calls=tool_call_args)
+
+            tool_results = await self._calling_tools(tool_call_args)
+            tool_calls += 1
+
+            context_manager.add_tool_results(tool_results)
+            for result in tool_results:
+                result_str = json.dumps(result.result, indent=4, ensure_ascii=False)
+                logger.info(f"[Tool Call] Executed tool `{result.metadata.tool_name}` results:\n{result_str}")
+
+            if failed_tool_calls == 0:
+                # if this is the first time any tool has failed, ask agent to retry.
+                for result in tool_results:
+                    if isinstance(result.result, dict) and "error" in result.result:
+                        failed_tool_calls += 1
+                        context_manager.add_user_prompt(RETRY_TOOL_PROMPT)
+                        break
+
+        final_output = await self._async_extract_output(final_answer, llm=llm)
+        logger.info(f"[Final Output] `{self.name}` final output:\n{final_output.to_str()}")
+
+        if return_prompt:
+            system_prompt = context_manager.get_system_prompt()
+
+            user_prompt = ""
+            for msg in context_manager.context:
+                if msg["role"] == "user":
+                    user_prompt = msg["content"]
+                    break
+
+            return final_output, f"<system_prompt>\n{system_prompt}\n</system_prompt>\n\n----\n\n<user_prompt>\n{user_prompt}\n</user_prompt>"
+        return final_output
+
+    async def prepare_context(
+        self,
+        llm: BaseLLM,
+        inputs: Optional[dict] = None,
+        sys_msg: Optional[str] = None,
+        context_manager: Optional[ContextManager] = None,
+    ) -> ContextManager:
+
+        inputs = inputs or {}
+
+        if context_manager is None:
+            context_manager = ContextManager(llm=llm)
+        elif len(context_manager.context) > 0:
+            return context_manager
+
+        if self.prompt_template is not None:
+            context_manager.add_prompt_template(
+                self.prompt_template,
+                sys_msg=sys_msg,
+                values=inputs,
                 inputs_format=self.inputs_format,
                 outputs_format=self.outputs_format,
                 parse_mode=self.parse_mode,
@@ -103,457 +445,21 @@ class CustomizeAction(Action):
                 custom_output_format=self.custom_output_format,
                 tools=self.tools
             )
+        elif self.prompt is not None:
+            sys_msg = sys_msg or DEFAULT_SYSTEM_PROMPT
+            context_manager.add_system_prompt(sys_msg)
+            user_prompt = self.prompt.format(**inputs)
+            # Only append the textual tool-calling guide when tools are actually
+            # available AND we are not using native tool calling. Without tools,
+            # the guide's web_search/code_execution examples can induce the model
+            # to emit <tool_call> blocks for non-existent tools, causing loops or
+            # failures. In OpenRouter native mode, tools are passed to the model
+            # directly, so the textual guide would only duplicate the prompt.
+            if self.tools and context_manager.mode != "openrouter":
+                user_prompt += "\n\n" + TOOL_CALLING_TEMPLATE.format(
+                    tool_descriptions=json.dumps(self.tool_schemas, indent=4, ensure_ascii=False)
+                )
+            context_manager.add_user_prompt(user_prompt)
 
-    def prepare_extraction_prompt(self, llm_output_content: str) -> str:
-        """Prepare extraction prompt for fallback extraction when parsing fails.
-        
-        Args:
-            self: The action instance
-            llm_output_content: Raw output content from LLM
-            
-        Returns:
-            str: Formatted extraction prompt
-        """
-        attr_descriptions: dict = self.outputs_format.get_attr_descriptions()
-        output_description_list = [] 
-        for i, (name, desc) in enumerate(attr_descriptions.items()):
-            output_description_list.append(f"{i+1}. {name}\nDescription: {desc}")
-        output_description = "\n\n".join(output_description_list)
-        return OUTPUT_EXTRACTION_PROMPT.format(text=llm_output_content, output_description=output_description)
-    
-    def _get_unique_class_name(self, candidate_name: str) -> str:
-        """
-        Get a unique class name by checking if it already exists in the registry.
-        If it does, append "Vx" to make it unique.
-        """
-        if not MODULE_REGISTRY.has_module(candidate_name):
-            return candidate_name 
-        
-        i = 1 
-        while True:
-            unique_name = f"{candidate_name}V{i}"
-            if not MODULE_REGISTRY.has_module(unique_name):
-                break
-            i += 1 
-        return unique_name 
-    
-    def add_tools(self, tools: Union[Toolkit, List[Toolkit]]):
-        if not tools:
-            return
-        if isinstance(tools,Toolkit):
-            tools = [tools]
-        if not all(isinstance(tool, Toolkit) for tool in tools):
-            raise TypeError("`tools` must be a Toolkit or list of Toolkit instances.")
-        if not self.tools:
-            self.tools_caller = {}
-            self.tools = []
-        # self.tools += tools
-        # tools_callers = [tool.get_tools() for tool in tools]
-        # tools_callers = [j for i in tools_callers for j in i]
-        # for tool_caller in tools_callers:
-        #     self.tools_caller[tool_caller.name] = tool_caller
-
-        # avoid duplication & type checks 
-        for toolkit in tools:
-            try:
-                tool_callers = toolkit.get_tools()
-                if not isinstance(tool_callers, list):
-                    logger.warning(f"Expected list of tool functions from '{toolkit.name}.get_tools()', got {type(tool_callers)}.")
-                    continue 
-                
-                # add tool callers to the tools_caller dictionary
-                valid_tools_count = 0 
-                valid_tools_names, valid_tool_callers = [], []
-                for tool_caller in tool_callers:
-                    tool_caller_name = getattr(tool_caller, "name", None)
-                    if not tool_caller_name or not callable(tool_caller):
-                        logger.warning(f"Invalid tool function in '{toolkit.name}': missing name or not callable.")
-                        continue
-                    if tool_caller_name in self.tools_caller:
-                        logger.warning(f"Duplicate tool function '{tool_caller_name}' detected. Overwriting previous function.")
-                    # self.tools_caller[tool_caller_name] = tool_caller
-                    valid_tools_count += 1
-                    valid_tools_names.append(tool_caller_name)
-                    valid_tool_callers.append(tool_caller)
-
-                if valid_tools_count == 0:
-                    logger.info(f"No valid tools found in toolkit '{toolkit.name}'. Skipping.")
-                    continue 
-
-                if valid_tools_count > 0 and all(name in self.tools_caller for name in valid_tools_names):
-                    logger.info(f"All tools from toolkit '{toolkit.name}' are already added. Skipping.")
-                    continue
-                
-                if valid_tools_count > 0:
-                    self.tools_caller.update({name: caller for name, caller in zip(valid_tools_names, valid_tool_callers)}) 
-                
-                # only add toolkit if at least one valid tool is added and toolkit is not already added 
-                existing_toolkit_names = {tkt.name for tkt in self.tools}
-                if valid_tools_count > 0 and toolkit.name not in existing_toolkit_names:
-                    self.tools.append(toolkit)
-                if valid_tools_count > 0:
-                    logger.info(f"Added toolkit '{toolkit.name}' with {valid_tools_count} valid tools in {self.name}: {valid_tools_names}.")
-            
-            except Exception as e:
-                logger.error(f"Failed to load tools from toolkit '{toolkit.name}': {e}")
-    
-    
-    def _extract_tool_calls(self, llm_output: str, llm: Optional[BaseLLM] = None) -> List[dict]:
-        pattern = r"<ToolCalling>\s*(.*?)\s*</ToolCalling>"
-    
-        
-        # Find all ToolCalling blocks in the output
-        matches = re.findall(pattern, llm_output, re.DOTALL)
-
-        if not matches:
-            return []
-        
-        parsed_tool_calls = []
-        for match_content in matches:
-            try:
-                json_content = match_content.strip()
-                json_list = parse_json_from_text(json_content)
-                if not json_list:
-                    logger.warning("No valid JSON found in ToolCalling block")
-                    continue
-                # Only use the first JSON string from each block
-                parsed_tool_call = json.loads(json_list[0])
-                if isinstance(parsed_tool_call, dict):
-                    parsed_tool_calls.append(parsed_tool_call)
-                elif isinstance(parsed_tool_call, list):
-                    parsed_tool_calls.extend(parsed_tool_call)
-                else:
-                    logger.warning(f"Invalid tool call format: {parsed_tool_call}")
-                    continue
-            except (json.JSONDecodeError, IndexError) as e:
-                logger.warning(f"Failed to parse tool calls from LLM output: {e}")
-                if llm is not None:
-                    retry_prompt = TOOL_CALLING_RETRY_PROMPT.format(text=match_content)
-                    try:
-                        fixed_output = llm.generate(prompt=retry_prompt).content.strip()
-                        logger.info(f"Retrying tool call parse with fixed output:\n{fixed_output}")
-                        
-                        fixed_list = parse_json_from_text(fixed_output)
-                        if fixed_list:
-                            parsed_tool_call = json.loads(fixed_list[0])
-                            if isinstance(parsed_tool_call, dict):
-                                parsed_tool_calls.append(parsed_tool_call)
-                        elif isinstance(parsed_tool_call, list):
-                            parsed_tool_calls.extend(parsed_tool_call)
-                    except Exception as retry_err:
-                        logger.error(f"Retry failed: {retry_err}")
-                        continue
-            else:
-                continue
-
-        return parsed_tool_calls
-    
-    def _extract_output(self, llm_output: Any, llm: BaseLLM = None, **kwargs):
-
-        # Get the raw output content
-        llm_output_content = getattr(llm_output, "content", str(llm_output))
-        
-        # Check if there are any defined output fields
-        output_attrs = self.outputs_format.get_attrs()
-        
-        # If no output fields are defined, create a simple content-only output
-        if not output_attrs:
-            # Create output with just the content field
-            output = self.outputs_format.parse(content=llm_output_content)
-            # print("Created simple content output for agent with no defined outputs:")
-            # print(output)
-            return output
-        
-        # Use the action's parse_mode and parse_func for parsing
-        try:
-            # Use the outputs_format's parse method with the action's parse settings
-            parsed_output = self.outputs_format.parse(
-                content=llm_output_content,
-                parse_mode=self.parse_mode,
-                parse_func=getattr(self, 'parse_func', None),
-                title_format=getattr(self, 'title_format', "## {title}")
-            )
-            
-            # print("Successfully parsed output using action's parse settings:")
-            # print(parsed_output)
-            return parsed_output
-            
-        except Exception as e:
-            logger.info(f"Failed to parse with action's parse settings: {e}")
-            logger.info("Falling back to using LLM to extract outputs...")
-            
-            # Fall back to extraction prompt if direct parsing fails
-            extraction_prompt = self.prepare_extraction_prompt(llm_output_content)
-                
-            llm_extracted_output: LLMOutputParser = llm.generate(prompt=extraction_prompt)
-            llm_extracted_data: dict = parse_json_from_llm_output(llm_extracted_output.content)
-            output = self.outputs_format.from_dict(llm_extracted_data)
-            
-            # print("Extracted output using fallback:")
-            # print(output)
-            return output
-    
-    async def _async_extract_output(self, llm_output: Any, llm: BaseLLM = None, **kwargs):
-        
-        # Get the raw output content
-        llm_output_content = getattr(llm_output, "content", str(llm_output))
-        
-        # Check if there are any defined output fields
-        output_attrs = self.outputs_format.get_attrs()
-        
-        # If no output fields are defined, create a simple content-only output
-        if not output_attrs:
-            # Create output with just the content field
-            output = self.outputs_format.parse(content=llm_output_content)
-            # print("Created simple content output for agent with no defined outputs:")
-            # print(output)
-            return output
-        
-        # Use the action's parse_mode and parse_func for parsing
-        try:
-            # Use the outputs_format's parse method with the action's parse settings
-            parsed_output = self.outputs_format.parse(
-                content=llm_output_content,
-                parse_mode=self.parse_mode,
-                parse_func=getattr(self, 'parse_func', None),
-                title_format=getattr(self, 'title_format', "## {title}")
-            )
-            
-            # print("Successfully parsed output using action's parse settings:")
-            # print(parsed_output)
-            return parsed_output
-            
-        except Exception as e:
-            logger.info(f"Failed to parse with action's parse settings: {e}")
-            logger.info("Falling back to using LLM to extract outputs...")
-            
-            # Fall back to extraction prompt if direct parsing fails
-            extraction_prompt = self.prepare_extraction_prompt(llm_output_content)
-                
-            llm_extracted_output = await llm.async_generate(prompt=extraction_prompt)
-            llm_extracted_data: dict = parse_json_from_llm_output(llm_extracted_output.content)
-            output = self.outputs_format.from_dict(llm_extracted_data)
-            
-            # print("Extracted output using fallback:")
-            # print(output)
-            return output
-    
-    def _call_single_tool(self, function_param: dict) -> tuple:
-        try:
-            function_name = function_param.get("function_name")
-            function_args = function_param.get("function_args") or {}
-    
-            if not function_name:
-                return None, "No function name provided"
-
-            callable_fn = self.tools_caller.get(function_name)
-            if not callable(callable_fn):
-                return None, f"Function '{function_name}' not found or not callable"
-            
-            print("_____________________ Start Function Calling _____________________")
-            print(f"Executing function calling: {function_name} with parameters: {function_args}")
-            result = callable_fn(**function_args)
-            return result, None
-
-        except Exception as e:
-            logger.error(f"Error executing tool {function_name}: {e}")
-            return None, f"Error executing tool {function_name}: {str(e)}"
-
-    def _calling_tools(self, tool_call_args: List[dict]) -> dict:
-        ## ___________ Call the tools in parallel___________
-        errors = []
-        results = []
-        
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            future_to_tool = {executor.submit(self._call_single_tool, param): param for param in tool_call_args}
-            
-            for future in concurrent.futures.as_completed(future_to_tool):
-                result, error = future.result()
-                if error:
-                    errors.append(error)
-                if result is not None:
-                    results.append(result)
-
-        return {"result": results, "error": errors}
-
-    async def _async_call_single_tool(self, function_param: dict) -> tuple:
-        try:
-            function_name = function_param.get("function_name")
-            function_args = function_param.get("function_args") or {}
-
-            if not function_name:
-                return None, "No function name provided"
-
-            callable_fn = self.tools_caller.get(function_name)
-            if not callable(callable_fn):
-                return None, f"Function '{function_name}' not found or not callable"
-
-            print("_____________________ Start Function Calling _____________________")
-            print(f"Executing function calling: {function_name} with parameters: {function_args}")
-
-            if inspect.iscoroutinefunction(callable_fn):
-                result = await callable_fn(**function_args)
-            else:
-                loop = asyncio.get_running_loop()
-                result = await loop.run_in_executor(None, lambda: callable_fn(**function_args))
-            
-            return result, None
-        
-        except Exception as e:
-            logger.error(f"Error executing tool {function_name}: {e}")
-            return None, f"Error executing tool {function_name}: {str(e)}"
-
-    async def _async_calling_tools(self, tool_call_args: List[dict]) -> dict:
-        ## ___________ Call the tools concurrently ___________
-        tasks = [self._async_call_single_tool(param) for param in tool_call_args]
-        results_with_errors = await asyncio.gather(*tasks)
-
-        results = [res for res, err in results_with_errors if err is None and res is not None]
-        errors = [err for _, err in results_with_errors if err is not None]
-
-        return {"result": results, "error": errors}
-    
-    def execute(self, llm: Optional[BaseLLM] = None, inputs: Optional[dict] = None, sys_msg: Optional[str]=None, return_prompt: bool = False, time_out = 0, **kwargs):
-        # Allow empty inputs if the action has no required input attributes
-        input_attributes: dict = self.inputs_format.get_attr_descriptions()
-        if not inputs and input_attributes:
-            logger.error("CustomizeAction action received invalid `inputs`: None or empty.")
-            raise ValueError('The `inputs` to CustomizeAction action is None or empty.')
-        # Set inputs to empty dict if None and no inputs are required
-        if inputs is None:
-            inputs = {}
-        final_llm_response = None
-        
-        if self.prompt_template:
-
-            if isinstance(self.prompt_template, ChatTemplate):
-                # must determine whether prompt_template is ChatTemplate first since ChatTemplate is a subclass of StringTemplate
-                conversation = self.prepare_action_prompt(inputs=inputs, system_prompt=sys_msg)
-            elif isinstance(self.prompt_template, StringTemplate):
-                conversation = [{"role": "system", "content": self.prepare_action_prompt(inputs=inputs, system_prompt=sys_msg)}]
-            else:
-                raise ValueError(f"`prompt_template` must be a StringTemplate or ChatTemplate instance, but got {type(self.prompt_template)}")
-        else:
-            conversation = [{"role": "system", "content": sys_msg}, {"role": "user", "content": self.prepare_action_prompt(inputs=inputs, system_prompt=sys_msg)}]
-        
-        
-        ## 1. get all the input parameters
-        prompt_params_values = {k: inputs.get(k, "") for k in input_attributes.keys()}
-        while True:
-            ### Generate response from LLM
-            if time_out > self.max_tool_try:
-                # Get the appropriate prompt for return
-                current_prompt = self.prepare_action_prompt(inputs=prompt_params_values or {})
-                # Use the final LLM response if available, otherwise fall back to execution history
-                content_to_extract = final_llm_response if final_llm_response is not None else "{content}".format(content = conversation)
-                if return_prompt:
-                    return self._extract_output(content_to_extract, llm = llm), current_prompt
-                return self._extract_output(content_to_extract, llm = llm) 
-            time_out += 1
-            
-            # Handle both string prompts and chat message lists
-            llm_response = llm.generate(messages=conversation)
-            conversation.append({"role": "assistant", "content": llm_response.content})
-            
-            # Store the final LLM response
-            final_llm_response = llm_response
-            
-            tool_call_args = self._extract_tool_calls(llm_response.content)
-            if not tool_call_args:
-                break
-            
-            logger.info("Extracted tool call args:")
-            logger.info(json.dumps(tool_call_args, indent=4))
-            
-            results = self._calling_tools(tool_call_args)
-            
-            logger.info("Tool call results:")
-            logger.info(json.dumps(results, indent=4))
-            
-            conversation.append({"role": "assistant", "content": TOOL_CALLING_HISTORY_PROMPT.format(
-                iteration_number=time_out,
-                tool_call_args=f"{tool_call_args}",
-                results=f"{results}"
-            )})
-        
-        # Get the appropriate prompt for return
-        current_prompt = self.prepare_action_prompt(inputs=prompt_params_values or {})
-        # Use the final LLM response if available, otherwise fall back to execution history
-        content_to_extract = final_llm_response if final_llm_response is not None else "{content}".format(content = conversation)
-        if return_prompt:
-            return self._extract_output(content_to_extract, llm = llm), current_prompt
-        return self._extract_output(content_to_extract, llm = llm)
-        
-
-    async def async_execute(self, llm: Optional[BaseLLM] = None, inputs: Optional[dict] = None, sys_msg: Optional[str]=None, return_prompt: bool = False, time_out = 0, **kwargs):
-        # Allow empty inputs if the action has no required input attributes
-        input_attributes: dict = self.inputs_format.get_attr_descriptions()
-        if not inputs and input_attributes:
-            logger.error("CustomizeAction action received invalid `inputs`: None or empty.")
-            raise ValueError('The `inputs` to CustomizeAction action is None or empty.')
-        # Set inputs to empty dict if None and no inputs are required
-        if inputs is None:
-            inputs = {}
-        final_llm_response = None
-        
-        if self.prompt_template:
-            if isinstance(self.prompt_template, ChatTemplate):
-                # must determine whether prompt_template is ChatTemplate first since ChatTemplate is a subclass of StringTemplate
-                conversation = self.prepare_action_prompt(inputs=inputs, system_prompt=sys_msg)
-            elif isinstance(self.prompt_template, StringTemplate):
-                conversation = [{"role": "system", "content": self.prepare_action_prompt(inputs=inputs, system_prompt=sys_msg)}]
-            else:
-                raise ValueError(f"`prompt_template` must be a StringTemplate or ChatTemplate instance, but got {type(self.prompt_template)}")
-        else:
-            conversation = [{"role": "system", "content": sys_msg}, {"role": "user", "content": self.prepare_action_prompt(inputs=inputs, system_prompt=sys_msg)}]
-        
-        
-        ## 1. get all the input parameters
-        prompt_params_values = {k: inputs.get(k, "") for k in input_attributes.keys()}
-        while True:
-            ### Generate response from LLM
-            if time_out > self.max_tool_try:
-                # Get the appropriate prompt for return
-                current_prompt = self.prepare_action_prompt(inputs=prompt_params_values or {})
-                # Use the final LLM response if available, otherwise fall back to execution history
-                content_to_extract = final_llm_response if final_llm_response is not None else "{content}".format(content = conversation)
-                if return_prompt:
-                    return await self._async_extract_output(content_to_extract, llm = llm), current_prompt
-                return await self._async_extract_output(content_to_extract, llm = llm) 
-            time_out += 1
-            
-            # Handle both string prompts and chat message lists
-            llm_response = await llm.async_generate(messages=conversation)
-            conversation.append({"role": "assistant", "content": llm_response.content})
-            
-            # Store the final LLM response
-            final_llm_response = llm_response
-            
-            tool_call_args = self._extract_tool_calls(llm_response.content)
-            if not tool_call_args:
-                break
-            
-            logger.info("Extracted tool call args:")
-            logger.info(json.dumps(tool_call_args, indent=4))
-            
-            results = self._calling_tools(tool_call_args)
-            
-            logger.info("Tool call results:")
-            try:
-                logger.info(json.dumps(results, indent=4))
-            except Exception:
-                logger.info(str(results))
-            
-            conversation.append({"role": "assistant", "content": TOOL_CALLING_HISTORY_PROMPT.format(
-                iteration_number=time_out,
-                tool_call_args=f"{tool_call_args}",
-                results=f"{results}"
-            )})
-        
-        # Get the appropriate prompt for return
-        current_prompt = self.prepare_action_prompt(inputs=prompt_params_values or {})
-        # Use the final LLM response if available, otherwise fall back to execution history
-        content_to_extract = final_llm_response if final_llm_response is not None else "{content}".format(content = conversation)
-        if return_prompt:
-            return await self._async_extract_output(content_to_extract, llm = llm), current_prompt
-        return await self._async_extract_output(content_to_extract, llm = llm)
+        context_manager.add_system_prompt(ANSWER_PROMPT)
+        return context_manager

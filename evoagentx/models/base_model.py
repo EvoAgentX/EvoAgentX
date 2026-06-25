@@ -792,23 +792,23 @@ class BaseLLM(ABC):
         """
         pass
     
+    @abstractmethod
     async def single_generate_async(self, messages: List[dict], **kwargs) -> str:
         """Asynchronously generates LLM output for a single set of messages.
-        
-        This default implementation wraps the synchronous method in an async executor.
-        Subclasses should override this for true async implementation if supported.
-        
+
+        Subclasses must provide a true async implementation. There is intentionally
+        no default that wraps `single_generate` in an executor: such a wrapper both
+        mishandles `**kwargs` through `run_in_executor` and silently diverges from the
+        provider's real async path (which can break test mocking and behavior parity).
+
         Args:
             messages: The input messages to the LLM in chat format.
             **kwargs (Any): Additional keyword arguments for generation settings.
-        
+
         Returns:
             The generated output text from the LLM.
         """
-        # Default implementation for backward compatibility
-        loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(None, self.single_generate, messages, **kwargs)
-        return result
+        pass
     
     async def batch_generate_async(self, batch_messages: List[List[dict]], **kwargs) -> List[str]:
         """Asynchronously generates outputs for a batch of message sets.
