@@ -1,8 +1,96 @@
-# todo: Switch back to <tool_call> once CustomizeAction supports the canonical tool-call tag.
 TOOL_CALL_FORMAT = """
-<ToolCalling>
+<tool_call>
 {tool_calls}
-</ToolCalling>
+</tool_call>
+"""
+
+TOOL_CALLING_HISTORY_PROMPT = """
+<tool_result>
+{results}
+</tool_result>
+"""
+
+AGENT_GENERATION_TOOLS_PROMPT = """
+### Tools
+In the following **Tool Descriptions** section, you are offered with the following tools. A short description of each functionality is also provided for each tool.
+You should assign tools to agent if you think it would be helpful for the agent to use the tool.
+
+**Tool Descriptions**
+{tool_descriptions}
+
+"""
+
+TOOL_CALLING_TEMPLATE = """
+### Tool Calling Guide
+
+The following tools are available:
+{tool_descriptions}
+
+#### Tool Calling Rules
+- Only use the tools provided. Do not invent or use non-existent ones.
+- Check the conversation history before calling a tool. If the information you need is already present, do not make another call.
+- If a tool call fails, try a different tool or adjust the arguments. Do not repeat the failed call.
+- Only use a tool when it is essential to complete the task, such as to retrieve external data.
+- Each tool call must include `function_name` and `function_args`.
+- The arguments in `function_args` must exactly match the tool's required parameters and their data types. Do not include any extra arguments.
+- Each argument must be a valid JSON type (e.g., string, number, boolean, array, object).
+- Output only the JSON format shown in the **Tool Calling Output Format** section. Do not include any additional text, explanations, or comments within the `<tool_call>` block. If no tools are needed, do not output this block at all.
+
+#### Tool Calling Output Format
+<tool_call>
+[
+    {{
+        "function_name": "tool_name",
+        "function_args": {{
+            "param1": "value1",
+            "param2": "value2"
+        }}
+    }},
+    ...
+]
+</tool_call>
+
+#### Tool Calling Examples
+Example 1: Single tool call for web search.
+<tool_call>
+[
+    {{
+        "function_name": "web_search",
+        "function_args": {{
+            "query": "example search term",
+            "num_results": 5
+        }}
+    }}
+]
+</tool_call>
+
+Example 2: Multiple calls that don't depend on each other (e.g., search and code execution).
+<tool_call>
+[
+    {{
+        "function_name": "web_search",
+        "function_args": {{
+            "query": "latest tech news",
+            "num_results": 5
+        }}
+    }},
+    {{
+        "function_name": "code_execution",
+        "function_args": {{
+            "code": "print('Hello world')"
+        }}
+    }}
+]
+</tool_call>
+"""
+
+TOOL_CALLING_RETRY_PROMPT = """
+The following is an invalid JSON array. Please correct it and return only the valid JSON array.
+
+**Invalid JSON Array**
+```json
+{text}
+```
 """
 
 
@@ -33,97 +121,43 @@ We need you to process this text and generate high-quality outputs for each of t
 Now, based on the text and the instructions above, provide your final JSON output.
 """
 
+def format_tool_descriptions(tools, default: str = "No tools provided.") -> str:
+    """
+    Args:
+        tools: List of tools to format.
+        default: Default description to use if no tools are provided.
 
-TOOL_CALLING_HISTORY_PROMPT = """
-Iteration {iteration_number}:
-Executed tool calls:
-{tool_call_args}
-Results:
-{results}
+    Returns:
+        str: Formatted tool descriptions.
 
-"""
+    Example output:
+    - **Tool 1**: Description of tool 1
+    - **Tool 2**: Description of tool 2
+    - **Toolkit** is a toolkit that provides the following functionalities:
+        * Description of tool 1 in toolkit
+        * Description of tool 2 in toolkit
+    """
+    from ..tools import Tool, Toolkit
 
-AGENT_GENERATION_TOOLS_PROMPT = """
-In the following Tools Description section, you are offered with the following tools. A short description of each functionality is also provided for each tool.
-You should assign tools to agent if you think it would be helpful for the agent to use the tool.
-A sample output for tool argument looks like this following line (The example tools are not real tools): 
-tools: ["File Tool", "Browser Tool"]
+    if not tools:
+        return default
+        
+    descriptions = []
 
-**Tools Description**
-{tools_description}
+    for tool in tools:
+        if isinstance(tool, Tool):
+            name = tool.name
+            description = tool.description.replace("\n", "\n    ")
+            descriptions.append(f"- **{name}**: {description}")
+        elif isinstance(tool, Toolkit):
+            name = tool.name
+            description = "is a toolkit that provides the following functionalities:"
 
-"""
+            for tool in tool.get_tools():
+                tool_description = tool.description.replace("\n", "\n        ")
+                description += f"\n    * {tool_description}"
+            
+            descriptions.append(f"- **{name}** {description}")
 
-
-TOOL_CALLING_TEMPLATE = """
-# Tool Calling Guide
-
-You can call the following tools:
-{tools_description}
-
-## Rules
-- ONLY use tools listed above. Do not invent or use non-existent tools.
-- Check the conversation history before calling: If the needed information is already available (e.g., from previous tool results), do not call tools again. Summarize and use it directly.
-- If a previous tool call failed (e.g., error in history), try a different tool or adjust arguments; do not repeat the same call.
-- Call tools ONLY when necessary for the task (e.g., external data, computation). Otherwise, proceed to the final output without tools.
-- Support multiple parallel calls: Use an array with multiple objects if needed.
-- Each call MUST include "function_name" (exact match from tool's Action) and "function_args" (a dict with exact argument names and values).
-- For arguments: Each parameter must be a valid JSON type (e.g., string, integer) and required/optional status as described. Do not add extra args.
-- Output STRICTLY in the format below. NO explanations, comments, thoughts, or extra text outside the <ToolCalling> block. If no tools needed, do not output this block at all.
-
-## Output format
-Always return a JSON array of tool calls, like:
-
-<ToolCalling>
-[
-  {{
-         "function_name": "tool_name",
-         "function_args": {{
-             "param1": "value1",
-             "param2": "value2"
-         }}
-     }},
-     ...
-]
-</ToolCalling>
-
-## Examples
-Example 1: Single tool call for web search.
-<ToolCalling>
-[
-    {{
-        "function_name": "web_search",
-        "function_args": {{
-            "query": "example search term",
-            "num_results": 5
-        }}
-    }}
-]
-</ToolCalling>
-
-Example 2: Multiple parallel calls (e.g., search and code execution).
-<ToolCalling>
-[
-    {{
-        "function_name": "web_search",
-        "function_args": {{
-            "query": "python tips"
-        }}
-    }},
-    {{
-        "function_name": "code_execution",
-        "function_args": {{
-            "code": "print('Hello world')"
-        }}
-    }}
-]
-</ToolCalling>
-"""
-
-TOOL_CALLING_RETRY_PROMPT = """
-The following output is supposed to be a JSON list of tool calls, but it's invalid.
-Please fix it and return ONLY the valid JSON array:
---- Invalid Output ---
-{text}
---- End ---
-"""
+    descriptions = "\n".join(descriptions)
+    return descriptions
