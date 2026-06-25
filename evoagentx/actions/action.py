@@ -1,14 +1,14 @@
 import json
 from pydantic import model_validator 
 from pydantic_core import PydanticUndefined
-from typing import Optional, Type, Tuple, Union, List, Any
+from typing import ClassVar, Optional, Type, Tuple, Union, List, Any
 
 from ..core.module import BaseModule
 from ..core.registry import MODULE_REGISTRY
 from ..core.parser import Parser
 from ..core.message import Message
 from ..models.base_model import BaseLLM, LLMOutputParser
-from ..tools.tool import Toolkit 
+from ..tools.tool import Tool, Toolkit 
 from ..prompts.context_extraction import CONTEXT_EXTRACTION
 from ..prompts.template import PromptTemplate  
 
@@ -53,6 +53,7 @@ class ActionOutput(LLMOutputParser):
     to convert the output to structured data. It inherits from LLMOutputParser
     to support parsing of LLM outputs into structured action results.
     """
+    fix_json_schema_error: ClassVar[bool] = True
     
     def to_str(self) -> str:
         """Convert the output to a formatted JSON string.
@@ -60,8 +61,7 @@ class ActionOutput(LLMOutputParser):
         Returns:
             A pretty-printed JSON string representation of the structured data.
         """
-        return json.dumps(self.get_structured_data(), indent=4)
-    
+        return json.dumps(self.get_structured_data(), indent=4, ensure_ascii=False)
 
 class Action(BaseModule):
     """Base class for all actions in the EvoAgentX framework.
@@ -83,7 +83,7 @@ class Action(BaseModule):
     description: str
     prompt: Optional[str] = None
     prompt_template: Optional[PromptTemplate] = None 
-    tools: Optional[List[Toolkit]] = None # specify the possible tool for the action
+    tools: Optional[List[Union[Tool, Toolkit]]] = None # specify the possible tool for the action
     inputs_format: Optional[Type[ActionInput]] = None # specify the input format of the action
     outputs_format: Optional[Type[Parser]] = None  # specify the possible structured output format
 
