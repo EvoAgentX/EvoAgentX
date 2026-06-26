@@ -228,6 +228,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 Once the API key is set, initialise the LLM with:
 
 ```python
+import os
 from evoagentx.models import OpenAILLMConfig, OpenAILLM
 
 # Load the API key from environment
