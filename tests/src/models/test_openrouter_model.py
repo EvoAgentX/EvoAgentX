@@ -96,7 +96,7 @@ def test_sync_tool_call_non_stream(mocker):
     llm = _make_llm(stream=False, tools=[GET_WEATHER_TOOL], tool_choice="auto")
     out = llm.generate(prompt="What is the weather in Tokyo?")
     assert isinstance(out, LLMOutputParser)
-    assert "<ToolCalling>" in out.content
+    assert "<tool_call>" in out.content
     assert "get_weather" in out.content
     assert "Tokyo" in out.content
     _assert_cost_updated()
@@ -111,7 +111,7 @@ def test_sync_tool_call_stream(mocker):
     llm = _make_llm(stream=True, tools=[GET_WEATHER_TOOL], tool_choice="auto")
     out = llm.generate(prompt="What is the weather in Tokyo?")
     assert isinstance(out, LLMOutputParser)
-    assert "<ToolCalling>" in out.content
+    assert "<tool_call>" in out.content
     assert "get_weather" in out.content
     assert "Tokyo" in out.content
     _assert_cost_updated()
@@ -152,7 +152,7 @@ async def test_async_tool_call_non_stream(mocker):
     llm = _make_llm(stream=False, tools=[GET_WEATHER_TOOL], tool_choice="auto")
     out = await llm.async_generate(prompt="What is the weather in Tokyo?")
     assert isinstance(out, LLMOutputParser)
-    assert "<ToolCalling>" in out.content
+    assert "<tool_call>" in out.content
     assert "get_weather" in out.content
     _assert_cost_updated()
 
@@ -166,7 +166,7 @@ async def test_async_tool_call_stream(mocker):
     llm = _make_llm(stream=True, tools=[GET_WEATHER_TOOL], tool_choice="auto")
     out = await llm.async_generate(prompt="What is the weather in Tokyo?")
     assert isinstance(out, LLMOutputParser)
-    assert "<ToolCalling>" in out.content
+    assert "<tool_call>" in out.content
     assert "get_weather" in out.content
     _assert_cost_updated()
 

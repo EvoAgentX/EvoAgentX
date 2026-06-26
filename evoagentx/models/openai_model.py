@@ -35,6 +35,13 @@ class OpenAILLM(BaseLLM):
         if self.config.model not in get_openai_model_cost():
             raise KeyError(f"'{self.config.model}' is not a valid OpenAI model name!")
 
+    def supports_native_tool_calling(self) -> bool:
+        # OpenAI's chat-completions API is the reference implementation of native
+        # function calling. SiliconFlow and Aliyun (DashScope compatible-mode) speak
+        # the same protocol and inherit this; all three were verified end-to-end
+        # (native tool_calls + role:tool round-trip) against the real APIs.
+        return True
+
     def _init_client(self, config: OpenAILLMConfig):
         return OpenAI(api_key=config.openai_key)
 

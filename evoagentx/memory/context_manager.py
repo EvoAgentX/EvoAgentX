@@ -1,7 +1,7 @@
 import json
 from typing import List, Optional, Union
 
-from ..models import BaseLLM, OpenRouterLLM
+from ..models import BaseLLM
 from ..prompts.template import ChatTemplate, PromptTemplate, StringTemplate
 from ..prompts.tool_calling import TOOL_CALL_FORMAT, TOOL_CALLING_HISTORY_PROMPT
 from ..prompts.utils import DEFAULT_SYSTEM_PROMPT
@@ -17,8 +17,12 @@ class ContextManager:
         self.context = []
         self.llm = llm
 
-        if isinstance(llm, OpenRouterLLM):
-            self.mode = "openrouter"
+        # "native": pass tools to the model and exchange structured tool_calls /
+        # role:tool messages. "default": describe tools in the prompt and parse a
+        # textual <tool_call> block from the response. Decided per-LLM by whether the
+        # provider supports the native function-calling protocol.
+        if llm.supports_native_tool_calling():
+            self.mode = "native"
         else:
             self.mode = "default"
         
@@ -49,15 +53,18 @@ class ContextManager:
 
 
     def add_prompt_template(self, prompt_template: PromptTemplate, sys_msg: Optional[str] = None, **kwargs):
-        if isinstance(prompt_template, ChatTemplate):
-            if self.mode == "openrouter":
-                # if using OpenRouter models, remove tools from the prompt template
-                # because we use native tool calling support from OpenRouter
-                template_copy = prompt_template.copy()
-                template_copy.tools = None
-                prompts = template_copy.format(**kwargs)
-            else:
-                prompts = prompt_template.format(**kwargs)
+        format_kwargs = dict(kwargs)
+        template = prompt_template
+        if self.mode == "native":
+            # In native mode the tool schema is sent via the model `tools`
+            # parameter, so remove both template-owned tools and call-time tools
+            # from the rendered prompt.
+            format_kwargs["tools"] = None
+            if getattr(prompt_template, "tools", None):
+                template = prompt_template.copy(tools=None)
+
+        if isinstance(template, ChatTemplate):
+            prompts = template.format(**format_kwargs)
 
             if prompts[0]["role"] == "system":
                 self.replace_system_prompt(prompts[0]["content"])
@@ -65,15 +72,15 @@ class ContextManager:
             else:
                 self.context.extend(prompts)
 
-        elif isinstance(prompt_template, StringTemplate):
+        elif isinstance(template, StringTemplate):
             # `StringTemplate.format()` returns one consolidated prompt, so mirror the
             # `self.prompt` path: `sys_msg` (or the default) becomes the system message
             # and the whole formatted string becomes the user message.
             self.add_system_prompt(sys_msg or DEFAULT_SYSTEM_PROMPT)
-            self.add_user_prompt(prompt_template.format(**kwargs))
+            self.add_user_prompt(template.format(**format_kwargs))
 
         else:
-            raise TypeError(f"Invalid prompt template type {type(prompt_template)}.")
+            raise TypeError(f"Invalid prompt template type {type(template)}.")
 
 
     def add_user_prompt(self, user_prompt: Union[str, list]):
@@ -105,11 +112,11 @@ class ContextManager:
 
             tool_results_str = json.dumps(formatted_tool_results, indent=4, ensure_ascii=False)
             self.context.append({
-                "role": "user", 
+                "role": "user",
                 "content": TOOL_CALLING_HISTORY_PROMPT.format(results=tool_results_str)
             })
 
-        elif self.mode == "openrouter":
+        elif self.mode == "native":
             for result in tool_results:
                 result_str = json.dumps(result.result, indent=4, ensure_ascii=False)
 
@@ -132,8 +139,8 @@ class ContextManager:
                 response += TOOL_CALL_FORMAT.format(tool_calls=json.dumps(tool_calls, indent=4, ensure_ascii=False))
 
             self.context.append({"role": "assistant", "content": response})
-        
-        elif self.mode == "openrouter":
+
+        elif self.mode == "native":
             if not tool_calls:
                 self.context.append({"role": "assistant", "content": llm_response})
                 return
@@ -144,7 +151,7 @@ class ContextManager:
                 tool_args = json.dumps(tool_call["function_args"], indent=4, ensure_ascii=False)
                 formatted_tool_calls.append(
                     {
-                        "id": tool_call["id"],
+                        "id": tool_call.get("id"),
                         "function": {
                             "name": tool_call["function_name"],
                             "arguments": tool_args

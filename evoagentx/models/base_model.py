@@ -753,6 +753,21 @@ class BaseLLM(ABC):
         memo[id(self)] = self
         return self
 
+    def supports_native_tool_calling(self) -> bool:
+        """Whether this LLM supports the native (OpenAI-style) function-calling protocol.
+
+        "Native" means the provider accepts a `tools` schema, returns structured
+        `tool_calls`, and accepts the round-trip of an assistant message carrying
+        `tool_calls` followed by `role: "tool"` result messages. When True, the agent
+        loop passes tools to the model directly instead of describing them in the prompt
+        and asking the model to emit a `<tool_call>` block.
+
+        Defaults to False so that unknown/unverified subclasses fall back to the
+        prompt-based tool-calling guide. Subclasses whose providers have been verified
+        end-to-end against the real API should override this to return True.
+        """
+        return False
+
     @abstractmethod
     def formulate_messages(self, prompts: List[str], system_messages: Optional[List[str]] = None) -> List[List[dict]]:
         """Converts input prompts into the chat format compatible with different LLMs.

@@ -1,6 +1,7 @@
 import asyncio
 import json
 import re
+import uuid
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Optional, Union
@@ -56,6 +57,14 @@ class CustomizeAction(Action):
         # Prioritize template and give warning if both are provided
         if self.prompt and self.prompt_template:
             logger.warning("Both `prompt` and `prompt_template` are provided for CustomizeAction action. Prioritizing `prompt_template` and ignoring `prompt`.")
+        if tools and self.prompt_template is not None and getattr(self.prompt_template, "tools", None):
+            logger.warning(
+                "Both `CustomizeAction.tools` and `prompt_template.tools` are provided. "
+                "`CustomizeAction.tools` will override `prompt_template.tools`. "
+                "`PromptTemplate.tools` is legacy and will be removed in a future release; "
+                "prefer passing tools to `CustomizeAction`/`CustomizeAgent`, or to "
+                "`PromptTemplate.format(..., tools=...)` when rendering prompt-based tool instructions."
+            )
 
         self.tools_caller = dict()
         self.tools = []
@@ -170,6 +179,15 @@ class CustomizeAction(Action):
                         parsed_tool_calls.extend(_parse_tool_calls(fixed_output))
                     except Exception as retry_err:
                         logger.error(f"Retry failed: {retry_err}")
+
+        # Guarantee every tool call carries an `id`. Native tool calls come back with
+        # provider-issued ids, but a model may also emit a hand-written <tool_call>
+        # block with no id. In native mode the id links the assistant `tool_calls`
+        # message to its `role: tool` result, and providers reject a null/mismatched
+        # id, so synthesize one when absent.
+        for tool_call in parsed_tool_calls:
+            if isinstance(tool_call, dict) and not tool_call.get("id"):
+                tool_call["id"] = f"call_{uuid.uuid4().hex}"
 
         return parsed_tool_calls
 
@@ -349,10 +367,13 @@ class CustomizeAction(Action):
             if iter == self.max_steps - 1:
                 context_manager.add_user_prompt(LAST_ATTEMPT_PROMPT)
 
-            # todo: tools and extra_body might be OpenRouter specific, should be adapted for other LLMs
+            # In native mode the tools schema is passed to the model directly; in
+            # default mode tools are described in the prompt and we parse a textual
+            # <tool_call> block instead. `extra_body` is OpenRouter-specific (e.g.
+            # Anthropic prompt caching) and is silently dropped by other LLMs.
             llm_response = await llm.async_generate(
                 messages=context_manager.context,
-                tools=self.tool_schemas if context_manager.mode == "openrouter" else None,
+                tools=self.tool_schemas if context_manager.mode == "native" else None,
                 extra_body=llm_extra_kwargs
             )
 
@@ -453,9 +474,9 @@ class CustomizeAction(Action):
             # available AND we are not using native tool calling. Without tools,
             # the guide's web_search/code_execution examples can induce the model
             # to emit <tool_call> blocks for non-existent tools, causing loops or
-            # failures. In OpenRouter native mode, tools are passed to the model
-            # directly, so the textual guide would only duplicate the prompt.
-            if self.tools and context_manager.mode != "openrouter":
+            # failures. In native mode, tools are passed to the model directly, so
+            # the textual guide would only duplicate the prompt.
+            if self.tools and context_manager.mode != "native":
                 user_prompt += "\n\n" + TOOL_CALLING_TEMPLATE.format(
                     tool_descriptions=json.dumps(self.tool_schemas, indent=4, ensure_ascii=False)
                 )

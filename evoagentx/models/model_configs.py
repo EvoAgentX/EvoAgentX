@@ -32,7 +32,7 @@ class OpenAILLMConfig(LLMConfig):
 
     # tools 
     tools: Optional[List] = Field(default=None, description="A list of tools the model may call. Currently, only functions are supported as a tool. Use this to provide a list of functions the model may generate JSON inputs for.")
-    tool_choice: Optional[str] = Field(default=None, description="Controls which (if any) function is called by the model. none means the model will not call a function and instead generates a message. auto means the model can pick between generating a message or calling a function. Specifying a particular function via {\"type\": \"function\", \"function\": {\"name\": \"my_function\"}} forces the model to call that function.")
+    tool_choice: Optional[Union[str, dict]] = Field(default=None, description="Controls which (if any) function is called by the model. none means the model will not call a function and instead generates a message. auto means the model can pick between generating a message or calling a function. required forces the model to call a tool. Specifying a particular function via {\"type\": \"function\", \"function\": {\"name\": \"my_function\"}} forces the model to call that function.")
     parallel_tool_calls: Optional[bool] = Field(default=None, description="Whether to enable parallel function calling during tool use. OpenAI default is true.")
     
     # reasoning parameters 
@@ -94,7 +94,7 @@ class LiteLLMConfig(LLMConfig):
 
     # tools
     tools: Optional[List] = Field(default=None, description="A list of tools the model may call. Currently, only functions are supported as a tool. Use this to provide a list of functions the model may generate JSON inputs for.")
-    tool_choice: Optional[str] = Field(default=None, description="Controls which (if any) function is called by the model. none means the model will not call a function and instead generates a message. auto means the model can pick between generating a message or calling a function. Specifying a particular function via {\"type\": \"function\", \"function\": {\"name\": \"my_function\"}} forces the model to call that function.")
+    tool_choice: Optional[Union[str, dict]] = Field(default=None, description="Controls which (if any) function is called by the model. none means the model will not call a function and instead generates a message. auto means the model can pick between generating a message or calling a function. required forces the model to call a tool. Specifying a particular function via {\"type\": \"function\", \"function\": {\"name\": \"my_function\"}} forces the model to call that function.")
     parallel_tool_calls: Optional[bool] = Field(default=None, description="Whether to enable parallel function calling during tool use. OpenAI default is true.")
 
     # token probabilities
@@ -126,7 +126,7 @@ class SiliconFlowConfig(LLMConfig):
 
     # tools
     tools: Optional[List] = Field(default=None, description="A list of tools the model may call. Currently, only functions are supported as a tool. Use this to provide a list of functions the model may generate JSON inputs for.")
-    tool_choice: Optional[str] = Field(default=None, description="Controls which (if any) function is called by the model. none means the model will not call a function and instead generates a message. auto means the model can pick between generating a message or calling a function. Specifying a particular function via {\"type\": \"function\", \"function\": {\"name\": \"my_function\"}} forces the model to call that function.")
+    tool_choice: Optional[Union[str, dict]] = Field(default=None, description="Controls which (if any) function is called by the model. none means the model will not call a function and instead generates a message. auto means the model can pick between generating a message or calling a function. required forces the model to call a tool. Specifying a particular function via {\"type\": \"function\", \"function\": {\"name\": \"my_function\"}} forces the model to call that function.")
     parallel_tool_calls: Optional[bool] = Field(default=None, description="Whether to enable parallel function calling during tool use. OpenAI default is true.")
 
     # token probabilities
@@ -193,7 +193,7 @@ class AliyunLLMConfig(LLMConfig):
 
     # tools
     tools: Optional[List] = Field(default=None, description="A list of tools or functions the model may call. Aliyun supports function calling for specific models.")
-    tool_choice: Optional[str] = Field(default=None, description="Controls whether the model should call a tool. Options include 'none' (no tool call), 'auto' (model decides), or a specific tool name.")
+    tool_choice: Optional[Union[str, dict]] = Field(default=None, description="Controls whether the model should call a tool. Options include 'none' (no tool call), 'auto' (model decides), 'required' (force a tool call), or a specific tool via {\"type\": \"function\", \"function\": {\"name\": \"my_function\"}}.")
     
     # model-specific parameters
     enable_search: Optional[bool] = Field(default=None, description="Whether to enable web search augmentation for the model, if supported.")

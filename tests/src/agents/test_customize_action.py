@@ -14,6 +14,7 @@ from evoagentx.core.exception import NoAnswerError
 from evoagentx.memory.context_manager import ContextManager
 from evoagentx.models.litellm_model import LiteLLM
 from evoagentx.models.model_configs import LiteLLMConfig
+from evoagentx.prompts.template import ChatTemplate, StringTemplate
 from evoagentx.tools.tool import Tool, ToolResult
 
 
@@ -38,8 +39,24 @@ class AddNumbersTool(Tool):
         return {"sum": a + b}
 
 
+class PromptOnlyTool(Tool):
+    name: str = "prompt_only"
+    description: str = "A legacy prompt-template tool that should be overridden."
+    inputs: Dict[str, Dict[str, Any]] = {
+        "text": {"type": "string", "description": "Text to echo."},
+    }
+    required: Optional[List[str]] = ["text"]
+
+    def __call__(self, text: str) -> Dict[str, str]:
+        return {"text": text}
+
+
 def _user_messages(context: List[dict]) -> str:
     return "\n".join(m["content"] for m in context if m["role"] == "user" and isinstance(m["content"], str))
+
+
+def _all_message_text(context: List[dict]) -> str:
+    return "\n".join(m["content"] for m in context if isinstance(m.get("content"), str))
 
 
 GUIDE_MARKER = "Tool Calling Guide"
@@ -65,16 +82,76 @@ class TestPrepareContext(unittest.IsolatedAsyncioTestCase):
 
     async def test_prompt_with_tools_default_mode_includes_guide(self):
         action = self._action(tools=[AddNumbersTool()])
-        cm = ContextManager(llm=make_llm())  # default mode
+        cm = ContextManager(llm=make_llm())
+        cm.mode = "default"  # simulate an LLM without native tool calling
         await action.prepare_context(llm=make_llm(), inputs={}, context_manager=cm)
         self.assertIn(GUIDE_MARKER, _user_messages(cm.context))
 
-    async def test_prompt_with_tools_openrouter_mode_omits_guide(self):
+    async def test_prompt_with_tools_native_mode_omits_guide(self):
         action = self._action(tools=[AddNumbersTool()])
         cm = ContextManager(llm=make_llm())
-        cm.mode = "openrouter"  # simulate native tool-calling path
+        cm.mode = "native"  # native tool-calling path
         await action.prepare_context(llm=make_llm(), inputs={}, context_manager=cm)
         self.assertNotIn(GUIDE_MARKER, _user_messages(cm.context))
+
+    async def test_string_template_with_tools_native_mode_omits_guide(self):
+        agent = CustomizeAgent(
+            name="StringTemplateTools", description="d",
+            prompt_template=StringTemplate(instruction="Add two numbers using tools."),
+            llm_config=make_config(),
+            tools=[AddNumbersTool()],
+        )
+        cm = ContextManager(llm=make_llm())
+        cm.mode = "native"
+        await agent.action.prepare_context(llm=make_llm(), inputs={}, context_manager=cm)
+        self.assertNotIn(GUIDE_MARKER, _all_message_text(cm.context))
+
+    async def test_chat_template_with_tools_native_mode_omits_guide(self):
+        agent = CustomizeAgent(
+            name="ChatTemplateTools", description="d",
+            prompt_template=ChatTemplate(instruction="Add two numbers using tools."),
+            llm_config=make_config(),
+            tools=[AddNumbersTool()],
+        )
+        cm = ContextManager(llm=make_llm())
+        cm.mode = "native"
+        await agent.action.prepare_context(llm=make_llm(), inputs={}, context_manager=cm)
+        self.assertNotIn(GUIDE_MARKER, _all_message_text(cm.context))
+
+    async def test_string_template_with_tools_default_mode_includes_guide(self):
+        agent = CustomizeAgent(
+            name="StringTemplateToolsDefault", description="d",
+            prompt_template=StringTemplate(instruction="Add two numbers using tools."),
+            llm_config=make_config(),
+            tools=[AddNumbersTool()],
+        )
+        cm = ContextManager(llm=make_llm())
+        cm.mode = "default"
+        await agent.action.prepare_context(llm=make_llm(), inputs={}, context_manager=cm)
+        self.assertIn(GUIDE_MARKER, _all_message_text(cm.context))
+
+    async def test_action_tools_override_prompt_template_tools(self):
+        template = StringTemplate(
+            instruction="Use the available tool.",
+            tools=[PromptOnlyTool()],
+        )
+        with patch("evoagentx.actions.customize_action.logger.warning") as mock_warning:
+            agent = CustomizeAgent(
+                name="OverrideTemplateTools", description="d",
+                prompt_template=template,
+                llm_config=make_config(),
+                tools=[AddNumbersTool()],
+            )
+
+        warning_text = "\n".join(str(call.args[0]) for call in mock_warning.call_args_list)
+        self.assertIn("`CustomizeAction.tools` will override `prompt_template.tools`", warning_text)
+
+        cm = ContextManager(llm=make_llm())
+        cm.mode = "default"
+        await agent.action.prepare_context(llm=make_llm(), inputs={}, context_manager=cm)
+        prompt_text = _all_message_text(cm.context)
+        self.assertIn("add_numbers", prompt_text)
+        self.assertNotIn("prompt_only", prompt_text)
 
 
 class TestExtractHelpers(unittest.TestCase):

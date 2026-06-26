@@ -24,7 +24,14 @@ class PromptTemplate(BaseModule):
     instruction: str = Field(description="The instruction that the LLM will follow.")
     context: Optional[str] = Field(default=None, description="Additional context that can help the LLM understand the instruction.")
     constraints: Optional[Union[List[str], str]] = Field(default=None, description="Constraints that the LLM must follow.")
-    tools: Optional[List[Union[Tool, Toolkit]]] = Field(default=None, description="Tools that the LLM can use.")
+    tools: Optional[List[Union[Tool, Toolkit]]] = Field(
+        default=None,
+        description=(
+            "Legacy prompt-owned tools used only for rendering prompt-based tool "
+            "instructions. This field will be removed in a future release; prefer "
+            "passing tools to `format(..., tools=...)` when rendering tool instructions."
+        ),
+    )
     demonstrations: Optional[List[dict]] = Field(default=None, description="Examples of how to use the instruction.")
     history: Optional[List[Any]] = Field(default=None, description="History of the conversation between the user and the LLM.")
 

@@ -26,6 +26,11 @@ class OpenRouterLLM(BaseLLM):
         self._async_client = None
         self._default_ignore_fields = ["llm_type", "openrouter_key", "openrouter_base", "openrouter_model_base", "output_response"]
     
+    def supports_native_tool_calling(self) -> bool:
+        # OpenRouter proxies the OpenAI tool-calling protocol for the models that
+        # support it; native tool calling was the original behavior here.
+        return True
+
     def _init_client(self, config: OpenRouterConfig):
         return OpenAI(api_key=config.openrouter_key, base_url=config.openrouter_base)
 
