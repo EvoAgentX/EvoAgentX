@@ -91,6 +91,9 @@ tools = [
 multimodal = [
     "torch",
     "datasets>=3.4.0",
+    # Transitive dep of `datasets`; 0.70.18+ resource_tracker raises a harmless
+    # AttributeError at shutdown on some Python builds. Pin below it.
+    "multiprocess<0.70.18",
     "voyageai"
 ]
 optimizers = [
@@ -147,6 +150,7 @@ all = [
     "google-auth-httplib2>=0.1.0",
     "torch",
     "datasets>=3.4.0",
+    "multiprocess<0.70.18",
     "voyageai",
     "textgrad>=0.1.8",
     "dspy",

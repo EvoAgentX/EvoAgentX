@@ -72,8 +72,6 @@ class CustomizeAction(Action):
             self.add_tools(tools)
         self.tool_schemas: List[dict] = compile_tool_schemas(self.tools)
 
-        self.semaphore = asyncio.Semaphore(self.max_tool_call_concurrency)
-
     def prepare_extraction_prompt(self, llm_output_content: str) -> str:
         """Prepare extraction prompt for fallback extraction when parsing fails.
 
@@ -244,7 +242,11 @@ class CustomizeAction(Action):
             output = self.outputs_format(**llm_extracted_data)
             return output
 
-    async def _call_single_tool(self, function_param: dict) -> ToolResult:
+    async def _call_single_tool(self, function_param: dict, semaphore: Optional[asyncio.Semaphore] = None) -> ToolResult:
+        # When called outside of `_calling_tools` (e.g. directly in tests), create a
+        # loop-bound semaphore on the fly so concurrency limiting still applies.
+        if semaphore is None:
+            semaphore = asyncio.Semaphore(self.max_tool_call_concurrency)
         tool_call_id = function_param.get("id")
         function_name = function_param.get("function_name") or ""
         function_args = function_param.get("function_args") or {}
@@ -268,7 +270,7 @@ class CustomizeAction(Action):
             return ToolResult(result=output, metadata=metadata, id=tool_call_id)
 
         try:
-            async with self.semaphore:
+            async with semaphore:
                 tool_args_str = json.dumps(function_args, indent=4, ensure_ascii=False)
                 logger.info(f"[Tool Call] Executing tool `{function_name}` with parameters:\n{tool_args_str}")
 
@@ -289,8 +291,15 @@ class CustomizeAction(Action):
             return ToolResult(result={"error": str(e)}, metadata=metadata, id=tool_call_id)
 
     async def _calling_tools(self, tool_call_args: List[dict]) -> List[ToolResult]:
+        # Create the semaphore inside the running event loop. `asyncio.Semaphore`
+        # binds to the loop on first await, so a long-lived instance attribute would
+        # be reused across the fresh loops that `execute()` spins up via
+        # `asyncio.run()` / the thread-pool loop, raising "Semaphore is bound to a
+        # different event loop". A per-call semaphore is loop-safe and still bounds
+        # concurrency within a single tool-calling round.
+        semaphore = asyncio.Semaphore(self.max_tool_call_concurrency)
         tasks = [
-            self._call_single_tool(args)
+            self._call_single_tool(args, semaphore)
             for args in tool_call_args
         ]
 
