@@ -30,6 +30,9 @@ from ..utils.utils import (
 from .agent import Agent
 
 
+COMPLEX_PARAM_TYPES = {"object", "array", "dict", "list"}
+
+
 class CustomizeAgent(Agent):
 
     """
@@ -49,13 +52,13 @@ class CustomizeAgent(Agent):
             - type (str): Type of the input
             - description (str): Description of what the input represents
             - required (bool, optional): Whether this input is required (default: True)
-            - json_schema (dict, optional): The json schema of the input, only used when type is `object` or `array`.
+            - json_schema (dict, optional): The json schema of the input, recommended when type is `object` or `array`.
         outputs (List[Union[dict, Parameter]], optional): List of output specifications as dicts or Parameter objects. Each dict (e.g., `{"name": str, "type": str, "description": str, ["required": bool, "json_schema": dict]}`) contains:
             - name (str): Name of the output field
             - type (str): Type of the output
             - description (str): Description of what the output represents
             - required (bool, optional): Whether this output is required (default: True)
-            - json_schema (dict, optional): The json schema of the output, only used when type is `object` or `array`.
+            - json_schema (dict, optional): The json schema of the output, recommended when type is `object` or `array`.
         system_prompt (str, optional): The system prompt for the LLM. Defaults to DEFAULT_SYSTEM_PROMPT.
         output_parser (Type[ActionOutput], optional): A custom class for parsing the LLM's output.
             Must be a subclass of ActionOutput.
@@ -258,7 +261,9 @@ class CustomizeAgent(Agent):
     def parse_mode(self, parse_mode: str):
         if parse_mode not in PARSER_VALID_MODE:
             raise ValueError(f"'{parse_mode}' is an invalid value for `parse_mode`. Available choices: {PARSER_VALID_MODE}.")
-        if CustomizeAgent._outputs_require_json_mode(self.outputs, self.parse_func) and parse_mode != "json":
+        # Only enforce json for prompt_template-based agents (see validate_data): a raw `prompt`
+        # owns its output format, so the user is free to pair complex outputs with any parse_mode.
+        if self.prompt_template is not None and CustomizeAgent._outputs_require_json_mode(self.outputs, self.parse_func) and parse_mode != "json":
             raise ValueError(
                 f"Cannot set parse_mode='{parse_mode}': current outputs contain object/array types or json_schema. "
                 f"Set parse_mode='json', or provide a custom parse_func first."
@@ -298,7 +303,7 @@ class CustomizeAgent(Agent):
         if parse_func is not None:
             return False
         return (
-            any(p.type in {"object", "array"} for p in outputs)
+            any(p.type in COMPLEX_PARAM_TYPES for p in outputs)
             or CustomizeAgent.contain_json_schema(outputs)
         )
     
@@ -386,9 +391,11 @@ class CustomizeAgent(Agent):
         """Validate and normalize agent configuration, auto-correcting parse_mode where needed.
 
         Converts `inputs` and `outputs` to `Parameter` objects, validates all
-        parsing-related options, and auto-corrects `parse_mode` to `"json"` when the
-        output schema contains `object`/`array` types or a `json_schema` without a
-        custom parse function.
+        parsing-related options, and (for `prompt_template`-based agents only)
+        auto-corrects `parse_mode` to `"json"` when the output schema contains
+        `object`/`array` types or a `json_schema` without a custom parse function.
+        Raw-`prompt` agents keep their `parse_mode`, since the prompt is sent verbatim
+        and dictates its own output format.
 
         Returns:
             A tuple containing:
@@ -420,8 +427,12 @@ class CustomizeAgent(Agent):
         if parse_mode not in PARSER_VALID_MODE:
             raise ValueError(f"'{parse_mode}' is an invalid value for `parse_mode`. Available choices: {PARSER_VALID_MODE}.")
 
-        # Auto-correct parse_mode to "json" when outputs require it and no custom parse_func is provided
-        if CustomizeAgent._outputs_require_json_mode(valid_outputs, parse_func) and parse_mode != "json":
+        # Auto-correct parse_mode to "json" when outputs require it and no custom parse_func is provided.
+        # Only do this for prompt_template-based agents: the template renders the output-format section
+        # (and injects the JSON schema) so the model is actually instructed to emit JSON. A raw `prompt`
+        # is sent verbatim, so the model follows whatever format the prompt itself specifies; forcing
+        # json here would make the parser disagree with the prompt's requested format.
+        if prompt_template is not None and CustomizeAgent._outputs_require_json_mode(valid_outputs, parse_func) and parse_mode != "json":
             logger.warning(
                 f"parse_mode='{parse_mode}' is not compatible with the current outputs (object/array types or "
                 f"json_schema). Auto-correcting to parse_mode='json'. To suppress this warning, explicitly set "
@@ -542,7 +553,7 @@ class CustomizeAgent(Agent):
         action_parser_type = ActionInput if type == "input" else ActionOutput
         action_fields = CustomizeAgent._prepare_action_info(params)
 
-        if CustomizeAgent.contain_json_schema(params):
+        if CustomizeAgent._requires_model_json_schema(params):
             json_schema = CustomizeAgent.create_json_schema(params)
         else:
             json_schema = None
@@ -603,6 +614,11 @@ class CustomizeAgent(Agent):
     def contain_json_schema(params: List[Union[dict, Parameter]]) -> bool:
         params: List[Parameter] = to_params(params)
         return any(param.json_schema for param in params)
+
+    @staticmethod
+    def _requires_model_json_schema(params: List[Union[dict, Parameter]]) -> bool:
+        params: List[Parameter] = to_params(params)
+        return any(param.json_schema or param.type in COMPLEX_PARAM_TYPES for param in params)
 
     def _check_output_parser(self, outputs: List[Parameter], output_parser: Type[ActionOutput]):
 
@@ -736,4 +752,3 @@ class CustomizeAgent(Agent):
                         break
 
         return cls(**agent_data, **kwargs)
-    

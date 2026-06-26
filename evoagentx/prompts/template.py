@@ -167,7 +167,7 @@ class PromptTemplate(BaseModule):
                 if field_description is not None:
                     description = f"({field_description})"
             
-            if isinstance(value, dict):
+            if isinstance(value, (dict, list)):
                 value = json.dumps(value, indent=2, ensure_ascii=False)
             inputs_str += template.format(name=name, description=description, value=value)
         return inputs_str

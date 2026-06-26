@@ -237,8 +237,11 @@ class TestValidation(unittest.TestCase):
             )
 
     def test_object_output_auto_corrects_to_json(self):
+        # Auto-correction only applies to prompt_template agents: the template injects the
+        # JSON-schema output instruction, so json parsing is what the model is told to produce.
         agent = CustomizeAgent(
-            name="N", description="d", prompt="p",
+            name="N", description="d",
+            prompt_template=ChatTemplate(instruction="Do the task"),
             llm_config=make_config(),
             outputs=[{
                 "name": "data", "type": "object", "description": "obj",
@@ -247,6 +250,30 @@ class TestValidation(unittest.TestCase):
             parse_mode="title",
         )
         self.assertEqual(agent.parse_mode, "json")
+
+    def test_object_output_without_schema_builds_minimal_schema(self):
+        agent = CustomizeAgent(
+            name="N", description="d",
+            prompt_template=ChatTemplate(instruction="Do the task"),
+            llm_config=make_config(),
+            outputs=[{"name": "data", "type": "object", "description": "obj"}],
+            parse_mode="title",
+        )
+
+        schema = agent.action.outputs_format.model_config.get("json_schema_extra")
+        self.assertEqual(agent.parse_mode, "json")
+        self.assertEqual(schema["properties"]["data"], {"type": "object", "description": "obj"})
+
+    def test_raw_prompt_object_output_keeps_parse_mode(self):
+        # A raw `prompt` is sent verbatim, so the model follows the format the prompt requests.
+        # parse_mode must NOT be force-corrected to json (it would disagree with the prompt).
+        agent = CustomizeAgent(
+            name="N", description="d", prompt="p",
+            llm_config=make_config(),
+            outputs=[{"name": "data", "type": "object", "description": "obj"}],
+            parse_mode="title",
+        )
+        self.assertEqual(agent.parse_mode, "title")
 
     def test_invalid_input_item_type_raises(self):
         with self.assertRaises(ValueError):
@@ -271,7 +298,10 @@ class TestPropertySetters(unittest.TestCase):
         return CustomizeAgent(**kwargs)
 
     def test_parse_mode_setter_rejects_non_json_for_object_outputs(self):
+        # Setter enforcement only applies to prompt_template agents (see validate_data).
         agent = self._agent(
+            prompt=None,
+            prompt_template=ChatTemplate(instruction="Do the task"),
             outputs=[{
                 "name": "data", "type": "object", "description": "obj",
                 "json_schema": {"type": "object", "properties": {"k": {"type": "string"}}},
@@ -280,6 +310,14 @@ class TestPropertySetters(unittest.TestCase):
         )
         with self.assertRaises(ValueError):
             agent.parse_mode = "title"
+
+    def test_parse_mode_setter_allows_non_json_for_raw_prompt_object_outputs(self):
+        agent = self._agent(
+            outputs=[{"name": "data", "type": "object", "description": "obj"}],
+            parse_mode="title",
+        )
+        agent.parse_mode = "str"
+        self.assertEqual(agent.parse_mode, "str")
 
     def test_parse_func_none_while_custom_raises(self):
         agent = self._agent(parse_mode="custom", parse_func=_cfg_parse_func)

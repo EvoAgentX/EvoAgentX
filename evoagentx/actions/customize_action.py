@@ -475,7 +475,11 @@ class CustomizeAction(Action):
         elif self.prompt is not None:
             sys_msg = sys_msg or DEFAULT_SYSTEM_PROMPT
             context_manager.add_system_prompt(sys_msg)
-            user_prompt = self.prompt.format(**inputs)
+            prompt_inputs = {
+                key: json.dumps(value, indent=2, ensure_ascii=False) if isinstance(value, (dict, list)) else value
+                for key, value in inputs.items()
+            }
+            user_prompt = self.prompt.format(**prompt_inputs)
             # Only append the textual tool-calling guide when tools are actually
             # available AND we are not using native tool calling. Without tools,
             # the guide's web_search/code_execution examples can induce the model

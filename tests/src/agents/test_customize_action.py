@@ -4,6 +4,7 @@ bridge. The agent loop tests mock `single_generate_async` so no real LLM is
 called."""
 
 import asyncio
+import json
 import unittest
 from typing import Any, Dict, List, Optional
 from unittest.mock import AsyncMock, patch
@@ -152,6 +153,59 @@ class TestPrepareContext(unittest.IsolatedAsyncioTestCase):
         prompt_text = _all_message_text(cm.context)
         self.assertIn("add_numbers", prompt_text)
         self.assertNotIn("prompt_only", prompt_text)
+
+    async def test_prompt_path_renders_array_input_as_json(self):
+        agent = CustomizeAgent(
+            name="PromptArrayInput", description="d",
+            prompt="Summarize these records: {records}",
+            llm_config=make_config(),
+            inputs=[
+                {"name": "records", "type": "array", "description": "Records to summarize."},
+            ],
+        )
+
+        cm = ContextManager(llm=make_llm())
+        await agent.action.prepare_context(
+            llm=make_llm(),
+            inputs={"records": [{"title": "Alpha", "score": 1}]},
+            context_manager=cm,
+        )
+
+        user_text = _user_messages(cm.context)
+        self.assertIn(json.dumps([{"title": "Alpha", "score": 1}], indent=2), user_text)
+        self.assertNotIn("[{'title': 'Alpha', 'score': 1}]", user_text)
+
+    async def test_no_schema_array_input_and_object_output_prompt(self):
+        agent = CustomizeAgent(
+            name="NoSchemaComplex", description="d",
+            prompt_template=ChatTemplate(instruction="Summarize the provided records."),
+            llm_config=make_config(),
+            inputs=[
+                {"name": "records", "type": "array", "description": "Records to summarize."},
+            ],
+            outputs=[
+                {"name": "summary", "type": "object", "description": "Structured summary."},
+            ],
+            parse_mode="title",
+        )
+
+        self.assertEqual(agent.parse_mode, "json")
+
+        cm = ContextManager(llm=make_llm())
+        await agent.action.prepare_context(
+            llm=make_llm(),
+            inputs={"records": [{"title": "Alpha", "score": 1}]},
+            context_manager=cm,
+        )
+
+        messages_text = _all_message_text(cm.context)
+        user_text = _user_messages(cm.context)
+        output_schema = agent.action.outputs_format.model_config.get("json_schema_extra")
+
+        self.assertEqual(output_schema["properties"]["summary"]["type"], "object")
+        self.assertIn("strictly follows the following JSON schema", messages_text)
+        self.assertIn(json.dumps([{"title": "Alpha", "score": 1}], indent=2), user_text)
+        self.assertNotIn("[{'title': 'Alpha', 'score': 1}]", user_text)
 
 
 class TestExtractHelpers(unittest.TestCase):
