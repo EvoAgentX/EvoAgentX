@@ -6,7 +6,7 @@ import json
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from copy import copy, deepcopy
-from typing import Any, ClassVar, Dict, List, Optional, Type, Union
+from typing import Any, ClassVar, Dict, List, Optional, Tuple, Type, Union
 
 import yaml
 from jsonschema import Draft7Validator
@@ -767,6 +767,28 @@ class BaseLLM(ABC):
         end-to-end against the real API should override this to return True.
         """
         return False
+
+    def prepare_request(self, messages: List[dict], params: dict) -> Tuple[List[dict], dict]:
+        """Provider-specific request-shaping hook, applied just before the API call.
+
+        This is the single extension point for rewriting the outgoing request to
+        opt into provider-specific features (e.g. prompt caching). Subclasses should
+        invoke it on every path that reaches the provider — sync/async,
+        streaming/non-streaming, tool-call or not — so callers (actions, agents)
+        never need to know about provider quirks or model naming.
+
+        The default is a no-op. Implementations must NOT mutate the caller's
+        `messages`; return a new list (e.g. via `deepcopy`) if content changes are
+        needed. `params` is a fresh per-call dict and may be mutated in place.
+
+        Args:
+            messages: The chat messages about to be sent to the provider.
+            params: The keyword params about to be passed to the completion call.
+
+        Returns:
+            A `(messages, params)` tuple to use for the actual request.
+        """
+        return messages, params
 
     @abstractmethod
     def formulate_messages(self, prompts: List[str], system_messages: Optional[List[str]] = None) -> List[List[dict]]:

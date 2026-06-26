@@ -13,7 +13,7 @@ from ..core.logging import logger
 from ..core.message import Message
 from ..core.module_utils import parse_json_from_llm_output, parse_json_from_text
 from ..memory.context_manager import ContextManager
-from ..models import BaseLLM, LLMOutputParser, OpenRouterLLM
+from ..models import BaseLLM, LLMOutputParser
 from ..prompts.customize_agent import (
     ANSWER_HINT,
     ANSWER_PROMPT,
@@ -358,15 +358,6 @@ class CustomizeAction(Action):
         failed_tool_calls = 0
         iter = 0
 
-        is_anthropic = llm.config.model.startswith("anthropic/")
-        is_openrouter = isinstance(llm, OpenRouterLLM)
-        has_many_tools = self.tools and len(self.tools) > 1
-
-        llm_extra_kwargs = {}
-        if is_openrouter and is_anthropic and has_many_tools:
-            # Enable prompt caching
-            llm_extra_kwargs = {"cache_control": {"type": "ephemeral"}}
-        
         while True:
             if iter >= self.max_steps:
                 logger.error(f"{self.name} exceeded maximum number of steps ({self.max_steps}).")
@@ -378,12 +369,18 @@ class CustomizeAction(Action):
 
             # In native mode the tools schema is passed to the model directly; in
             # default mode tools are described in the prompt and we parse a textual
-            # <tool_call> block instead. `extra_body` is OpenRouter-specific (e.g.
-            # Anthropic prompt caching) and is silently dropped by other LLMs.
+            # <tool_call> block instead.
+            #
+            # `enable_prompt_caching=True` opts this agent loop into provider prompt
+            # caching: the loop re-sends a growing-but-shared prefix every iteration,
+            # so cache reads from iteration 2 onward outweigh the first-call write
+            # premium. The LLM layer decides what (if anything) to do per provider —
+            # the action stays provider-agnostic. Non-OpenRouter providers ignore
+            # the flag (it is filtered out before the request).
             llm_response = await llm.async_generate(
                 messages=context_manager.context,
                 tools=self.tool_schemas if context_manager.mode == "native" else None,
-                extra_body=llm_extra_kwargs
+                enable_prompt_caching=True,
             )
 
             logger.info(f"[Raw LLM Response]: {llm_response.content}")
