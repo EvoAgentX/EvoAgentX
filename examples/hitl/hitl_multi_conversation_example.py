@@ -1,7 +1,8 @@
 import asyncio
 import os
 from dotenv import load_dotenv
-from evoagentx.models import OpenAILLMConfig, OpenAILLM
+from evoagentx.models import OpenRouterLLM
+from evoagentx.models.model_configs import OpenRouterConfig
 from evoagentx.hitl import HITLOutsideConversationAgent, HITLManager
 # from evoagentx.workflow import WorkFlow, WorkFlowGraph
 # from evoagentx.workflow.workflow_graph import WorkFlowNode, WorkFlowEdge
@@ -9,7 +10,7 @@ from evoagentx.hitl import HITLOutsideConversationAgent, HITLManager
 # from evoagentx.core.base_config import Parameter
 
 load_dotenv()
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
 
 async def main():
@@ -20,13 +21,13 @@ async def main():
     print("=" * 80)
     
     # configure the LLM
-    llm_config = OpenAILLMConfig(
-        model="gpt-4o", 
-        openai_key=OPENAI_API_KEY, 
-        stream=True, 
+    llm_config = OpenRouterConfig(
+        model="openai/gpt-5.4-mini",
+        openrouter_key=OPENROUTER_API_KEY,
+        stream=True,
         output_response=True
     )
-    llm = OpenAILLM(llm_config)
+    llm = OpenRouterLLM(llm_config)
     
     # create the HITLOutsideConversationAgent
     conversation_agent = HITLOutsideConversationAgent(

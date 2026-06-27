@@ -10,10 +10,10 @@ from evoagentx.core.module_utils import extract_code_blocks
 load_dotenv()
 OPEN_ROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 openrouter_config = OpenRouterConfig(
-    model="deepseek/deepseek-r1-0528-qwen3-8b:free", 
-    openrouter_key=OPEN_ROUTER_API_KEY, 
+    model="openai/gpt-5.4-mini",
+    openrouter_key=OPEN_ROUTER_API_KEY,
     output_response=True,
-    max_tokens=1,
+    max_tokens=512,
     temperature=0.5
 )
 

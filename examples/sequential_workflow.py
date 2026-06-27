@@ -5,11 +5,11 @@ from evoagentx.core.registry import register_parse_function
 from evoagentx.core.module_utils import extract_code_blocks
 from evoagentx.workflow import SequentialWorkFlowGraph, WorkFlow 
 from evoagentx.agents import AgentManager 
-from evoagentx.models import OpenAILLMConfig, OpenAILLM
+from evoagentx.models import OpenRouterConfig, OpenRouterLLM
 from evoagentx.tools import FileToolkit
 
 load_dotenv()
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
 
 @register_parse_function
@@ -19,9 +19,9 @@ def custom_parse_func(content: str) -> str:
 
 def build_sequential_workflow():
     
-    # configure the LLM 
-    llm_config = OpenAILLMConfig(model="gpt-4o-mini", openai_key=OPENAI_API_KEY, stream=True, output_response=True)
-    llm = OpenAILLM(llm_config)
+    # configure the LLM
+    llm_config = OpenRouterConfig(model="openai/gpt-5.4-mini", openrouter_key=OPENROUTER_API_KEY, stream=True, output_response=True)
+    llm = OpenRouterLLM(config=llm_config)
     
     # Define two sequential tasks: Planning and Coding
     tasks = [
@@ -69,8 +69,9 @@ def build_sequential_workflow():
     # create agent instance from the workflow graph 
     agent_manager = AgentManager(tools = [FileToolkit()])
     agent_manager.add_agents_from_workflow(
-        graph, 
-        llm_config=llm_config, # will be used for all tasks without `llm_config`. 
+        graph,
+        llm_config=llm_config, # will be used for all tasks without `llm_config`.
+        tools=[FileToolkit()]
     )
 
     # create a workflow instance for execution 

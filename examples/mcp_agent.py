@@ -2,18 +2,14 @@
 
 import os 
 from dotenv import load_dotenv
-from evoagentx.models import OpenAILLMConfig
+from evoagentx.models import OpenRouterConfig, OpenRouterLLM
 from evoagentx.agents import CustomizeAgent
-from evoagentx.prompts import StringTemplate 
+from evoagentx.prompts import StringTemplate
 from evoagentx.tools.mcp import MCPToolkit
-from evoagentx.tools.image_analysis import ImageAnalysisTool
-from evoagentx.tools.images_flux_generation import FluxImageGenerationTool
 
 load_dotenv()
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-OPENAI_ORGANIZATION_ID = os.getenv("OPENAI_ORGANIZATION_ID")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-openai_config = OpenAILLMConfig(model="gpt-4o-mini", openai_key=OPENAI_API_KEY, stream=True, output_response=True)
+openrouter_config = OpenRouterConfig(model="openai/gpt-5.4-mini", openrouter_key=OPENROUTER_API_KEY, stream=True, output_response=True)
 
 def test_MCP_server():
     
@@ -26,7 +22,7 @@ def test_MCP_server():
         prompt_template= StringTemplate(
             instruction="Do some operations based on the user's instruction."
         ), 
-        llm_config=openai_config,
+        llm_config=openrouter_config,
         inputs=[
             {"name": "instruction", "type": "string", "description": "The goal you need to achieve"}
         ],
@@ -36,7 +32,7 @@ def test_MCP_server():
         tools=tools
     )
     mcp_agent.save_module("examples/output/mcp_agent/mcp_agent.json")
-    mcp_agent.load_module("examples/output/mcp_agent/mcp_agent.json", llm_config=openai_config, tools=tools)
+    mcp_agent.load_module("examples/output/mcp_agent/mcp_agent.json", llm_config=openrouter_config, tools=tools)
 
     message = mcp_agent(
         inputs={"instruction": "Summarize all the tools."}

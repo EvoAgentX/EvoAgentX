@@ -87,7 +87,7 @@ class MCPTool(Tool):
         if hasattr(result, 'text'):
             return result.text
         elif hasattr(result, 'content'):
-            return result.content
+            return self._convert_result(result.content)
         
         # Handle objects with __dict__ (convert to dictionary)
         if hasattr(result, '__dict__'):

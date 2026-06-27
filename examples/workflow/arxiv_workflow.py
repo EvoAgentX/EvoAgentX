@@ -13,7 +13,7 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 def main():
 
     openrouter_config = OpenRouterConfig(
-        model="deepseek/deepseek-v4-pro",
+        model="openai/gpt-5.4-mini",
         openrouter_key=OPENROUTER_API_KEY,
         stream=True,
         output_response=True,

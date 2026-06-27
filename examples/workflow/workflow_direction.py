@@ -5,14 +5,14 @@ import os
 from dotenv import load_dotenv 
 import sys
 
-from evoagentx.models import OpenAILLMConfig, OpenAILLM
+from evoagentx.models import OpenRouterConfig, OpenRouterLLM
 from evoagentx.workflow import WorkFlowGraph, WorkFlow
 # from evoagentx.workflow.workflow_generator import WorkFlowGenerator
 from evoagentx.agents import AgentManager
 from evoagentx.tools.mcp import MCPToolkit
 from evoagentx.tools.file_tool import FileToolkit
 load_dotenv() # Loads environment variables from .env file
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
 output_file = "debug/output/direction/output.md"
 mcp_config_path = "examples/output/direction/mcp_direction.config"
@@ -21,9 +21,9 @@ module_save_path = "examples/output/direction/direction_demo_4o_mini.json"
 
 def main(goal=None):
     # LLM configuration
-    openai_config = OpenAILLMConfig(model="gpt-4o-mini", openai_key=OPENAI_API_KEY, stream=True, output_response=True, max_tokens=16000)
+    openrouter_config = OpenRouterConfig(model="openai/gpt-5.4-mini", openrouter_key=OPENROUTER_API_KEY, stream=True, output_response=True, max_tokens=16000)
     # Initialize the language model
-    llm = OpenAILLM(config=openai_config)
+    llm = OpenRouterLLM(config=openrouter_config)
     
     goal = """Read and analyze the candidate's pdf resume at examples/output/direction/test_pdf.pdf, and recommend one future PHD directions based on the resume. You should provide a list of 5 review papers about the topic for the candidate to learn more about this direction as well."""
     # goal = making_goal(openai_config, goal)
@@ -56,8 +56,7 @@ def main(goal=None):
     # [optional] display workflow
     # workflow_graph.display()
     agent_manager = AgentManager(tools=tools)
-    agent_manager.add_agents_from_workflow(workflow_graph, llm_config=openai_config)
-    # from pdb import set_trace; set_trace()
+    agent_manager.add_agents_from_workflow(workflow_graph, llm_config=openrouter_config, tools=tools)
 
     workflow = WorkFlow(graph=workflow_graph, agent_manager=agent_manager, llm=llm)
     output = workflow.execute()

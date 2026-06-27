@@ -1,19 +1,17 @@
 import os 
 from dotenv import load_dotenv
-from evoagentx.core import Message 
-from evoagentx.models import OpenAILLMConfig
+from evoagentx.core import Message
+from evoagentx.models import OpenRouterConfig, OpenRouterLLM
 from evoagentx.agents import CustomizeAgent
 from evoagentx.prompts import StringTemplate, ChatTemplate
 from evoagentx.core.module_utils import extract_code_blocks as util_extract_code_blocks
 from evoagentx.core.registry import register_parse_function
-from evoagentx.tools.file_tool import FileToolkit 
+from evoagentx.tools.file_tool import FileToolkit
 from evoagentx.tools.mcp import MCPToolkit
 
 load_dotenv()
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
-model_config = OpenAILLMConfig(model="gpt-4o-mini", openai_key=OPENAI_API_KEY, stream=True, output_response=True)
-# model_config = LiteLLMConfig(model="anthropic/claude-3-7-sonnet-20250219", anthropic_key=ANTHROPIC_API_KEY, stream=True, output_response=True, max_tokens=20000)
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+model_config = OpenRouterConfig(model="openai/gpt-5.4-mini", openrouter_key=OPENROUTER_API_KEY, stream=True, output_response=True)
 
 
 @register_parse_function
