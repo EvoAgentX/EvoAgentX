@@ -46,13 +46,13 @@ class TestParameter(unittest.TestCase):
         with self.assertRaises(Exception):
             Parameter(name="p", type="invalid_type", description="bad type")
 
-    def test_object_type_requires_json_schema(self):
-        with self.assertRaises(Exception):
-            Parameter(name="p", type="object", description="missing schema")
+    def test_object_type_allows_missing_json_schema(self):
+        param = Parameter(name="p", type="object", description="missing schema")
+        self.assertIsNone(param.json_schema)
 
-    def test_array_type_requires_json_schema(self):
-        with self.assertRaises(Exception):
-            Parameter(name="p", type="array", description="missing schema")
+    def test_array_type_allows_missing_json_schema(self):
+        param = Parameter(name="p", type="array", description="missing schema")
+        self.assertIsNone(param.json_schema)
 
     def test_object_with_valid_json_schema(self):
         schema = {"type": "object", "properties": {"key": {"type": "string"}}}
@@ -62,6 +62,11 @@ class TestParameter(unittest.TestCase):
     def test_array_with_valid_json_schema(self):
         schema = {"type": "array", "items": {"type": "string"}}
         param = Parameter(name="p", type="array", description="an array", json_schema=schema)
+        self.assertEqual(param.json_schema, schema)
+
+    def test_python_alias_with_valid_json_schema(self):
+        schema = {"type": "array", "items": {"type": "string"}}
+        param = Parameter(name="p", type="list", description="an array", json_schema=schema)
         self.assertEqual(param.json_schema, schema)
 
     def test_json_schema_type_mismatch_raises(self):

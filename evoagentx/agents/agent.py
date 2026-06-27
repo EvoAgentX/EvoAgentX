@@ -1,20 +1,22 @@
 import asyncio
-import inspect 
-from pydantic import Field
-from typing import Type, Optional, Union, Tuple, List, Any, Coroutine
+import inspect
+from collections.abc import Coroutine
+from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
+from pydantic import Field
+
+from ..actions.action import Action, ContextExtraction
+from ..core.message import Message, MessageType
 from ..core.module import BaseModule
 from ..core.module_utils import generate_id
-from ..core.message import Message, MessageType
 from ..core.registry import MODEL_REGISTRY
-from ..models.model_configs import LLMConfig
-from ..models.base_model import BaseLLM
-from ..memory.memory import ShortTermMemory
 from ..memory.long_term_memory import LongTermMemory
+from ..memory.memory import ShortTermMemory
 from ..memory.memory_manager import MemoryManager
+from ..models.base_model import BaseLLM
+from ..models.model_configs import LLMConfig
 from ..storages.base import StorageHandler
-from ..actions.action import Action
-from ..actions.action import ContextExtraction
+from ..utils.utils import add_llm_config_to_agent_dict
 
 
 class Agent(BaseModule):
@@ -280,20 +282,42 @@ class Agent(BaseModule):
             return message, action_input_data
         return message
     
+    def set_llm_config(self, llm_config: LLMConfig):
+        """Set a new LLM config and rebuild the LLM instance from it."""
+        self.llm_config = llm_config
+        llm_cls = MODEL_REGISTRY.get_model(llm_config.llm_type)
+        self.llm = llm_cls(config=llm_config)
+
+    def set_llm(self, llm: BaseLLM):
+        """Set a new LLM instance and sync llm_config from it."""
+        self.llm = llm
+        self.llm_config = llm.config
+    
     def init_llm(self):
         """
         Initialize the language model for the agent.
         """
-        # Only initialize LLM if not human and LLM is provided
-        if not self.is_human and (not self.llm_config and not self.llm):
-            raise ValueError("must provide `llm_config` or `llm` when `is_human` is False")
-        if not self.is_human and (self.llm_config or self.llm):
-            if self.llm_config and not self.llm:
-                llm_cls = MODEL_REGISTRY.get_model(self.llm_config.llm_type)
-                self.llm = llm_cls(config=self.llm_config)
-            if self.llm:
-                self.llm_config = self.llm.config
-        # If is_human=True or no LLM provided, self.llm remains None
+        if self.is_human:
+            # if human, no need to initialize LLM
+            return
+
+        # 1. Handle the case where both llm and llm_config are set
+        if self.llm and self.llm_config:
+            if self.llm.config != self.llm_config:
+                raise ValueError(
+                    f"Inconsistent LLM setup for agent '{self.name}': "
+                    "The provided `llm` does not match `llm_config`. "
+                    "Ensure they match or only provide one."
+                )
+            return
+
+        # 2. Handle the case where only one (llm or llm_config) is provided
+        if self.llm_config:
+            self.set_llm_config(self.llm_config)
+        elif self.llm:
+            self.set_llm(self.llm)
+        else:
+            raise ValueError(f"Must provide `llm_config` or `llm` for agent '{self.name}'.")
 
     def init_long_term_memory(self):
         """
@@ -503,20 +527,19 @@ class Agent(BaseModule):
         super().save_module(path=path, ignore=ignore_fields, **kwargs)
 
     @classmethod
-    def load_module(cls, path: str, llm_config: LLMConfig = None, **kwargs) -> "Agent":
+    def from_dict(cls, data: Dict, llm_config: Optional[LLMConfig] = None, **kwargs) -> 'Agent':
         """
-        load the agent from local storage. Must provide `llm_config` when loading the agent from local storage. 
+        Create an agent instance from a dictionary.
 
         Args:
-            path: The path of the file
+            data: The dictionary containing all necessary configuration to recreate this agent
             llm_config: The LLMConfig instance
         
         Returns:
-            Agent: The loaded agent instance
+            Agent: The agent instance
         """
-        agent = super().load_module(path=path, **kwargs)
-        if llm_config is not None:
-            agent["llm_config"] = llm_config.to_dict()
+        data = add_llm_config_to_agent_dict(data, llm_config)
+        agent = cls._create_instance(data)
         return agent 
     
     def get_config(self) -> dict:

@@ -60,10 +60,10 @@ class Parameter(BaseModule):
 
     Attributes:
         name: Parameter name
-        type: Parameter type, support json & python type. if type is `object` or `array`, then schema is required.
+        type: Parameter type, support json & python type.
         description: Parameter description
         required: Whether the parameter is required, defaults to True
-        json_schema: the json schema of the parameter, required when type is `object` or `array`.
+        json_schema: the optional json schema of the parameter. Recommended when type is `object` or `array`.
     """
     name: str
     type: str
@@ -73,16 +73,19 @@ class Parameter(BaseModule):
 
     @model_validator(mode="after")
     def _validate_type_and_schema(self):
-        from ..utils.utils import string_to_python_type
+        from ..utils.utils import string_to_json_schema_type, string_to_python_type
         if self.type not in string_to_python_type:
             raise ValueError(f"Invalid `type`: {self.type}. Allowed: {list(string_to_python_type.keys())}")
-        if self.type in {"object", "array"} and not self.json_schema:
-            raise ValueError("`json_schema` is required when `type` is `object` or `array`.")
         if self.json_schema is not None:
             try:
                 Draft7Validator.check_schema(self.json_schema)
             except Exception as e:
                 raise ValueError(f"Invalid `json_schema` for '{self.name}': {self.json_schema}.") from e
-            assert self.type == self.json_schema.get("type"), f"`type` and `json_schema.type` must be the same if `json_schema` is provided. But got `type`: {self.type}, `json_schema.type`: {self.json_schema.get('type')}"
+            expected_schema_type = string_to_json_schema_type[self.type]
+            actual_schema_type = self.json_schema.get("type")
+            if expected_schema_type != actual_schema_type:
+                raise ValueError(
+                    "`type` and `json_schema.type` must be the same if `json_schema` is provided. "
+                    f"But got `type`: {self.type}, `json_schema.type`: {actual_schema_type}"
+                )
         return self
-

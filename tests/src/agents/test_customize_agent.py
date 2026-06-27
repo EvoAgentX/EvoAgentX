@@ -1,6 +1,6 @@
 import os 
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, AsyncMock
 from pydantic import Field 
 from evoagentx.core.registry import register_parse_function 
 from evoagentx.models.model_configs import LiteLLMConfig
@@ -28,9 +28,9 @@ class TestModule(unittest.TestCase):
             "tests/agents/saved_customize_agent_with_parser.json" 
         ]
 
-    @patch("evoagentx.models.litellm_model.LiteLLM.single_generate")
+    @patch("evoagentx.models.litellm_model.LiteLLM.single_generate_async", new_callable=AsyncMock)
     def test_simple_agent(self, mock_generate):
-        mock_generate.return_value = "Hello, world!"
+        mock_generate.return_value = "<answer>Hello, world!</answer>"
         llm_config = LiteLLMConfig(model="gpt-4o-mini", openai_key="xxxxx")
 
         simple_agent = CustomizeAgent(
@@ -59,9 +59,9 @@ class TestModule(unittest.TestCase):
         self.assertEqual(msg.msg_type, MessageType.UNKNOWN)
         self.assertEqual(msg.content.content, "Hello, world!")
     
-    @patch("evoagentx.models.litellm_model.LiteLLM.single_generate")
+    @patch("evoagentx.models.litellm_model.LiteLLM.single_generate_async", new_callable=AsyncMock)
     def test_agent_with_inputs_and_outputs(self, mock_generate):
-        mock_generate.return_value = "```python\nprint('Hello, world!')```" 
+        mock_generate.return_value = "<answer>\n```python\nprint('Hello, world!')```\n</answer>"
         llm_config = LiteLLMConfig(model="gpt-4o-mini", openai_key="xxxxx")
         agent_with_inputs = CustomizeAgent(
             name = "CodeWriter",

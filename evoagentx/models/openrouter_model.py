@@ -1,5 +1,6 @@
 import json
-from typing import Dict, List, Optional, Union
+from copy import deepcopy
+from typing import Dict, List, Optional, Tuple, Union
 
 from openai import AsyncOpenAI, OpenAI, Stream
 from openai.types.chat import ChatCompletion, ChatCompletionChunk
@@ -18,14 +19,122 @@ from .model_configs import OpenRouterConfig
 from .model_utils import Cost, cost_manager
 
 
+# Models already warned about paid cache writes. Process-wide so the warning
+# fires at most once per model regardless of how many LLM instances are created.
+_PROMPT_CACHING_COST_WARNED: set = set()
+
+
 @register_model(config_cls=OpenRouterConfig, alias=["openrouter"])
 class OpenRouterLLM(BaseLLM):
+
+    # Model-family prefixes that require an explicit `cache_control` breakpoint AND
+    # bill cache writes at a premium (verified against OpenRouter's pricing docs):
+    #   anthropic/*    -> writes at ~1.25x input (5-min) / 2x (1-hour)
+    #   google/gemini* -> writes at input price plus a cache-storage fee
+    #   qwen/*         -> Alibaba explicit-cache write multiplier
+    # Automatic-cache providers (openai/*, deepseek/*, x-ai/*, moonshot/*) are
+    # intentionally absent: their writes are free and need no breakpoint, so we
+    # leave their requests untouched and let OpenRouter cache them server-side.
+    _PAID_CACHE_WRITE_PREFIXES: Tuple[str, ...] = ("anthropic/", "google/gemini", "qwen/")
 
     def init_model(self):
         self._client = None
         self._async_client = None
         self._default_ignore_fields = ["llm_type", "openrouter_key", "openrouter_base", "openrouter_model_base", "output_response"]
     
+    def supports_native_tool_calling(self) -> bool:
+        # OpenRouter proxies the OpenAI tool-calling protocol for the models that
+        # support it; native tool calling was the original behavior here.
+        return True
+
+    def prepare_request(self, messages: List[dict], params: dict) -> Tuple[List[dict], dict]:
+        """Inject OpenRouter prompt-caching breakpoints when opted in.
+
+        Caching is gated behind `enable_prompt_caching` (per-call kwarg, else the
+        config default of False) because cache writes are billed at a premium on
+        the providers that need explicit breakpoints (see
+        `_PAID_CACHE_WRITE_PREFIXES`). The flag is popped here so it never leaks
+        into the OpenAI-compatible request body.
+        """
+        # `enable_prompt_caching` is a config field, so a per-call kwarg flows into
+        # `params` via get_completion_params; pop it regardless to keep it off the wire.
+        enabled = params.pop("enable_prompt_caching", None)
+        if enabled is None:
+            enabled = bool(getattr(self.config, "enable_prompt_caching", False))
+        if not enabled:
+            return messages, params
+
+        model = (getattr(self.config, "model", "") or "").lower()
+        if not model.startswith(self._PAID_CACHE_WRITE_PREFIXES):
+            # Automatic-cache providers need no breakpoint and bill no write premium.
+            return messages, params
+
+        self._warn_prompt_caching_cost_once(model)
+        return self._add_cache_control_to_last_text_block(messages), params
+
+    @staticmethod
+    def _warn_prompt_caching_cost_once(model: str) -> None:
+        if model in _PROMPT_CACHING_COST_WARNED:
+            return
+        _PROMPT_CACHING_COST_WARNED.add(model)
+        logger.warning(
+            f"[OpenRouterLLM] Prompt caching is enabled for '{model}'. On this provider "
+            "OpenRouter bills cache WRITES at a premium (e.g. Anthropic ~1.25x input "
+            "price; Gemini adds a cache-storage fee; Qwen applies a write multiplier), "
+            "so a single non-repeated call costs MORE than without caching — it only "
+            "pays off across repeated calls that share a prompt prefix. To disable, set "
+            "`enable_prompt_caching=False` on the OpenRouterConfig."
+        )
+
+    @staticmethod
+    def _add_cache_control_to_last_text_block(messages: List[dict]) -> List[dict]:
+        """Return a copy with OpenRouter block-level prompt caching enabled.
+
+        OpenRouter routes Anthropic/Gemini/Qwen prompt caching through
+        Anthropic-style content-block metadata. Use a single breakpoint on the
+        latest cacheable text block so multi-turn agent loops cache the growing
+        shared prefix without accumulating multiple paid cache writes. The input
+        `messages` is never mutated.
+        """
+        cached_messages = deepcopy(messages)
+        target_message: Optional[dict] = None
+        target_block: Optional[dict] = None
+
+        for message in cached_messages:
+            content = message.get("content")
+            if isinstance(content, str):
+                if content:
+                    target_message = message
+                    target_block = None
+                continue
+
+            if isinstance(content, list):
+                for block in content:
+                    if not isinstance(block, dict):
+                        continue
+                    block.pop("cache_control", None)
+                    if (
+                        block.get("type") == "text"
+                        and isinstance(block.get("text"), str)
+                        and block.get("text")
+                    ):
+                        target_message = None
+                        target_block = block
+
+        if target_block is not None:
+            target_block["cache_control"] = {"type": "ephemeral"}
+            return cached_messages
+
+        if target_message is not None:
+            target_message["content"] = [
+                {
+                    "type": "text",
+                    "text": target_message["content"],
+                    "cache_control": {"type": "ephemeral"},
+                }
+            ]
+        return cached_messages
+
     def _init_client(self, config: OpenRouterConfig):
         return OpenAI(api_key=config.openrouter_key, base_url=config.openrouter_base)
 
@@ -208,6 +317,7 @@ class OpenRouterLLM(BaseLLM):
         try:
             client = self.ensure_client()
             completion_params = self.get_completion_params(**kwargs)
+            messages, completion_params = self.prepare_request(messages, completion_params)
             response = client.chat.completions.create(messages=messages, **completion_params)
             if stream:
                 output = self.get_stream_output(response, output_response=output_response)
@@ -228,6 +338,7 @@ class OpenRouterLLM(BaseLLM):
         try:
             async_client = self.ensure_async_client()
             completion_params = self.get_completion_params(**kwargs)
+            messages, completion_params = self.prepare_request(messages, completion_params)
             response = await async_client.chat.completions.create(
                 messages=messages, **completion_params
             )

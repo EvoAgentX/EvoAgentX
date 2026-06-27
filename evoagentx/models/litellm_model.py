@@ -88,6 +88,15 @@ class LiteLLM(OpenAILLM):
             "groq_key", "api_base", "is_local", "azure_endpoint", "azure_key", "api_version", "api_key"
         ] # parameters in LiteLLMConfig that are not LiteLLM models' input parameters 
     
+    def supports_native_tool_calling(self) -> bool:
+        # LiteLLM is a meta-provider. For cloud providers it translates the native
+        # tool-calling round-trip (tool_calls + role:tool) per backend, which works
+        # for the OpenAI/Anthropic/Gemini/DeepSeek families. Local models (Ollama,
+        # LM Studio, etc.) have unreliable tool support, so keep the prompt-based
+        # fallback for them. (`litellm.supports_function_calling` is not used here:
+        # it wrongly reports False for many tool-capable hosted models.)
+        return not bool(self.config.is_local)
+
     def _apply_provider_params(self, completion_params: dict) -> dict:
         """Inject provider-specific routing parameters (local / Azure) into the
         LiteLLM completion params. OpenAI and the remaining providers are routed

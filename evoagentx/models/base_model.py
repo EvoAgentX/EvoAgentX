@@ -6,7 +6,7 @@ import json
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from copy import copy, deepcopy
-from typing import Any, ClassVar, Dict, List, Optional, Type, Union
+from typing import Any, ClassVar, Dict, List, Optional, Tuple, Type, Union
 
 import yaml
 from jsonschema import Draft7Validator
@@ -753,6 +753,43 @@ class BaseLLM(ABC):
         memo[id(self)] = self
         return self
 
+    def supports_native_tool_calling(self) -> bool:
+        """Whether this LLM supports the native (OpenAI-style) function-calling protocol.
+
+        "Native" means the provider accepts a `tools` schema, returns structured
+        `tool_calls`, and accepts the round-trip of an assistant message carrying
+        `tool_calls` followed by `role: "tool"` result messages. When True, the agent
+        loop passes tools to the model directly instead of describing them in the prompt
+        and asking the model to emit a `<tool_call>` block.
+
+        Defaults to False so that unknown/unverified subclasses fall back to the
+        prompt-based tool-calling guide. Subclasses whose providers have been verified
+        end-to-end against the real API should override this to return True.
+        """
+        return False
+
+    def prepare_request(self, messages: List[dict], params: dict) -> Tuple[List[dict], dict]:
+        """Provider-specific request-shaping hook, applied just before the API call.
+
+        This is the single extension point for rewriting the outgoing request to
+        opt into provider-specific features (e.g. prompt caching). Subclasses should
+        invoke it on every path that reaches the provider — sync/async,
+        streaming/non-streaming, tool-call or not — so callers (actions, agents)
+        never need to know about provider quirks or model naming.
+
+        The default is a no-op. Implementations must NOT mutate the caller's
+        `messages`; return a new list (e.g. via `deepcopy`) if content changes are
+        needed. `params` is a fresh per-call dict and may be mutated in place.
+
+        Args:
+            messages: The chat messages about to be sent to the provider.
+            params: The keyword params about to be passed to the completion call.
+
+        Returns:
+            A `(messages, params)` tuple to use for the actual request.
+        """
+        return messages, params
+
     @abstractmethod
     def formulate_messages(self, prompts: List[str], system_messages: Optional[List[str]] = None) -> List[List[dict]]:
         """Converts input prompts into the chat format compatible with different LLMs.
@@ -792,23 +829,23 @@ class BaseLLM(ABC):
         """
         pass
     
+    @abstractmethod
     async def single_generate_async(self, messages: List[dict], **kwargs) -> str:
         """Asynchronously generates LLM output for a single set of messages.
-        
-        This default implementation wraps the synchronous method in an async executor.
-        Subclasses should override this for true async implementation if supported.
-        
+
+        Subclasses must provide a true async implementation. There is intentionally
+        no default that wraps `single_generate` in an executor: such a wrapper both
+        mishandles `**kwargs` through `run_in_executor` and silently diverges from the
+        provider's real async path (which can break test mocking and behavior parity).
+
         Args:
             messages: The input messages to the LLM in chat format.
             **kwargs (Any): Additional keyword arguments for generation settings.
-        
+
         Returns:
             The generated output text from the LLM.
         """
-        # Default implementation for backward compatibility
-        loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(None, self.single_generate, messages, **kwargs)
-        return result
+        pass
     
     async def batch_generate_async(self, batch_messages: List[List[dict]], **kwargs) -> List[str]:
         """Asynchronously generates outputs for a batch of message sets.

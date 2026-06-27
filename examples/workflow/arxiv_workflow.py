@@ -1,25 +1,25 @@
 import os 
 from dotenv import load_dotenv
-from evoagentx.models import OpenAILLMConfig, OpenAILLM
+from evoagentx.models import OpenRouterConfig, OpenRouterLLM
 from evoagentx.workflow import WorkFlowGenerator, WorkFlowGraph, WorkFlow
 from evoagentx.agents import AgentManager
 from evoagentx.tools.file_tool import FileToolkit
-from evoagentx.tools import ArxivToolkit   
+from evoagentx.tools import ArxivToolkit
 
-load_dotenv()  
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+load_dotenv()
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
 
 def main():
 
-    openai_config = OpenAILLMConfig(
-        model="gpt-4o",
-        openai_key=OPENAI_API_KEY,
+    openrouter_config = OpenRouterConfig(
+        model="openai/gpt-5.4-mini",
+        openrouter_key=OPENROUTER_API_KEY,
         stream=True,
         output_response=True,
         max_tokens=16000
     )
-    llm = OpenAILLM(config=openai_config)
+    llm = OpenRouterLLM(config=openrouter_config)
 
     keywords = "medical, multiagent"
     max_results = 10
@@ -47,7 +47,7 @@ def main():
     daily_paper_digest
     """
 
-    target_directory = "EvoAgentX/examples/output/paper_push"
+    target_directory = "examples/output/paper_push"
     module_save_path = os.path.join(target_directory, "paper_push_workflow.json")
     result_path = os.path.join(target_directory, "daily_paper_digest.md")
     os.makedirs(target_directory, exist_ok=True)
@@ -60,10 +60,10 @@ def main():
 
     workflow_graph.save_module(module_save_path)
 
-    workflow_graph.display()
+    # workflow_graph.display()
 
-    agent_manager = AgentManager(tools=tools)
-    agent_manager.add_agents_from_workflow(workflow_graph, llm_config=openai_config)
+    agent_manager = AgentManager()
+    agent_manager.add_agents_from_workflow(workflow_graph, llm_config=openrouter_config, tools=tools)
 
     workflow = WorkFlow(graph=workflow_graph, agent_manager=agent_manager, llm=llm)
     output = workflow.execute()
