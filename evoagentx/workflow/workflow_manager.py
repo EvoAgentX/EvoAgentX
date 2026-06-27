@@ -16,7 +16,7 @@ from .workflow_graph import WorkFlowNode, WorkFlowGraph
 from ..prompts.workflow.workflow_manager import (
     DEFAULT_TASK_SCHEDULER, 
     DEFAULT_ACTION_SCHEDULER, 
-    OUTPUT_EXTRACTION_PROMPT
+    WORKFLOW_OUTPUT_EXTRACTION_PROMPT
 )
 
 
@@ -320,7 +320,7 @@ class ActionScheduler(Action):
 
         # prepare task and execution information
         task_info = task.get_task_info()
-        task_input_names = [param.name for param in task.inputs]
+        task_input_names = {param.name: param.required for param in task.inputs}
         task_input_data: dict = env.get_execution_data(task_input_names)
         task_input_data_info = self.format_task_input_data(data=task_input_data)
         task_execution_history = "\n\n".join([str(msg) for msg in task_execution_messages])
@@ -480,7 +480,7 @@ class WorkFlowManager(BaseModule):
             candidate_msgs_with_output.extend(env.get_task_messages(tasks=task, n=1))
         candidate_msgs_with_output = Message.sort_by_timestamp(messages=candidate_msgs_with_output)
 
-        prompt = OUTPUT_EXTRACTION_PROMPT.format(
+        prompt = WORKFLOW_OUTPUT_EXTRACTION_PROMPT.format(
             goal=graph.goal, 
             workflow_graph_representation=graph.get_workflow_description(), 
             workflow_execution_results="\n\n".join([str(msg) for msg in candidate_msgs_with_output]), 
