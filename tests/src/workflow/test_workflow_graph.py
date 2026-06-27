@@ -2,7 +2,6 @@ import unittest
 import pytest
 
 from evoagentx.core.base_config import Parameter
-from evoagentx.models import OpenRouterConfig
 from evoagentx.workflow.workflow_graph import (
     WorkFlowEdge,
     WorkFlowGraph,
@@ -524,9 +523,8 @@ class TestWorkFlowGraph(unittest.TestCase):
             "workflow_outputs": [{"name": "output", "type": "string", "description": "desc"}],
         }
         
-        llm_config = OpenRouterConfig(openrouter_key="test", model="test")
-        graph = WorkFlowGraph.from_dict(graph_dict, llm_config=llm_config, auto_fix=True)
-        
+        graph = WorkFlowGraph.from_dict(graph_dict, auto_fix=True)
+
         # Verify it was fixed
         fixed_node_input = graph.get_node("MismatchedNode").inputs[0]
         self.assertEqual(fixed_node_input.type, "string")
@@ -536,13 +534,16 @@ class TestWorkFlowGraph(unittest.TestCase):
         self.assertEqual(fixed_node_output.type, "string")
         self.assertTrue(fixed_node_output.required)
 
-        fixed_agent_input = graph.get_node("MismatchedNode").agents[0].inputs[0]
-        self.assertEqual(fixed_agent_input.type, "string")
-        self.assertTrue(fixed_agent_input.required)
+        # from_dict no longer instantiates agents: they stay as dicts and are
+        # materialized later by AgentManager. auto_fix still reconciles the agent
+        # dict's parameters with the node parameters in place.
+        fixed_agent_input = graph.get_node("MismatchedNode").agents[0]["inputs"][0]
+        self.assertEqual(fixed_agent_input["type"], "string")
+        self.assertTrue(fixed_agent_input["required"])
 
-        fixed_agent_output = graph.get_node("MismatchedNode").agents[0].outputs[0]
-        self.assertEqual(fixed_agent_output.type, "string")
-        self.assertTrue(fixed_agent_output.required)
+        fixed_agent_output = graph.get_node("MismatchedNode").agents[0]["outputs"][0]
+        self.assertEqual(fixed_agent_output["type"], "string")
+        self.assertTrue(fixed_agent_output["required"])
 
     def test_from_dict_preserves_explicit_edges(self):
         """Explicit control edges (no shared input/output) must survive a from_dict round-trip;
@@ -584,8 +585,7 @@ class TestWorkFlowGraph(unittest.TestCase):
             ],
         }
 
-        llm_config = OpenRouterConfig(openrouter_key="test", model="test")
-        graph = WorkFlowGraph.from_dict(graph_dict, llm_config=llm_config)
+        graph = WorkFlowGraph.from_dict(graph_dict)
 
         edge_pairs = {(edge.source, edge.target) for edge in graph.edges}
         self.assertIn(("A", "B"), edge_pairs)

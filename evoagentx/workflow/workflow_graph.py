@@ -15,14 +15,10 @@ from ..agents import Agent, CustomizeAgent
 from ..core.base_config import Parameter
 from ..core.logging import logger
 from ..core.module import BaseModule
-from ..core.registry import MODULE_REGISTRY
 from ..core.module_utils import recursive_to_dict
-from ..models import LLMConfig
 from ..prompts.utils import DEFAULT_SYSTEM_PROMPT
 from ..prompts.workflow.sew_workflow import SEW_WORKFLOW
-from ..tools.tool import Tool, Toolkit
 from ..utils.utils import (
-    create_agent_from_dict,
     generate_dynamic_class_name,
     make_parent_folder,
     pydantic_to_parameters,
@@ -31,7 +27,6 @@ from ..utils.utils import (
     validate_param,
 )
 from .action_graph import ActionGraph
-from .model_selector import DefaultModelSelector, ModelSelector
 
 
 class WorkFlowNodeState(str, Enum):
@@ -1667,105 +1662,35 @@ class WorkFlowGraph(BaseModule):
 
 
     @classmethod
-    def from_dict(
-        cls, 
-        data: Dict, 
-        llm_config: Optional[LLMConfig] = None, 
-        tools: Optional[List[Union[Tool, Toolkit]]] = None, 
-        agents: Optional[List[Agent]] = None,
-        auto_fix: bool = False,
-        model_selector: Optional[ModelSelector] = None,
-        override: bool = True,
-        **kwargs
-    ) -> 'WorkFlowGraph':
+    def from_dict(cls, data: Dict, auto_fix: bool = False, **kwargs) -> 'WorkFlowGraph':
         """
         Create a WorkFlowGraph instance from a dictionary.
 
+        This only loads the structural data of the workflow (goal, nodes, edges,
+        inputs/outputs). Agents are kept exactly as serialized (names or dicts) and are
+        NOT instantiated here: binding an `llm_config`/`tools` and turning them into live
+        `Agent` instances is the responsibility of `AgentManager.add_agents_from_workflow`.
+        This keeps a workflow graph loadable, inspectable, and editable without an LLM.
+
         Args:
-            data (Dict): The dictionary to create the WorkFlowGraph from.
-            llm_config (Optional[LLMConfig]): The LLM configuration to use for the agents.
-            tools (Optional[List[Union[Tool, Toolkit]]]): The tools to use for the agents.
-            agents (Optional[List[Agent]]): The agents to use for the workflow.
-            auto_fix (bool): Whether to automatically fix mismatched `type` and `required` fields when the parameter name is the same.
-            model_selector (Optional[ModelSelector]): The model selector to use for the agents. If None, a DefaultModelSelector will be used.
-            override (bool): Whether to override the existing LLMConfig of the agents.
-            **kwargs: Additional keyword arguments to pass to the create_agent_from_dict function.
+            data (Dict): The serialized workflow graph.
+            auto_fix (bool): Whether to automatically fix mismatched `type` and `required`
+                fields when a node parameter and an agent parameter share the same name.
+            **kwargs: Additional keyword arguments forwarded to `BaseModule.from_dict`.
         """
+        # `auto_fix` is a model field; inject it so that both construction-time
+        # (init_module) and the post-load validation below use the same value.
+        if auto_fix:
+            data = {**data, "auto_fix": True}
 
-        # Honor the BaseModule class_name dispatch: when the data describes a subclass
-        # (e.g. SequentialWorkFlowGraph, which serializes "tasks" rather than "nodes"),
-        # delegate to that subclass's from_dict instead of parsing it as a WorkFlowGraph.
-        class_name = data.get("class_name", None)
-        if class_name and class_name != cls.__name__:
-            target_cls = MODULE_REGISTRY.get_module(class_name)
-            if target_cls is not None and target_cls is not cls and issubclass(target_cls, WorkFlowGraph):
-                return target_cls.from_dict(
-                    data,
-                    llm_config=llm_config,
-                    tools=tools,
-                    agents=agents,
-                    auto_fix=auto_fix,
-                    model_selector=model_selector,
-                    override=override,
-                    **kwargs,
-                )
+        # Delegate the actual data loading (class_name dispatch, nested _process_data,
+        # construction) to BaseModule. Agents pass through untouched as str/dict.
+        workflow_graph: WorkFlowGraph = super().from_dict(data, **kwargs)
 
-        if override and not llm_config and not model_selector:
-            override = False
-
-        if model_selector is None:
-            model_selector = DefaultModelSelector(llm_config, override=override)
-
-        workflow_dict = deepcopy(data)
-
-        for node in workflow_dict["nodes"]:
-            for i, agent in enumerate(node["agents"]):
-                if isinstance(agent, dict):
-                    llm_config = model_selector.get_model(agent)
-
-                    if llm_config is None and not agent.get("is_human", False):
-                        agent_llm_config = agent.get("llm_config", None)
-                        agent_llm = agent.get("llm", None)
-                        if agent_llm_config is None and agent_llm is None:
-                            raise ValueError(f"Must provide `llm_config` or `llm` for agent '{agent.get('name', '')}'")
-
-                    node["agents"][i] = create_agent_from_dict(
-                        agent_dict=agent, 
-                        llm_config=llm_config, 
-                        tools=tools, 
-                        agents=agents,
-                        **kwargs
-                    )
-                
-                elif isinstance(agent, Agent):
-                    llm_config = model_selector.get_model(agent)
-
-                    if llm_config is not None:
-                        agent.set_llm_config(llm_config)
-                
-                elif isinstance(agent, str):
-                    continue
-                
-                else:
-                    raise TypeError(f"'{type(agent)}' is an unknown agent type!")
-
-        workflow_inputs = BaseModule._process_data(workflow_dict.get("workflow_inputs", []))
-        workflow_outputs = BaseModule._process_data(workflow_dict.get("workflow_outputs", []))
-        nodes = BaseModule._process_data(workflow_dict.get("nodes", []))
-        # Pass the serialized edges so explicit control dependencies (edges with no shared
-        # input/output, which cannot be re-inferred from data flow) survive a save/load round-trip.
-        edges = BaseModule._process_data(workflow_dict.get("edges", []))
-
-        workflow_graph: WorkFlowGraph = cls(
-            goal=workflow_dict.get("goal", ""),
-            nodes=nodes,
-            edges=edges,
-            workflow_inputs=workflow_inputs,
-            workflow_outputs=workflow_outputs,
-            auto_fix=auto_fix
-        )
-
-        workflow_graph.validate_workflow_graph(auto_fix=auto_fix)
+        # Validate structure and node/agent parameter compatibility at load time. This is
+        # the one behavior BaseModule.from_dict does not provide, and it is also where
+        # auto_fix reconciles agent-dict parameters with their node parameters.
+        workflow_graph.validate_workflow_graph(auto_fix=workflow_graph.auto_fix)
         return workflow_graph
 
 
