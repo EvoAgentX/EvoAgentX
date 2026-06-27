@@ -238,12 +238,15 @@ class WorkFlow(BaseModule):
             
         return inputs 
     
-    async def get_next_task(self) -> WorkFlowNode:
+    async def get_next_task(self) -> Optional[WorkFlowNode]:
         task_execution_history = " -> ".join(self.environment.task_execution_history)
         if not task_execution_history:
             task_execution_history = "None"
         logger.info(f"Task Execution Trajectory: {task_execution_history}. Scheduling next subtask ...")
-        task: WorkFlowNode = await self.workflow_manager.schedule_next_task(graph=self.graph, env=self.environment)
+        task: Optional[WorkFlowNode] = await self.workflow_manager.schedule_next_task(graph=self.graph, env=self.environment)
+        if task is None:
+            logger.info("No next subtask could be scheduled (the scheduler returned None).")
+            return None
         logger.info(f"The next subtask to be executed is: {task.name}")
         return task
         
