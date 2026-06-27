@@ -25,6 +25,16 @@ class EchoActionGraph(ActionGraph):
         return {"result": value}
 
 
+class SyncOnlyActionGraph(ActionGraph):
+    llm_config: Optional[LLMConfig] = None
+
+    def init_module(self):
+        pass
+
+    def execute(self, value: str) -> dict:
+        return {"result": value}
+
+
 class TestModule(unittest.IsolatedAsyncioTestCase):
 
     def setUp(self):
@@ -140,3 +150,60 @@ class TestActionGraphWorkflow(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.workflow.environment.execution_data["result"], "second")
         self.assertNotIn("stale", self.workflow.environment.execution_data)
         self.assertNotIn("StaleTask", self.workflow.environment.task_execution_history)
+
+    async def test_sync_execute_can_run_inside_running_event_loop(self):
+        result = self.workflow.execute(inputs={"value": "inside-loop"})
+
+        self.assertEqual(result.status, "success")
+        self.assertEqual(result.result, {"result": "inside-loop"})
+
+    async def test_workflow_executes_sync_only_action_graph(self):
+        workflow = WorkFlow(
+            graph=WorkFlowGraph(
+                goal="Echo input value",
+                nodes=[
+                    WorkFlowNode(
+                        name="EchoTask",
+                        description="Echo the provided input value.",
+                        inputs=[Parameter(name="value", type="string", description="Input value")],
+                        outputs=[Parameter(name="result", type="string", description="Echo result")],
+                        action_graph=SyncOnlyActionGraph(
+                            name="SyncOnlyActionGraph",
+                            description="Echoes the input value synchronously.",
+                        ),
+                    )
+                ],
+            ),
+            llm=Mock(spec=BaseLLM),
+        )
+
+        result = await workflow.async_execute(inputs={"value": "sync-only"})
+
+        self.assertEqual(result.status, "success")
+        self.assertEqual(result.result, {"result": "sync-only"})
+
+    async def test_action_graph_workflow_does_not_require_source_code_inspection(self):
+        with patch("inspect.getsource", side_effect=OSError("source unavailable")):
+            workflow = WorkFlow(
+                graph=WorkFlowGraph(
+                    goal="Echo input value",
+                    nodes=[
+                        WorkFlowNode(
+                            name="EchoTask",
+                            description="Echo the provided input value.",
+                            inputs=[Parameter(name="value", type="string", description="Input value")],
+                            outputs=[Parameter(name="result", type="string", description="Echo result")],
+                            action_graph=EchoActionGraph(
+                                name="EchoActionGraphNoSource",
+                                description="Echoes the input value.",
+                            ),
+                        )
+                    ],
+                ),
+                llm=Mock(spec=BaseLLM),
+            )
+
+            result = await workflow.async_execute(inputs={"value": "no-source"})
+
+        self.assertEqual(result.status, "success")
+        self.assertEqual(result.result, {"result": "no-source"})

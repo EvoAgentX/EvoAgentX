@@ -18,6 +18,7 @@ from ..core.module import BaseModule
 from ..core.module_utils import recursive_to_dict
 from ..prompts.utils import DEFAULT_SYSTEM_PROMPT
 from ..prompts.workflow.sew_workflow import SEW_WORKFLOW
+from ..utils.async_utils import is_method_overridden
 from ..utils.utils import (
     generate_dynamic_class_name,
     make_parent_folder,
@@ -137,14 +138,17 @@ class WorkFlowNode(BaseModule):
         input_param_names = {param.name for param in self.inputs if param.required}
         output_param_names = {param.name for param in self.outputs if param.required}
         
-        def check_method_signature(method, method_name):
+        implemented_methods = []
+
+        def check_method_signature(method_name):
             """Helper function to check method signature against input parameters"""
 
-            method_source = inspect.getsource(method)
-            if "NotImplementedError" in method_source:
+            if not is_method_overridden(self.action_graph, ActionGraph, method_name):
                 return
-                
+            implemented_methods.append(method_name)
+
             # Get method signature
+            method = getattr(self.action_graph, method_name)
             method_sig = inspect.signature(method)
             
             # Only consider parameters other than self, *args, and **kwargs as required
@@ -160,14 +164,16 @@ class WorkFlowNode(BaseModule):
                 raise ValueError(f"`{method_name}` method requires parameters that are not in `inputs`: {missing_inputs}")
         
         # Check execute method
-        check_method_signature(self.action_graph.execute, "execute")
+        check_method_signature("execute")
         # Check async_execute method if it exists
-        check_method_signature(self.action_graph.async_execute, "async_execute")
+        check_method_signature("async_execute")
+
+        if not implemented_methods:
+            raise ValueError(
+                f"ActionGraph '{type(self.action_graph).__name__}' must implement `execute` or `async_execute`."
+            )
 
         # Monkey-patch execute and async_execute to check returns at runtime
-        original_execute = self.action_graph.execute
-        original_async_execute = self.action_graph.async_execute
-        
         def check_method_return(method_name, result):
             if not isinstance(result, dict):
                 raise TypeError(f"{method_name} must return a dictionary, got {type(result)}")
@@ -178,20 +184,29 @@ class WorkFlowNode(BaseModule):
                 raise ValueError(f"{method_name} return value is missing required outputs: {missing_outputs}")
             
             return result
-        
-        @wraps(original_execute)
-        def patched_execute(*args, **kwargs):
-            result = original_execute(*args, **kwargs)
-            return check_method_return("execute", result)
-        
-        @wraps(original_async_execute)
-        async def patched_async_execute(*args, **kwargs):
-            result = await original_async_execute(*args, **kwargs)
-            return check_method_return("async_execute", result)
-        
+
         # Replace the methods with our patched versions
-        self.action_graph.execute = patched_execute
-        self.action_graph.async_execute = patched_async_execute
+        if "execute" in implemented_methods:
+            original_execute = self.action_graph.execute
+
+            @wraps(original_execute)
+            def patched_execute(*args, **kwargs):
+                result = original_execute(*args, **kwargs)
+                return check_method_return("execute", result)
+
+            self.action_graph.execute = patched_execute
+
+        if "async_execute" in implemented_methods:
+            original_async_execute = self.action_graph.async_execute
+
+            @wraps(original_async_execute)
+            async def patched_async_execute(*args, **kwargs):
+                result = original_async_execute(*args, **kwargs)
+                if inspect.isawaitable(result):
+                    result = await result
+                return check_method_return("async_execute", result)
+
+            self.action_graph.async_execute = patched_async_execute
         
         return self
 

@@ -1,9 +1,25 @@
 import os 
 import unittest
+from unittest.mock import patch
 from evoagentx.models.litellm_model import LiteLLM
 from evoagentx.models.model_configs import LiteLLMConfig
 from evoagentx.agents.agent import Agent
-from evoagentx.actions.action import Action
+from evoagentx.actions.action import Action, ActionOutput
+
+
+class EchoOutput(ActionOutput):
+    result: str
+
+
+class SyncOnlyTestAction(Action):
+    def __init__(self):
+        super().__init__(name="SyncOnlyTestAction", description="Echoes a value synchronously.")
+
+    def execute(self, llm=None, inputs=None, sys_msg=None, return_prompt=False, **kwargs):
+        output = EchoOutput(result=inputs["value"])
+        if return_prompt:
+            return output, "sync prompt"
+        return output
 
 
 class TestModule(unittest.TestCase):
@@ -106,6 +122,25 @@ class TestModule(unittest.TestCase):
     def tearDown(self):
         if os.path.exists(self.save_file):
             os.remove(self.save_file)
+
+
+class TestAgentAsyncExecution(unittest.IsolatedAsyncioTestCase):
+    async def test_async_execute_supports_sync_only_action_without_source_inspection(self):
+        agent = Agent(
+            name="SyncAgent",
+            description="Runs sync-only actions.",
+            actions=[SyncOnlyTestAction()],
+            is_human=True,
+        )
+
+        with patch("inspect.getsource", side_effect=OSError("source unavailable")):
+            message = await agent.async_execute(
+                action_name="SyncOnlyTestAction",
+                action_input_data={"value": "echo"},
+            )
+
+        self.assertEqual(message.content.result, "echo")
+        self.assertEqual(message.prompt, "sync prompt")
 
 if __name__ == "__main__":
     unittest.main()

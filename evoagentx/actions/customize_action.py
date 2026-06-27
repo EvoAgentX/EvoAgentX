@@ -3,7 +3,6 @@ import json
 import re
 import uuid
 from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor
 from typing import List, Optional, Union
 
 from pydantic import Field, PositiveInt
@@ -28,6 +27,7 @@ from ..prompts.tool_calling import (
 )
 from ..prompts.utils import DEFAULT_SYSTEM_PROMPT
 from ..tools.tool import Tool, Toolkit, ToolMetadata, ToolResult
+from ..utils.async_utils import run_coroutine_sync
 from ..utils.utils import compile_tool_schemas, pydantic_to_parameters
 from .action import Action
 
@@ -322,18 +322,7 @@ class CustomizeAction(Action):
             return_prompt=return_prompt,
             **kwargs
         )
-
-        try:
-            asyncio.get_running_loop()
-        except RuntimeError:
-            # No event loop is running in this thread: drive the coroutine directly.
-            return asyncio.run(coro)
-
-        # We are already inside a running event loop (e.g. `execute` was called from
-        # async code). `asyncio.run()` would raise `RuntimeError` here, so run the
-        # coroutine to completion on a dedicated thread that owns its own event loop.
-        with ThreadPoolExecutor(max_workers=1) as pool:
-            return pool.submit(asyncio.run, coro).result()
+        return run_coroutine_sync(coro)
 
     async def async_execute(
         self,

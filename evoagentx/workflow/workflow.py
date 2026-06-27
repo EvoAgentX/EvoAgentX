@@ -1,5 +1,4 @@
 import inspect
-import asyncio
 import traceback
 from copy import deepcopy
 from pydantic import Field, ValidationError, create_model
@@ -19,6 +18,7 @@ from .workflow_manager import WorkFlowManager, NextAction
 from .workflow_graph import WorkFlowNode, WorkFlowGraph
 from .action_graph import ActionGraph
 from ..hitl import HITLManager, HITLBaseAgent
+from ..utils.async_utils import call_maybe_async, is_method_overridden, run_coroutine_sync
 from ..utils.utils import generate_dynamic_class_name, fix_property_name, format_validation_error
 from ..actions import ActionInput, ActionOutput
 
@@ -55,7 +55,7 @@ class WorkFlow(BaseModule):
 
     def execute(self, inputs: dict = {}, extract_output: bool = False, **kwargs) -> WorkflowResult:
         """
-        Synchronous wrapper for async_execute. Creates a new event loop and runs the async method.
+        Synchronous wrapper for async_execute.
 
         Args:
             inputs: Dictionary of inputs for workflow execution
@@ -65,12 +65,7 @@ class WorkFlow(BaseModule):
         Returns:
             WorkflowResult: The result of the workflow execution
         """
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            return loop.run_until_complete(self.async_execute(inputs, extract_output, **kwargs))
-        finally:
-            loop.close()
+        return run_coroutine_sync(self.async_execute(inputs, extract_output, **kwargs))
 
     async def async_execute(self, inputs: dict = {}, extract_output: bool = False, **kwargs) -> WorkflowResult:
         """
@@ -242,13 +237,14 @@ class WorkFlow(BaseModule):
             next_action: The next action to perform with its action graph
         """
         action_graph: ActionGraph = next_action.action_graph
-        async_execute_source = inspect.getsource(action_graph.async_execute)
-        if "NotImplementedError" in async_execute_source:
-            execute_function = action_graph.execute
-            async_execute = False
-        else:
+        if is_method_overridden(action_graph, ActionGraph, "async_execute"):
             execute_function = action_graph.async_execute
-            async_execute = True
+        elif is_method_overridden(action_graph, ActionGraph, "execute"):
+            execute_function = action_graph.execute
+        else:
+            raise NotImplementedError(
+                f"The action graph '{type(action_graph).__name__}' must implement `execute` or `async_execute`."
+            )
         # execute_signature = inspect.signature(type(action_graph).async_execute)
         execute_signature = inspect.signature(execute_function)
         execute_params = {}
@@ -266,10 +262,7 @@ class WorkFlow(BaseModule):
         # action_input_data = self.environment.get_all_execution_data()
         # execute_inputs = {param: action_input_data.get(param, "") for param in execute_params}
         # action_graph_output: dict = await action_graph.async_execute(**execute_inputs)
-        if async_execute:
-            action_graph_output: dict = await action_graph.async_execute(**execute_params)
-        else:
-            action_graph_output: dict = action_graph.execute(**execute_params)
+        action_graph_output: dict = await call_maybe_async(execute_function, **execute_params)
 
         message = Message(
             content=action_graph_output, action=action_graph.name, msg_type=MessageType.RESPONSE,
