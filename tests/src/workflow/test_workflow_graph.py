@@ -545,6 +545,101 @@ class TestWorkFlowGraph(unittest.TestCase):
         self.assertEqual(fixed_agent_output["type"], "string")
         self.assertTrue(fixed_agent_output["required"])
 
+    def test_json_schema_cannot_be_dropped_downstream(self):
+        """A node/agent cannot omit a schema declared by the workflow output."""
+        schema = {
+            "type": "object",
+            "properties": {"answer": {"type": "string"}},
+            "required": ["answer"],
+        }
+        graph_dict = {
+            "goal": "Schema contract",
+            "nodes": [{
+                "name": "SchemaNode",
+                "description": "test",
+                "inputs": [{"name": "input", "type": "string", "description": "desc"}],
+                "outputs": [{"name": "output", "type": "object", "description": "desc"}],
+                "agents": [{
+                    "name": "SchemaAgent",
+                    "description": "test",
+                    "inputs": [{"name": "input", "type": "string", "description": "desc"}],
+                    "outputs": [{"name": "output", "type": "object", "description": "desc"}],
+                }],
+            }],
+            "workflow_inputs": [{"name": "input", "type": "string", "description": "desc"}],
+            "workflow_outputs": [{
+                "name": "output",
+                "type": "object",
+                "description": "desc",
+                "json_schema": schema,
+            }],
+        }
+
+        with pytest.raises(Exception, match="json_schema"):
+            WorkFlowGraph.from_dict(graph_dict)
+
+    def test_auto_fix_propagates_json_schema_to_node_and_agent(self):
+        """auto_fix should preserve structured contracts from workflow -> node -> agent."""
+        schema = {
+            "type": "object",
+            "properties": {"answer": {"type": "string"}},
+            "required": ["answer"],
+        }
+        graph_dict = {
+            "goal": "Schema auto-fix",
+            "nodes": [{
+                "name": "SchemaNode",
+                "description": "test",
+                "inputs": [{"name": "input", "type": "string", "description": "desc"}],
+                "outputs": [{"name": "output", "type": "object", "description": "desc"}],
+                "agents": [{
+                    "name": "SchemaAgent",
+                    "description": "test",
+                    "inputs": [{"name": "input", "type": "string", "description": "desc"}],
+                    "outputs": [{"name": "output", "type": "object", "description": "desc"}],
+                }],
+            }],
+            "workflow_inputs": [{"name": "input", "type": "string", "description": "desc"}],
+            "workflow_outputs": [{
+                "name": "output",
+                "type": "object",
+                "description": "desc",
+                "json_schema": schema,
+            }],
+        }
+
+        graph = WorkFlowGraph.from_dict(graph_dict, auto_fix=True)
+
+        fixed_node_output = graph.get_node("SchemaNode").outputs[0]
+        self.assertEqual(schema, fixed_node_output.json_schema)
+
+        fixed_agent_output = graph.get_node("SchemaNode").agents[0]["outputs"][0]
+        self.assertEqual(schema, fixed_agent_output["json_schema"])
+
+    def test_object_params_without_any_json_schema_are_allowed(self):
+        """object params remain valid when no workflow/node/agent layer declares a schema."""
+        graph_dict = {
+            "goal": "Schema optional",
+            "nodes": [{
+                "name": "SchemaNode",
+                "description": "test",
+                "inputs": [{"name": "input", "type": "string", "description": "desc"}],
+                "outputs": [{"name": "output", "type": "object", "description": "desc"}],
+                "agents": [{
+                    "name": "SchemaAgent",
+                    "description": "test",
+                    "inputs": [{"name": "input", "type": "string", "description": "desc"}],
+                    "outputs": [{"name": "output", "type": "object", "description": "desc"}],
+                }],
+            }],
+            "workflow_inputs": [{"name": "input", "type": "string", "description": "desc"}],
+            "workflow_outputs": [{"name": "output", "type": "object", "description": "desc"}],
+        }
+
+        graph = WorkFlowGraph.from_dict(graph_dict)
+        self.assertIsNone(graph.get_node("SchemaNode").outputs[0].json_schema)
+        self.assertNotIn("json_schema", graph.get_node("SchemaNode").agents[0]["outputs"][0])
+
     def test_from_dict_preserves_explicit_edges(self):
         """Explicit control edges (no shared input/output) must survive a from_dict round-trip;
         they cannot be re-inferred from data flow."""

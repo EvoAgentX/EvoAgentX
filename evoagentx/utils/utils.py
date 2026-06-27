@@ -285,9 +285,9 @@ def validate_param(
     Checks if `actual_param` is compatible with `required_param`.
 
     Only the attributes that affect runtime behavior are strictly enforced: `type` and
-    `required`. `description` is free-form text and is not compared. `json_schema` is
-    compared softly — only when both params provide one (matching `Parameter`'s own
-    "provide to validate, omit to skip" semantics).
+    `required`. `description` is free-form text and is not compared. If the required
+    parameter provides a `json_schema`, the actual parameter must provide the same
+    schema so structured contracts cannot be dropped downstream.
     """
 
     def format_error_msg(
@@ -311,8 +311,9 @@ def validate_param(
     if required_param.required != actual_param.required:
         raise ValueError(format_error_msg("required", required_param.required, actual_param.required))
 
-    # `json_schema` is optional: only enforce it when both sides provide one.
-    if required_param.json_schema is not None and actual_param.json_schema is not None:
+    # `json_schema` is optional for parameters in general, but once an upstream
+    # contract provides one, downstream params must preserve it.
+    if required_param.json_schema is not None:
         if required_param.json_schema != actual_param.json_schema:
             raise ValueError(format_error_msg("json_schema", required_param.json_schema, actual_param.json_schema))
 

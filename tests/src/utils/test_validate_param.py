@@ -28,15 +28,21 @@ class TestValidateParam(unittest.TestCase):
         with self.assertRaises(ValueError):
             self._validate(required, actual)
 
-    def test_json_schema_skipped_when_one_side_missing(self):
-        """json_schema is soft: if either side omits it, it is not compared."""
+    def test_json_schema_required_when_required_param_has_schema(self):
+        """A downstream param cannot drop a schema declared by the required param."""
         schema = {"type": "object", "properties": {"a": {"type": "string"}}}
         required = Parameter(name="p", type="object", description="d", json_schema=schema)
         actual = Parameter(name="p", type="object", description="d")  # no json_schema
+        with self.assertRaises(ValueError):
+            self._validate(required, actual)
+
+    def test_extra_actual_json_schema_allowed_when_required_param_has_none(self):
+        """A more specific actual param is allowed when the required param has no schema."""
+        schema = {"type": "object", "properties": {"a": {"type": "string"}}}
+        required = Parameter(name="p", type="object", description="d")  # no json_schema
+        actual = Parameter(name="p", type="object", description="d", json_schema=schema)
         # Should not raise.
         self._validate(required, actual)
-        # Other direction too.
-        self._validate(actual, required)
 
     def test_json_schema_enforced_when_both_provided(self):
         required = Parameter(
