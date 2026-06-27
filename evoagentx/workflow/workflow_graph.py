@@ -73,6 +73,34 @@ class WorkFlowNode(BaseModule):
     action_graph: Optional[ActionGraph] = None
     status: Optional[WorkFlowNodeState] = WorkFlowNodeState.PENDING
 
+    @staticmethod
+    def _warn_agent_dict_class_name(agent: dict, node_name: Optional[str] = None) -> None:
+        if not isinstance(agent, dict) or "class_name" not in agent:
+            return
+
+        agent_name = agent.get("name", "<unknown>")
+        node_context = f" in node '{node_name}'" if node_name else ""
+        logger.warning(
+            "Agent dict '{}'{} contains class_name='{}'. BaseModule will convert "
+            "this dict into an Agent instance during construction/loading. If you "
+            "intended to keep it as a plain agent config dict for AgentManager, "
+            "remove or rename the top-level 'class_name' key.",
+            agent_name,
+            node_context,
+            agent.get("class_name"),
+        )
+
+    @classmethod
+    def _warn_agent_dicts_with_class_name(cls, agents, node_name: Optional[str] = None) -> None:
+        if not agents:
+            return
+        for agent in agents:
+            cls._warn_agent_dict_class_name(agent, node_name=node_name)
+
+    def __init__(self, **kwargs):
+        self._warn_agent_dicts_with_class_name(kwargs.get("agents"), node_name=kwargs.get("name"))
+        super().__init__(**kwargs)
+
     @field_validator('agents', mode="before")
     @classmethod
     def check_agent_format(cls, agents: List[Union[str, Dict, Agent]]):
@@ -86,6 +114,7 @@ class WorkFlowNode(BaseModule):
             elif isinstance(agent, Agent):
                 validated_agents.append(agent)
             elif isinstance(agent, dict):
+                cls._warn_agent_dict_class_name(agent)
                 assert "name" in agent and "description" in agent, \
                     "must provide the name and description of an agent when specifying an agent with a dict."
                 validated_agents.append(agent)
@@ -1666,11 +1695,13 @@ class WorkFlowGraph(BaseModule):
         """
         Create a WorkFlowGraph instance from a dictionary.
 
-        This only loads the structural data of the workflow (goal, nodes, edges,
-        inputs/outputs). Agents are kept exactly as serialized (names or dicts) and are
-        NOT instantiated here: binding an `llm_config`/`tools` and turning them into live
-        `Agent` instances is the responsibility of `AgentManager.add_agents_from_workflow`.
-        This keeps a workflow graph loadable, inspectable, and editable without an LLM.
+        Agent entries follow the same BaseModule revival rules as the rest of the
+        workflow data: string agents stay as references, dict agents without a
+        top-level `class_name` stay as config dicts, and dict agents with a top-level
+        `class_name` are converted into live `Agent` instances during construction.
+        Use a top-level `class_name` only when that eager revival is intended; otherwise
+        leave it out so `AgentManager.add_agents_from_workflow` can materialize the
+        agent later with the desired `llm_config`/`tools`.
 
         Args:
             data (Dict): The serialized workflow graph.
@@ -1684,7 +1715,7 @@ class WorkFlowGraph(BaseModule):
             data = {**data, "auto_fix": True}
 
         # Delegate the actual data loading (class_name dispatch, nested _process_data,
-        # construction) to BaseModule. Agents pass through untouched as str/dict.
+        # construction) to BaseModule.
         workflow_graph: WorkFlowGraph = super().from_dict(data, **kwargs)
 
         # Validate structure and node/agent parameter compatibility at load time. This is
