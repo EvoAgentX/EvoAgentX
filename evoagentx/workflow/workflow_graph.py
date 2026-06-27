@@ -172,13 +172,19 @@ class WorkFlowNode(BaseModule):
 
     def to_dict(self, exclude_none: bool = True, ignore: List[str] = [], **kwargs) -> dict:
         
-        agents_dict: List[dict] = []
+        agents_dict: List[Union[str, dict]] = []
         if self.agents:
             for agent in self.agents:
-                if isinstance(agent, Agent):
+                if isinstance(agent, str):
+                    agents_dict.append(agent)
+                elif isinstance(agent, Agent):
                     agents_dict.append(agent.get_config())
                 elif isinstance(agent, dict):
-                    agents_dict.append(recursive_to_dict(agent))
+                    agent_dict = recursive_to_dict(agent)
+                    # for CustomizeAgent: a callable parse_func is not serializable, store its name
+                    if "parse_func" in agent_dict and callable(agent_dict["parse_func"]):
+                        agent_dict["parse_func"] = agent_dict["parse_func"].__name__
+                    agents_dict.append(agent_dict)
                 else:
                     raise TypeError(f"'{type(agent)}' is an unknown agent type!")
 
@@ -632,13 +638,25 @@ class WorkFlowGraph(BaseModule):
         else:
             raise TypeError(f"{type(self.graph)} is an unknown type for graph. Supported types: [MultiDiGraph, WorkFlowGraph]")
         
+        def _dedup_params(params: List[Parameter]) -> List[Parameter]:
+            # Multiple initial/end nodes may share a parameter name (e.g. a common workflow
+            # input). Keep the first occurrence so the derived list passes the uniqueness check.
+            seen = set()
+            deduped = []
+            for param in params:
+                if param.name in seen:
+                    continue
+                seen.add(param.name)
+                deduped.append(param)
+            return deduped
+
         # If `workflow_inputs` is not provided, set it to the inputs of initial nodes
         if self.workflow_inputs is None:
             initial_nodes = [node for node, in_degree in self.graph.in_degree() if in_degree==0]
             workflow_inputs = []
             for node_name in initial_nodes:
                 workflow_inputs.extend(self.get_node(node_name).inputs)
-            self.workflow_inputs = workflow_inputs
+            self.workflow_inputs = _dedup_params(workflow_inputs)
 
         # If `workflow_outputs` is not provided, set it to the outputs of end nodes
         if self.workflow_outputs is None:
@@ -646,7 +664,7 @@ class WorkFlowGraph(BaseModule):
             workflow_outputs = []
             for node_name in end_nodes:
                 workflow_outputs.extend(self.get_node(node_name).outputs)
-            self.workflow_outputs = workflow_outputs
+            self.workflow_outputs = _dedup_params(workflow_outputs)
 
         self.workflow_inputs_dict = {param.name: param for param in self.workflow_inputs}
         self.workflow_outputs_dict = {param.name: param for param in self.workflow_outputs}
@@ -1351,11 +1369,17 @@ class WorkFlowGraph(BaseModule):
 
     def get_next_candidate_nodes(self) -> List[str]:
 
+        # `find_initial_nodes` classifies a node as initial purely from data readiness
+        # (its required inputs are a subset of the workflow inputs). A node can satisfy that
+        # while still having incoming edges — an explicit control edge, or an inferred edge
+        # feeding one of its optional inputs. Those nodes must not start before their
+        # predecessors, so filter the initial candidates by predecessor completion as well.
         uncomplete_initial_nodes = self.get_uncomplete_initial_nodes()
-        if len(uncomplete_initial_nodes) > 0:
-            return uncomplete_initial_nodes
-        
-        # find the last completed nodes in all paths starting from initial nodes. 
+        ready_initial_nodes = self.filter_nodes_with_uncompleted_predecessors(uncomplete_initial_nodes)
+        if len(ready_initial_nodes) > 0:
+            return ready_initial_nodes
+
+        # find the last completed nodes in all paths starting from initial nodes.
         completed_leaf_nodes = self.find_completed_leaf_nodes_start_from_initial_nodes()
 
         # obtain children nodes of last completed nodes which are uncompleted (consider previous completed tasks if there exists loops)
@@ -1692,10 +1716,14 @@ class WorkFlowGraph(BaseModule):
         workflow_inputs = BaseModule._process_data(workflow_dict.get("workflow_inputs", []))
         workflow_outputs = BaseModule._process_data(workflow_dict.get("workflow_outputs", []))
         nodes = BaseModule._process_data(workflow_dict.get("nodes", []))
-        
+        # Pass the serialized edges so explicit control dependencies (edges with no shared
+        # input/output, which cannot be re-inferred from data flow) survive a save/load round-trip.
+        edges = BaseModule._process_data(workflow_dict.get("edges", []))
+
         workflow_graph: WorkFlowGraph = cls(
             goal=workflow_dict.get("goal", ""),
             nodes=nodes,
+            edges=edges,
             workflow_inputs=workflow_inputs,
             workflow_outputs=workflow_outputs,
             auto_fix=auto_fix

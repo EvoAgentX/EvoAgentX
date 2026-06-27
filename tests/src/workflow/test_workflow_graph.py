@@ -216,6 +216,90 @@ class TestWorkFlowGraph(unittest.TestCase):
         next_tasks = self.fork_join_graph.next()
         self.assertEqual(0, len(next_tasks))
     
+    def test_control_edge_not_executed_in_parallel(self):
+        """An explicit control edge (A -> B with no shared data) must be respected even
+        when B's required inputs are all workflow inputs and therefore B is data-initial."""
+        node_a = WorkFlowNode(
+            name="A",
+            description="control source",
+            inputs=[Parameter(name="input1", type="string", description="workflow input")],
+            outputs=[Parameter(name="outputA", type="string", description="output A")],
+            agents=["TestAgent"],
+        )
+        node_b = WorkFlowNode(
+            name="B",
+            description="control target",
+            inputs=[Parameter(name="input1", type="string", description="workflow input")],
+            outputs=[Parameter(name="outputB", type="string", description="output B")],
+            agents=["TestAgent"],
+        )
+        graph = WorkFlowGraph(
+            goal="Control Edge Workflow",
+            nodes=[node_a, node_b],
+            edges=[WorkFlowEdge(source="A", target="B")],
+            workflow_inputs=[Parameter(name="input1", type="string", description="workflow input")],
+            workflow_outputs=[
+                Parameter(name="outputA", type="string", description="output A"),
+                Parameter(name="outputB", type="string", description="output B"),
+            ],
+        )
+
+        # Both A and B are data-initial, but only A may run first.
+        self.assertEqual({"A", "B"}, set(graph.find_initial_nodes()))
+        next_tasks = graph.next()
+        self.assertEqual(1, len(next_tasks))
+        self.assertEqual("A", next_tasks[0].name)
+
+        graph.set_node_status("A", WorkFlowNodeState.COMPLETED)
+        next_tasks = graph.next()
+        self.assertEqual(1, len(next_tasks))
+        self.assertEqual("B", next_tasks[0].name)
+
+    def test_optional_input_edge_respects_dependency(self):
+        """An inferred edge feeding an optional input must be respected even though the
+        target's required inputs are all workflow inputs (so it is data-initial)."""
+        node_a = WorkFlowNode(
+            name="A",
+            description="optional source",
+            inputs=[Parameter(name="input1", type="string", description="workflow input")],
+            outputs=[Parameter(name="outA", type="string", description="output A")],
+            agents=["TestAgent"],
+        )
+        node_b = WorkFlowNode(
+            name="B",
+            description="optional target",
+            inputs=[
+                Parameter(name="input1", type="string", description="workflow input"),
+                Parameter(name="outA", type="string", description="optional from A", required=False),
+            ],
+            outputs=[Parameter(name="outputB", type="string", description="output B")],
+            agents=["TestAgent"],
+        )
+        graph = WorkFlowGraph(
+            goal="Optional Input Workflow",
+            nodes=[node_a, node_b],
+            workflow_inputs=[Parameter(name="input1", type="string", description="workflow input")],
+            workflow_outputs=[
+                Parameter(name="outA", type="string", description="output A"),
+                Parameter(name="outputB", type="string", description="output B"),
+            ],
+        )
+
+        # The A -> B edge is inferred from the shared `outA` name (B's optional input).
+        edge_pairs = [(edge.source, edge.target) for edge in graph.edges]
+        self.assertIn(("A", "B"), edge_pairs)
+
+        # B is data-initial (only required input is the workflow input) but must wait for A.
+        self.assertEqual({"A", "B"}, set(graph.find_initial_nodes()))
+        next_tasks = graph.next()
+        self.assertEqual(1, len(next_tasks))
+        self.assertEqual("A", next_tasks[0].name)
+
+        graph.set_node_status("A", WorkFlowNodeState.COMPLETED)
+        next_tasks = graph.next()
+        self.assertEqual(1, len(next_tasks))
+        self.assertEqual("B", next_tasks[0].name)
+
     def test_cycle_detection(self):
         """Test cycle detection in a workflow."""
         # The cycle graph should identify a loop
@@ -459,6 +543,118 @@ class TestWorkFlowGraph(unittest.TestCase):
         fixed_agent_output = graph.get_node("MismatchedNode").agents[0].outputs[0]
         self.assertEqual(fixed_agent_output.type, "string")
         self.assertTrue(fixed_agent_output.required)
+
+    def test_from_dict_preserves_explicit_edges(self):
+        """Explicit control edges (no shared input/output) must survive a from_dict round-trip;
+        they cannot be re-inferred from data flow."""
+
+        def make_agent(name, in_name, out_name):
+            return {
+                "name": name,
+                "description": "test",
+                "inputs": [{"name": in_name, "type": "string", "description": "desc"}],
+                "outputs": [{"name": out_name, "type": "string", "description": "desc"}],
+                "prompt_template": {"class_name": "ChatTemplate", "instruction": "instruction"},
+            }
+
+        graph_dict = {
+            "goal": "Test Explicit Edges",
+            "nodes": [
+                {
+                    "name": "A",
+                    "description": "control source",
+                    "inputs": [{"name": "wf_in", "type": "string", "description": "desc"}],
+                    "outputs": [{"name": "outA", "type": "string", "description": "desc"}],
+                    "agents": [make_agent("AgentA", "wf_in", "outA")],
+                },
+                {
+                    "name": "B",
+                    "description": "control target",
+                    "inputs": [{"name": "wf_in", "type": "string", "description": "desc"}],
+                    "outputs": [{"name": "outB", "type": "string", "description": "desc"}],
+                    "agents": [make_agent("AgentB", "wf_in", "outB")],
+                },
+            ],
+            # A -> B shares no input/output, so it cannot be inferred from data flow.
+            "edges": [{"source": "A", "target": "B"}],
+            "workflow_inputs": [{"name": "wf_in", "type": "string", "description": "desc"}],
+            "workflow_outputs": [
+                {"name": "outA", "type": "string", "description": "desc"},
+                {"name": "outB", "type": "string", "description": "desc"},
+            ],
+        }
+
+        llm_config = OpenRouterConfig(openrouter_key="test", model="test")
+        graph = WorkFlowGraph.from_dict(graph_dict, llm_config=llm_config)
+
+        edge_pairs = {(edge.source, edge.target) for edge in graph.edges}
+        self.assertIn(("A", "B"), edge_pairs)
+
+        # The restored control edge must still gate execution: B waits for A.
+        next_tasks = graph.next()
+        self.assertEqual(["A"], [task.name for task in next_tasks])
+
+    def test_to_dict_supports_string_and_dict_agents(self):
+        """get_config()/to_dict() must support string agents and convert a callable
+        parse_func in a dict agent to its function name (JSON-serializable)."""
+        import json
+
+        def my_parser(x):
+            return x
+
+        node_a = WorkFlowNode(
+            name="A",
+            description="d",
+            inputs=[Parameter(name="i", type="string", description="x")],
+            outputs=[Parameter(name="o", type="string", description="x")],
+            agents=["StrAgent"],
+        )
+        node_b = WorkFlowNode(
+            name="B",
+            description="d",
+            inputs=[Parameter(name="o", type="string", description="x")],
+            outputs=[Parameter(name="o2", type="string", description="x")],
+            agents=[{"name": "DAgent", "description": "d", "parse_func": my_parser}],
+        )
+        graph = WorkFlowGraph(
+            goal="g",
+            nodes=[node_a, node_b],
+            workflow_inputs=[Parameter(name="i", type="string", description="x")],
+            workflow_outputs=[Parameter(name="o2", type="string", description="x")],
+        )
+
+        config = graph.get_config()
+
+        # string agent is preserved as-is
+        self.assertEqual(["StrAgent"], config["nodes"][0]["agents"])
+        # callable parse_func is converted to its name
+        self.assertEqual("my_parser", config["nodes"][1]["agents"][0]["parse_func"])
+        # whole config is JSON-serializable
+        json.dumps(config)
+
+    def test_derived_workflow_inputs_deduplicated(self):
+        """When workflow_inputs is not provided, two initial nodes sharing the same input
+        name must not produce a duplicate (which the uniqueness check would reject)."""
+        node_a = WorkFlowNode(
+            name="A",
+            description="d",
+            inputs=[Parameter(name="shared_in", type="string", description="x")],
+            outputs=[Parameter(name="outA", type="string", description="x")],
+            agents=["TestAgent"],
+        )
+        node_b = WorkFlowNode(
+            name="B",
+            description="d",
+            inputs=[Parameter(name="shared_in", type="string", description="x")],
+            outputs=[Parameter(name="outB", type="string", description="x")],
+            agents=["TestAgent"],
+        )
+        # No workflow_inputs/outputs provided -> they are derived from initial/end nodes.
+        graph = WorkFlowGraph(goal="g", nodes=[node_a, node_b])
+
+        input_names = [param.name for param in graph.workflow_inputs]
+        self.assertEqual(["shared_in"], input_names)
+        self.assertIn("shared_in", graph.workflow_inputs_dict)
 
     def test_node_input_unknown_source_raises(self):
         """A node input that is neither a workflow input nor any other node's output must fail."""

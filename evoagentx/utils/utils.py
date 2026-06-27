@@ -282,7 +282,12 @@ def validate_param(
     actual_params_name: str,
 ):
     """
-    Checks if `actual_param` has the same type, required, description and json_schema value as `required_param`.
+    Checks if `actual_param` is compatible with `required_param`.
+
+    Only the attributes that affect runtime behavior are strictly enforced: `type` and
+    `required`. `description` is free-form text and is not compared. `json_schema` is
+    compared softly — only when both params provide one (matching `Parameter`'s own
+    "provide to validate, omit to skip" semantics).
     """
 
     def format_error_msg(
@@ -306,11 +311,10 @@ def validate_param(
     if required_param.required != actual_param.required:
         raise ValueError(format_error_msg("required", required_param.required, actual_param.required))
 
-    if required_param.description != actual_param.description:
-        raise ValueError(format_error_msg("description", required_param.description, actual_param.description))
-
-    if required_param.json_schema != actual_param.json_schema:
-        raise ValueError(format_error_msg("json_schema", required_param.json_schema, actual_param.json_schema))
+    # `json_schema` is optional: only enforce it when both sides provide one.
+    if required_param.json_schema is not None and actual_param.json_schema is not None:
+        if required_param.json_schema != actual_param.json_schema:
+            raise ValueError(format_error_msg("json_schema", required_param.json_schema, actual_param.json_schema))
 
 
 def format_validation_error(error: ValidationError) -> str:
