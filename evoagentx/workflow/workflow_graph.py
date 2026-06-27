@@ -748,11 +748,12 @@ class WorkFlowGraph(BaseModule):
         a name with an input of B.
 
         Any user-provided `explicit_edges` are merged *in addition to* the inferred edges
-        (deduplicated by `(source, target)`), so explicit edges supplement — but never replace —
-        the inferred data-flow topology. This lets users express ordering dependencies that carry
-        no shared data, while wrong/incomplete explicit edges can no longer silently break the graph.
-        Explicit edges referencing unknown nodes raise; explicit edges with no matching input/output
-        are kept but emit a warning (see `add_edge`).
+        (deduplicated by `(source, target)`). If an explicit edge has the same `(source, target)`
+        as an inferred edge, the explicit edge replaces the inferred edge's metadata (e.g.
+        `priority`) while preserving the inferred data-flow topology. This lets users express
+        ordering dependencies that carry no shared data, while wrong/incomplete explicit edges can
+        no longer silently break the graph. Explicit edges referencing unknown nodes raise;
+        explicit edges with no matching input/output are kept but emit a warning (see `add_edge`).
         """
         self.nodes = []
         self.edges = []
@@ -767,10 +768,33 @@ class WorkFlowGraph(BaseModule):
             for edge in explicit_edges:
                 pair = (edge.source, edge.target)
                 if pair in seen_pairs:
+                    self._replace_edge_by_pair(edge)
                     continue
                 seen_pairs.add(pair)
                 extra_edges.append(edge)
             self.add_edges(*extra_edges, update_graph=False)
+
+    def _replace_edge_by_pair(self, edge: WorkFlowEdge) -> bool:
+        """
+        Replace an existing edge with the same source/target pair, preserving one edge
+        in both `self.edges` and the underlying NetworkX graph.
+        """
+        if not isinstance(edge, WorkFlowEdge):
+            raise ValueError(f"{edge} is not a valid WorkFlowEdge instance!")
+
+        for i, existing_edge in enumerate(self.edges):
+            if existing_edge.source != edge.source or existing_edge.target != edge.target:
+                continue
+
+            self.edges[i] = edge
+            edge_data = self.graph.get_edge_data(edge.source, edge.target, default={})
+            for attrs in edge_data.values():
+                ref = attrs.get("ref")
+                if isinstance(ref, WorkFlowEdge) and ref.source == edge.source and ref.target == edge.target:
+                    attrs["ref"] = edge
+                    return True
+            return True
+        return False
 
     def _init_from_multidigraph(self, graph: MultiDiGraph, nodes: List[WorkFlowNode] = []):
         graph_nodes = [deepcopy(node_attrs["ref"]) for _, node_attrs in graph.nodes(data=True)]

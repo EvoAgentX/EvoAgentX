@@ -689,6 +689,42 @@ class TestWorkFlowGraph(unittest.TestCase):
         next_tasks = graph.next()
         self.assertEqual(["A"], [task.name for task in next_tasks])
 
+    def test_explicit_edge_priority_overrides_inferred_edge_priority(self):
+        """When an explicit edge matches an inferred data-flow edge, preserve the explicit metadata."""
+        graph_dict = {
+            "goal": "Test Explicit Edge Priority",
+            "nodes": [
+                {
+                    "name": "A",
+                    "description": "source",
+                    "inputs": [{"name": "wf_in", "type": "string", "description": "desc"}],
+                    "outputs": [{"name": "outA", "type": "string", "description": "desc"}],
+                    "agents": ["AgentA"],
+                },
+                {
+                    "name": "B",
+                    "description": "target",
+                    "inputs": [{"name": "outA", "type": "string", "description": "desc"}],
+                    "outputs": [{"name": "outB", "type": "string", "description": "desc"}],
+                    "agents": ["AgentB"],
+                },
+            ],
+            # A -> B is also inferred from outA, but the explicit priority must win.
+            "edges": [{"source": "A", "target": "B", "priority": 7}],
+            "workflow_inputs": [{"name": "wf_in", "type": "string", "description": "desc"}],
+            "workflow_outputs": [{"name": "outB", "type": "string", "description": "desc"}],
+        }
+
+        graph = WorkFlowGraph.from_dict(graph_dict)
+
+        self.assertEqual([("A", "B", 7)], [(edge.source, edge.target, edge.priority) for edge in graph.edges])
+        graph_edge_refs = [
+            attrs["ref"]
+            for source, target, attrs in graph.graph.edges(data=True)
+            if source == "A" and target == "B"
+        ]
+        self.assertEqual([7], [edge.priority for edge in graph_edge_refs])
+
     def test_to_dict_supports_string_and_dict_agents(self):
         """get_config()/to_dict() must support string agents and convert a callable
         parse_func in a dict agent to its function name (JSON-serializable)."""
