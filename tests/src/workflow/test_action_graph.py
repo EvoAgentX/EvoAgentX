@@ -35,6 +35,16 @@ class SyncOnlyActionGraph(ActionGraph):
         return {"result": value}
 
 
+class GoalEchoActionGraph(ActionGraph):
+    llm_config: Optional[LLMConfig] = None
+
+    def init_module(self):
+        pass
+
+    async def async_execute(self, goal: str) -> dict:
+        return {"result": goal}
+
+
 class TestModule(unittest.IsolatedAsyncioTestCase):
 
     def setUp(self):
@@ -207,3 +217,30 @@ class TestActionGraphWorkflow(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result.status, "success")
         self.assertEqual(result.result, {"result": "no-source"})
+
+    async def test_goal_injection_does_not_mutate_input_dict(self):
+        workflow = WorkFlow(
+            graph=WorkFlowGraph(
+                goal="Injected goal",
+                nodes=[
+                    WorkFlowNode(
+                        name="GoalTask",
+                        description="Echo the workflow goal.",
+                        inputs=[Parameter(name="goal", type="string", description="Workflow goal")],
+                        outputs=[Parameter(name="result", type="string", description="Echoed goal")],
+                        action_graph=GoalEchoActionGraph(
+                            name="GoalEchoActionGraph",
+                            description="Echoes the workflow goal.",
+                        ),
+                    )
+                ],
+            ),
+            llm=Mock(spec=BaseLLM),
+        )
+        caller_inputs = {}
+
+        result = await workflow.async_execute(inputs=caller_inputs)
+
+        self.assertEqual(result.status, "success")
+        self.assertEqual(result.result, {"result": "Injected goal"})
+        self.assertEqual(caller_inputs, {})

@@ -93,7 +93,7 @@ class WorkFlow(BaseModule):
                 f"{sorted(missing_agents)}. Available agents: {sorted(self.agent_manager.list_agents())}."
             )
 
-    def execute(self, inputs: dict = {}, extract_output: bool = False, **kwargs) -> WorkflowResult:
+    def execute(self, inputs: Optional[dict] = None, extract_output: bool = False, **kwargs) -> WorkflowResult:
         """
         Synchronous wrapper for async_execute.
 
@@ -107,7 +107,7 @@ class WorkFlow(BaseModule):
         """
         return run_coroutine_sync(self.async_execute(inputs, extract_output, **kwargs))
 
-    async def async_execute(self, inputs: dict = {}, extract_output: bool = False, **kwargs) -> WorkflowResult:
+    async def async_execute(self, inputs: Optional[dict] = None, extract_output: bool = False, **kwargs) -> WorkflowResult:
         """
         Asynchronously execute the workflow.
 
@@ -137,7 +137,7 @@ class WorkFlow(BaseModule):
                 displayable_error="An unexpected error occurred. Please try again. If the problem persists, please contact support.",
             )
 
-    async def _execute_workflow(self, inputs: dict = {}, extract_output: bool = False, **kwargs) -> Union[dict, str]:
+    async def _execute_workflow(self, inputs: Optional[dict] = None, extract_output: bool = False, **kwargs) -> Union[dict, str]:
         """
         Asynchronously execute the workflow.
 
@@ -150,6 +150,7 @@ class WorkFlow(BaseModule):
             Union[dict, str]: The output of the workflow execution
         """
         goal = self.graph.goal
+        inputs = dict(inputs or {})
         # Reset node statuses and environment state so reusing the same WorkFlow instance
         # does not leak the previous run's trajectory/execution data into this one. This
         # runs unconditionally, so it also recovers from a previous failed execution.
@@ -223,10 +224,11 @@ class WorkFlow(BaseModule):
         except Exception:
             raise
 
-    def _prepare_inputs(self, inputs: dict) -> dict:
+    def _prepare_inputs(self, inputs: Optional[dict] = None) -> dict:
         """
         Prepare the inputs for the workflow execution. Mainly determine whether the goal should be added to the inputs.
         """
+        inputs = dict(inputs or {})
         initial_node_names = self.graph.find_initial_nodes()
         initial_node_required_inputs = set()
         for initial_node_name in initial_node_names:

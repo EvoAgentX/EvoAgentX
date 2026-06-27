@@ -1221,15 +1221,9 @@ class WorkFlowGraph(BaseModule):
     
     @property
     def is_complete(self):
-        # node_complete_list = [node.is_complete for node in self.nodes]
-        # leaf_nodes = [self.get_node(name) for name in self.find_end_nodes()]
-        leaf_nodes = self.nodes
-        node_complete_list = [node.is_complete for node in leaf_nodes]
-        if len(node_complete_list) == 0:
-            return True
-        if all(node_complete_list):
-            return True
-        return False
+        output_node_names = self.find_end_nodes()
+        target_nodes = [self.get_node(name) for name in output_node_names] if output_node_names else self.nodes
+        return all(node.is_complete for node in target_nodes)
     
     def reset_graph(self):
         """

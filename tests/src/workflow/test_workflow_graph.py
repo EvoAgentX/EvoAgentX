@@ -214,6 +214,46 @@ class TestWorkFlowGraph(unittest.TestCase):
         self.fork_join_graph.set_node_status("Task4", WorkFlowNodeState.COMPLETED)
         next_tasks = self.fork_join_graph.next()
         self.assertEqual(0, len(next_tasks))
+
+    def test_workflow_completes_when_workflow_output_nodes_complete(self):
+        """Nodes that do not produce workflow outputs should not keep the workflow open."""
+        node_a = WorkFlowNode(
+            name="A",
+            description="initial task",
+            inputs=[Parameter(name="input1", type="string", description="workflow input")],
+            outputs=[
+                Parameter(name="target_input", type="string", description="feeds target output"),
+                Parameter(name="side_input", type="string", description="feeds side branch"),
+            ],
+            agents=["TestAgent"],
+        )
+        node_b = WorkFlowNode(
+            name="B",
+            description="workflow output task",
+            inputs=[Parameter(name="target_input", type="string", description="from A")],
+            outputs=[Parameter(name="target_output", type="string", description="workflow output")],
+            agents=["TestAgent"],
+        )
+        node_c = WorkFlowNode(
+            name="C",
+            description="side branch task",
+            inputs=[Parameter(name="side_input", type="string", description="from A")],
+            outputs=[Parameter(name="side_output", type="string", description="not a workflow output")],
+            agents=["TestAgent"],
+        )
+        graph = WorkFlowGraph(
+            goal="Complete on workflow output",
+            nodes=[node_a, node_b, node_c],
+            workflow_inputs=[Parameter(name="input1", type="string", description="workflow input")],
+            workflow_outputs=[Parameter(name="target_output", type="string", description="workflow output")],
+        )
+
+        graph.set_node_status("A", WorkFlowNodeState.COMPLETED)
+        self.assertFalse(graph.is_complete)
+
+        graph.set_node_status("B", WorkFlowNodeState.COMPLETED)
+        self.assertTrue(graph.is_complete)
+        self.assertEqual([], graph.next())
     
     def test_control_edge_not_executed_in_parallel(self):
         """An explicit control edge (A -> B with no shared data) must be respected even
