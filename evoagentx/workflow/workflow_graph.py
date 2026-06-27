@@ -387,8 +387,15 @@ class WorkFlowNode(BaseModule):
             return agent
 
 
+        # String agents are references to agents registered elsewhere (e.g. in an
+        # AgentManager) and are not resolved here, so their inputs/outputs cannot be
+        # inspected for structural validation.
+        has_unresolved_agents = any(isinstance(agent, str) for agent in self.agents)
+
         for i, agent in enumerate(self.agents):
-            if isinstance(agent, Agent):
+            if isinstance(agent, str):
+                continue
+            elif isinstance(agent, Agent):
                 if isinstance(agent, CustomizeAgent):
                     self.agents[i] = _check_customize_agent(agent, "inputs")
                     self.agents[i] = _check_customize_agent(agent, "outputs")
@@ -426,6 +433,11 @@ class WorkFlowNode(BaseModule):
             return agent
 
 
+        # When the node has unresolved (string) agent references, their inputs/outputs
+        # are unknown here, so coverage of the node's inputs/outputs cannot be verified.
+        if has_unresolved_agents:
+            return
+
         try:
             if not all(in_agents["inputs"].values()):
                 missing_inputs = [input_name for input_name, in_agent in in_agents["inputs"].items() if not in_agent]
@@ -433,7 +445,7 @@ class WorkFlowNode(BaseModule):
             if not all(in_agents["outputs"].values()):
                 missing_outputs = [output_name for output_name, in_agent in in_agents["outputs"].items() if not in_agent]
                 raise ValueError(f"Not all outputs of node '{self.name}' can be found in agents: {missing_outputs}")
-        
+
         except Exception as e:
             # Auto-fix missing inputs/outputs if there is only one agent
             if auto_fix and len(self.agents)==1:
