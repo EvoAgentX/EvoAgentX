@@ -76,7 +76,7 @@
 - `output_parser`（可选）：用于解析任务输出的解析器
 - `parse_mode`（可选）：解析输出的模式，默认为 "str"
 - `parse_func`（可选）：用于解析输出的自定义函数
-- `parse_title`（可选）：解析输出的标题
+- `title_format`（可选）：当 `parse_mode` 为 "title" 时使用的标题格式，例如 "## {title}"
 
 与提示和解析相关的参数将用于在 `agent_manager` 中创建 `CustomizeAgent` 实例。有关代理配置的更多详细信息，请参阅[自定义代理](./customize_agent.md)文档。
 

@@ -171,10 +171,15 @@ async def main():
         )
     
         print("\n" + "="*60)
-        print("🎉 workflow executed successfully!")
-        print("="*60)
-        print("final result:\n")
-        print(result)
+        if result.status == "success":
+            print("🎉 workflow executed successfully!")
+            print("="*60)
+            print("final result:\n")
+            print(result.result)
+        else:
+            print("❌ workflow execution failed!")
+            print("="*60)
+            print(result.displayable_error)
     except Exception as e:
         print(f"workflow execution failed: {e}")
     finally:

@@ -1,6 +1,14 @@
 import unittest
+import pytest
+
 from evoagentx.core.base_config import Parameter
-from evoagentx.workflow.workflow_graph import WorkFlowNode, WorkFlowGraph, WorkFlowEdge, WorkFlowNodeState
+from evoagentx.models import OpenRouterConfig
+from evoagentx.workflow.workflow_graph import (
+    WorkFlowEdge,
+    WorkFlowGraph,
+    WorkFlowNode,
+    WorkFlowNodeState,
+)
 
 
 class TestWorkFlowGraph(unittest.TestCase):
@@ -30,30 +38,47 @@ class TestWorkFlowGraph(unittest.TestCase):
             name="Task3",
             description="Third task",
             inputs=[Parameter(name="output2", type="string", description="Output from Task2")],
-            outputs=[Parameter(name="final_output", type="string", description="Final output")],
+            outputs=[Parameter(name="output3", type="string", description="Output from Task3")],
             agents=["TestAgent"],
             status=WorkFlowNodeState.PENDING
         )
-        
-        # Create a fork-join workflow structure
-        #     Task1
-        #    /     
-        # Task2 -- Task3
-        #    \     /
-        #    Task4
+
         self.task4 = WorkFlowNode(
             name="Task4",
             description="Fourth task (join)",
             inputs=[
                 Parameter(name="output2", type="string", description="Output from Task2"),
-                Parameter(name="final_output", type="string", description="Output from Task3")
+                Parameter(name="output3", type="string", description="Output from Task3")
             ],
-            outputs=[Parameter(name="result", type="string", description="Final result")],
+            outputs=[Parameter(name="output4", type="string", description="Output from Task4")],
+            agents=["TestAgent"],
+            status=WorkFlowNodeState.PENDING
+        )
+
+        self.task5 = WorkFlowNode(
+            name="Task5",
+            description="Fifth task (first node in loop)",
+            inputs=[
+                Parameter(name="output1", type="string", description="Output from Task1"),
+                Parameter(name="output6", type="string", description="Output from Task6", required=False)
+            ],
+            outputs=[Parameter(name="output5", type="string", description="Output from Task5")],
+            agents=["TestAgent"],
+            status=WorkFlowNodeState.PENDING
+        )
+
+        self.task6 = WorkFlowNode(
+            name="Task6",
+            description="Sixth task (second node in loop)",
+            inputs=[
+                Parameter(name="output5", type="string", description="Output from Task5")
+            ],
+            outputs=[Parameter(name="output6", type="string", description="Output from Task6")],
             agents=["TestAgent"],
             status=WorkFlowNodeState.PENDING
         )
         
-        # Create a simple linear workflow
+        # Create a simple linear workflow: Task1 -> Task2 -> Task3
         self.linear_graph = WorkFlowGraph(
             goal="Simple Linear Workflow",
             nodes=[self.task1, self.task2, self.task3],
@@ -64,6 +89,11 @@ class TestWorkFlowGraph(unittest.TestCase):
         )
         
         # Create a fork-join workflow
+        #     Task1
+        #    /     
+        # Task2 -- Task3
+        #    \     /
+        #    Task4
         self.fork_join_graph = WorkFlowGraph(
             goal="Fork-Join Workflow",
             nodes=[self.task1, self.task2, self.task3, self.task4],
@@ -76,14 +106,10 @@ class TestWorkFlowGraph(unittest.TestCase):
         )
         
         # Create a workflow with a cycle
+        # Task1 -> Task5 -> Task6 -> Task5
         self.cycle_graph = WorkFlowGraph(
             goal="Workflow with Cycle",
-            nodes=[self.task1, self.task2, self.task3],
-            edges=[
-                WorkFlowEdge(source="Task1", target="Task2"),
-                WorkFlowEdge(source="Task2", target="Task3"),
-                WorkFlowEdge(source="Task3", target="Task2")  # Creates a cycle
-            ]
+            nodes=[self.task1, self.task5, self.task6]
         )
     
     def test_graph_initialization(self):
@@ -195,10 +221,8 @@ class TestWorkFlowGraph(unittest.TestCase):
         # The cycle graph should identify a loop
         loops = self.cycle_graph._find_all_loops()
         self.assertTrue(loops)  # Should contain at least one loop
-        
-        # Check if Task1 is identified as both a loop start and loop end
-        self.assertTrue(self.cycle_graph.is_loop_start("Task2"))
-        self.assertTrue(self.cycle_graph.is_loop_end("Task3"))
+        self.assertTrue(self.cycle_graph.is_loop_start("Task5"))
+        self.assertTrue(self.cycle_graph.is_loop_end("Task6"))
     
     def test_node_status_management(self):
         """Test node status management."""
@@ -257,6 +281,217 @@ class TestWorkFlowGraph(unittest.TestCase):
         # After completing Task3 as well, Task4's dependencies should be satisfied
         self.fork_join_graph.set_node_status("Task3", WorkFlowNodeState.COMPLETED)
         self.assertTrue(self.fork_join_graph.are_dependencies_complete("Task4"))
+
+    def test_workflow_io_duplicates(self):
+        """Test that workflow inputs and outputs cannot have duplicate names."""
+        with pytest.raises(ValueError, match=r"Workflow inputs and outputs share the following name\(s\), which is not allowed: \['shared'\]"):
+            WorkFlowGraph(
+                goal="Duplicate IO",
+                nodes=[self.task1],
+                workflow_inputs=[Parameter(name="shared", type="string", description="desc")],
+                workflow_outputs=[Parameter(name="shared", type="string", description="desc")]
+            )
+
+    def test_node_io_duplicates(self):
+        """Test that node inputs and outputs cannot have internal duplicates or overlap."""
+        # Duplicate input name
+        node_dup_in = WorkFlowNode(
+            name="DupIn",
+            description="test",
+            inputs=[
+                Parameter(name="in1", type="string", description="desc"),
+                Parameter(name="in1", type="string", description="desc")
+            ],
+            outputs=[Parameter(name="out1", type="string", description="desc")],
+            agents=["TestAgent"]
+        )
+        with pytest.raises(ValueError, match="Node 'DupIn' has duplicate input name: 'in1'"):
+            WorkFlowGraph(
+                goal="test", 
+                nodes=[node_dup_in],
+                workflow_inputs=[Parameter(name="workflow_in", type="string", description="desc")],
+                workflow_outputs=[Parameter(name="workflow_out", type="string", description="desc")]
+            )
+
+        # Duplicate output name
+        node_dup_out = WorkFlowNode(
+            name="DupOut",
+            description="test",
+            inputs=[Parameter(name="in1", type="string", description="desc")],
+            outputs=[
+                Parameter(name="out1", type="string", description="desc"),
+                Parameter(name="out1", type="string", description="desc")
+            ],
+            agents=["TestAgent"]
+        )
+        with pytest.raises(ValueError, match="Node 'DupOut' has duplicate output name: 'out1'"):
+            WorkFlowGraph(
+                goal="test", 
+                nodes=[node_dup_out],
+                workflow_inputs=[Parameter(name="workflow_in", type="string", description="desc")],
+                workflow_outputs=[Parameter(name="workflow_out", type="string", description="desc")]
+            )
+
+        # Overlap between inputs and outputs
+        node_overlap = WorkFlowNode(
+            name="Overlap",
+            description="test",
+            inputs=[Parameter(name="shared", type="string", description="desc")],
+            outputs=[Parameter(name="shared", type="string", description="desc")],
+            agents=["TestAgent"]
+        )
+        with pytest.raises(ValueError, match=r"Node 'Overlap' inputs and outputs share the following name\(s\), which is not allowed: \['shared'\]"):
+            WorkFlowGraph(
+                goal="test", 
+                nodes=[node_overlap],
+                workflow_inputs=[Parameter(name="workflow_in", type="string", description="desc")],
+                workflow_outputs=[Parameter(name="workflow_out", type="string", description="desc")]
+            )
+
+    def test_node_output_uniqueness(self):
+        """Test that each output name must be unique across all nodes."""
+        node1 = WorkFlowNode(
+            name="Node1",
+            description="test",
+            inputs=[Parameter(name="in1", type="string", description="desc")],
+            outputs=[Parameter(name="out_shared", type="string", description="desc")],
+            agents=["TestAgent"]
+        )
+        node2 = WorkFlowNode(
+            name="Node2",
+            description="test",
+            inputs=[Parameter(name="in2", type="string", description="desc")],
+            outputs=[Parameter(name="out_shared", type="string", description="desc")],
+            agents=["TestAgent"]
+        )
+        expected_msg = (
+            r"Each node output name must be unique across all nodes\. "
+            r"Found conflicts:\n'out_shared' produced by \['Node1', 'Node2'\]"
+        )
+        with pytest.raises(ValueError, match=expected_msg):
+            WorkFlowGraph(
+                goal="test", 
+                nodes=[node1, node2],
+                workflow_inputs=[Parameter(name="workflow_in", type="string", description="desc")],
+                workflow_outputs=[Parameter(name="workflow_out", type="string", description="desc")]
+            )
+
+    def test_auto_fix_mismatched_params(self):
+        """Test that auto_fix correctly updates node parameters to match workflow/agent parameters."""
+        # Create a node with a mismatched type compared to workflow input
+        mismatched_node = WorkFlowNode(
+            name="MismatchedNode",
+            description="test",
+            inputs=[Parameter(name="input", type="number", description="desc", required=False)], # Should be string, required=True
+            outputs=[Parameter(name="output", type="boolean", description="desc")],
+            agents=["TestAgent"]
+        )
+        
+        # This should fail without auto_fix
+        with pytest.raises(ValueError):
+            WorkFlowGraph(
+                goal="Test Auto-fix",
+                nodes=[mismatched_node],
+                workflow_inputs=[Parameter(name="input", type="string", description="desc", required=True)],
+                workflow_outputs=[Parameter(name="output", type="string", description="desc")],
+            )
+            
+        graph = WorkFlowGraph(
+            goal="Test Auto-fix",
+            nodes=[mismatched_node],
+            workflow_inputs=[Parameter(name="input", type="string", description="desc", required=True)],
+            workflow_outputs=[Parameter(name="output", type="string", description="desc")],
+            auto_fix=True
+        )
+        
+        # Verify it was fixed
+        fixed_input = graph.get_node("MismatchedNode").inputs[0]
+        self.assertEqual(fixed_input.type, "string")
+        self.assertTrue(fixed_input.required)
+
+        fixed_output = graph.get_node("MismatchedNode").outputs[0]
+        self.assertEqual(fixed_output.type, "string")
+        self.assertTrue(fixed_output.required)
+
+    def test_auto_fix_mismatched_params_from_dict(self):
+        """Test that auto_fix correctly updates node parameters when using WorkFlowGraph.from_dict."""
+
+        graph_dict = {
+            "goal": "Test Auto-fix",
+            "nodes": [{
+                "name": "MismatchedNode",
+                "description": "test",
+                "inputs": [{"name": "input", "type": "number", "description": "desc", "required": False}],
+                "outputs": [{"name": "output", "type": "boolean", "description": "desc"}],
+                "agents": [
+                    {
+                        "name": "TestAgent",
+                        "description": "test",
+                        "inputs": [{"name": "input", "type": "integer", "description": "desc", "required": False}],
+                        "outputs": [{"name": "output", "type": "number", "description": "desc", "required": False}],
+                        "prompt_template": {
+                            "class_name": "ChatTemplate",
+                            "instruction": "instruction"
+                        }
+                    }
+                ]
+            }],
+            "workflow_inputs": [{"name": "input", "type": "string", "description": "desc", "required": True}],
+            "workflow_outputs": [{"name": "output", "type": "string", "description": "desc"}],
+        }
+        
+        llm_config = OpenRouterConfig(openrouter_key="test", model="test")
+        graph = WorkFlowGraph.from_dict(graph_dict, llm_config=llm_config, auto_fix=True)
+        
+        # Verify it was fixed
+        fixed_node_input = graph.get_node("MismatchedNode").inputs[0]
+        self.assertEqual(fixed_node_input.type, "string")
+        self.assertTrue(fixed_node_input.required)
+
+        fixed_node_output = graph.get_node("MismatchedNode").outputs[0]
+        self.assertEqual(fixed_node_output.type, "string")
+        self.assertTrue(fixed_node_output.required)
+
+        fixed_agent_input = graph.get_node("MismatchedNode").agents[0].inputs[0]
+        self.assertEqual(fixed_agent_input.type, "string")
+        self.assertTrue(fixed_agent_input.required)
+
+        fixed_agent_output = graph.get_node("MismatchedNode").agents[0].outputs[0]
+        self.assertEqual(fixed_agent_output.type, "string")
+        self.assertTrue(fixed_agent_output.required)
+
+    def test_node_input_unknown_source_raises(self):
+        """A node input that is neither a workflow input nor any other node's output must fail."""
+        workflow_input = Parameter(name="wf_in", type="string", description="workflow input", required=True)
+        workflow_output = Parameter(name="wf_out", type="string", description="workflow output")
+        
+        nodeA = WorkFlowNode(
+            name="NodeA",
+            description="NodeA",
+            inputs=[Parameter(name="wf_in", type="string", description="workflow input", required=True)],
+            outputs=[Parameter(name="nodeA_out", type="string", description="node A output")]
+        )
+
+        nodeB = WorkFlowNode(
+            name="NodeB",
+            description="NodeB",
+            inputs=[
+                Parameter(name="ghost_input", type="string", description="ghost_input", required=True),
+                Parameter(name="nodeA_out", type="string", description="node A output", required=True)
+            ],
+            outputs=[Parameter(name="wf_out", type="string", description="workflow output")]
+        )
+
+        with pytest.raises(
+            ValueError,
+            match="Node 'NodeB' input 'ghost_input' is not a workflow input or from another node's output.",
+        ):
+            WorkFlowGraph(
+                goal="test",
+                nodes=[nodeA, nodeB],
+                workflow_inputs=[workflow_input],
+                workflow_outputs=[workflow_output],
+            )
 
 
 if __name__ == "__main__":

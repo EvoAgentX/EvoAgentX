@@ -77,7 +77,7 @@ The `SequentialWorkFlowGraph` accepts a simplified input format that makes it ea
 - `output_parser` (optional): The output parser to parse the output of the task 
 - `parse_mode` (optional): Mode for parsing outputs, defaults to "str"
 - `parse_func` (optional): Custom function for parsing outputs
-- `parse_title` (optional): Title for the parsed output
+- `title_format` (optional): Title format used when `parse_mode` is "title", e.g. "## {title}"
 
 The parameters related to prompts and parsing will be used to create a `CustomizeAgent` instance in the `agent_manager`. Please refer to the [Customize Agent](./customize_agent.md) documentation for more details about the agent configuration. 
 
