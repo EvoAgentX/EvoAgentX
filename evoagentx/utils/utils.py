@@ -359,51 +359,6 @@ def params_to_json(params: List[Parameter], ignore: List[str] = []) -> str:
     return params_json
 
 
-def fix_property_name(object: Any, json_schema: Dict) -> Any:
-    """
-    Recursively fixes the property names of `object` to match the provided JSON schema.
-    """
-    if object is None:
-        return object
-
-    if json_schema["type"] == "array" and json_schema["items"]["type"] == "object":
-        return [fix_property_name(item, json_schema["items"]) for item in object]
-
-    elif json_schema["type"] == "object":
-        fixed_object = dict()
-        properties = json_schema.get("properties")
-
-        if properties is None:
-            return object
-
-        for property_name, property_schema in properties.items():
-
-            if property_schema["type"] == "array":
-                property = object.get(property_name, None)
-                if property is not None:
-                    fixed_object[property_name] = [fix_property_name(item, property_schema["items"]) for item in property]
-
-            elif property_schema["type"] == "object":
-                property = object.get(property_name, None)
-                if property is not None:
-                    fixed_object[property_name] = fix_property_name(property, property_schema)
-
-            else:
-                object_properties_lower = {name.lower(): name for name in object}
-                schema_properties_lower = {name.lower(): name for name in properties}
-
-                for name in object_properties_lower:
-                    if name in schema_properties_lower:
-                        fixed_object[schema_properties_lower[name]] = object[object_properties_lower[name]]
-                    else:
-                        fixed_object[object_properties_lower[name]] = object[object_properties_lower[name]]
-
-        return fixed_object
-
-    else:
-        return object
-
-
 def resolve_json_schema_ref(json_schema: Any, root_schema: Optional[Dict] = None) -> Any:
     """
     Recursively resolve all $ref in a JSON schema.

@@ -2,7 +2,7 @@ import inspect
 import traceback
 from copy import deepcopy
 from pydantic import Field, ValidationError, create_model
-from typing import Dict, Literal, Optional, List, Union
+from typing import Literal, Optional, List, Union
 from ..core.logging import logger
 from ..core.exception import DisplayableException, InputValidationError
 from ..core.module import BaseModule
@@ -19,7 +19,7 @@ from .workflow_graph import WorkFlowNode, WorkFlowGraph
 from .action_graph import ActionGraph
 from ..hitl import HITLManager, HITLBaseAgent
 from ..utils.async_utils import call_maybe_async, is_method_overridden, run_coroutine_sync
-from ..utils.utils import generate_dynamic_class_name, fix_property_name, format_validation_error
+from ..utils.utils import generate_dynamic_class_name, format_validation_error
 from ..actions import ActionInput, ActionOutput
 
 
@@ -193,25 +193,10 @@ class WorkFlow(BaseModule):
             output: str = await self.workflow_manager.extract_output(graph=self.graph, env=self.environment)
         else:
             output: dict = self.environment.get_execution_data(self.output_names)
-            output = self._fix_outputs(output)
 
         self.graph.reset_graph()
         logger.info("Workflow execution completed successfully")
         return output
-
-    def _fix_outputs(self, outputs: Dict) -> Dict:
-        """
-        Recursively fixes the property names of the outputs to match the provided JSON schema.
-        """
-        outputs_copy = deepcopy(outputs)
-
-        for output_name, output in outputs_copy.items():
-            json_schema = self.graph.workflow_outputs_dict[output_name].json_schema
-
-            if json_schema:
-                outputs_copy[output_name] = fix_property_name(output, json_schema)
-
-        return outputs_copy
 
     def _validate_inputs(self, inputs: dict):
         workflow_inputs = [param.to_dict(ignore=["class_name"]) for param in self.graph.workflow_inputs]

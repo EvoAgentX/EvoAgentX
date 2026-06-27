@@ -499,9 +499,8 @@ class TestWorkFlowGraph(unittest.TestCase):
                 workflow_outputs=[Parameter(name="workflow_out", type="string", description="desc")]
             )
 
-    def test_auto_fix_mismatched_params(self):
-        """Test that auto_fix correctly updates node parameters to match workflow/agent parameters."""
-        # Create a node with a mismatched type compared to workflow input
+    def test_mismatched_params_raise(self):
+        """A node parameter that mismatches the workflow parameter (type/required) must raise."""
         mismatched_node = WorkFlowNode(
             name="MismatchedNode",
             description="test",
@@ -509,81 +508,14 @@ class TestWorkFlowGraph(unittest.TestCase):
             outputs=[Parameter(name="output", type="boolean", description="desc")],
             agents=["TestAgent"]
         )
-        
-        # This should fail without auto_fix
+
         with pytest.raises(ValueError):
             WorkFlowGraph(
-                goal="Test Auto-fix",
+                goal="Test mismatch",
                 nodes=[mismatched_node],
                 workflow_inputs=[Parameter(name="input", type="string", description="desc", required=True)],
                 workflow_outputs=[Parameter(name="output", type="string", description="desc")],
             )
-            
-        graph = WorkFlowGraph(
-            goal="Test Auto-fix",
-            nodes=[mismatched_node],
-            workflow_inputs=[Parameter(name="input", type="string", description="desc", required=True)],
-            workflow_outputs=[Parameter(name="output", type="string", description="desc")],
-            auto_fix=True
-        )
-        
-        # Verify it was fixed
-        fixed_input = graph.get_node("MismatchedNode").inputs[0]
-        self.assertEqual(fixed_input.type, "string")
-        self.assertTrue(fixed_input.required)
-
-        fixed_output = graph.get_node("MismatchedNode").outputs[0]
-        self.assertEqual(fixed_output.type, "string")
-        self.assertTrue(fixed_output.required)
-
-    def test_auto_fix_mismatched_params_from_dict(self):
-        """Test that auto_fix correctly updates node parameters when using WorkFlowGraph.from_dict."""
-
-        graph_dict = {
-            "goal": "Test Auto-fix",
-            "nodes": [{
-                "name": "MismatchedNode",
-                "description": "test",
-                "inputs": [{"name": "input", "type": "number", "description": "desc", "required": False}],
-                "outputs": [{"name": "output", "type": "boolean", "description": "desc"}],
-                "agents": [
-                    {
-                        "name": "TestAgent",
-                        "description": "test",
-                        "inputs": [{"name": "input", "type": "integer", "description": "desc", "required": False}],
-                        "outputs": [{"name": "output", "type": "number", "description": "desc", "required": False}],
-                        "prompt_template": {
-                            "class_name": "ChatTemplate",
-                            "instruction": "instruction"
-                        }
-                    }
-                ]
-            }],
-            "workflow_inputs": [{"name": "input", "type": "string", "description": "desc", "required": True}],
-            "workflow_outputs": [{"name": "output", "type": "string", "description": "desc"}],
-        }
-        
-        graph = WorkFlowGraph.from_dict(graph_dict, auto_fix=True)
-
-        # Verify it was fixed
-        fixed_node_input = graph.get_node("MismatchedNode").inputs[0]
-        self.assertEqual(fixed_node_input.type, "string")
-        self.assertTrue(fixed_node_input.required)
-
-        fixed_node_output = graph.get_node("MismatchedNode").outputs[0]
-        self.assertEqual(fixed_node_output.type, "string")
-        self.assertTrue(fixed_node_output.required)
-
-        # from_dict no longer instantiates agents: they stay as dicts and are
-        # materialized later by AgentManager. auto_fix still reconciles the agent
-        # dict's parameters with the node parameters in place.
-        fixed_agent_input = graph.get_node("MismatchedNode").agents[0]["inputs"][0]
-        self.assertEqual(fixed_agent_input["type"], "string")
-        self.assertTrue(fixed_agent_input["required"])
-
-        fixed_agent_output = graph.get_node("MismatchedNode").agents[0]["outputs"][0]
-        self.assertEqual(fixed_agent_output["type"], "string")
-        self.assertTrue(fixed_agent_output["required"])
 
     def test_json_schema_cannot_be_dropped_downstream(self):
         """A node/agent cannot omit a schema declared by the workflow output."""
@@ -617,44 +549,6 @@ class TestWorkFlowGraph(unittest.TestCase):
 
         with pytest.raises(Exception, match="json_schema"):
             WorkFlowGraph.from_dict(graph_dict)
-
-    def test_auto_fix_propagates_json_schema_to_node_and_agent(self):
-        """auto_fix should preserve structured contracts from workflow -> node -> agent."""
-        schema = {
-            "type": "object",
-            "properties": {"answer": {"type": "string"}},
-            "required": ["answer"],
-        }
-        graph_dict = {
-            "goal": "Schema auto-fix",
-            "nodes": [{
-                "name": "SchemaNode",
-                "description": "test",
-                "inputs": [{"name": "input", "type": "string", "description": "desc"}],
-                "outputs": [{"name": "output", "type": "object", "description": "desc"}],
-                "agents": [{
-                    "name": "SchemaAgent",
-                    "description": "test",
-                    "inputs": [{"name": "input", "type": "string", "description": "desc"}],
-                    "outputs": [{"name": "output", "type": "object", "description": "desc"}],
-                }],
-            }],
-            "workflow_inputs": [{"name": "input", "type": "string", "description": "desc"}],
-            "workflow_outputs": [{
-                "name": "output",
-                "type": "object",
-                "description": "desc",
-                "json_schema": schema,
-            }],
-        }
-
-        graph = WorkFlowGraph.from_dict(graph_dict, auto_fix=True)
-
-        fixed_node_output = graph.get_node("SchemaNode").outputs[0]
-        self.assertEqual(schema, fixed_node_output.json_schema)
-
-        fixed_agent_output = graph.get_node("SchemaNode").agents[0]["outputs"][0]
-        self.assertEqual(schema, fixed_agent_output["json_schema"])
 
     def test_object_params_without_any_json_schema_are_allowed(self):
         """object params remain valid when no workflow/node/agent layer declares a schema."""

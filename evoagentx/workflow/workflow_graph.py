@@ -300,7 +300,7 @@ class WorkFlowNode(BaseModule):
         else:
             return [param.name for param in self.outputs]
 
-    def check_agents(self, auto_fix: bool = False):
+    def check_agents(self):
         """
         Checks if any agent assigned to this node accept the node inputs and if any agent outputs the node outputs.
         """
@@ -333,25 +333,17 @@ class WorkFlowNode(BaseModule):
             # "input" or "output"
             input_or_output = inputs_or_outputs[:-1]
 
-            for i, agent_input_or_output in enumerate(agent_dict[inputs_or_outputs]):
+            for agent_input_or_output in agent_dict[inputs_or_outputs]:
                 if agent_input_or_output["name"] in node_inputs_outputs[inputs_or_outputs]:
                     in_agents[inputs_or_outputs][agent_input_or_output["name"]] = True
                     agent_input_or_output_param = Parameter(**agent_input_or_output)
-                    try:
-                        validate_param(
-                            node_inputs_outputs[inputs_or_outputs][agent_input_or_output["name"]],
-                            agent_input_or_output_param,
-                            f"node '{self.name}' {input_or_output}",
-                            f"agent '{agent_dict['name']}' {input_or_output}",
-                        )
-                    except ValueError as e:
-                        if auto_fix:
-                            logger.warning(e)
-                            logger.info(f"Auto-fixed agent '{agent_dict['name']}' {input_or_output}: '{agent_input_or_output['name']}'")
-                            agent_dict[inputs_or_outputs][i] = node_inputs_outputs[inputs_or_outputs][agent_input_or_output["name"]].to_dict(ignore=["class_name"])
-                        else:
-                            raise
-            
+                    validate_param(
+                        node_inputs_outputs[inputs_or_outputs][agent_input_or_output["name"]],
+                        agent_input_or_output_param,
+                        f"node '{self.name}' {input_or_output}",
+                        f"agent '{agent_dict['name']}' {input_or_output}",
+                    )
+
             return agent_dict
 
 
@@ -374,23 +366,15 @@ class WorkFlowNode(BaseModule):
                 
                 action_params = pydantic_to_parameters(action_format, ignore=ignore)
 
-                for j, param in enumerate(action_params):
+                for param in action_params:
                     if param.name in node_inputs_outputs[inputs_or_outputs]:
                         in_agents[inputs_or_outputs][param.name] = True
-                        try:
-                            validate_param(
-                                node_inputs_outputs[inputs_or_outputs][param.name],
-                                param,
-                                f"node '{self.name}' {input_or_output}",
-                                f"agent action '{agent_actions.name}' {input_or_output}",
-                            )
-                        except ValueError as e:
-                            if auto_fix:
-                                logger.warning(e)
-                                logger.info(f"Auto-fixed agent action '{agent_actions.name}' {inputs_or_outputs}: '{param.name}'")
-                                action_params[j] = node_inputs_outputs[inputs_or_outputs][param.name]
-                            else:
-                                raise
+                        validate_param(
+                            node_inputs_outputs[inputs_or_outputs][param.name],
+                            param,
+                            f"node '{self.name}' {input_or_output}",
+                            f"agent action '{agent_actions.name}' {input_or_output}",
+                        )
 
                 action_params = [param.to_dict(ignore=["class_name"]) for param in action_params]
                 if inputs_or_outputs == "inputs":                      
@@ -405,30 +389,17 @@ class WorkFlowNode(BaseModule):
             # input or output
             input_or_output = inputs_or_outputs[:-1]
 
-            new_inputs_or_outputs = []
-
-            for i, agent_input_or_output in enumerate(getattr(agent, inputs_or_outputs)):
-                new_inputs_or_outputs.append(agent_input_or_output)
-
+            for agent_input_or_output in getattr(agent, inputs_or_outputs):
                 param_name = agent_input_or_output.name
                 if param_name in node_inputs_outputs[inputs_or_outputs]:
                     in_agents[inputs_or_outputs][param_name] = True
-                    try:
-                        validate_param(
-                            node_inputs_outputs[inputs_or_outputs][param_name],
-                            agent_input_or_output,
-                            f"node '{self.name}' {input_or_output}",
-                            f"agent '{agent.name}' {input_or_output}",
-                        )
-                    except ValueError as e:
-                        if auto_fix:
-                            logger.warning(e)
-                            logger.info(f"Auto-fixed agent '{agent.name}' {input_or_output}: '{param_name}'")
-                            new_inputs_or_outputs[i] = node_inputs_outputs[inputs_or_outputs][param_name]
-                        else:
-                            raise
+                    validate_param(
+                        node_inputs_outputs[inputs_or_outputs][param_name],
+                        agent_input_or_output,
+                        f"node '{self.name}' {input_or_output}",
+                        f"agent '{agent.name}' {input_or_output}",
+                    )
 
-            setattr(agent, inputs_or_outputs, new_inputs_or_outputs)
             return agent
 
 
@@ -452,62 +423,18 @@ class WorkFlowNode(BaseModule):
                 self.agents[i] = _check_agent_dict(agent, "outputs")
             else:
                 raise TypeError(f"{type(agent)} is an unknown agent type!")
-        
-
-        def fix_agent(agent: Union[Dict, Agent]) -> Union[Dict, Agent]:
-
-            node_inputs_dict = [node_input.to_dict(ignore=["class_name"]) for node_input in self.inputs]
-            node_outputs_dict = [node_output.to_dict(ignore=["class_name"]) for node_output in self.outputs]
-
-            if isinstance(agent, dict):
-                agent["inputs"] = node_inputs_dict
-                agent["outputs"] = node_outputs_dict
-
-            elif isinstance(agent, Agent):
-                if hasattr(agent, "inputs"):
-                    agent.inputs = self.inputs
-                else:
-                    raise AttributeError(f"Cannot auto fix agent '{agent.name}' which lacks 'inputs' attribute")
-                if hasattr(agent, "outputs"):
-                    agent.outputs = self.outputs
-                else:
-                    raise AttributeError(f"Cannot auto fix agent '{agent.name}' which lacks 'outputs' attribute")
-            else:
-                raise TypeError(f"Cannot auto fix agent of type '{type(agent)}'")
-
-            return agent
-
 
         # When the node has unresolved (string) agent references, their inputs/outputs
         # are unknown here, so coverage of the node's inputs/outputs cannot be verified.
         if has_unresolved_agents:
             return
 
-        try:
-            if not all(in_agents["inputs"].values()):
-                missing_inputs = [input_name for input_name, in_agent in in_agents["inputs"].items() if not in_agent]
-                raise ValueError(f"Not all inputs of node '{self.name}' are used by agents: {missing_inputs}")
-            if not all(in_agents["outputs"].values()):
-                missing_outputs = [output_name for output_name, in_agent in in_agents["outputs"].items() if not in_agent]
-                raise ValueError(f"Not all outputs of node '{self.name}' can be found in agents: {missing_outputs}")
-
-        except Exception as e:
-            # Auto-fix missing inputs/outputs if there is only one agent
-            if auto_fix and len(self.agents)==1:
-                logger.error(e)
-                agent = self.agents[0]
-                
-                if isinstance(agent, dict):
-                    agent_name = agent["name"]
-                elif isinstance(agent, Agent):
-                    agent_name = agent.name
-                else:
-                    raise TypeError(f"Cannot auto fix agent of type '{type(agent)}'")
-
-                self.agents[0] = fix_agent(agent)
-                logger.info(f"Auto-fixed missing inputs/outputs for '{agent_name}'")
-            else:
-                raise
+        if not all(in_agents["inputs"].values()):
+            missing_inputs = [input_name for input_name, in_agent in in_agents["inputs"].items() if not in_agent]
+            raise ValueError(f"Not all inputs of node '{self.name}' are used by agents: {missing_inputs}")
+        if not all(in_agents["outputs"].values()):
+            missing_outputs = [output_name for output_name, in_agent in in_agents["outputs"].items() if not in_agent]
+            raise ValueError(f"Not all outputs of node '{self.name}' can be found in agents: {missing_outputs}")
 
     def update_inputs(self, inputs: List[Parameter]):
         self.inputs = inputs
@@ -673,7 +600,6 @@ class WorkFlowGraph(BaseModule):
         graph: Internal NetworkX MultiDiGraph or another WorkFlowGraph
         workflow_inputs: List of inputs that the workflow accepts. If not provided, inputs from initial nodes are used.
         workflow_outputs: The final outputs of the workflow. If not provided, outputs from end nodes are used.
-        auto_fix: Whether to automatically fix mismatched `type` and `required` fields when the parameter name is the same.
     """
 
     goal: str
@@ -682,7 +608,6 @@ class WorkFlowGraph(BaseModule):
     graph: Optional[Union[MultiDiGraph, "WorkFlowGraph"]] = Field(default=None, exclude=True)
     workflow_inputs: Optional[List[Parameter]] = None
     workflow_outputs: Optional[List[Parameter]] = None
-    auto_fix: bool = False
 
     def init_module(self):
         self._lock = threading.Lock()
@@ -727,7 +652,7 @@ class WorkFlowGraph(BaseModule):
         self.workflow_outputs_dict = {param.name: param for param in self.workflow_outputs}
         
         self._validate_workflow_structure()
-        self._check_workflow_inputs_outputs(self.auto_fix)
+        self._check_workflow_inputs_outputs()
         # NOTE: skip _check_agents during initialization because in workflow generator
         # the graph needs to be constructed before agents are generated
         self.update_graph()
@@ -1635,12 +1560,9 @@ class WorkFlowGraph(BaseModule):
         return workflow_desc
 
 
-    def _check_workflow_inputs_outputs(self, auto_fix: bool = False):
+    def _check_workflow_inputs_outputs(self):
         """Checks if the workflow inputs and outputs can be satisfied by the nodes in the workflow graph.
         Raises error If any workflow input is not used by a node, or if any workflow output cannot be found from a node's output.
-
-        Args:
-            auto_fix: Whether to automatically fix mismatched `type` and `required` fields.
         """
         workflow_inputs_outputs = {"inputs": self.workflow_inputs_dict, "outputs": self.workflow_outputs_dict}
         workflow_input_in_nodes = {workflow_input_name: False for workflow_input_name in self.workflow_inputs_dict}
@@ -1653,26 +1575,16 @@ class WorkFlowGraph(BaseModule):
             input_or_output = inputs_or_outputs[:-1]
             node_inputs_or_outputs = getattr(node, inputs_or_outputs)
 
-            for i, node_input_or_output in enumerate(node_inputs_or_outputs):
+            for node_input_or_output in node_inputs_or_outputs:
                 if node_input_or_output.name in in_nodes[inputs_or_outputs]:
                     in_nodes[inputs_or_outputs][node_input_or_output.name] = True
-                
-                    try:
-                        validate_param(
-                            workflow_inputs_outputs[inputs_or_outputs][node_input_or_output.name], 
-                            node_input_or_output,
-                            f"workflow {input_or_output}",
-                            f"node '{node.name}' {input_or_output}",
-                        )
-                    except ValueError as e:
-                        if auto_fix:
-                            logger.warning(e)
-                            logger.info(f"Auto-fixed node '{node.name}' {input_or_output}: '{node_input_or_output.name}'")
-                            node_inputs_or_outputs[i] = workflow_inputs_outputs[inputs_or_outputs][node_input_or_output.name]
-                        else:
-                            raise
+                    validate_param(
+                        workflow_inputs_outputs[inputs_or_outputs][node_input_or_output.name],
+                        node_input_or_output,
+                        f"workflow {input_or_output}",
+                        f"node '{node.name}' {input_or_output}",
+                    )
 
-            setattr(node, inputs_or_outputs, node_inputs_or_outputs)
             return node
             
 
@@ -1689,25 +1601,22 @@ class WorkFlowGraph(BaseModule):
             raise ValueError(f"Not all workflow outputs are found in nodes: {missing_outputs}")
 
 
-    def _check_agents(self, auto_fix: bool = False):
+    def _check_agents(self):
         """Checks if each node's inputs and outputs can be satisfied by the agents assigned to the node."""
         for node in self.nodes:
-            node.check_agents(auto_fix=auto_fix)
+            node.check_agents()
 
 
-    def validate_workflow_graph(self, auto_fix: bool = False):
+    def validate_workflow_graph(self):
         """
         Validates the workflow graph by checking:
             - The workflow structure
             - Workflow inputs and outputs can be derived from nodes
             - Nodes' inputs and outputs can be derived from agents
-        
-        Args:
-            auto_fix: Whether to automatically fix mismatched `type` and `required` fields when the parameter name is the same.
         """
         self._validate_workflow_structure()
-        self._check_workflow_inputs_outputs(auto_fix=auto_fix)
-        self._check_agents(auto_fix=auto_fix)
+        self._check_workflow_inputs_outputs()
+        self._check_agents()
 
 
     def get_config(self) -> dict:
@@ -1724,7 +1633,7 @@ class WorkFlowGraph(BaseModule):
 
 
     @classmethod
-    def from_dict(cls, data: Dict, auto_fix: bool = False, **kwargs) -> 'WorkFlowGraph':
+    def from_dict(cls, data: Dict, **kwargs) -> 'WorkFlowGraph':
         """
         Create a WorkFlowGraph instance from a dictionary.
 
@@ -1738,23 +1647,15 @@ class WorkFlowGraph(BaseModule):
 
         Args:
             data (Dict): The serialized workflow graph.
-            auto_fix (bool): Whether to automatically fix mismatched `type` and `required`
-                fields when a node parameter and an agent parameter share the same name.
             **kwargs: Additional keyword arguments forwarded to `BaseModule.from_dict`.
         """
-        # `auto_fix` is a model field; inject it so that both construction-time
-        # (init_module) and the post-load validation below use the same value.
-        if auto_fix:
-            data = {**data, "auto_fix": True}
-
         # Delegate the actual data loading (class_name dispatch, nested _process_data,
         # construction) to BaseModule.
         workflow_graph: WorkFlowGraph = super().from_dict(data, **kwargs)
 
         # Validate structure and node/agent parameter compatibility at load time. This is
-        # the one behavior BaseModule.from_dict does not provide, and it is also where
-        # auto_fix reconciles agent-dict parameters with their node parameters.
-        workflow_graph.validate_workflow_graph(auto_fix=workflow_graph.auto_fix)
+        # the one behavior BaseModule.from_dict does not provide.
+        workflow_graph.validate_workflow_graph()
         return workflow_graph
 
 
