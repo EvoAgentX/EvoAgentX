@@ -115,6 +115,11 @@ class WorkFlow(BaseModule):
             Union[dict, str]: The output of the workflow execution
         """
         goal = self.graph.goal
+        # Reset node statuses and environment state so reusing the same WorkFlow instance
+        # does not leak the previous run's trajectory/execution data into this one. This
+        # runs unconditionally, so it also recovers from a previous failed execution.
+        self.graph.reset_graph()
+        self.environment.reset()
         # inputs.update({"goal": goal})
         inputs = self._prepare_inputs(inputs)
         self._validate_inputs(inputs)
@@ -402,6 +407,8 @@ class WorkFlow(BaseModule):
                     )
         
         for node in self.graph.nodes:
+            if not node.agents:
+                continue
             for agent in node.agents:
                 if hasattr(agent, "forbidden_in_workflow") and (agent.forbidden_in_workflow):
                     raise ValueError(f"The Agent of class {agent.__class__} is forbidden to be used in the workflow.")
@@ -507,4 +514,4 @@ class WorkFlow(BaseModule):
         for agent, node in zip(hitl_agents, node_with_hitl_agents):
             self._prepare_single_hitl_agent(agent, node)
 
-        return 
+        return

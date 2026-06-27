@@ -30,6 +30,15 @@ class Environment(BaseModule):
     task_execution_history: List[str] = Field(default_factory=list)
     execution_data: dict = Field(default_factory=dict)
 
+    def reset(self):
+        """
+        Clear all intermediate execution state so the environment can be reused for a
+        fresh workflow run without leaking data from a previous execution.
+        """
+        self.trajectory = []
+        self.task_execution_history = []
+        self.execution_data = {}
+
     def update(self, message: Message, state: TrajectoryState = None, error: str = None, **kwargs):
         """
         Add a message to the shared memory and optionally to a specific task's message list.

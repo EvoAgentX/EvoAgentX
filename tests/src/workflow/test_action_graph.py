@@ -1,12 +1,11 @@
 import unittest
 import os
-import pytest
 from unittest.mock import patch
 from evoagentx.models import OpenAILLMConfig 
 from evoagentx.workflow.action_graph import ActionGraph, QAActionGraph
 
 
-class TestModule(unittest.TestCase):
+class TestModule(unittest.IsolatedAsyncioTestCase):
 
     def setUp(self):
         self.llm_config = OpenAILLMConfig(model="gpt-4o-mini", openai_key="XXX")
@@ -30,7 +29,6 @@ class TestModule(unittest.TestCase):
         # Verify the result contains both answer and score
         self.assertEqual(result["answer"], "final answer")
     
-    @pytest.mark.asyncio
     @patch('evoagentx.workflow.operators.AnswerGenerate.async_execute')
     @patch('evoagentx.workflow.operators.QAScEnsemble.async_execute')
     async def test_async_execute(self, mock_sc_ensemble, mock_answer_generate):

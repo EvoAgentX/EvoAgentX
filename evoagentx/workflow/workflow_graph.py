@@ -15,6 +15,7 @@ from ..agents import Agent, CustomizeAgent
 from ..core.base_config import Parameter
 from ..core.logging import logger
 from ..core.module import BaseModule
+from ..core.registry import MODULE_REGISTRY
 from ..core.module_utils import recursive_to_dict
 from ..models import LLMConfig
 from ..prompts.utils import DEFAULT_SYSTEM_PROMPT
@@ -70,8 +71,8 @@ class WorkFlowNode(BaseModule):
 
     name: str # A short name of the task. Should be unique in a single workflow
     description: str # A detailed description of the task
-    inputs: List[Parameter] = Field(min_length=1)
-    outputs: List[Parameter] = Field(min_length=1)
+    inputs: List[Parameter] = Field(default_factory=list)  # may be empty for nodes with no external input
+    outputs: List[Parameter] = Field(default_factory=list)
     reason: Optional[str] = None
     agents: Optional[List] = None
     action_graph: Optional[ActionGraph] = None
@@ -265,6 +266,11 @@ class WorkFlowNode(BaseModule):
         Checks if any agent assigned to this node accept the node inputs and if any agent outputs the node outputs.
         """
         if not self.agents:
+            # A node may be executed either by agents or by an action_graph. When an
+            # action_graph is provided, the node is satisfied without any agents, and
+            # its inputs/outputs are validated against the action_graph elsewhere.
+            if self.action_graph is not None:
+                return
             raise ValueError(f"No agents assigned to node '{self.name}'")
 
         node_inputs_dict = {}
@@ -1685,6 +1691,24 @@ class WorkFlowGraph(BaseModule):
             override (bool): Whether to override the existing LLMConfig of the agents.
             **kwargs: Additional keyword arguments to pass to the create_agent_from_dict function.
         """
+
+        # Honor the BaseModule class_name dispatch: when the data describes a subclass
+        # (e.g. SequentialWorkFlowGraph, which serializes "tasks" rather than "nodes"),
+        # delegate to that subclass's from_dict instead of parsing it as a WorkFlowGraph.
+        class_name = data.get("class_name", None)
+        if class_name and class_name != cls.__name__:
+            target_cls = MODULE_REGISTRY.get_module(class_name)
+            if target_cls is not None and target_cls is not cls and issubclass(target_cls, WorkFlowGraph):
+                return target_cls.from_dict(
+                    data,
+                    llm_config=llm_config,
+                    tools=tools,
+                    agents=agents,
+                    auto_fix=auto_fix,
+                    model_selector=model_selector,
+                    override=override,
+                    **kwargs,
+                )
 
         if override and not llm_config and not model_selector:
             override = False
