@@ -47,11 +47,51 @@ class WorkFlow(BaseModule):
             if self.llm is None:
                 raise ValueError("Must provide `llm` when `workflow_manager` is None")
             self.workflow_manager = WorkFlowManager(llm=self.llm)
-        if self.agent_manager is None:
-            logger.warning("agent_manager is NoneType when initializing a WorkFlow instance")
+        self._validate_agent_manager()
 
         self.graph.validate_workflow_graph()
         self.output_names = {output.name: output.required for output in self.graph.workflow_outputs}
+
+    def _validate_agent_manager(self):
+        """
+        Validate that ``agent_manager`` can satisfy the workflow's agent-based nodes.
+
+        A node executed by an ``action_graph`` needs no agents, but any other node is
+        scheduled through ``agent_manager.get_agent()`` at runtime (see
+        ``WorkFlowManager._prepare_action_execution``). For those nodes we require, at
+        init time, that an ``agent_manager`` is present and contains every referenced
+        agent, so that a misconfiguration fails fast instead of crashing mid-execution.
+        """
+        # Collect the agents required by nodes that are not pure ActionGraph nodes.
+        required_agents = {}
+        for node in self.graph.nodes:
+            if node.action_graph is not None:
+                continue
+            agent_names = node.get_agents()
+            if not agent_names:
+                # A node with neither an action_graph nor agents is an invalid node;
+                # this is reported by graph.validate_workflow_graph().
+                continue
+            for agent_name in agent_names:
+                required_agents.setdefault(agent_name, node.name)
+
+        if not required_agents:
+            # Pure ActionGraph workflow: no agent_manager needed.
+            return
+
+        if self.agent_manager is None:
+            raise ValueError(
+                "agent_manager is required because the workflow contains agent-based "
+                f"node(s): {sorted(required_agents.values())}. The following agents "
+                f"must be provided: {sorted(required_agents)}."
+            )
+
+        missing_agents = [name for name in required_agents if not self.agent_manager.has_agent(name)]
+        if missing_agents:
+            raise ValueError(
+                "agent_manager is missing agent(s) required by the workflow: "
+                f"{sorted(missing_agents)}. Available agents: {sorted(self.agent_manager.list_agents())}."
+            )
 
     def execute(self, inputs: dict = {}, extract_output: bool = False, **kwargs) -> WorkflowResult:
         """
