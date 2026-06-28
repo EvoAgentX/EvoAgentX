@@ -9,8 +9,8 @@ from evoagentx.core.logging import logger
 from evoagentx.models import OpenRouterConfig, OpenRouterLLM
 from evoagentx.optimizers.engine.objective import ScalarObjective
 from evoagentx.optimizers.sew_optimizer import SEWOptimizer, SEWWorkFlowAdapter
-from evoagentx.prompts import StringTemplate
-from evoagentx.workflow import SequentialWorkFlowGraph
+from evoagentx.prompts import ChatTemplate
+from evoagentx.workflow import SequentialWorkFlowGraph, WorkflowResult
 
 # ---------------------------------------------------------------------------
 # Tunables (kept small so the example is cheap to run end-to-end).
@@ -20,7 +20,7 @@ TEST_SAMPLE_NUM = 50       # examples used for the before/after report
 MAX_TRIALS = 10            # total prompt variants the optimizer is allowed to evaluate
 NUM_VARIANTS_PER_STEP = 2  # variants generated per round (the "λ" in (1 + λ))
 EVAL_CONCURRENCY = 10      # how many dev examples to run concurrently per evaluation
-EXECUTION_MODEL = "openai/gpt-4o-mini" # OpenRouter model used to run the workflow (the program being optimized)
+EXECUTION_MODEL = "openai/gpt-5.4-mini" # OpenRouter model used to run the workflow (the program being optimized)
 OPTIMIZER_MODEL = "anthropic/claude-sonnet-4.6"  # OpenRouter model id used to mutate the prompts
 SAVE_DIR = "debug/sew_humaneval_final" # where to save the intermediate variants and final best state (SEWOptimizer.async_optimize's save_dir)
 
@@ -40,7 +40,7 @@ coding_graph_data = {
             "outputs": [
                 {"name": "code", "type": "str", "required": True, "description": "The generated Python code."}
             ],
-            "prompt_template": StringTemplate(instruction="Write code for the problem."),
+            "prompt_template": ChatTemplate(instruction="Write code for the problem."),
             "parse_mode": "str",
         },
     ],
@@ -62,7 +62,12 @@ class HumanEvalSplits(HumanEval):
 async def _score_one(adapter: SEWWorkFlowAdapter, benchmark: HumanEval, example: dict) -> float:
     """Run the workflow on one example and return its pass@1 (1.0 if it passes, else 0.0)."""
     try:
-        code = await adapter.async_execute(inputs={"question": example["prompt"]})
+        execution_result: WorkflowResult = await adapter.async_execute(inputs={"question": example["prompt"]})
+        if execution_result.status == "success":
+            result = execution_result.result
+            code = result.get("code", "") if isinstance(result, dict) else result
+        else:
+            code = execution_result.error_msg
         metrics = benchmark.evaluate(prediction=code, label=benchmark._get_label(example))
         return float(metrics.get("pass@1", 0.0))
     except Exception as exc:  # a single bad sample shouldn't abort the whole evaluation

@@ -627,8 +627,8 @@ class SEWWorkFlowAdapter(SEWProgramAdapter):
         # shared graph would let parallel runs clobber each other.
         graph = self._copy_graph()
         graph.reset_graph()
-        agent_manager = AgentManager(tools=self.tools)
-        agent_manager.add_agents_from_workflow(graph, llm_config=self.llm_config)
+        agent_manager = AgentManager()
+        agent_manager.add_agents_from_workflow(graph, llm_config=self.llm_config, tools=self.tools)
         return WorkFlow(
             graph=graph,
             agent_manager=agent_manager,
