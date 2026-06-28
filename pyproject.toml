@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evoagentx"
-version = "0.1.3"
+version = "0.1.4"
 description = "A framework for evolving agentic workflows with LLMs."
 readme = "README.md"
 requires-python = ">=3.10"
