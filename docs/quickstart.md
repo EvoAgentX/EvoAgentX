@@ -132,9 +132,13 @@ agent_manager.add_agents_from_workflow(workflow_graph, llm_config=openai_config)
 Once agents are ready, you can create a `WorkFlow` instance and run it:
 ```python
 workflow = WorkFlow(graph=workflow_graph, agent_manager=agent_manager, llm=llm)
-output = workflow.execute()
-print(output)
+result = workflow.execute()
+if result.status == "success":
+    print(result.result)
+else:
+    print(result.displayable_error)
 ```
 
-For a complete working example, check out the [full workflow demo](https://github.com/EvoAgentX/EvoAgentX/blob/main/examples/workflow_demo.py).
+`WorkFlow.execute()` returns a `WorkflowResult` object. By default, `result.result` is the structured workflow output as a `dict`. If you want the older text-extraction behavior, call `workflow.execute(extract_output=True)`.
 
+For a complete working example, check out the [full workflow demo](https://github.com/EvoAgentX/EvoAgentX/blob/main/examples/workflow_demo.py).

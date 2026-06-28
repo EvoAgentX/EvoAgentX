@@ -182,8 +182,12 @@ agent_manager.add_agents_from_workflow(workflow_graph, llm_config=llm_config)
 
 # 创建工作流实例以执行
 workflow = WorkFlow(graph=workflow_graph, agent_manager=agent_manager, llm=llm)
-workflow.execute(inputs={"data_source": "xxx"})
+result = workflow.execute(inputs={"data_source": "xxx"})
+if result.status == "success":
+    print(result.result)
 ```
+
+`WorkFlow.execute()` 会返回一个 `WorkflowResult` 对象。默认情况下，工作流结果是结构化的 `dict` 输出。若想保留旧的文本抽取行为，可以传入 `extract_output=True`。
 
 ### 创建顺序工作流图
 

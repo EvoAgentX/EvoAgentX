@@ -34,7 +34,12 @@ def main():
     agent_manager.add_agents_from_workflow(workflow_graph, llm_config=openrouter_config)
 
     workflow = WorkFlow(graph=workflow_graph, agent_manager=agent_manager, llm=llm)
-    output = workflow.execute()
+    result = workflow.execute(extract_output=True)
+    if result.status != "success":
+        raise RuntimeError(f"Workflow failed: {result.displayable_error or result.error_msg}")
+    output = result.result
+    if not isinstance(output, str):
+        output = str(output)
 
     # verify the code
     code_verifier = CodeVerification()

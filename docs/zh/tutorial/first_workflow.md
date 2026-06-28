@@ -111,15 +111,20 @@ agent_manager.add_agents_from_workflow(
 workflow = WorkFlow(graph=graph, agent_manager=agent_manager, llm=llm)
 
 # Execute the workflow with inputs
-output = workflow.execute(
+result = workflow.execute(
     inputs = {
         "problem": "Write a function to find the longest palindromic substring in a given string."
     }
 )
 
-print("Workflow completed!")
-print("Workflow output:\n", output)
+if result.status == "success":
+    print("Workflow completed!")
+    print("Workflow output:\n", result.result)
+else:
+    print("Workflow failed:\n", result.displayable_error)
 ```
+
+`WorkFlow.execute()` 会返回一个 `WorkflowResult` 对象。默认情况下，`result.result` 是结构化的工作流输出，类型为 `dict`。如果你想保留旧的文本抽取行为，可以调用 `workflow.execute(extract_output=True)`。
 
 你应该在 `execute` 方法的 `inputs` 参数中指定工作流所需的所有输入。
 

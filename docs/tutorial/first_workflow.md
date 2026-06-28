@@ -111,17 +111,22 @@ agent_manager.add_agents_from_workflow(
 workflow = WorkFlow(graph=graph, agent_manager=agent_manager, llm=llm)
 
 # Execute the workflow with inputs
-output = workflow.execute(
+result = workflow.execute(
     inputs = {
         "problem": "Write a function to find the longest palindromic substring in a given string."
     }
 )
 
-print("Workflow completed!")
-print("Workflow output:\n", output)
+if result.status == "success":
+    print("Workflow completed!")
+    print("Workflow output:\n", result.result)
+else:
+    print("Workflow failed:\n", result.displayable_error)
 ```
 
-You should specify all the required inputs for the workflow in the `inputs` argument of the `execute` method. 
+`WorkFlow.execute()` returns a `WorkflowResult` object. By default, `result.result` is the structured workflow output as a `dict`. If you want the older text-extraction behavior, call `workflow.execute(extract_output=True)`.
+
+You should specify all the required inputs for the workflow in the `inputs` argument of the `execute` method.
 
 For a complete working example, please refer to the [Sequential Workflow example](https://github.com/EvoAgentX/EvoAgentX/blob/main/examples/sequential_workflow.py). 
 

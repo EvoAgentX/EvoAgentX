@@ -74,7 +74,7 @@ The `SequentialWorkFlowGraph` accepts a simplified input format that makes it ea
 - `outputs` (required): List of output parameters produced by the task
 - `prompt` (required): The prompt template to guide the agent's behavior
 - `system_prompt` (optional): System message to provide context to the agent
-- `output_parser` (optional): The output parser to parse the output of the task 
+- `output_parser` (optional): The output parser to parse the output of the task
 - `parse_mode` (optional): Mode for parsing outputs, defaults to "str"
 - `parse_func` (optional): Custom function for parsing outputs
 - `title_format` (optional): Title format used when `parse_mode` is "title", e.g. "## {title}"
@@ -183,8 +183,12 @@ agent_manager.add_agents_from_workflow(workflow_graph, llm_config=llm_config)
 
 # create a workflow instance for execution 
 workflow = WorkFlow(graph=workflow_graph, agent_manager=agent_manager, llm=llm)
-workflow.execute(inputs={"data_source": "xxx"})
+result = workflow.execute(inputs={"data_source": "xxx"})
+if result.status == "success":
+    print(result.result)
 ```
+
+`WorkFlow.execute()` returns a `WorkflowResult` object. By default, the workflow result is the structured output data as a `dict`. Pass `extract_output=True` if you want the older text-extraction behavior.
 
 ### Creating a SequentialWorkFlowGraph
 
