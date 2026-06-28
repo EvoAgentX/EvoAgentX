@@ -5,37 +5,19 @@ This example shows how to use tools in workflows for file system operations.
 """
 
 import os
-import sys
 from dotenv import load_dotenv
 
-# Add the EvoAgentX project to the path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'EvoAgentX-clean_tools'))
-
-from evoagentx.models import OpenAILLMConfig, OpenAILLM
+from evoagentx.models import OpenRouterConfig, OpenRouterLLM
 from evoagentx.workflow import WorkFlowGenerator, WorkFlowGraph, WorkFlow
 from evoagentx.agents import AgentManager
 from evoagentx.tools import CMDToolkit
 
 def load_api_key():
-    """Load OpenAI API key from various sources"""
+    """Load OpenRouter API key from environment"""
     load_dotenv()
-    
-    # Try to get from environment
-    api_key = os.getenv("OPENAI_API_KEY")
-    
-    # Try to get from local file
-    if not api_key and os.path.exists("openai_api_key.txt"):
-        with open("openai_api_key.txt", "r") as f:
-            content = f.read().strip()
-            # Extract the key if it's in the format "OPENAI_API_KEY=..."
-            if "=" in content:
-                api_key = content.split("=", 1)[1].strip()
-            else:
-                api_key = content
-    
+    api_key = os.getenv("OPENROUTER_API_KEY")
     if not api_key:
-        raise ValueError("OpenAI API key not found. Please set OPENAI_API_KEY environment variable or create openai_api_key.txt file")
-    
+        raise ValueError("OpenRouter API key not found. Please set OPENROUTER_API_KEY environment variable.")
     return api_key
 
 def demo_basic_workflow():
@@ -45,14 +27,14 @@ def demo_basic_workflow():
     
     # Setup LLM configuration
     api_key = load_api_key()
-    openai_config = OpenAILLMConfig(
-        model="gpt-4o-mini",
-        openai_key=api_key,
+    openai_config = OpenRouterConfig(
+        model="openai/gpt-5.4-mini",
+        openrouter_key=api_key,
         stream=True,
         output_response=True,
         max_tokens=8000
     )
-    llm = OpenAILLM(config=openai_config)
+    llm = OpenRouterLLM(config=openai_config)
     
     # Define the goal
     goal = "Create a simple Python calculator application"
@@ -73,7 +55,12 @@ def demo_basic_workflow():
     # Create and execute workflow
     workflow = WorkFlow(graph=workflow_graph, agent_manager=agent_manager, llm=llm)
     print("\nExecuting workflow...")
-    output = workflow.execute()
+    result = workflow.execute(extract_output=True)
+    if result.status != "success":
+        raise RuntimeError(f"Workflow failed: {result.displayable_error or result.error_msg}")
+    output = result.result
+    if not isinstance(output, str):
+        output = str(output)
     
     print("Basic workflow completed successfully")
     print(f"\nOutput (first 500 chars):\n{str(output)[:500]}...")
@@ -87,14 +74,14 @@ def demo_toolkit_workflow():
     
     # Setup LLM configuration
     api_key = load_api_key()
-    openai_config = OpenAILLMConfig(
-        model="gpt-4o-mini",
-        openai_key=api_key,
+    openai_config = OpenRouterConfig(
+        model="openai/gpt-5.4-mini",
+        openrouter_key=api_key,
         stream=True,
         output_response=True,
         max_tokens=8000
     )
-    llm = OpenAILLM(config=openai_config)
+    llm = OpenRouterLLM(config=openai_config)
     
     # Define the goal and tools
     goal = "Create a folder structure for a Python project and show the file tree"
@@ -102,8 +89,8 @@ def demo_toolkit_workflow():
     print(f"Goal: {goal}")
     print(f"Tools: {[tool.__class__.__name__ for tool in tools]}")
     
-    # Generate workflow with tools
-    wf_generator = WorkFlowGenerator(llm=llm, tools=tools)
+    # Generate workflow (tools are passed to AgentManager, not WorkFlowGenerator)
+    wf_generator = WorkFlowGenerator(llm=llm)
     workflow_graph: WorkFlowGraph = wf_generator.generate_workflow(goal=goal)
     
     # Display workflow structure
@@ -117,7 +104,12 @@ def demo_toolkit_workflow():
     # Create and execute workflow
     workflow = WorkFlow(graph=workflow_graph, agent_manager=agent_manager, llm=llm)
     print("\nExecuting workflow with CMDToolkit...")
-    output = workflow.execute()
+    result = workflow.execute(extract_output=True)
+    if result.status != "success":
+        raise RuntimeError(f"Workflow failed: {result.displayable_error or result.error_msg}")
+    output = result.result
+    if not isinstance(output, str):
+        output = str(output)
     
     print("Toolkit workflow completed successfully")
     print(f"\nOutput (first 800 chars):\n{str(output)[:800]}...")
@@ -131,14 +123,14 @@ def demo_workflow_save_load():
     
     # Setup LLM configuration
     api_key = load_api_key()
-    openai_config = OpenAILLMConfig(
-        model="gpt-4o-mini",
-        openai_key=api_key,
+    openai_config = OpenRouterConfig(
+        model="openai/gpt-5.4-mini",
+        openrouter_key=api_key,
         stream=True,
         output_response=True,
         max_tokens=8000
     )
-    llm = OpenAILLM(config=openai_config)
+    llm = OpenRouterLLM(config=openai_config)
     
     # Generate a simple workflow
     goal = "Create a simple Python calculator application"

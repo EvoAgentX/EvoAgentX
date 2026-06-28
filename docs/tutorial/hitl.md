@@ -159,6 +159,11 @@ workflow = WorkFlow(graph=graph, llm=llm, agent_manager=manager, hitl_manager=hi
 result = await workflow.async_execute(inputs={
     "data_source": "2025Q2 financial report ..."
 })
+
+if result.status == "success":
+    print(result.result)
+else:
+    print(result.displayable_error)
 ```
 
 When the interceptor runs you will see a prompt like below. Type `a` (approve) or `r` (reject):

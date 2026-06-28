@@ -2,16 +2,16 @@ import threading
 from enum import Enum
 from typing import Union, Optional, Dict, List
 from pydantic import Field
-from copy import deepcopy
 
 from .agent import Agent
-# from .agent_generator import AgentGenerator
-from .customize_agent import CustomizeAgent
 from ..core.module import BaseModule
 from ..core.decorators import atomic_method
 from ..storages.base import StorageHandler
 from ..models.model_configs import LLMConfig
-from ..tools.tool import Toolkit, Tool
+from ..tools.tool import Tool, Toolkit
+from ..utils.utils import create_agent_from_dict
+
+
 class AgentState(str, Enum):
     AVAILABLE = "available"
     RUNNING = "running"
@@ -29,8 +29,6 @@ class AgentManager(BaseModule):
     agents: List[Agent] = Field(default_factory=list)
     agent_states: Dict[str, AgentState] = Field(default_factory=dict) # agent_name to AgentState mapping
     storage_handler: Optional[StorageHandler] = None # used to load and save agent from storage.
-    # agent_generator: Optional[AgentGenerator] = None # used to generate agents for a specific subtask
-    tools: Optional[List[Union[Toolkit, Tool]]] = None
 
     def init_module(self):
         self._lock = threading.Lock()
@@ -98,22 +96,23 @@ class AgentManager(BaseModule):
         """
         return len(self.agents)
     
-    def load_agent(self, agent_name: str, **kwargs) -> Agent:
+    def load_agent(self, agent_name: str, tools: Optional[List[Union[Tool, Toolkit]]] = None, **kwargs) -> Agent:
         """Load an agent from local storage through storage_handler.
-        
+
         Retrieves agent data from storage and creates an Agent instance.
-        
+
         Args:
             agent_name: The name of the agent to load
+            tools: Optional list of tools available for the agent
             **kwargs (Any): Additional parameters for agent creation
-        
+
         Returns:
             Agent instance with data loaded from storage
         """
         if not self.storage_handler:
             raise ValueError("must provide ``self.storage_handler`` to use ``load_agent``")
         agent_data = self.storage_handler.load_agent(agent_name=agent_name)
-        agent: Agent = self.create_customize_agent(agent_data=agent_data)
+        agent: Agent = create_agent_from_dict(agent_dict=agent_data, tools=tools, **kwargs)
         return agent
 
     def load_all_agents(self, **kwargs):
@@ -126,115 +125,6 @@ class AgentManager(BaseModule):
             **kwargs (Any): Additional parameters passed to storage handler
         """
         pass 
-    
-    def update_tools(self, agent_data: dict) -> None:
-        """
-        Update agent_data with tools based on tool_names.
-        
-        Handles four scenarios:
-        1. Neither tool_names nor tools exist: return directly
-        2. Only tool_names exists: resolve tool_names to tools and set tools field
-        3. Only tools exists: return directly (no action needed)
-        4. Both exist: merge tool_names into existing tools (skip duplicates)
-        
-        Args:
-            agent_data (dict): Agent configuration dictionary that may contain 'tool_names' and/or 'tools'
-            
-        Raises:
-            ValueError: If tool_names exist but self.tools is None, or if requested tools are not found
-        """
-        tool_names = agent_data.get("tool_names", None)
-        existing_tools = agent_data.get("tools", None)
-        
-        # Case 1: Neither tool_names nor tools exist
-        if not tool_names and not existing_tools:
-            return
-        
-        # Case 3: Only tools exist (no tool_names)
-        if not tool_names and existing_tools:
-            return
-        
-        # For cases 2 and 4: tool_names exists, need to resolve
-        if self.tools is None:
-            raise ValueError(
-                f"Agent requires tools {tool_names}, but no tools are available in AgentManager. "
-                f"Please set self.tools before creating agents with tool_names."
-            )
-        
-        # Create tool mapping from available tools
-        tool_mapping = {}
-        for tool in self.tools:
-            tool_mapping[tool.name] = tool
-        
-        # Case 2: Only tool_names exists - initialize empty tools list
-        if tool_names and not existing_tools:
-            existing_tools = []
-        
-        # Case 2 & 4: Process tool_names (either with empty or existing tools list)
-        if tool_names:
-            # Create a set of existing tool names for quick lookup
-            existing_tool_names = {tool.name for tool in existing_tools}
-            
-            tools_to_add = []
-            missing_tools = []
-            
-            for tool_name in tool_names:
-                # Skip if tool already exists in tools
-                if tool_name in existing_tool_names:
-                    continue
-                    
-                # Try to resolve new tool
-                if tool_name in tool_mapping:
-                    tools_to_add.append(tool_mapping[tool_name])
-                else:
-                    missing_tools.append(tool_name)
-            
-            if missing_tools:
-                available_tools = list(tool_mapping.keys())
-                raise ValueError(
-                    f"The following tools are not available: {missing_tools}. "
-                    f"Available tools: {available_tools}"
-                )
-            
-            # Merge new tools with existing ones
-            if tools_to_add:
-                agent_data["tools"] = list(existing_tools) + tools_to_add
-
-    def create_customize_agent(self, agent_data: dict, llm_config: Optional[Union[LLMConfig, dict]]=None, **kwargs) -> CustomizeAgent:
-        """
-        create a customized agent from the provided `agent_data`. 
-
-        Args:
-            agent_data: The data used to create an Agent instance, must contain 'name', 'description' and 'prompt' keys.
-            llm_config (Optional[LLMConfig]): The LLM configuration to be used for the agent. 
-                It will be used as the default LLM for agents without a `llm_config` key. 
-                If not provided, the `agent_data` should contain a `llm_config` key. 
-                If provided and `agent_data` contains a `llm_config` key, the `llm_config` in `agent_data` will be used.  
-            **kwargs (Any): Additional parameters for agent creation
-        
-        Returns:
-            Agent: the instantiated agent instance.
-        """
-        
-        agent_data = deepcopy(agent_data)
-        agent_llm_config = agent_data.get("llm_config", llm_config)
-        if not agent_data.get("is_human", False) and not agent_llm_config:
-            raise ValueError("`agent_data` should contain a `llm_config` key or `llm_config` should be provided.")
-
-        if agent_llm_config:
-            if isinstance(agent_llm_config, dict):
-                agent_data["llm_config"] = agent_llm_config
-            elif isinstance(agent_llm_config, LLMConfig):
-                agent_data["llm_config"] = agent_llm_config.to_dict()
-        
-        # tool_mapping = {}
-        # if self.tools is not None:
-        #     for tool in self.tools:
-        #         tool_mapping[tool.name] = tool
-        # if agent_data.get("tool_names", None):
-        #     agent_data["tools"] = [tool_mapping[tool_name] for tool_name in agent_data["tool_names"]]
-        self.update_tools(agent_data=agent_data) # add `tools` field if needed 
-        return CustomizeAgent.from_dict(data=agent_data)
     
     def get_agent_name(self, agent: Union[str, dict, Agent]) -> str:
         """Extract agent name from different agent representations.
@@ -259,7 +149,7 @@ class AgentManager(BaseModule):
             raise ValueError(f"{type(agent)} is not a supported type for ``get_agent_name``. Supported types: [str, dict, Agent].")
         return agent_name
     
-    def create_agent(self, agent: Union[str, dict, Agent], llm_config: Optional[LLMConfig]=None, **kwargs) -> Agent:
+    def create_agent(self, agent: Union[str, dict, Agent], llm_config: Optional[LLMConfig]=None, tools: Optional[List[Union[Tool, Toolkit]]]=None, **kwargs) -> Agent:
 
         if isinstance(agent, str):
             if self.storage_handler is None:
@@ -269,11 +159,11 @@ class AgentManager(BaseModule):
                 return self.get_agent(agent_name=agent)
             else:
                 # if self.storage_handler is not None, the agent (str) must exist in the storage and will be loaded from the storage.
-                agent_instance = self.load_agent(agent_name=agent)
+                agent_instance = self.load_agent(agent_name=agent, tools=tools)
         elif isinstance(agent, dict):
             if not agent.get("is_human", False) and (llm_config is None and "llm_config" not in agent):
                 raise ValueError("When providing an agent as a dictionary, you must either include 'llm_config' in the dictionary or provide it as a parameter.")
-            agent_instance = self.create_customize_agent(agent_data=agent, llm_config=llm_config, **kwargs)
+            agent_instance = create_agent_from_dict(agent_dict=agent, llm_config=llm_config, tools=tools, **kwargs)
         elif isinstance(agent, Agent):
             agent_instance = agent
         else:
@@ -281,7 +171,7 @@ class AgentManager(BaseModule):
         return agent_instance
     
     @atomic_method
-    def add_agent(self, agent: Union[str, dict, Agent], llm_config: Optional[LLMConfig]=None, **kwargs):
+    def add_agent(self, agent: Union[str, dict, Agent], llm_config: Optional[LLMConfig]=None, tools: Optional[List[Union[Tool, Toolkit]]]=None, **kwargs):
         """
         add a single agent, ignore if the agent already exists (judged by the name of an agent).
 
@@ -290,42 +180,35 @@ class AgentManager(BaseModule):
                 - String: Agent name to load from storage
                 - Dictionary: Agent specification to create a CustomizeAgent
                 - Agent: Existing Agent instance to add directly
-            llm_config (Optional[LLMConfig]): The LLM configuration to be used for the agent. Only used when the `agent` is a dictionary, used to create a CustomizeAgent. 
+            llm_config (Optional[LLMConfig]): The LLM configuration to be used for the agent. Only used when the `agent` is a dictionary, used to create a CustomizeAgent.
+            tools: Optional list of tools available for the agent, used to resolve tool_names in agent config.
             **kwargs (Any): Additional parameters for agent creation
         """
-        # Check for 'tool' key and convert it to 'tools' if needed
-        # if isinstance(agent, dict) and "tool_names" in agent:
-        #     tools_mapping = {}
-        #     if self.tools is not None:
-        #         for tool in self.tools:
-        #             tools_mapping[tool.name] = tool
-        #     agent["tools"] = [tools_mapping[tool_name] for tool_name in agent["tool_names"]]
-        #     agent["tools"] = [tool if isinstance(tool, Toolkit) else Toolkit(name=tool.name, tools=[tool]) for tool in agent["tools"]]
-        
         agent_name = self.get_agent_name(agent=agent)
         if self.has_agent(agent_name=agent_name):
             return
-        agent_instance = self.create_agent(agent=agent, llm_config=llm_config, **kwargs)
+        agent_instance = self.create_agent(agent=agent, llm_config=llm_config, tools=tools, **kwargs)
         self.agents.append(agent_instance)
         self.agent_states[agent_instance.name] = AgentState.AVAILABLE
         if agent_instance.name not in self._state_conditions:
             self._state_conditions[agent_instance.name] = threading.Condition()
         self.check_agents()
 
-    def add_agents(self, agents: List[Union[str, dict, Agent]], llm_config: Optional[LLMConfig]=None, **kwargs):
+    def add_agents(self, agents: List[Union[str, dict, Agent]], llm_config: Optional[LLMConfig]=None, tools: Optional[List[Union[Tool, Toolkit]]]=None, **kwargs):
         """
         add several agents by using self.add_agent().
         """
         for agent in agents:
-            self.add_agent(agent=agent, llm_config=llm_config, **kwargs)
+            self.add_agent(agent=agent, llm_config=llm_config, tools=tools, **kwargs)
     
-    def add_agents_from_workflow(self, workflow_graph, llm_config: Optional[LLMConfig]=None, **kwargs):
+    def add_agents_from_workflow(self, workflow_graph, llm_config: Optional[LLMConfig]=None, tools: Optional[List[Union[Tool, Toolkit]]]=None, **kwargs):
         """
-        Initialize agents from the nodes of a given WorkFlowGraph and add these agents to self.agents. 
+        Initialize agents from the nodes of a given WorkFlowGraph and add these agents to self.agents.
 
         Args:
             workflow_graph (WorkFlowGraph): The workflow graph containing nodes with agents information.
             llm_config (Optional[LLMConfig]): The LLM configuration to be used for the agents.
+            tools: Optional list of tools available for the agents, used to resolve tool_names in agent config.
             **kwargs (Any): Additional parameters passed to add_agent
         """
         from ..workflow.workflow_graph import WorkFlowGraph
@@ -334,15 +217,16 @@ class AgentManager(BaseModule):
         for node in workflow_graph.nodes:
             if node.agents:
                 for agent in node.agents:
-                    self.add_agent(agent=agent, llm_config=llm_config, **kwargs)
+                    self.add_agent(agent=agent, llm_config=llm_config, tools=tools, **kwargs)
     
-    def update_agents_from_workflow(self, workflow_graph, llm_config: Optional[LLMConfig]=None, **kwargs):
+    def update_agents_from_workflow(self, workflow_graph, llm_config: Optional[LLMConfig]=None, tools: Optional[List[Union[Tool, Toolkit]]]=None, **kwargs):
         """
         Update agents from a given WorkFlowGraph.
 
         Args:
             workflow_graph (WorkFlowGraph): The workflow graph containing nodes with agents information.
             llm_config (Optional[LLMConfig]): The LLM configuration to be used for the agents.
+            tools: Optional list of tools available for the agents, used to resolve tool_names in agent config.
             **kwargs: Additional parameters passed to update_agent
         """
         from ..workflow.workflow_graph import WorkFlowGraph
@@ -355,9 +239,9 @@ class AgentManager(BaseModule):
                     if self.has_agent(agent_name=agent_name):
                         # use the llm_config of the existing agent
                         agent_llm_config = self.get_agent(agent_name).llm_config
-                        self.update_agent(agent=agent, llm_config=agent_llm_config, **kwargs)
+                        self.update_agent(agent=agent, llm_config=agent_llm_config, tools=tools, **kwargs)
                     else:
-                        self.add_agent(agent=agent, llm_config=llm_config, **kwargs)
+                        self.add_agent(agent=agent, llm_config=llm_config, tools=tools, **kwargs)
 
     def get_agent(self, agent_name: str, **kwargs) -> Agent:
         """Retrieve an agent by its name from managed agents.
@@ -376,7 +260,7 @@ class AgentManager(BaseModule):
                 return agent
         raise ValueError(f"Agent ``{agent_name}`` does not exists!")
     
-    def update_agent(self, agent: Union[dict, Agent], llm_config: Optional[LLMConfig]=None, **kwargs):
+    def update_agent(self, agent: Union[dict, Agent], llm_config: Optional[LLMConfig]=None, tools: Optional[List[Union[Tool, Toolkit]]]=None, **kwargs):
         """
         Update an agent in the manager.
 
@@ -385,10 +269,11 @@ class AgentManager(BaseModule):
                 - Dictionary: Agent specification to update a CustomizeAgent
                 - Agent: Existing Agent instance to update
             llm_config (Optional[LLMConfig]): The LLM configuration to be used for the agent.
+            tools: Optional list of tools available for the agent, used to resolve tool_names in agent config.
         """
         agent_name = self.get_agent_name(agent=agent)
         self.remove_agent(agent_name=agent_name)
-        self.add_agent(agent=agent, llm_config=llm_config, **kwargs)
+        self.add_agent(agent=agent, llm_config=llm_config, tools=tools, **kwargs)
     
     @atomic_method
     def remove_agent(self, agent_name: str, remove_from_storage: bool=False, **kwargs):

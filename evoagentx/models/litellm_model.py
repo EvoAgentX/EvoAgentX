@@ -7,6 +7,7 @@ from tenacity import (
 )
 from litellm import completion, acompletion
 from typing import List
+from ..core.logging import logger
 from ..core.registry import register_model
 from .model_configs import LiteLLMConfig
 from .openai_model import OpenAILLM
@@ -87,102 +88,106 @@ class LiteLLM(OpenAILLM):
             "groq_key", "api_base", "is_local", "azure_endpoint", "azure_key", "api_version", "api_key"
         ] # parameters in LiteLLMConfig that are not LiteLLM models' input parameters 
     
-    def _compute_cost(self, input_tokens: int, output_tokens: int) -> Cost:
+    def supports_native_tool_calling(self) -> bool:
+        # LiteLLM is a meta-provider. For cloud providers it translates the native
+        # tool-calling round-trip (tool_calls + role:tool) per backend, which works
+        # for the OpenAI/Anthropic/Gemini/DeepSeek families. Local models (Ollama,
+        # LM Studio, etc.) have unreliable tool support, so keep the prompt-based
+        # fallback for them. (`litellm.supports_function_calling` is not used here:
+        # it wrongly reports False for many tool-capable hosted models.)
+        return not bool(self.config.is_local)
+
+    def _apply_provider_params(self, completion_params: dict) -> dict:
+        """Inject provider-specific routing parameters (local / Azure) into the
+        LiteLLM completion params. OpenAI and the remaining providers are routed
+        purely through the environment variables set in ``init_model``."""
+        company = infer_litellm_company_from_model(self.model)
+        if self.config.is_local or company == "local":  # route local model through its api_base
+            completion_params["api_base"] = self.api_base
+            completion_params["api_key"] = self.api_key
+        elif company == "azure":  # Add Azure OpenAI specific parameters
+            completion_params["api_base"] = self.config.azure_endpoint
+            completion_params["api_version"] = self.config.api_version
+            completion_params["api_key"] = self.config.azure_key
+        return completion_params
+
+    def _compute_cost(self, usage) -> Cost:
+        input_tokens = getattr(usage, "prompt_tokens", 0) or 0
+        output_tokens = getattr(usage, "completion_tokens", 0) or 0
+        # Local models are free; LiteLLM has no pricing for them.
         if self.config.is_local:
             return Cost(input_tokens=input_tokens, output_tokens=output_tokens, input_cost=0.0, output_cost=0.0)
-        return super()._compute_cost(input_tokens, output_tokens)
+        try:
+            return super()._compute_cost(usage)
+        except Exception as e:
+            # Unlike OpenAILLM (which validates the model against the price map at
+            # init), LiteLLM accepts arbitrary provider/model names, and
+            # ``litellm.cost_per_token`` raises for any model missing from LiteLLM's
+            # price map. Since cost is computed inside the generation path, a pricing
+            # gap must not abort an otherwise-successful (and possibly retried) call —
+            # record the tokens and fall back to zero cost.
+            logger.warning(
+                f"[LiteLLM] Could not compute cost for model '{self.config.model}': {e}. "
+                "Recording tokens with zero cost."
+            )
+            return Cost(input_tokens=input_tokens, output_tokens=output_tokens, input_cost=0.0, output_cost=0.0)
 
     @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(5))
     def single_generate(self, messages: List[dict], **kwargs) -> str:
 
         """
-        Generate a single response using the completion function.
+        Generate a single response using the LiteLLM completion function.
 
-        Args: 
+        Args:
             messages (List[dict]): A list of dictionaries representing the conversation history.
             **kwargs (Any): Additional parameters to be passed to the `completion` function.
-        
-        Returns: 
+
+        Returns:
             str: A string containing the model's response.
         """
-        stream = kwargs["stream"] if "stream" in kwargs else self.config.stream
-        output_response = kwargs["output_response"] if "output_response" in kwargs else self.config.output_response
+        stream = kwargs.get("stream", self.config.stream)
+        output_response = kwargs.get("output_response", self.config.output_response)
 
         try:
             completion_params = self.get_completion_params(**kwargs)
-            company = infer_litellm_company_from_model(self.model)
-            if self.config.is_local or company == "local":  # update save api_base for local model
-                completion_params["api_base"] = self.api_base
-            elif company == "azure":  # Add Azure OpenAI specific parameters
-                completion_params["api_base"] = self.config.azure_endpoint
-                completion_params["api_version"] = self.config.api_version
-                completion_params["api_key"] = self.config.azure_key
+            self._apply_provider_params(completion_params)
             response = completion(messages=messages, **completion_params)
+            # get_stream_output / get_completion_output record cost internally via _update_cost.
             if stream:
                 output = self.get_stream_output(response, output_response=output_response)
-                cost = self._stream_cost(messages=messages, output=output)
             else:
                 output: str = self.get_completion_output(response=response, output_response=output_response)
-                cost = self._completion_cost(response=response)
-            self._update_cost(cost=cost)
-
         except Exception as e:
-            raise RuntimeError(f"Error during single_generate: {str(e)}")
-        
-        return output
-    
-    def batch_generate(self, batch_messages: List[List[dict]], **kwargs) -> List[str]:
-        """
-        Generate responses for a batch of messages.
+            raise RuntimeError(f"Error during single_generate of LiteLLM: {str(e)}")
 
-        Args: 
-            batch_messages (List[List[dict]]): A list of message lists, where each sublist represents a conversation.
-            **kwargs (Any): Additional parameters to be passed to the `completion` function.
-        
-        Returns: 
-            List[str]: A list of responses for each conversation.
-        """
-        results = []
-        for messages in batch_messages:
-            response = self.single_generate(messages, **kwargs)
-            results.append(response)
-        return results
-    
+        return output
+
     async def single_generate_async(self, messages: List[dict], **kwargs) -> str:
         """
-        Generate a single response using the async completion function.
+        Generate a single response using the async LiteLLM completion function.
 
-        Args: 
+        Args:
             messages (List[dict]): A list of dictionaries representing the conversation history.
             **kwargs (Any): Additional parameters to be passed to the `completion` function.
-        
-        Returns: 
+
+        Returns:
             str: A string containing the model's response.
         """
-        stream = kwargs["stream"] if "stream" in kwargs else self.config.stream
-        output_response = kwargs["output_response"] if "output_response" in kwargs else self.config.output_response
+        stream = kwargs.get("stream", self.config.stream)
+        output_response = kwargs.get("output_response", self.config.output_response)
 
         try:
             completion_params = self.get_completion_params(**kwargs)
-            company = infer_litellm_company_from_model(self.model)
-            if self.config.is_local or company == "local":  # add api base for local model
-                completion_params["api_base"] = self.api_base
-            elif company == "azure":  # Add Azure OpenAI specific parameters
-                completion_params["api_base"] = self.config.azure_endpoint
-                completion_params["api_version"] = self.config.api_version
-                completion_params["api_key"] = self.config.azure_key
+            self._apply_provider_params(completion_params)
             response = await acompletion(messages=messages, **completion_params)
             if stream:
                 if hasattr(response, "__aiter__"):
                     output = await self.get_stream_output_async(response, output_response=output_response)
                 else:
                     output = self.get_stream_output(response, output_response=output_response)
-                cost = self._stream_cost(messages=messages, output=output)
             else:
                 output: str = self.get_completion_output(response=response, output_response=output_response)
-                cost = self._completion_cost(response=response)
-            self._update_cost(cost=cost)
         except Exception as e:
-            raise RuntimeError(f"Error during single_generate_async: {str(e)}")
-        
+            raise RuntimeError(f"Error during single_generate_async of LiteLLM: {str(e)}")
+
         return output

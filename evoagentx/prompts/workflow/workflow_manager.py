@@ -3,6 +3,55 @@ DEFAULT_TASK_SCHEDULER_DESC = "This action selects the next subtask to execute f
 DEFAULT_TASK_SCHEDULER_PROMPT = """
 ### objective
 Your task is to analyze the given workflow graph, current execution information, and candidate subtasks to decide one of the following actions:
+- Select a subtask for iterative execution (if there is a loop or iterative context in the workflow). You may only iterate on each task up to {max_num_turns} times, also determined by the `Workflow Execution History`. 
+- Select a new subtask from the candidates to move the workflow forward (if the workflow should proceed without re-executing or iterating).
+
+### Instructions
+1. Review the Workflow Information for the structure and details of the tasks and any potential loops or iterative sections.
+2. Check the Current Execution Information for evidence of errors or missing data from previously executed subtasks.
+3. If the workflow graph indicates there is a loop or iterative context, select a subtask from the Candidate Subtasks that aligns with that iterative or looping goal.
+4. Otherwise, select a subtask from the Candidate Subtasks that best moves the workflow forward.
+5. Finally, output the decision in the required format.
+
+### Output Format
+Your final output should ALWAYS in the following format:
+
+## Thought 
+Provide a brief explanation of your reasoning for scheduling the next task.
+
+## Scheduled Subtask 
+Produce your answer in valid JSON with the following structure: 
+```json
+{{
+    "decision": "iterate | forward",
+    "task_name": "name of the scheduled subtask",
+    "reason": "the reasoning for scheduling this subtask"
+}}
+```
+
+-----
+lets' begin 
+
+Here is the information for your decision:
+
+### Workflow Information:
+{workflow_graph_representation}
+
+### Workflow Execution History:
+{execution_history}
+
+### Workflow Execution Outputs:
+{execution_outputs}
+
+### Candidate Subtasks:
+{candidate_tasks}
+
+Output:
+"""
+
+OLD_DEFAULT_TASK_SCHEDULER_PROMPT = """
+### objective
+Your task is to analyze the given workflow graph, current execution information, and candidate subtasks to decide one of the following actions:
 - Re-execute a previous subtask to correct errors or gather missing information (if a previous subtask's result is erroneous or incomplete). You may only re-execute each task up to {max_num_turns} times, based on the `Workflow Execution History`. 
 - Select a subtask for iterative execution (if there is a loop or iterative context in the workflow). You may only iterate on each task up to {max_num_turns} times, also determined by the `Workflow Execution History`. 
 - Select a new subtask from the candidates to move the workflow forward (if the workflow should proceed without re-executing or iterating).
@@ -123,7 +172,7 @@ DEFAULT_ACTION_SCHEDULER = {
 }
 
 
-OUTPUT_EXTRACTION_PROMPT = """
+WORKFLOW_OUTPUT_EXTRACTION_PROMPT = """
 ### Objective 
 Your goal is to read the Workflow Goal, the WorkFlow Information, and the WorkFlow Execution Results from the provided input. Then, based on those details, extract and present ONLY the FINAL output data that meets the Workflow Goal.
 

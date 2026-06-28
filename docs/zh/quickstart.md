@@ -130,8 +130,13 @@ agent_manager.add_agents_from_workflow(workflow_graph, llm_config=openai_config)
 代理准备就绪后，可以创建 `WorkFlow` 实例并运行：
 ```python
 workflow = WorkFlow(graph=workflow_graph, agent_manager=agent_manager, llm=llm)
-output = workflow.execute()
-print(output)
+result = workflow.execute()
+if result.status == "success":
+    print(result.result)
+else:
+    print(result.displayable_error)
 ```
+
+`WorkFlow.execute()` 会返回一个 `WorkflowResult` 对象。默认情况下，`result.result` 是结构化的工作流输出，类型为 `dict`。如果你想保留旧的文本抽取行为，可以调用 `workflow.execute(extract_output=True)`。
 
 更多示例请参见 [完整工作流演示](https://github.com/EvoAgentX/EvoAgentX/blob/main/examples/workflow_demo.py)。

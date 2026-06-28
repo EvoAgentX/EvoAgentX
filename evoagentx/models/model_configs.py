@@ -32,7 +32,7 @@ class OpenAILLMConfig(LLMConfig):
 
     # tools 
     tools: Optional[List] = Field(default=None, description="A list of tools the model may call. Currently, only functions are supported as a tool. Use this to provide a list of functions the model may generate JSON inputs for.")
-    tool_choice: Optional[str] = Field(default=None, description="Controls which (if any) function is called by the model. none means the model will not call a function and instead generates a message. auto means the model can pick between generating a message or calling a function. Specifying a particular function via {\"type\": \"function\", \"function\": {\"name\": \"my_function\"}} forces the model to call that function.")
+    tool_choice: Optional[Union[str, dict]] = Field(default=None, description="Controls which (if any) function is called by the model. none means the model will not call a function and instead generates a message. auto means the model can pick between generating a message or calling a function. required forces the model to call a tool. Specifying a particular function via {\"type\": \"function\", \"function\": {\"name\": \"my_function\"}} forces the model to call that function.")
     parallel_tool_calls: Optional[bool] = Field(default=None, description="Whether to enable parallel function calling during tool use. OpenAI default is true.")
     
     # reasoning parameters 
@@ -94,7 +94,7 @@ class LiteLLMConfig(LLMConfig):
 
     # tools
     tools: Optional[List] = Field(default=None, description="A list of tools the model may call. Currently, only functions are supported as a tool. Use this to provide a list of functions the model may generate JSON inputs for.")
-    tool_choice: Optional[str] = Field(default=None, description="Controls which (if any) function is called by the model. none means the model will not call a function and instead generates a message. auto means the model can pick between generating a message or calling a function. Specifying a particular function via {\"type\": \"function\", \"function\": {\"name\": \"my_function\"}} forces the model to call that function.")
+    tool_choice: Optional[Union[str, dict]] = Field(default=None, description="Controls which (if any) function is called by the model. none means the model will not call a function and instead generates a message. auto means the model can pick between generating a message or calling a function. required forces the model to call a tool. Specifying a particular function via {\"type\": \"function\", \"function\": {\"name\": \"my_function\"}} forces the model to call that function.")
     parallel_tool_calls: Optional[bool] = Field(default=None, description="Whether to enable parallel function calling during tool use. OpenAI default is true.")
 
     # token probabilities
@@ -126,7 +126,7 @@ class SiliconFlowConfig(LLMConfig):
 
     # tools
     tools: Optional[List] = Field(default=None, description="A list of tools the model may call. Currently, only functions are supported as a tool. Use this to provide a list of functions the model may generate JSON inputs for.")
-    tool_choice: Optional[str] = Field(default=None, description="Controls which (if any) function is called by the model. none means the model will not call a function and instead generates a message. auto means the model can pick between generating a message or calling a function. Specifying a particular function via {\"type\": \"function\", \"function\": {\"name\": \"my_function\"}} forces the model to call that function.")
+    tool_choice: Optional[Union[str, dict]] = Field(default=None, description="Controls which (if any) function is called by the model. none means the model will not call a function and instead generates a message. auto means the model can pick between generating a message or calling a function. required forces the model to call a tool. Specifying a particular function via {\"type\": \"function\", \"function\": {\"name\": \"my_function\"}} forces the model to call that function.")
     parallel_tool_calls: Optional[bool] = Field(default=None, description="Whether to enable parallel function calling during tool use. OpenAI default is true.")
 
     # token probabilities
@@ -171,16 +171,18 @@ class OpenRouterConfig(LLMConfig):
     tool_choice: Optional[Union[str, dict]] = Field(default=None, description="Controls which tool is called by model. Can be 'none', 'auto', 'required', or specific tool configuration.")
 
     stream: Optional[bool] = Field(default=None, description="If set to true, it sends partial message deltas. Tokens will be sent as they become available, with the stream terminated by a [DONE] message.")
+    extra_body: Optional[dict] = Field(default=None, description="Additional request body parameters for provider-specific features.")
+    enable_prompt_caching: Optional[bool] = Field(default=False, description="Opt into OpenRouter prompt caching for providers that require explicit cache_control breakpoints (Anthropic, Gemini, Qwen). Defaults to False because cache WRITES on these providers are billed at a premium (e.g. Anthropic ~1.25x input price, Gemini adds storage fees, Qwen applies a write multiplier), so a single non-repeated call costs more than without caching — it only pays off across repeated calls sharing a prompt prefix. Agent loops such as CustomizeAction enable it per-call. Automatic-caching providers (OpenAI, DeepSeek, Grok, Moonshot) are unaffected.")
+
     def __str__(self):
         return self.model
 
 
 class AliyunLLMConfig(LLMConfig):
     llm_type: str = "AliyunLLM"
-    aliyun_api_key: Optional[str] = Field(default=None, description="The API key used to authenticate Aliyun requests")
-    aliyun_access_key_id: Optional[str] = Field(default=None, description="The Access Key ID for Aliyun authentication")
-    aliyun_access_key_secret: Optional[str] = Field(default=None, description="The Access Key Secret for Aliyun authentication")
-    
+    aliyun_api_key: Optional[str] = Field(default=None, description="The API key used to authenticate Aliyun requests (i.e. the DASHSCOPE_API_KEY)")
+    aliyun_base_url: Optional[str] = Field(default=None, description="The OpenAI-compatible base URL for the Aliyun Bailian endpoint. It is workspace-specific, e.g. 'https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/compatible-mode/v1'")
+
     # generation parameters
     temperature: Optional[float] = Field(default=None, description="The temperature used to control randomness in generation. Higher values increase diversity.")
     top_p: Optional[float] = Field(default=None, description="Nucleus sampling parameter. Only sample from tokens with cumulative probability greater than top_p.")
@@ -192,12 +194,11 @@ class AliyunLLMConfig(LLMConfig):
 
     # tools
     tools: Optional[List] = Field(default=None, description="A list of tools or functions the model may call. Aliyun supports function calling for specific models.")
-    tool_choice: Optional[str] = Field(default=None, description="Controls whether the model should call a tool. Options include 'none' (no tool call), 'auto' (model decides), or a specific tool name.")
+    tool_choice: Optional[Union[str, dict]] = Field(default=None, description="Controls whether the model should call a tool. Options include 'none' (no tool call), 'auto' (model decides), 'required' (force a tool call), or a specific tool via {\"type\": \"function\", \"function\": {\"name\": \"my_function\"}}.")
     
     # model-specific parameters
-    model_name: Optional[str] = Field(default=None, description="The name of the Aliyun model to use, e.g., 'qwen-max', 'qwen-turbo'.")
     enable_search: Optional[bool] = Field(default=None, description="Whether to enable web search augmentation for the model, if supported.")
-    
+
     # output format
     response_format: Optional[Union[BaseModel, dict]] = Field(default=None, description="Specifies the format of the model output, e.g., JSON schema for structured responses.")
     output_modalities: Optional[List] = Field(default=None, description="Output types the model should generate, e.g., ['text', 'image'] for multimodal models.")

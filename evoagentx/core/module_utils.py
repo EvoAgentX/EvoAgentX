@@ -1,7 +1,8 @@
 import json
 import os
 from datetime import date, datetime
-from typing import Any, Dict, List, Optional, Type, Union, get_args, get_origin
+from types import UnionType
+from typing import Any, Dict, List, Type, Union, get_args, get_origin
 from uuid import uuid4
 
 import regex
@@ -82,29 +83,6 @@ def save_json(data, path: str, type: str="json", use_indent: bool=True) -> str:
                 fout.write("{}\n".format(item if isinstance(item, str) else json.dumps(item)))
 
     return path
-
-
-def extract_fenced_blocks(text: str, labels: Optional[List[str]] = None) -> List[str]:
-    """
-    Extract fenced code blocks from the given text.
-
-    Args:
-        text (str): The text to extract fenced code blocks from.
-        labels (List[str]): The labels to extract fenced code blocks for.
-
-    Returns:
-        List[str]: Code blocks with specified labels.
-    """
-    # Pattern to match fenced blocks: ```label\ncode\n```
-    pattern = r"```([a-zA-Z0-9_\-\+]*)\s*\n*(.*?)\n*```"
-    matches = regex.findall(pattern, text, regex.DOTALL)
-    
-    if labels:
-        # Normalize labels for case-insensitive matching
-        labels_lower = {label.lower() for label in labels}
-        return [code.strip() for lang, code in matches if lang.strip().lower() in labels_lower]
-    
-    return [code.strip() for _, code in matches]
 
 
 def escape_json_values(string: str) -> str:
@@ -196,30 +174,25 @@ def remove_json_comments(json_str: str) -> str:
 
 def fix_json(string: str) -> str:
     string = remove_json_comments(string)
-    string = fix_json_booleans(string)
+    # string = fix_json_booleans(string)
     string = escape_json_values(string)
     return string
 
 
 def parse_json_from_text(text: str) -> List[str]:
     """
-    Autoregressively extract JSON object from text 
+    Autoregressively extract JSON object from text
 
-    Args: 
-        text (str): a text that includes JSON data 
-    
+    Args:
+        text (str): a text that includes JSON data
+
     Returns:
         List[str]: a list of parsed JSON data
     """
-    fenced_blocks = extract_fenced_blocks(text)
-    if fenced_blocks:
-        matches = fenced_blocks
-    else:
-        json_pattern = r"""(?:\{(?:[^{}]*|(?R))*\}|\[(?:[^\[\]]*|(?R))*\])"""
-        pattern = regex.compile(json_pattern, regex.VERBOSE)
-        matches = pattern.findall(text)
-
-    matches = [fix_json(m) for m in matches]
+    json_pattern = r"""(?:\{(?:[^{}]*|(?R))*\}|\[(?:[^\[\]]*|(?R))*\])"""
+    pattern = regex.compile(json_pattern, regex.VERBOSE)
+    matches = pattern.findall(text)
+    matches = [fix_json(match) for match in matches]
     return matches
 
 
@@ -231,20 +204,42 @@ def parse_xml_from_text(text: str, label: str) -> List[str]:
         values = [match.strip() for match in matches]
     return values
 
-def parse_data_from_text(text: str, datatype: str):
-
-    if datatype == "str":
+def parse_data_from_text(text: str, datatype: Type):
+    if datatype is str:
         data = text
-    elif datatype == "int":
+
+    elif datatype is int:
         data = int(text)
-    elif datatype == "float":
+
+    elif datatype is float:
         data = float(text)
-    elif datatype == "bool":
+
+    elif datatype is bool:
         data = text.lower() in ("true", "yes", "1", "on", "True")
-    elif datatype == "list":
-        data = eval(text)
-    elif datatype == "dict":
-        data = eval(text)
+
+    elif datatype is list:
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError:
+            data = [item.strip() for item in text.split(",")]
+            type_args = get_args(datatype)
+            if len(type_args) == 1:
+                data = [parse_data_from_text(item, type_args[0]) for item in data]
+
+    elif datatype is dict:
+        data = json.loads(text)
+
+    elif get_origin(datatype) is Union or get_origin(datatype) is UnionType:
+        type_args = get_args(datatype)
+        for i, type_arg in enumerate(type_args):
+            try:
+                data = parse_data_from_text(text, type_arg)
+                break
+            except Exception:
+                if i == len(type_args) - 1:
+                    data = text
+                continue
+
     else:
         # raise ValueError(
         #     f"Invalid value '{datatype}' is detected for `datatype`. "
@@ -252,7 +247,7 @@ def parse_data_from_text(text: str, datatype: str):
         # )
         # logger.warning(f"Unknown datatype '{datatype}' is detected for `datatype`. Return the raw text instead.")
         # failed to parse the data, return the raw text
-        return text 
+        return text
     return data
 
 def parse_json_from_llm_output(text: str) -> dict:

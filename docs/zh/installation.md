@@ -28,7 +28,6 @@ pip install git+https://github.com/EvoAgentX/EvoAgentX.git
 ```bash
 pip install "evoagentx[rag]"
 pip install "evoagentx[tools]"
-pip install "evoagentx[server]"
 pip install "evoagentx[multimodal]"
 pip install "evoagentx[optimizers]"
 pip install "evoagentx[benchmarks]"
@@ -65,7 +64,7 @@ conda activate evoagentx
 # 安装包
 pip install -e ".[dev]"
 # 或者按需安装可选功能
-pip install -e ".[dev,rag,tools,server]"
+pip install -e ".[dev,rag,tools]"
 # 或者以开发模式安装
 pip install -e .
 ```

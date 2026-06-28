@@ -39,7 +39,7 @@ Each sub-task should follow the structure below:
     "inputs": [
         {{
             "name": "the input's name", 
-            "type": "string/int/float/other_type",
+            "type": "string/integer/number/boolean/object/array",
             "description": "Description of the input's purpose and usage."
         }},
         ...
@@ -47,7 +47,7 @@ Each sub-task should follow the structure below:
     "outputs": [
         {{
             "name": "the output's name", 
-            "type": "string/int/float/other_type",
+            "type": "string/integer/number/boolean/object/array",
             "description": "Description of the output produced by this sub-task."
         }},
         ...
@@ -148,7 +148,7 @@ Each sub-task should follow the structure below:
     "inputs": [
         {{
             "name": "the input's name", 
-            "type": "string/int/float/other_type",
+            "type": "string/integer/number/boolean/object/array",
             "required": true/false (only set to `false` when this input is the feedback from later sub-task, or the previous generated output for the current sub-task),
             "description": "Description of the input's purpose and usage."
         }},
@@ -157,7 +157,7 @@ Each sub-task should follow the structure below:
     "outputs": [
         {{
             "name": "the output's name", 
-            "type": "string/int/float/other_type",
+            "type": "string/integer/number/boolean/object/array",
             "required": true (always set the `required` field of outputs as true), 
             "description": "Description of the output produced by this sub-task."
         }},

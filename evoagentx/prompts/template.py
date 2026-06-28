@@ -24,7 +24,14 @@ class PromptTemplate(BaseModule):
     instruction: str = Field(description="The instruction that the LLM will follow.")
     context: Optional[str] = Field(default=None, description="Additional context that can help the LLM understand the instruction.")
     constraints: Optional[Union[List[str], str]] = Field(default=None, description="Constraints that the LLM must follow.")
-    tools: Optional[List[Union[Tool, Toolkit]]] = Field(default=None, description="Tools that the LLM can use.")
+    tools: Optional[List[Union[Tool, Toolkit]]] = Field(
+        default=None,
+        description=(
+            "Legacy prompt-owned tools used only for rendering prompt-based tool "
+            "instructions. This field will be removed in a future release; prefer "
+            "passing tools to `format(..., tools=...)` when rendering tool instructions."
+        ),
+    )
     demonstrations: Optional[List[dict]] = Field(default=None, description="Examples of how to use the instruction.")
     history: Optional[List[Any]] = Field(default=None, description="History of the conversation between the user and the LLM.")
 
@@ -160,7 +167,7 @@ class PromptTemplate(BaseModule):
                 if field_description is not None:
                     description = f"({field_description})"
             
-            if isinstance(value, dict):
+            if isinstance(value, (dict, list)):
                 value = json.dumps(value, indent=2, ensure_ascii=False)
             inputs_str += template.format(name=name, description=description, value=value)
         return inputs_str
@@ -238,7 +245,7 @@ class PromptTemplate(BaseModule):
         tools = tools or self.tools
         tool_schemas = compile_tool_schemas(tools)
         tool_schemas_str = json.dumps(tool_schemas, indent=4, ensure_ascii=False)
-        return TOOL_CALLING_TEMPLATE.format(tools_description=tool_schemas_str)
+        return TOOL_CALLING_TEMPLATE.format(tool_descriptions=tool_schemas_str)
     
     def render_constraints(self) -> str:
         if not self.constraints:
@@ -485,12 +492,13 @@ class ChatTemplate(StringTemplate):
         return {"role": role, "content": content}
     
     def render_demonstrations(
-        self, 
-        inputs_format: Type[LLMOutputParser], 
-        outputs_format: Type[LLMOutputParser], 
-        parse_mode: str, 
-        title_format: str = None, 
-        custom_output_format: str = None
+        self,
+        inputs_format: Type[LLMOutputParser],
+        outputs_format: Type[LLMOutputParser],
+        parse_mode: str,
+        title_format: str = None,
+        custom_output_format: str = None,
+        **kwargs
     ) -> List[dict]:
         """
         Render demonstrations as alternating user and assistant messages.
@@ -525,9 +533,29 @@ class ChatTemplate(StringTemplate):
 
         return messages
     
-    # def render_history(self) -> List[dict]:
-    #     """Render conversation history as alternating user and assistant messages."""
-    #     raise NotImplementedError("`render_history` method is not supported for `{self.__class__.__name__}`. Returning empty list.") 
+    def render_history(self) -> List[dict]:
+        """
+        Render conversation history as a list of chat messages.
+
+        Unlike demonstrations (synthetic few-shot examples that are re-rendered
+        through `inputs_format`/`outputs_format`), history represents actual prior
+        conversation turns and is passed through directly as chat messages without
+        reformatting. Each history item is expected to be a message dict with
+        "role" and "content" keys. Items that are not in this shape are wrapped into
+        a single "user" message so that no history content is silently dropped.
+        """
+        if not self.history:
+            return []
+
+        valid_roles = {"system", "user", "assistant", "tool"}
+        messages = []
+        for item in self.history:
+            if isinstance(item, dict) and "role" in item and "content" in item:
+                role = item["role"] if item["role"] in valid_roles else "user"
+                messages.append(self._create_message(role, item["content"]))
+            else:
+                messages.append(self._create_message("user", str(item)))
+        return messages
     
     def render_current_user_message(
         self, 
@@ -597,9 +625,9 @@ class ChatTemplate(StringTemplate):
         system_content = self._render_system_message(system_prompt, tools)
 
         if custom_output_format:
-            system_content += f"### Outputs Format\n{custom_output_format}"
+            system_content += f"\n### Outputs Format\n{custom_output_format}"
         else:
-            system_content += self.render_outputs(outputs_format, parse_mode, title_format)
+            system_content += "\n" + self.render_outputs(outputs_format, parse_mode, title_format)
 
         messages.append(self._create_message("system", system_content))
         
@@ -615,9 +643,13 @@ class ChatTemplate(StringTemplate):
                 )
             )
         
+        # Add conversation history
+        if self.history:
+            messages.extend(self.render_history())
+
         # Add current user input & output format requirements
         current_input = self.render_current_user_message(
-            values=values, 
+            values=values,
             inputs_format=inputs_format
         )
         messages.append(self._create_message("user", current_input))
@@ -627,11 +659,11 @@ class ChatTemplate(StringTemplate):
 
 class MiproPromptTemplate(ChatTemplate):
 
-    def render_demonstrations(self, inputs_format: LLMOutputParser, outputs_format: LLMOutputParser, parse_mode: str, title_format: str = None, custom_output_format: str = None) -> List[dict]:
-        
+    def render_demonstrations(self, inputs_format: LLMOutputParser, outputs_format: LLMOutputParser, parse_mode: str, title_format: str = None, custom_output_format: str = None, **kwargs) -> List[dict]:
+
         import dspy
         if self.demonstrations:
             demo = self.demonstrations[0]
             if isinstance(demo, dspy.Example):
                 self.demonstrations = [demo.toDict() for demo in self.demonstrations]
-        return super().render_demonstrations(inputs_format, outputs_format, parse_mode, title_format, custom_output_format)
+        return super().render_demonstrations(inputs_format, outputs_format, parse_mode, title_format, custom_output_format, **kwargs)

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evoagentx"
-version = "0.1.0"
+version = "0.1.4"
 description = "A framework for evolving agentic workflows with LLMs."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -25,15 +25,16 @@ dependencies = [
     "pydantic>=2.9.0",
     "loguru>=0.7.3",
     "python-dotenv>=1.0.0",
-    "httpx>=0.24.1",
     "requests>=2.28.0",
     "openai>=1.55.3",
-    "litellm>=1.55.6",
+    "litellm>=1.83.10",
     "dashscope>=1.23.4",
     "tree_sitter",
     "tree_sitter_python",
-    "antlr4-python3-runtime==4.11",
-    "PyYAML>=6.0"
+    "PyYAML>=6.0",
+    "tqdm>=4.65.0",
+    "regex",
+    "jsonschema"
 ]
 
 [project.optional-dependencies]
@@ -46,107 +47,119 @@ dev = [
     "pytest-json-report",
     "ruff"
 ]
-server = [
-    "fastapi>=0.115.11",
-    "uvicorn>=0.34.0",
-    "motor>=3.7.0",
-    "sqlalchemy>=2.0.38",
-    "python-jose>=3.3.0",
-    "passlib>=1.7.4",
-    "python-multipart>=0.0.6",
-    "bcrypt>=4.0.1",
-    "celery>=5.3.4",
-    "redis>=5.0.0",
-    "asgi-lifespan>=1.0.1",
-    "jwt>=1.3.1"
-]
 rag = [
     "llama-index",
     "llama-index-vector-stores-faiss",
     "llama-index-graph-stores-neo4j",
+    "llama-index-embeddings-azure-openai",
     "faiss-cpu==1.8.0.post1",
     "sentence-transformers",
+    "transformers>=4.41,<5",
+    "cryptography<49",
     "neo4j",
-    "ollama"
+    "ollama",
+    "docx2txt",
+    "python-pptx"
 ]
 tools = [
     "docker>=6.1.2",
     "googlesearch-python",
     "wikipedia",
-    "mcp",
     "beautifulsoup4",
     "selenium",
     "html2text",
     "fastmcp>=2.2.0,<3.0",
+    "cryptography<49",
     "PyPDF2",
-    "docx2txt",
-    "python-pptx",
     "Pillow",
-    "exa-py>=2.0.0"
+    "exa-py>=2.0.0",
+    "pymongo>=4.6.0",
+    "psycopg2-binary>=2.9.0",
+    "spacy",
+    "selectolax",
+    "feedparser",
+    "telethon>=1.35.0",
+    "ddgs",
+    "reportlab>=3.6.0",
+    "webdriver-manager>=3.8.0",
+    "browser-use; python_version >= \"3.11\"",
+    "browser-use-py310x; python_version < \"3.11\"",
+    "google-api-python-client>=2.0.0",
+    "google-auth-oauthlib>=1.0.0",
+    "google-auth-httplib2>=0.1.0"
 ]
 multimodal = [
-    "colpali-engine==0.3.9",
     "torch",
-    "transformers>=4.50.0,<4.51.0",
     "datasets>=3.4.0",
+    # Transitive dep of `datasets`; 0.70.18+ resource_tracker raises a harmless
+    # AttributeError at shutdown on some Python builds. Pin below it.
+    "multiprocess<0.70.18",
     "voyageai"
 ]
 optimizers = [
     "textgrad>=0.1.8",
-    "dspy"
+    "dspy",
+    "optuna",
+    "cloudpickle",
+    "ujson>=5.9.0"
 ]
 benchmarks = [
     "sympy",
-    "scipy",
-    "nltk>=3.9.1"
+    "antlr4-python3-runtime==4.11"
 ]
 viz = [
     "matplotlib>=3.10.0"
 ]
 all = [
-    "fastapi>=0.115.11",
-    "uvicorn>=0.34.0",
-    "motor>=3.7.0",
-    "sqlalchemy>=2.0.38",
-    "python-jose>=3.3.0",
-    "passlib>=1.7.4",
-    "python-multipart>=0.0.6",
-    "bcrypt>=4.0.1",
-    "celery>=5.3.4",
-    "redis>=5.0.0",
-    "asgi-lifespan>=1.0.1",
-    "jwt>=1.3.1",
     "llama-index",
     "llama-index-vector-stores-faiss",
     "llama-index-graph-stores-neo4j",
+    "llama-index-embeddings-azure-openai",
     "faiss-cpu==1.8.0.post1",
     "sentence-transformers",
+    "transformers>=4.41,<5",
+    "cryptography<49",
     "neo4j",
     "ollama",
+    "docx2txt",
+    "python-pptx",
     "docker>=6.1.2",
     "googlesearch-python",
     "wikipedia",
-    "mcp",
     "beautifulsoup4",
     "selenium",
     "html2text",
     "fastmcp>=2.2.0,<3.0",
+    "cryptography<49",
     "PyPDF2",
-    "docx2txt",
-    "python-pptx",
     "Pillow",
-    "colpali-engine==0.3.9",
+    "exa-py>=2.0.0",
+    "pymongo>=4.6.0",
+    "psycopg2-binary>=2.9.0",
+    "spacy",
+    "selectolax",
+    "feedparser",
+    "telethon>=1.35.0",
+    "ddgs",
+    "reportlab>=3.6.0",
+    "webdriver-manager>=3.8.0",
+    "browser-use; python_version >= \"3.11\"",
+    "browser-use-py310x; python_version < \"3.11\"",
+    "google-api-python-client>=2.0.0",
+    "google-auth-oauthlib>=1.0.0",
+    "google-auth-httplib2>=0.1.0",
     "torch",
-    "transformers>=4.50.0,<4.51.0",
     "datasets>=3.4.0",
+    "multiprocess<0.70.18",
     "voyageai",
     "textgrad>=0.1.8",
     "dspy",
+    "optuna",
+    "cloudpickle",
+    "ujson>=5.9.0",
     "sympy",
-    "scipy",
-    "nltk>=3.9.1",
-    "matplotlib>=3.10.0",
-    "exa-py>=2.0.0"
+    "antlr4-python3-runtime==4.11",
+    "matplotlib>=3.10.0"
 ]
 
 [project.urls]

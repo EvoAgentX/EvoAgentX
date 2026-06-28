@@ -28,7 +28,6 @@ Optional feature sets:
 ```bash
 pip install "evoagentx[rag]"
 pip install "evoagentx[tools]"
-pip install "evoagentx[server]"
 pip install "evoagentx[multimodal]"
 pip install "evoagentx[optimizers]"
 pip install "evoagentx[benchmarks]"
@@ -65,7 +64,7 @@ conda activate evoagentx
 # Install the package dependencies
 pip install -e ".[dev]"
 # Or install with optional features
-pip install -e ".[dev,rag,tools,server]"
+pip install -e ".[dev,rag,tools]"
 # OR install in development mode
 pip install -e .
 ```

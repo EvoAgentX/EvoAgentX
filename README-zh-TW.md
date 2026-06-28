@@ -532,6 +532,7 @@ EvoAgentX 定期邀請頂尖研究者舉辦講座，分享 AI 領域的前沿主
 
 | 發言者 | 主題 | 日期 | 會議影片 |
 |---|---|---|---|
+| [歐陽思如](https://siruo2.notion.site/) | [EvoAgentX 講座] SkillOS：自演化智慧體框架 | 2026-06-07 | [YouTube](https://www.youtube.com/watch?v=SdX0nX9mXgs) |
 | [王鴻儒](https://hrwise-nlp.github.io/) | [EvoAgentX 講座] 語言智能體的下半場 | 2026-05-10 | [YouTube](https://www.youtube.com/watch?v=p8HU_lFtAM4) |
 | [周輝池](https://scholar.google.com/citations?user=1IJyxpUAAAAJ&hl=en) | [EvoAgentX 講座] 通過狀態反思進行學習的智能體框架 | 2026-04-26 | [YouTube](https://www.youtube.com/watch?v=DHKBq4NYAxA&t=53s) |
 | [張曦](https://x-izhang.github.io/) | [EvoAgentX 講座] EvoScientist | 2026-04-05 |  [YouTube](https://www.youtube.com/watch?v=EVrxBC99_1k&t=2745s)  |

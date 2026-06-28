@@ -1,6 +1,10 @@
-# from pydantic import BaseModel
-from typing import Optional, List
+from typing import List, Optional
+
+from jsonschema import Draft7Validator
+from pydantic import model_validator
+
 from .module import BaseModule
+
 
 class BaseConfig(BaseModule):
 
@@ -53,15 +57,40 @@ class BaseConfig(BaseModule):
 
 class Parameter(BaseModule):
     """Parameter class used to define configuration parameters.
-    
+
     Attributes:
         name: Parameter name
-        type: Parameter type
+        type: Parameter type, support json & python type.
         description: Parameter description
         required: Whether the parameter is required, defaults to True
+        json_schema: the optional json schema of the parameter. Recommended when type is `object` or `array`.
     """
     name: str
-    type: str 
-    description: str 
-    required: Optional[bool] = True 
+    type: str
+    description: str
+    required: Optional[bool] = True
+    json_schema: Optional[dict] = None
 
+    @model_validator(mode="after")
+    def _validate_type_and_schema(self):
+        from ..utils.utils import normalize_param_type, string_to_json_schema_type, string_to_python_type
+        if self.type not in string_to_python_type:
+            # LLM-generated specs may emit synonyms (e.g. "List[str]", "text"); map those to
+            # canonical types. Truly unrecognized types (e.g. "other_type") still raise.
+            normalized = normalize_param_type(self.type)
+            if normalized is None:
+                raise ValueError(f"Invalid `type`: {self.type}. Allowed: {list(string_to_python_type.keys())}")
+            self.type = normalized
+        if self.json_schema is not None:
+            try:
+                Draft7Validator.check_schema(self.json_schema)
+            except Exception as e:
+                raise ValueError(f"Invalid `json_schema` for '{self.name}': {self.json_schema}.") from e
+            expected_schema_type = string_to_json_schema_type[self.type]
+            actual_schema_type = self.json_schema.get("type")
+            if expected_schema_type != actual_schema_type:
+                raise ValueError(
+                    "`type` and `json_schema.type` must be the same if `json_schema` is provided. "
+                    f"But got `type`: {self.type}, `json_schema.type`: {actual_schema_type}"
+                )
+        return self

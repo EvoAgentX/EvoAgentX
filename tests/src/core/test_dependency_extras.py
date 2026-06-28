@@ -8,6 +8,11 @@ def read_pyproject_text() -> str:
     return (repo_root / "pyproject.toml").read_text(encoding="utf-8")
 
 
+def read_requirements_text() -> str:
+    repo_root = Path(__file__).resolve().parents[3]
+    return (repo_root / "requirements.txt").read_text(encoding="utf-8")
+
+
 def parse_list_block(text: str, start_key: str) -> list[str]:
     start = text.find(f"{start_key} = [")
     assert start != -1
@@ -43,7 +48,6 @@ def test_optional_dependency_groups_present():
     text = read_pyproject_text()
     optional_keys = parse_optional_dependency_keys(text)
     expected_groups = {
-        "server",
         "rag",
         "tools",
         "multimodal",
@@ -53,6 +57,7 @@ def test_optional_dependency_groups_present():
         "all",
     }
     assert expected_groups.issubset(optional_keys)
+    assert "server" not in optional_keys
 
 
 def test_core_dependencies_do_not_include_server_packages():
@@ -60,3 +65,26 @@ def test_core_dependencies_do_not_include_server_packages():
     core_deps = parse_list_block(text, "dependencies")
     forbidden = {"fastapi", "uvicorn", "motor", "redis", "celery"}
     assert all(not any(dep.startswith(pkg) for pkg in forbidden) for dep in core_deps)
+
+
+def test_requirements_do_not_include_legacy_server_packages():
+    text = read_requirements_text()
+    forbidden = {
+        "fastapi",
+        "uvicorn",
+        "motor",
+        "redis",
+        "celery",
+        "python-jose",
+        "passlib",
+        "python-multipart",
+        "bcrypt",
+        "asgi-lifespan",
+        "jwt",
+    }
+    requirements = [
+        line.strip()
+        for line in text.splitlines()
+        if line.strip() and not line.strip().startswith("#")
+    ]
+    assert all(not any(req.startswith(pkg) for pkg in forbidden) for req in requirements)

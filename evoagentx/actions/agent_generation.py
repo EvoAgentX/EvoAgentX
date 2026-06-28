@@ -182,7 +182,7 @@ class AgentGeneration(Action):
                 }
                 for tool in self.tools
             ]
-            prompt_params_values["tools"] = AGENT_GENERATION_TOOLS_PROMPT.format(tools_description=tool_description)
+            prompt_params_values["tools"] = AGENT_GENERATION_TOOLS_PROMPT.format(tool_descriptions=tool_description)
         prompt = self.prompt.format(**prompt_params_values)
         agents = llm.generate(
             prompt = prompt, 

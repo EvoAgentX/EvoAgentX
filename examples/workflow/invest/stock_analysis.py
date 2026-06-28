@@ -186,7 +186,11 @@ Past report folder: {past_report}
 Please read ALL files in the data folder and generate a comprehensive trading decision report in Chinese based on real data. Return the complete content.
 """
 
-        output = workflow.execute({"goal": goal})
+        result = workflow.execute({"goal": goal}, extract_output=True)
+        if result.status != "success":
+            print(f"Error executing workflow: {result.displayable_error}")
+            return
+        output = result.result
         try:
             with open(output_file, "w", encoding="utf-8") as f:
                 f.write(output)

@@ -129,7 +129,13 @@ class Evaluator:
         graph_copy = WorkFlowGraph(goal=graph.goal, graph=graph)
         graph_copy.reset_graph() # reset the status of all nodes to pending
         workflow = WorkFlow(llm=self.llm, graph=graph_copy, agent_manager=self.agent_manager, **kwargs)
-        output: str = workflow.execute(inputs=inputs, **kwargs)
+        result = workflow.execute(inputs=inputs, extract_output=True, **kwargs)
+        if result.status == "success":
+            output = result.result
+            if not isinstance(output, str):
+                output = str(output)
+        else:
+            output = result.displayable_error or "Workflow Execution Failed"
         if return_trajectory:
             return output, workflow.environment.get()
         return output
@@ -509,8 +515,13 @@ class Evaluator:
             **kwargs
         )
         
-        output: str = await workflow.async_execute(inputs=inputs, **kwargs)
+        result = await workflow.async_execute(inputs=inputs, extract_output=True, **kwargs)
+        if result.status == "success":
+            output = result.result
+            if not isinstance(output, str):
+                output = str(output)
+        else:
+            output = result.displayable_error or "Workflow Execution Failed"
         if return_trajectory:
             return output, workflow.environment.get()
         return output
-

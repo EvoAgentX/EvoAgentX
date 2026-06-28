@@ -177,7 +177,12 @@ def execute_workflow(llm: LiteLLM, graph: WorkFlowGraph, goal: str, target_dir: 
     mgr = AgentManager()
     mgr.add_agents_from_workflow(graph, llm_config=cfg)
     workflow = WorkFlow(graph=graph, agent_manager=mgr, llm=llm)
-    output = workflow.execute()
+    result = workflow.execute(extract_output=True)
+    if result.status != "success":
+        raise RuntimeError(f"Workflow failed: {result.displayable_error or result.error_msg}")
+    output = result.result
+    if not isinstance(output, str):
+        output = str(output)
     
     print("Workflow execution completed")
     return output

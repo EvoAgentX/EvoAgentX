@@ -2,9 +2,23 @@
 import inspect
 from typing import Dict, List, Optional, Any
 
+from pydantic import Field
+
 from ..core.module import BaseModule
+from ..core.metadata import Metadata
 
 ALLOWED_TYPES = ["string", "number", "integer", "boolean", "object", "array"]
+
+
+class ToolMetadata(Metadata):
+    tool_name: str
+    args: Dict[str, Any] = Field(default_factory=dict, description="The arguments passed to the tool")
+
+
+class ToolResult(BaseModule):
+    result: Any
+    metadata: ToolMetadata
+    id: Optional[str] = None
 
 
 class Tool(BaseModule):

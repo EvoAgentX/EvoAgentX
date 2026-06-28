@@ -14,10 +14,12 @@ from evoagentx.hitl import (
     HITLUserInputCollectorAgent,
     HITLManager
 )
-from evoagentx.models import OpenAILLMConfig, OpenAILLM 
+from evoagentx.models import OpenRouterLLM
+from evoagentx.models.model_configs import OpenRouterConfig
+from evoagentx.prompts import ChatTemplate
 
 load_dotenv()
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
 class UserProfileInput(ActionInput):
     user_name: str = Field(description="User's name")
@@ -33,8 +35,8 @@ async def main():
     print("🚀 EvoAgentX HITL user input collection example")
     print("=" * 60)
 
-    llm_config = OpenAILLMConfig(model="gpt-4o", openai_key=OPENAI_API_KEY, stream=True, output_response=True)
-    llm = OpenAILLM(llm_config)
+    llm_config = OpenRouterConfig(model="openai/gpt-5.4-mini", openrouter_key=OPENROUTER_API_KEY, stream=True, output_response=True)
+    llm = OpenRouterLLM(llm_config)
 
     # define user input fields
     user_input_fields = {
@@ -69,6 +71,9 @@ async def main():
         input_fields=user_input_fields,
     )
 
+    profile_processor_template = ChatTemplate(
+        instruction="Generate a profile summary and personalized recommendations based on the user information provided in the inputs.",
+    )
     profile_processor = CustomizeAgent(
         name="ProfileProcessor",
         description="process user's profile and generate recommendations",
@@ -82,7 +87,7 @@ async def main():
             {"name": "profile_summary", "type": "string", "description": "profile summary based on user's information"},
             {"name": "recommendations", "type": "string", "description": "Personalized recommendations based on user information"}
         ],
-        prompt="Generate profile summary and personalized recommendations based on the following user information:\nName: {user_name}\nAge: {user_age}\nEmail: {user_email}\nPreferences: {user_preferences}\n\nPlease provide profile summary and personalized recommendations. The results should be presented in json format and have field of 'profile_summary' and 'recommendations'",
+        prompt_template=profile_processor_template,
         llm_config=llm_config,
         parse_mode="json"
     )
@@ -166,10 +171,15 @@ async def main():
         )
     
         print("\n" + "="*60)
-        print("🎉 workflow executed successfully!")
-        print("="*60)
-        print("final result:\n")
-        print(result)
+        if result.status == "success":
+            print("🎉 workflow executed successfully!")
+            print("="*60)
+            print("final result:\n")
+            print(result.result)
+        else:
+            print("❌ workflow execution failed!")
+            print("="*60)
+            print(result.displayable_error)
     except Exception as e:
         print(f"workflow execution failed: {e}")
     finally:

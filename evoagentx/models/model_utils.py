@@ -1,13 +1,15 @@
 import threading
+from collections import defaultdict
+from typing import Optional
+
 import pandas as pd
-from dataclasses import dataclass
 
 from ..core.logging import logger
 from ..core.decorators import atomic_method
 from ..core.callbacks import suppress_cost_logs
 from ..core.registry import MODEL_REGISTRY
 from .model_configs import LLMConfig
-from ..models.base_model import BaseLLM 
+from ..models.base_model import BaseLLM
 
 def get_openai_model_cost() -> dict:
     import json 
@@ -39,98 +41,107 @@ def infer_litellm_company_from_model(model: str) -> str:
     return company
 
 
-@dataclass
 class Cost:
-    input_tokens: int 
-    output_tokens: int
-    input_cost: float 
-    output_cost: float
+
+    def __init__(
+        self,
+        input_tokens: Optional[int] = None,
+        output_tokens: Optional[int] = None,
+        input_cost: Optional[float] = None,
+        output_cost: Optional[float] = None,
+        cost: Optional[float] = None
+    ):
+        self.input_tokens = input_tokens
+        self.output_tokens = output_tokens
+        # Keep input_cost/output_cost only as temporary constructor compatibility.
+        self.cost = cost if cost is not None else (input_cost or 0.0) + (output_cost or 0.0)
+
+    @property
+    def cost(self) -> float:
+        return self._cost
+
+    @cost.setter
+    def cost(self, value: float):
+        self._cost = value or 0.0
 
 
 class CostManager:
 
     def __init__(self):
 
-        self.total_input_tokens = {}
-        self.total_output_tokens = {} 
-        self.total_tokens = {} 
+        self.input_tokens = defaultdict(int)
+        self.output_tokens = defaultdict(int)
+        self.total_tokens = defaultdict(int)
 
-        self.total_input_cost = {}
-        self.total_output_cost = {}
-        self.total_cost = {}
+        self.cost_per_model = defaultdict(float)
 
         self._lock = threading.Lock()
 
-    def compute_total_cost(self):
-        total_tokens, total_cost = 0, 0.0
-        for _, value in self.total_tokens.items():
-            total_tokens += value
-        for _, value in self.total_cost.items():
-            total_cost += value
-        return total_tokens, total_cost
+    @property
+    def total_llm_cost(self) -> float:
+        return sum(self.cost_per_model.values())
+
+    @property
+    def total_llm_tokens(self) -> int:
+        return sum(self.total_tokens.values())
+
+    @property
+    def total_cost(self) -> float:
+        return self.total_llm_cost
+
+    def add_llm_cost(self, cost: Cost, model: str):
+        self.input_tokens[model] += (cost.input_tokens or 0)
+        self.output_tokens[model] += (cost.output_tokens or 0)
+        self.total_tokens[model] += (cost.input_tokens or 0) + (cost.output_tokens or 0)
+
+        self.cost_per_model[model] += cost.cost
 
     @atomic_method
     def update_cost(self, cost: Cost, model: str):
+        self.add_llm_cost(cost, model)
 
-        self.total_input_tokens[model] = self.total_input_tokens.get(model, 0) + cost.input_tokens
-        self.total_output_tokens[model] = self.total_output_tokens.get(model, 0) + cost.output_tokens
-        current_total_tokens = cost.input_tokens + cost.output_tokens
-        self.total_tokens[model] = self.total_tokens.get(model, 0) + current_total_tokens
+        total_tokens = self.total_llm_tokens
+        total_llm_cost = self.total_llm_cost
+        current_llm_cost = cost.cost
+        current_total_tokens = (cost.input_tokens or 0) + (cost.output_tokens or 0)
 
-        self.total_input_cost[model] = self.total_input_cost.get(model, 0.0) + cost.input_cost
-        self.total_output_cost[model] = self.total_output_cost.get(model, 0.0) + cost.output_cost
-        current_total_cost = cost.input_cost + cost.output_cost
-        self.total_cost[model] = self.total_cost.get(model, 0.0) + current_total_cost
-        
-        total_tokens, total_cost = self.compute_total_cost()
         if not suppress_cost_logs.get():
-            logger.info(f"Total cost: ${total_cost:.3f} | Total tokens: {total_tokens} | Current cost: ${current_total_cost:.3f} | Current tokens: {current_total_tokens}")
+            logger.info(f"Total LLM cost: ${total_llm_cost:.3f} | Total tokens: {total_tokens} | Current LLM cost: ${current_llm_cost:.3f} | Current tokens: {current_total_tokens}")
 
     def display_cost(self):
 
         data = {
             "Model": [],
-            "Total Cost (USD)": [], 
-            "Total Input Cost (USD)": [], 
-            "Total Output Cost (USD)": [], 
-            "Total Tokens": [], 
-            "Total Input Tokens": [], 
+            "Total Cost (USD)": [],
+            "Total Tokens": [],
+            "Total Input Tokens": [],
             "Total Output Tokens": [],
         }
 
         for model in self.total_tokens.keys():
 
             data["Model"].append(model)
-            data["Total Cost (USD)"].append(round(self.total_cost[model], 4))
-            data["Total Input Cost (USD)"].append(round(self.total_input_cost[model], 4))
-            data["Total Output Cost (USD)"].append(round(self.total_output_cost[model], 4))
+            data["Total Cost (USD)"].append(round(self.cost_per_model[model], 4))
 
             data["Total Tokens"].append(self.total_tokens[model])
-            data["Total Input Tokens"].append(self.total_input_tokens[model])
-            data["Total Output Tokens"].append(self.total_output_tokens[model])
-        
-        # Convert to DataFrame for display
+            data["Total Input Tokens"].append(self.input_tokens[model])
+            data["Total Output Tokens"].append(self.output_tokens[model])
+
         df = pd.DataFrame(data)
         if len(df) > 1:
             summary = {
                 "Model": "TOTAL",
                 "Total Cost (USD)": df["Total Cost (USD)"].sum(),
-                "Total Input Cost (USD)": df["Total Input Cost (USD)"].sum(),
-                "Total Output Cost (USD)": df["Total Output Cost (USD)"].sum(),
                 "Total Tokens": df["Total Tokens"].sum(),
                 "Total Input Tokens": df["Total Input Tokens"].sum(),
                 "Total Output Tokens": df["Total Output Tokens"].sum(),
             }
-            df = df._append(summary, ignore_index=True)
-        
+            df = pd.concat([df, pd.DataFrame([summary])], ignore_index=True)
+
         print(df.to_string(index=False))
 
-    def get_total_cost(self):
-        
-        total_cost = 0.0
-        for model in self.total_cost.keys():
-            total_cost += self.total_cost[model]
-        return total_cost
+    def get_total_cost(self) -> float:
+        return self.total_llm_cost
 
 
 cost_manager = CostManager()

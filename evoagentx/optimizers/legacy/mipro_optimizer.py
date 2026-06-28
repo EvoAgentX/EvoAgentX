@@ -1313,7 +1313,13 @@ class WorkFlowGraphProgram:
         else:
             # use the original executor llm to execute the graph
             workflow = WorkFlow(llm=self.executor_llm, graph=new_graph, agent_manager=self.agent_manager)
-        output: str = workflow.execute(inputs=self.collate_func(input_data))
+        result = workflow.execute(inputs=self.collate_func(input_data), extract_output=True)
+        if result.status == "success":
+            output = result.result
+            if not isinstance(output, str):
+                output = str(output)
+        else:
+            output = result.displayable_error or "Workflow Execution Failed"
         output = self.output_postprocess_func(output)
 
         # extract all the input and output data from the workflow execution
