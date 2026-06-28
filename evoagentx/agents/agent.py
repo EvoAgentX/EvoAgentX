@@ -1,5 +1,4 @@
 import asyncio
-import inspect
 from collections.abc import Coroutine
 from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
@@ -16,6 +15,7 @@ from ..memory.memory_manager import MemoryManager
 from ..models.base_model import BaseLLM
 from ..models.model_configs import LLMConfig
 from ..storages.base import StorageHandler
+from ..utils.async_utils import call_maybe_async, is_method_overridden
 from ..utils.utils import add_llm_config_to_agent_dict
 
 
@@ -198,24 +198,22 @@ class Agent(BaseModule):
             **kwargs
         )
 
-        # execute action asynchronously
-        async_execute_source = inspect.getsource(action.async_execute)
-        if "NotImplementedError" in async_execute_source:
-            # if the async_execute method is not implemented, use the execute method instead
-            execution_results = action.execute(
-                llm=self.llm, 
-                inputs=action_input_data, 
-                sys_msg=self.system_prompt,
-                return_prompt=True,
-                **kwargs
-            )
+        if is_method_overridden(action, Action, "async_execute"):
+            execute_function = action.async_execute
+        elif is_method_overridden(action, Action, "execute"):
+            execute_function = action.execute
         else:
-            execution_results = await action.async_execute(
-                llm=self.llm, 
-                inputs=action_input_data, 
-                sys_msg=self.system_prompt,
-                return_prompt=True,
-                **kwargs
+            raise NotImplementedError(
+                f"The action '{type(action).__name__}' must implement `execute` or `async_execute`."
+            )
+
+        execution_results = await call_maybe_async(
+            execute_function,
+            llm=self.llm,
+            inputs=action_input_data,
+            sys_msg=self.system_prompt,
+            return_prompt=True,
+            **kwargs
         )
         action_output, prompt = execution_results
 

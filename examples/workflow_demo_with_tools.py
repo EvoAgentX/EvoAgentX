@@ -55,7 +55,12 @@ def demo_basic_workflow():
     # Create and execute workflow
     workflow = WorkFlow(graph=workflow_graph, agent_manager=agent_manager, llm=llm)
     print("\nExecuting workflow...")
-    output = workflow.execute()
+    result = workflow.execute(extract_output=True)
+    if result.status != "success":
+        raise RuntimeError(f"Workflow failed: {result.displayable_error or result.error_msg}")
+    output = result.result
+    if not isinstance(output, str):
+        output = str(output)
     
     print("Basic workflow completed successfully")
     print(f"\nOutput (first 500 chars):\n{str(output)[:500]}...")
@@ -99,7 +104,12 @@ def demo_toolkit_workflow():
     # Create and execute workflow
     workflow = WorkFlow(graph=workflow_graph, agent_manager=agent_manager, llm=llm)
     print("\nExecuting workflow with CMDToolkit...")
-    output = workflow.execute()
+    result = workflow.execute(extract_output=True)
+    if result.status != "success":
+        raise RuntimeError(f"Workflow failed: {result.displayable_error or result.error_msg}")
+    output = result.result
+    if not isinstance(output, str):
+        output = str(output)
     
     print("Toolkit workflow completed successfully")
     print(f"\nOutput (first 800 chars):\n{str(output)[:800]}...")

@@ -1,5 +1,4 @@
 import unittest
-import pytest
 from unittest.mock import Mock, patch, AsyncMock
 
 from evoagentx.core.message import Message, MessageType
@@ -17,7 +16,7 @@ class MockLLMOutputParser(LLMOutputParser):
         return self.content
 
 
-class TestWorkFlowManager(unittest.TestCase):
+class TestWorkFlowManager(unittest.IsolatedAsyncioTestCase):
 
     def setUp(self):
         # Create mock LLM
@@ -98,7 +97,6 @@ class TestWorkFlowManager(unittest.TestCase):
         self.assertIsNotNone(self.workflow_manager.task_scheduler)
         self.assertIsNotNone(self.workflow_manager.action_scheduler)
 
-    @pytest.mark.asyncio
     @patch('evoagentx.workflow.workflow_manager.TaskScheduler.async_execute')
     async def test_sync_task_scheduling_with_single_task(self, mock_task_scheduler_execute):
         """Test that the task scheduler correctly handles the case of a single candidate task"""
@@ -108,8 +106,10 @@ class TestWorkFlowManager(unittest.TestCase):
             task_name="Task2",
             reason="Only one candidate task is available"
         )
-        mock_task_scheduler_execute.return_value = single_task_output
-        
+        # schedule_next_task calls async_execute with return_prompt=True and unpacks a
+        # (scheduled_task, prompt) tuple, so the mock must return a tuple.
+        mock_task_scheduler_execute.return_value = (single_task_output, "mock prompt")
+
         # Mark Task1 as completed to make Task2 the only next candidate
         self.workflow.set_node_status("Task1", WorkFlowNodeState.COMPLETED)
         
@@ -127,7 +127,6 @@ class TestWorkFlowManager(unittest.TestCase):
         self.assertEqual("Task2", message.content.task_name)
         self.assertEqual(MessageType.COMMAND, message.msg_type)
 
-    @pytest.mark.asyncio
     @patch('evoagentx.workflow.workflow_manager.ActionScheduler.async_execute')
     async def test_action_scheduling(self, mock_action_scheduler_execute):
         """Test scheduling the next action for a task"""
@@ -160,57 +159,67 @@ class TestWorkFlowManager(unittest.TestCase):
         self.assertEqual("TestAction", message.content.action)
         self.assertEqual(MessageType.COMMAND, message.msg_type)
 
-    @pytest.mark.asyncio
     async def test_async_task_scheduling(self):
-        """Test async task scheduling with multiple candidate tasks"""
-        # Set up the llm.async_generate to return a task
+        """Test async task scheduling: with a single candidate task the scheduler
+        forwards to it directly without consulting the LLM."""
+        # Set up the llm.async_generate to return a task (it should NOT be used here)
         self.mock_llm.async_generate.return_value = self.task_output
-        
-        # Run the test
+
+        # With all nodes pending, the only entry/candidate task is Task1
         task = await self.workflow_manager.schedule_next_task(graph=self.workflow, env=self.env)
-        
+
         # Check results
         self.assertIsNotNone(task)
-        self.assertEqual("Task2", task.name)
-        
+        self.assertEqual("Task1", task.name)
+        # The single-candidate edge case short-circuits without an LLM call
+        self.mock_llm.async_generate.assert_not_called()
+
         # Verify the environment was updated
         self.assertEqual(1, len(self.env.trajectory))
         message = self.env.trajectory[0].message
-        self.assertEqual(self.task_output, message.content)
+        self.assertIsInstance(message.content, TaskSchedulerOutput)
+        self.assertEqual("Task1", message.content.task_name)
         self.assertEqual(TrajectoryState.COMPLETED, self.env.trajectory[0].status)
 
-    @pytest.mark.asyncio
     async def test_async_action_scheduling(self):
-        """Test async action scheduling"""
-        # Set up the llm.async_generate to return an action
+        """Test async action scheduling: a task with a single agent that has a single
+        action resolves to that action directly without consulting the LLM."""
+        # Set up the llm.async_generate to return an action (it should NOT be used here)
         self.mock_llm.async_generate.return_value = self.action_output
-        
-        # Get the first task node
+
+        # Get the first task node (it references the single agent 'TestAgent')
         task = self.workflow.get_node("Task1")
-        
-        # Create a mock agent manager
+
+        # Mock agent manager that resolves 'TestAgent' to an agent exposing one action
+        mock_action = Mock()
+        mock_action.name = "TestAction"
+        mock_agent = Mock()
+        mock_agent.name = "TestAgent"
+        mock_agent.get_all_actions.return_value = [mock_action]
         mock_agent_manager = Mock()
-        
+        mock_agent_manager.get_agent.return_value = mock_agent
+
         # Run the test
         action = await self.workflow_manager.schedule_next_action(
-            goal="Test Goal", 
-            task=task, 
-            agent_manager=mock_agent_manager, 
+            goal="Test Goal",
+            task=task,
+            agent_manager=mock_agent_manager,
             env=self.env
         )
-        
+
         # Check results
         self.assertIsNotNone(action)
         self.assertEqual("TestAgent", action.agent)
         self.assertEqual("TestAction", action.action)
-        
+        # The single-agent/single-action case short-circuits without an LLM call
+        self.mock_llm.async_generate.assert_not_called()
+
         # Verify the environment was updated
         self.assertEqual(1, len(self.env.trajectory))
         message = self.env.trajectory[0].message
-        self.assertEqual(self.action_output, message.content)
+        self.assertEqual(action, message.content)
         self.assertEqual(TrajectoryState.COMPLETED, self.env.trajectory[0].status)
 
-    @pytest.mark.asyncio
     async def test_output_extraction(self):
         """Test extracting the output from the workflow execution"""
         # Set up the llm.async_generate to return an output
@@ -247,7 +256,6 @@ class TestWorkFlowManager(unittest.TestCase):
         # Verify the LLM was called
         self.mock_llm.async_generate.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_edge_case_handling(self):
         """Test edge case handling in workflow management"""
         # Test case: No tasks available for scheduling

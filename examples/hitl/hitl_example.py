@@ -165,9 +165,12 @@ async def main():
     try:
         print("\n📋 start to execute the workflow")
         result = await workflow.async_execute(inputs=inputs)
-        print(f"\n✅ workflow executed successfully!")
-        print(f"result: {result}")
-        
+        if result.status == "success":
+            print(f"\n✅ workflow executed successfully!")
+            print(f"result: {result.result}")
+        else:
+            print(f"\n❌ workflow execution failed: {result.displayable_error}")
+
     except Exception as e:
         print(f"\n❌ workflow execution failed: {e}")
     

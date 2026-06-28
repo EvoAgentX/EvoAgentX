@@ -1,6 +1,6 @@
 from enum import Enum
 from pydantic import Field
-from typing import Union, Optional, List
+from typing import Union, Optional, List, Dict
 from ..core.module import BaseModule
 from ..core.message import Message, MessageType
 from ..models.base_model import LLMOutputParser
@@ -29,6 +29,15 @@ class Environment(BaseModule):
     trajectory: List[TrajectoryStep] = Field(default_factory=list)
     task_execution_history: List[str] = Field(default_factory=list)
     execution_data: dict = Field(default_factory=dict)
+
+    def reset(self):
+        """
+        Clear all intermediate execution state so the environment can be reused for a
+        fresh workflow run without leaking data from a previous execution.
+        """
+        self.trajectory = []
+        self.task_execution_history = []
+        self.execution_data = {}
 
     def update(self, message: Message, state: TrajectoryState = None, error: str = None, **kwargs):
         """
@@ -99,13 +108,12 @@ class Environment(BaseModule):
     def get_all_execution_data(self) -> dict:
         return self.execution_data
     
-    def get_execution_data(self, params: Union[str, List[str]]) -> dict:
-        if isinstance(params, str):
-            params = [params]
+    def get_execution_data(self, params: Dict[str, bool]) -> dict:
         data = {}
-        for param in params:
-            if param not in self.execution_data:
+        for param, required in params.items():
+            if param in self.execution_data:
+                data[param] = self.execution_data[param]
+            elif required:
                 raise KeyError(f"Couldn't find execution data with key '{param}'. Available execution data: {list(self.execution_data.keys())}")
-            data[param] = self.execution_data[param]
         return data
 

@@ -282,7 +282,12 @@ def validate_param(
     actual_params_name: str,
 ):
     """
-    Checks if `actual_param` has the same type, required, description and json_schema value as `required_param`.
+    Checks if `actual_param` is compatible with `required_param`.
+
+    Only the attributes that affect runtime behavior are strictly enforced: `type` and
+    `required`. `description` is free-form text and is not compared. If the required
+    parameter provides a `json_schema`, the actual parameter must provide the same
+    schema so structured contracts cannot be dropped downstream.
     """
 
     def format_error_msg(
@@ -306,11 +311,11 @@ def validate_param(
     if required_param.required != actual_param.required:
         raise ValueError(format_error_msg("required", required_param.required, actual_param.required))
 
-    if required_param.description != actual_param.description:
-        raise ValueError(format_error_msg("description", required_param.description, actual_param.description))
-
-    if required_param.json_schema != actual_param.json_schema:
-        raise ValueError(format_error_msg("json_schema", required_param.json_schema, actual_param.json_schema))
+    # `json_schema` is optional for parameters in general, but once an upstream
+    # contract provides one, downstream params must preserve it.
+    if required_param.json_schema is not None:
+        if required_param.json_schema != actual_param.json_schema:
+            raise ValueError(format_error_msg("json_schema", required_param.json_schema, actual_param.json_schema))
 
 
 def format_validation_error(error: ValidationError) -> str:
@@ -352,51 +357,6 @@ def params_to_json(params: List[Parameter], ignore: List[str] = []) -> str:
     params_dict = [param.to_dict(ignore=ignore) for param in params]
     params_json = json.dumps(params_dict, indent=4, ensure_ascii=False)
     return params_json
-
-
-def fix_property_name(object: Any, json_schema: Dict) -> Any:
-    """
-    Recursively fixes the property names of `object` to match the provided JSON schema.
-    """
-    if object is None:
-        return object
-
-    if json_schema["type"] == "array" and json_schema["items"]["type"] == "object":
-        return [fix_property_name(item, json_schema["items"]) for item in object]
-
-    elif json_schema["type"] == "object":
-        fixed_object = dict()
-        properties = json_schema.get("properties")
-
-        if properties is None:
-            return object
-
-        for property_name, property_schema in properties.items():
-
-            if property_schema["type"] == "array":
-                property = object.get(property_name, None)
-                if property is not None:
-                    fixed_object[property_name] = [fix_property_name(item, property_schema["items"]) for item in property]
-
-            elif property_schema["type"] == "object":
-                property = object.get(property_name, None)
-                if property is not None:
-                    fixed_object[property_name] = fix_property_name(property, property_schema)
-
-            else:
-                object_properties_lower = {name.lower(): name for name in object}
-                schema_properties_lower = {name.lower(): name for name in properties}
-
-                for name in object_properties_lower:
-                    if name in schema_properties_lower:
-                        fixed_object[schema_properties_lower[name]] = object[object_properties_lower[name]]
-                    else:
-                        fixed_object[object_properties_lower[name]] = object[object_properties_lower[name]]
-
-        return fixed_object
-
-    else:
-        return object
 
 
 def resolve_json_schema_ref(json_schema: Any, root_schema: Optional[Dict] = None) -> Any:
@@ -682,6 +642,39 @@ string_to_python_type = {
     "dict": dict,
     "list": list,
 }
+
+# Common aliases LLMs emit for parameter types, mapped to canonical names.
+_param_type_aliases = {
+    "text": "string",
+    "char": "string",
+    "double": "number",
+    "long": "integer",
+    "json": "object",
+    "dictionary": "object",
+    "map": "object",
+    "tuple": "array",
+    "set": "array",
+}
+
+
+def normalize_param_type(type_str: str) -> Optional[str]:
+    """Best-effort normalization of a parameter `type` string into a canonical type.
+
+    Handles casing/whitespace, common aliases, and parametrized forms such as
+    ``List[str]`` or ``Dict[str, int]``. Returns ``None`` when the type cannot be
+    recognized, so the caller can decide how to handle it (e.g. raise an error).
+    """
+    if not isinstance(type_str, str):
+        return None
+    normalized = type_str.strip().lower()
+    # Strip parametrization, e.g. "list[str]" -> "list", "dict[str, int]" -> "dict".
+    base = normalized.split("[", 1)[0].strip()
+    if base in string_to_python_type:
+        return base
+    if base in _param_type_aliases:
+        return _param_type_aliases[base]
+    return None
+
 
 json_to_python_type = {
     "string": str,

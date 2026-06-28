@@ -77,14 +77,17 @@ def build_sequential_workflow():
     # create a workflow instance for execution 
     workflow = WorkFlow(graph=graph, agent_manager=agent_manager, llm=llm)
 
-    output = workflow.execute(
+    result = workflow.execute(
         inputs = {
             "problem": "Write a function to find the longest palindromic substring in a given string. Save the code to local file: ./debug/test.py"
         }
     )
-    
-    print("Workflow completed!")
-    print("Workflow output:\n", output)
+
+    if result.status == "success":
+        print("Workflow completed!")
+        print("Workflow output:\n", result.result)
+    else:
+        print("Workflow failed:\n", result.displayable_error)
 
 
 

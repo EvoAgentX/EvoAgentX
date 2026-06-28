@@ -1,23 +1,33 @@
 import inspect
-import asyncio
+import traceback
 from copy import deepcopy
-from pydantic import Field, create_model
-from typing import Optional, List
+from pydantic import Field, ValidationError, create_model
+from typing import Literal, Optional, List, Union
 from ..core.logging import logger
+from ..core.exception import DisplayableException, InputValidationError
 from ..core.module import BaseModule
 from ..core.message import Message, MessageType
 from ..core.module_utils import generate_id
 from ..models.base_model import BaseLLM
 from ..agents.agent import Agent
 from ..agents.agent_manager import AgentManager, AgentState
+from ..agents.customize_agent import CustomizeAgent
 from ..storages.base import StorageHandler
 from .environment import Environment, TrajectoryState
 from .workflow_manager import WorkFlowManager, NextAction
 from .workflow_graph import WorkFlowNode, WorkFlowGraph
 from .action_graph import ActionGraph
 from ..hitl import HITLManager, HITLBaseAgent
-from ..utils.utils import generate_dynamic_class_name
+from ..utils.async_utils import call_maybe_async, is_method_overridden, run_coroutine_sync
+from ..utils.utils import generate_dynamic_class_name, format_validation_error
 from ..actions import ActionInput, ActionOutput
+
+
+class WorkflowResult(BaseModule):
+    status: Literal["success", "failed"]
+    result: Optional[Union[dict, str]] = None
+    error_msg: Optional[str] = Field(default=None, description="Contains error message and traceback")
+    displayable_error: Optional[str] = Field(default=None, description="This is the error message that can be displayed to the user")
 
 class WorkFlow(BaseModule):
 
@@ -37,54 +47,130 @@ class WorkFlow(BaseModule):
             if self.llm is None:
                 raise ValueError("Must provide `llm` when `workflow_manager` is None")
             self.workflow_manager = WorkFlowManager(llm=self.llm)
-        if self.agent_manager is None:
-            logger.warning("agent_manager is NoneType when initializing a WorkFlow instance")
+        self._validate_agent_manager()
 
-    def execute(self, inputs: dict = {}, **kwargs) -> str:
+        self.graph.validate_workflow_graph()
+        self.output_names = {output.name: output.required for output in self.graph.workflow_outputs}
+
+    def _validate_agent_manager(self):
         """
-        Synchronous wrapper for async_execute. Creates a new event loop and runs the async method.
-        
+        Validate that ``agent_manager`` can satisfy the workflow's agent-based nodes.
+
+        A node executed by an ``action_graph`` needs no agents, but any other node is
+        scheduled through ``agent_manager.get_agent()`` at runtime (see
+        ``WorkFlowManager._prepare_action_execution``). For those nodes we require, at
+        init time, that an ``agent_manager`` is present and contains every referenced
+        agent, so that a misconfiguration fails fast instead of crashing mid-execution.
+        """
+        # Collect the agents required by nodes that are not pure ActionGraph nodes.
+        required_agents = {}
+        for node in self.graph.nodes:
+            if node.action_graph is not None:
+                continue
+            agent_names = node.get_agents()
+            if not agent_names:
+                # A node with neither an action_graph nor agents is an invalid node;
+                # this is reported by graph.validate_workflow_graph().
+                continue
+            for agent_name in agent_names:
+                required_agents.setdefault(agent_name, node.name)
+
+        if not required_agents:
+            # Pure ActionGraph workflow: no agent_manager needed.
+            return
+
+        if self.agent_manager is None:
+            raise ValueError(
+                "agent_manager is required because the workflow contains agent-based "
+                f"node(s): {sorted(required_agents.values())}. The following agents "
+                f"must be provided: {sorted(required_agents)}."
+            )
+
+        missing_agents = [name for name in required_agents if not self.agent_manager.has_agent(name)]
+        if missing_agents:
+            raise ValueError(
+                "agent_manager is missing agent(s) required by the workflow: "
+                f"{sorted(missing_agents)}. Available agents: {sorted(self.agent_manager.list_agents())}."
+            )
+
+    def execute(self, inputs: Optional[dict] = None, extract_output: bool = False, **kwargs) -> WorkflowResult:
+        """
+        Synchronous wrapper for async_execute.
+
         Args:
             inputs: Dictionary of inputs for workflow execution
+            extract_output: Use LLM to extract the workflow output
             **kwargs (Any): Additional keyword arguments
-            
-        Returns:
-            str: The output of the workflow execution
-        """
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            return loop.run_until_complete(self.async_execute(inputs, **kwargs))
-        finally:
-            loop.close()
 
-    async def async_execute(self, inputs: dict = {}, **kwargs) -> str:
+        Returns:
+            WorkflowResult: The result of the workflow execution
+        """
+        return run_coroutine_sync(self.async_execute(inputs, extract_output, **kwargs))
+
+    async def async_execute(self, inputs: Optional[dict] = None, extract_output: bool = False, **kwargs) -> WorkflowResult:
         """
         Asynchronously execute the workflow.
-        
+
         Args:
             inputs: Dictionary of inputs for workflow execution
+            extract_output: Use LLM to extract the final workflow output
             **kwargs (Any): Additional keyword arguments
-            
+
         Returns:
-            str: The output of the workflow execution
+            WorkflowResult: The result of the workflow execution
+        """
+        try:
+            result = await self._execute_workflow(inputs, extract_output, **kwargs)
+            return WorkflowResult(status="success", result=result)
+
+        except DisplayableException as e:
+            logger.exception(e)
+            tb = traceback.format_exc()
+            return WorkflowResult(status="failed", error_msg=tb, displayable_error=str(e))
+
+        except Exception as e:
+            logger.exception(e)
+            tb = traceback.format_exc()
+            return WorkflowResult(
+                status="failed",
+                error_msg=tb,
+                displayable_error="An unexpected error occurred. Please try again. If the problem persists, please contact support.",
+            )
+
+    async def _execute_workflow(self, inputs: Optional[dict] = None, extract_output: bool = False, **kwargs) -> Union[dict, str]:
+        """
+        Asynchronously execute the workflow.
+
+        Args:
+            inputs: Dictionary of inputs for workflow execution
+            extract_output: Use LLM to extract the final workflow output
+            **kwargs (Any): Additional keyword arguments
+
+        Returns:
+            Union[dict, str]: The output of the workflow execution
         """
         goal = self.graph.goal
+        inputs = dict(inputs or {})
+        # Reset node statuses and environment state so reusing the same WorkFlow instance
+        # does not leak the previous run's trajectory/execution data into this one. This
+        # runs unconditionally, so it also recovers from a previous failed execution.
+        self.graph.reset_graph()
+        self.environment.reset()
         # inputs.update({"goal": goal})
         inputs = self._prepare_inputs(inputs)
+        self._validate_inputs(inputs)
 
         # prepare for hitl functionalities
         if hasattr(self, "hitl_manager") and (self.hitl_manager is not None):
             self._prepare_hitl()
 
-        # check the inputs and outputs of the task 
+        # check the inputs and outputs of the task
         self._validate_workflow_structure(inputs=inputs, **kwargs)
         inp_message = Message(content=inputs, msg_type=MessageType.INPUT, wf_goal=goal)
         self.environment.update(message=inp_message, state=TrajectoryState.COMPLETED)
+        task = None
 
-        failed = False
-        error_message = None
-        while not self.graph.is_complete and not failed:
+        while not self.graph.is_complete:
             try:
                 task: WorkFlowNode = await self.get_next_task()
                 if task is None:
@@ -92,26 +178,42 @@ class WorkFlow(BaseModule):
                 logger.info(f"Executing subtask: {task.name}")
                 await self.execute_task(task=task)
             except Exception as e:
-                failed = True
+                task_name = getattr(task, "name", "Unknown")
                 error_message = Message(
-                    content=f"An Error occurs when executing the workflow: {e}",
-                    msg_type=MessageType.ERROR, 
+                    content=f"An Error occurs when executing task {task_name}: {e}",
+                    msg_type=MessageType.ERROR,
                     wf_goal=goal
                 )
                 self.environment.update(message=error_message, state=TrajectoryState.FAILED, error=str(e))
-        
-        if failed:
-            logger.error(error_message.content)
-            return "Workflow Execution Failed"
-        
+                raise
+
         logger.info("Extracting WorkFlow Output ...")
-        output: str = await self.workflow_manager.extract_output(graph=self.graph, env=self.environment)
+
+        if extract_output:
+            output: str = await self.workflow_manager.extract_output(graph=self.graph, env=self.environment)
+        else:
+            output: dict = self.environment.get_execution_data(self.output_names)
+
+        self.graph.reset_graph()
+        logger.info("Workflow execution completed successfully")
         return output
-    
-    def _prepare_inputs(self, inputs: dict) -> dict:
+
+    def _validate_inputs(self, inputs: dict):
+        workflow_inputs = [param.to_dict(ignore=["class_name"]) for param in self.graph.workflow_inputs]
+        input_validator = CustomizeAgent.create_action_input(workflow_inputs, "workflow_inputs")
+        try:
+            input_validator(**inputs)
+        except ValidationError as e:
+            error_msg = format_validation_error(e)
+            raise InputValidationError(f"Invalid inputs: {error_msg}") from e
+        except Exception:
+            raise
+
+    def _prepare_inputs(self, inputs: Optional[dict] = None) -> dict:
         """
         Prepare the inputs for the workflow execution. Mainly determine whether the goal should be added to the inputs.
         """
+        inputs = dict(inputs or {})
         initial_node_names = self.graph.find_initial_nodes()
         initial_node_required_inputs = set()
         for initial_node_name in initial_node_names:
@@ -123,12 +225,15 @@ class WorkFlow(BaseModule):
             
         return inputs 
     
-    async def get_next_task(self) -> WorkFlowNode:
+    async def get_next_task(self) -> Optional[WorkFlowNode]:
         task_execution_history = " -> ".join(self.environment.task_execution_history)
         if not task_execution_history:
             task_execution_history = "None"
         logger.info(f"Task Execution Trajectory: {task_execution_history}. Scheduling next subtask ...")
-        task: WorkFlowNode = await self.workflow_manager.schedule_next_task(graph=self.graph, env=self.environment)
+        task: Optional[WorkFlowNode] = await self.workflow_manager.schedule_next_task(graph=self.graph, env=self.environment)
+        if task is None:
+            logger.info("No next subtask could be scheduled (the scheduler returned None).")
+            return None
         logger.info(f"The next subtask to be executed is: {task.name}")
         return task
         
@@ -162,13 +267,14 @@ class WorkFlow(BaseModule):
             next_action: The next action to perform with its action graph
         """
         action_graph: ActionGraph = next_action.action_graph
-        async_execute_source = inspect.getsource(action_graph.async_execute)
-        if "NotImplementedError" in async_execute_source:
-            execute_function = action_graph.execute
-            async_execute = False
-        else:
+        if is_method_overridden(action_graph, ActionGraph, "async_execute"):
             execute_function = action_graph.async_execute
-            async_execute = True
+        elif is_method_overridden(action_graph, ActionGraph, "execute"):
+            execute_function = action_graph.execute
+        else:
+            raise NotImplementedError(
+                f"The action graph '{type(action_graph).__name__}' must implement `execute` or `async_execute`."
+            )
         # execute_signature = inspect.signature(type(action_graph).async_execute)
         execute_signature = inspect.signature(execute_function)
         execute_params = {}
@@ -186,10 +292,7 @@ class WorkFlow(BaseModule):
         # action_input_data = self.environment.get_all_execution_data()
         # execute_inputs = {param: action_input_data.get(param, "") for param in execute_params}
         # action_graph_output: dict = await action_graph.async_execute(**execute_inputs)
-        if async_execute:
-            action_graph_output: dict = await action_graph.async_execute(**execute_params)
-        else:
-            action_graph_output: dict = action_graph.execute(**execute_params)
+        action_graph_output: dict = await call_maybe_async(execute_function, **execute_params)
 
         message = Message(
             content=action_graph_output, action=action_graph.name, msg_type=MessageType.RESPONSE,
@@ -327,6 +430,8 @@ class WorkFlow(BaseModule):
                     )
         
         for node in self.graph.nodes:
+            if not node.agents:
+                continue
             for agent in node.agents:
                 if hasattr(agent, "forbidden_in_workflow") and (agent.forbidden_in_workflow):
                     raise ValueError(f"The Agent of class {agent.__class__} is forbidden to be used in the workflow.")
@@ -432,4 +537,4 @@ class WorkFlow(BaseModule):
         for agent, node in zip(hitl_agents, node_with_hitl_agents):
             self._prepare_single_hitl_agent(agent, node)
 
-        return 
+        return

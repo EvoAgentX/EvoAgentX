@@ -428,7 +428,10 @@ result = workflow.execute(inputs={
     "output_format": "summary"
 })
 
-print(f"Workflow result: {result}")
+if result.status == "success":
+    print(f"Workflow result: {result.result}")
+else:
+    print(f"Workflow failed: {result.displayable_error}")
 
 # Clean up
 toolkit.disconnect()

@@ -76,7 +76,7 @@
 - `output_parser`（可选）：用于解析任务输出的解析器
 - `parse_mode`（可选）：解析输出的模式，默认为 "str"
 - `parse_func`（可选）：用于解析输出的自定义函数
-- `parse_title`（可选）：解析输出的标题
+- `title_format`（可选）：当 `parse_mode` 为 "title" 时使用的标题格式，例如 "## {title}"
 
 与提示和解析相关的参数将用于在 `agent_manager` 中创建 `CustomizeAgent` 实例。有关代理配置的更多详细信息，请参阅[自定义代理](./customize_agent.md)文档。
 
@@ -182,8 +182,12 @@ agent_manager.add_agents_from_workflow(workflow_graph, llm_config=llm_config)
 
 # 创建工作流实例以执行
 workflow = WorkFlow(graph=workflow_graph, agent_manager=agent_manager, llm=llm)
-workflow.execute(inputs={"data_source": "xxx"})
+result = workflow.execute(inputs={"data_source": "xxx"})
+if result.status == "success":
+    print(result.result)
 ```
+
+`WorkFlow.execute()` 会返回一个 `WorkflowResult` 对象。默认情况下，工作流结果是结构化的 `dict` 输出。若想保留旧的文本抽取行为，可以传入 `extract_output=True`。
 
 ### 创建顺序工作流图
 
