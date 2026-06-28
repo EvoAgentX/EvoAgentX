@@ -643,6 +643,39 @@ string_to_python_type = {
     "list": list,
 }
 
+# Common aliases LLMs emit for parameter types, mapped to canonical names.
+_param_type_aliases = {
+    "text": "string",
+    "char": "string",
+    "double": "number",
+    "long": "integer",
+    "json": "object",
+    "dictionary": "object",
+    "map": "object",
+    "tuple": "array",
+    "set": "array",
+}
+
+
+def normalize_param_type(type_str: str) -> Optional[str]:
+    """Best-effort normalization of a parameter `type` string into a canonical type.
+
+    Handles casing/whitespace, common aliases, and parametrized forms such as
+    ``List[str]`` or ``Dict[str, int]``. Returns ``None`` when the type cannot be
+    recognized, so the caller can decide how to handle it (e.g. raise an error).
+    """
+    if not isinstance(type_str, str):
+        return None
+    normalized = type_str.strip().lower()
+    # Strip parametrization, e.g. "list[str]" -> "list", "dict[str, int]" -> "dict".
+    base = normalized.split("[", 1)[0].strip()
+    if base in string_to_python_type:
+        return base
+    if base in _param_type_aliases:
+        return _param_type_aliases[base]
+    return None
+
+
 json_to_python_type = {
     "string": str,
     "integer": int,

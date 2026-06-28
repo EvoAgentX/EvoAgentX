@@ -73,9 +73,14 @@ class Parameter(BaseModule):
 
     @model_validator(mode="after")
     def _validate_type_and_schema(self):
-        from ..utils.utils import string_to_json_schema_type, string_to_python_type
+        from ..utils.utils import normalize_param_type, string_to_json_schema_type, string_to_python_type
         if self.type not in string_to_python_type:
-            raise ValueError(f"Invalid `type`: {self.type}. Allowed: {list(string_to_python_type.keys())}")
+            # LLM-generated specs may emit synonyms (e.g. "List[str]", "text"); map those to
+            # canonical types. Truly unrecognized types (e.g. "other_type") still raise.
+            normalized = normalize_param_type(self.type)
+            if normalized is None:
+                raise ValueError(f"Invalid `type`: {self.type}. Allowed: {list(string_to_python_type.keys())}")
+            self.type = normalized
         if self.json_schema is not None:
             try:
                 Draft7Validator.check_schema(self.json_schema)
