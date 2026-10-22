@@ -1,22 +1,28 @@
 import asyncio
 from collections.abc import Coroutine
-from typing import Any, Dict, List, Optional, Tuple, Type, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, Union
 
-from pydantic import Field
+from pydantic import Field, TypeAdapter, field_validator
 
 from ..actions.action import Action, ContextExtraction
 from ..core.message import Message, MessageType
 from ..core.module import BaseModule
 from ..core.module_utils import generate_id
 from ..core.registry import MODEL_REGISTRY
-from ..memory.long_term_memory import LongTermMemory
 from ..memory.memory import ShortTermMemory
-from ..memory.memory_manager import MemoryManager
 from ..models.base_model import BaseLLM
 from ..models.model_configs import LLMConfig
 from ..storages.base import StorageHandler
 from ..utils.async_utils import call_maybe_async, is_method_overridden
 from ..utils.utils import add_llm_config_to_agent_dict
+
+if TYPE_CHECKING:
+    from ..memory.long_term_memory import LongTermMemory
+    from ..memory.memory_manager import MemoryManager
+else:
+    # Concrete types are validated on demand, without importing the RAG stack.
+    LongTermMemory = Any
+    MemoryManager = Any
 
 
 class Agent(BaseModule):
@@ -52,6 +58,30 @@ class Agent(BaseModule):
     n: int = Field(default=None, description="number of latest messages used to provide context for action execution. It uses all the messages in short term memory by default.")
     is_human: bool = Field(default=False)
     version: int = 0 
+
+    @field_validator("long_term_memory", "long_term_memory_manager", mode="before")
+    @classmethod
+    def _validate_long_term_memory_fields(cls, value, info):
+        if value is None:
+            return None
+        from .. import memory
+
+        type_name = (
+            "LongTermMemory" if info.field_name == "long_term_memory" else "MemoryManager"
+        )
+        return TypeAdapter(getattr(memory, type_name)).validate_python(value)
+
+    @classmethod
+    def _process_data(cls, data: Any) -> Any:
+        # BaseModule resolves serialized class names through the module registry.
+        # Register optional memory types only when a configuration uses them.
+        if isinstance(data, dict) and data.get("class_name") in {
+            "LongTermMemory", "MemoryManager"
+        }:
+            from .. import memory
+
+            getattr(memory, data["class_name"])
+        return super()._process_data(data)
 
     def init_module(self):
         if not self.is_human:
@@ -322,6 +352,8 @@ class Agent(BaseModule):
         Initialize long-term memory components.
         """
         assert self.storage_handler is not None, "must provide ``storage_handler`` when use_long_term_memory=True"
+        from ..memory import LongTermMemory, MemoryManager
+
         # TODO revise the initialisation of long_term_memory and long_term_memory_manager
         if not self.long_term_memory:
             self.long_term_memory = LongTermMemory()
