@@ -53,6 +53,8 @@ rag = [
     "llama-index-graph-stores-neo4j",
     "llama-index-embeddings-azure-openai",
     "faiss-cpu==1.8.0.post1",
+    # Arrow 26 requires NumPy 2, incompatible with this FAISS version.
+    "pyarrow>=21,<26",
     "sentence-transformers",
     "transformers>=4.41,<5",
     "cryptography<49",
@@ -91,6 +93,7 @@ tools = [
 multimodal = [
     "torch",
     "datasets>=3.4.0",
+    "pyarrow>=21,<26",
     # Transitive dep of `datasets`; 0.70.18+ resource_tracker raises a harmless
     # AttributeError at shutdown on some Python builds. Pin below it.
     "multiprocess<0.70.18",
@@ -116,6 +119,7 @@ all = [
     "llama-index-graph-stores-neo4j",
     "llama-index-embeddings-azure-openai",
     "faiss-cpu==1.8.0.post1",
+    "pyarrow>=21,<26",
     "sentence-transformers",
     "transformers>=4.41,<5",
     "cryptography<49",

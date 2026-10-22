@@ -70,6 +70,8 @@ google-auth-httplib2>=0.1.0
 # multimodal
 # torch  # uncomment and pin as needed, e.g. for cu118: --extra-index-url https://download.pytorch.org/whl/cu118
 datasets>=3.4.0
+# Arrow 26 requires NumPy 2; faiss-cpu 1.8.0.post1 requires NumPy <2.
+pyarrow>=21,<26
 # Pulled in transitively by `datasets`. 0.70.18+ resource_tracker calls
 # RLock._recursion_count(), which is absent on some Python builds, raising a
 # harmless AttributeError at interpreter shutdown. Pin below it to avoid the noise.
